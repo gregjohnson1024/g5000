@@ -22,6 +22,41 @@ class MemorySource implements Ngt1Source {
   }
 }
 
+describe('Ngt1Driver.txPgn', () => {
+  it('encodes a PGN 130306 wind frame and writes the line to the serial sink', async () => {
+    const writes: Buffer[] = [];
+    const sinkSource = {
+      on(_event: 'data', _cb: (chunk: Buffer) => void) {
+        return this;
+      },
+      off() {
+        return this;
+      },
+      write(buf: Buffer | string, cb?: () => void): boolean {
+        writes.push(typeof buf === 'string' ? Buffer.from(buf) : buf);
+        cb?.();
+        return true;
+      },
+    };
+    const driver = new Ngt1Driver({ source: sinkSource as any });
+    await driver.start();
+    await driver.txPgn({
+      pgn: 130306,
+      prio: 2,
+      dst: 255,
+      fields: {
+        'Wind Speed': 5.34,
+        'Wind Angle': 1.0,
+        Reference: 'Apparent',
+      },
+    });
+    expect(writes.length).toBeGreaterThan(0);
+    const text = Buffer.concat(writes).toString('utf8');
+    expect(text).toMatch(/130306/);
+    expect(text.endsWith('\n')).toBe(true);
+  });
+});
+
 describe('Ngt1Driver', () => {
   let source: MemorySource;
   let driver: Ngt1Driver;

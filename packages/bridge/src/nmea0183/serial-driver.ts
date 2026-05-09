@@ -1,5 +1,11 @@
 import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
-import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
+import type {
+  RawCanFrame,
+  Raw0183Sentence,
+  WireDriver,
+  DriverHealth,
+  OutgoingPgn,
+} from '../wire-driver.js';
 
 /**
  * The minimal shape of a serial source: any object that emits `Buffer`
@@ -63,6 +69,10 @@ export class SerialPort0183Driver implements WireDriver {
 
   async tx0183(_port: number, _text: string): Promise<void> {
     throw new Error('SerialPort0183Driver.tx0183 not implemented in Phase 0a');
+  }
+
+  async txPgn(_pgn: OutgoingPgn): Promise<void> {
+    throw new Error('SerialPort0183Driver.txPgn not supported');
   }
 
   private onData(chunk: Buffer): void {

@@ -35,6 +35,16 @@ export interface DriverHealth {
   errorCount: number;
 }
 
+export interface OutgoingPgn {
+  pgn: number;
+  /** Priority 0–7. Default 6 if undefined. */
+  prio?: number;
+  /** Destination address. Default 255 (broadcast) if undefined. */
+  dst?: number;
+  /** Field name → value, matching canboat's database. */
+  fields: Record<string, unknown>;
+}
+
 /**
  * Phase-stable driver contract. Phase 0 implementations: Ngt1Driver,
  * SerialPort0183Driver, ReplayDriver. Phase 1: a single McuDriver.
@@ -48,6 +58,12 @@ export interface WireDriver {
   rx0183: Observable<Raw0183Sentence>;
   txCan(frame: RawCanFrame): Promise<void>;
   tx0183(port: number, text: string): Promise<void>;
+  /**
+   * Transmit a typed PGN object onto the bus. The driver is responsible for
+   * encoding it appropriately (Actisense ASCII for NGT-1, raw CAN for the
+   * Phase 1 MCU driver).
+   */
+  txPgn(pgn: OutgoingPgn): Promise<void>;
   health: Observable<DriverHealth>;
   start(): Promise<void>;
   stop(): Promise<void>;

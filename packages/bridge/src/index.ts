@@ -8,3 +8,4 @@ export * from './nmea0183/serial-driver.js';
 export * from './nmea0183/channel-mapper.js';
 export * from './persistence/session-logger.js';
 export * from './persistence/replay-driver.js';
+export * from './tx/true-wind-tx.js';
