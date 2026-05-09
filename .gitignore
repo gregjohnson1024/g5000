@@ -28,16 +28,12 @@ Thumbs.db
 sessions/
 *.jsonl.gz
 
-# Build artifacts
+# Build artifacts (top-level dist/ from earlier covers all workspace dist/ as well)
 *.tsbuildinfo
-packages/*/dist/
-apps/*/dist/
 
 # Coverage
 coverage/
 
-# Next.js (package-scoped)
-packages/*/.next/
-apps/*/.next/
+# Next.js (top-level .next/ covers all workspace .next/ as well)
 packages/*/out/
 apps/*/out/
