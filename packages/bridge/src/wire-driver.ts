@@ -16,6 +16,18 @@ export interface RawCanFrame {
   rxTimestamp: bigint;
 }
 
+/**
+ * One NMEA 0183 sentence as received on the wire, before parsing.
+ * `text` is the raw ASCII line minus its trailing CR/LF; `port` identifies
+ * which physical RS-422 port produced it (so multi-port drivers can
+ * disambiguate sources).
+ */
+export interface Raw0183Sentence {
+  text: string;
+  port: number;
+  rxTimestamp: bigint;
+}
+
 export interface DriverHealth {
   connected: boolean;
   bytesPerSecond: number;
@@ -25,14 +37,17 @@ export interface DriverHealth {
 
 /**
  * Phase-stable driver contract. Phase 0 implementations: Ngt1Driver,
- * SerialPort0183Driver, Bno085Driver. Phase 1: a single McuDriver.
+ * SerialPort0183Driver, ReplayDriver. Phase 1: a single McuDriver.
  *
- * Observables are hot — subscribers receive only frames produced AFTER they
- * subscribe. Drivers must not buffer input.
+ * Drivers expose every input stream they care about. Drivers that don't
+ * produce a given stream type return rxjs `EMPTY`. The bridge orchestrator
+ * merges streams across drivers without special-casing source types.
  */
 export interface WireDriver {
   rxCan: Observable<RawCanFrame>;
+  rx0183: Observable<Raw0183Sentence>;
   txCan(frame: RawCanFrame): Promise<void>;
+  tx0183(port: number, text: string): Promise<void>;
   health: Observable<DriverHealth>;
   start(): Promise<void>;
   stop(): Promise<void>;

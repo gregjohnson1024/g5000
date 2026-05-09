@@ -7,6 +7,7 @@
 **Architecture:** The Phase 0a `WireDriver` interface grows two more observable streams (`rx0183` for NMEA 0183 sentences, `health` already exists). Existing `Ngt1Driver` returns `EMPTY` for the new streams; a new `SerialPort0183Driver` returns `EMPTY` for `rxCan`. The bridge orchestrator merges all streams from all drivers, each through its own decoder/mapper. A session-log writer subscribes to driver outputs (raw frames/sentences, not Samples — preserves replay fidelity) and writes timestamped JSONL to a gzipped file per session. A new `ReplayDriver` reads those files back as a normal `WireDriver`, indistinguishable from live hardware to the layers above.
 
 **Tech Stack:**
+
 - Adds: zero new runtime deps. NMEA 0183 parsing is implemented from scratch (sentences are simple). Gzip via Node's built-in `zlib`. File I/O via `node:fs/promises`.
 - Existing: TypeScript, RxJS, vitest, canboatjs, serialport.
 
@@ -17,6 +18,7 @@
 ## What's in scope (and what's not)
 
 **In scope:**
+
 - NMEA 0183 input driver: opens an RS-422 USB dongle, reads `$XXSSS,...*HH\n` framed sentences.
 - 0183 sentence parser: at minimum MWV (wind apparent/true), VHW (boat speed + heading), HDG (heading), VTG (course/speed over ground), GLL (position), DBT (depth). One-pass parse-and-validate-checksum.
 - 0183 channel mapper: same shape as N2K mapper, different inputs.
@@ -26,6 +28,7 @@
 - A small CLI (`apps/autopilot-server`'s `--replay <path>`) that boots the server with a `ReplayDriver` instead of live hardware.
 
 **Out of scope (keep deferring):**
+
 - TX path on either bus (no calibrated true wind back to N2K yet — that's a later plan).
 - Compute pipelines (true wind, polars, leeway, laylines).
 - Persistence beyond raw inbound frames (no `config.db`, no SQLite — those land with the calibration UI).
@@ -75,6 +78,7 @@ autopilot/
 ## Task 1: Extend WireDriver interface for NMEA 0183
 
 **Files:**
+
 - Modify: `packages/bridge/src/wire-driver.ts`
 - Modify: `packages/bridge/src/ngt-driver.ts`
 - Modify: `packages/bridge/src/ngt-driver.test.ts` (no behavior change; sanity-check the new field types)
@@ -162,7 +166,7 @@ npx vitest run packages/bridge
 
 All 17 prior tests must still pass — this is a pure interface widening with no behavior change. If the typechecker complains in `bridge.ts` about the new methods, that's expected; we fix it in Task 5.
 
-**Note:** `bridge.ts` will not fully typecheck after this step in isolation, because the bridge orchestrator type-checks against `WireDriver` and now sees new mandatory fields. We *will* fix it in Task 5; for this task the failing typecheck is on `bridge.ts`, not the test you're running. Confirm tests pass and proceed.
+**Note:** `bridge.ts` will not fully typecheck after this step in isolation, because the bridge orchestrator type-checks against `WireDriver` and now sees new mandatory fields. We _will_ fix it in Task 5; for this task the failing typecheck is on `bridge.ts`, not the test you're running. Confirm tests pass and proceed.
 
 If the test runner fails for type reasons in unrelated files, see Task 5 for the orchestrator update — you can do that update inline here if it bothers you, but the cleanest split keeps Task 5 focused.
 
@@ -178,6 +182,7 @@ git commit -m "feat(bridge): widen WireDriver to expose rx0183 and tx0183"
 ## Task 2: NMEA 0183 sentence parser (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/nmea0183/sentence-parser.ts`
 - Test: `packages/bridge/src/nmea0183/sentence-parser.test.ts`
 
@@ -303,9 +308,7 @@ export interface ParsedSentence {
   fields: readonly string[];
 }
 
-export type ParseResult =
-  | { ok: true; sentence: ParsedSentence }
-  | { ok: false; error: string };
+export type ParseResult = { ok: true; sentence: ParsedSentence } | { ok: false; error: string };
 
 /**
  * Parse one NMEA 0183 ASCII sentence. Returns `{ok: true, sentence}` if the
@@ -379,6 +382,7 @@ git commit -m "feat(bridge/0183): add sentence parser with checksum validation"
 ## Task 3: SerialPort0183Driver (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/nmea0183/serial-driver.ts`
 - Test: `packages/bridge/src/nmea0183/serial-driver.test.ts`
 
@@ -389,10 +393,7 @@ A `WireDriver` that opens (or accepts an injected) line-emitting source, batches
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import {
-  SerialPort0183Driver,
-  type Sentence0183Source,
-} from './serial-driver.js';
+import { SerialPort0183Driver, type Sentence0183Source } from './serial-driver.js';
 
 class MemorySource implements Sentence0183Source {
   private listener: ((c: Buffer) => void) | null = null;
@@ -477,18 +478,8 @@ Expected: module not found.
 - [ ] **Step 3: Implement `serial-driver.ts`**
 
 ```ts
-import {
-  Subject,
-  type Observable,
-  BehaviorSubject,
-  EMPTY,
-} from 'rxjs';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 
 /**
  * The minimal shape of a serial source: any object that emits `Buffer`
@@ -547,9 +538,7 @@ export class SerialPort0183Driver implements WireDriver {
   }
 
   async txCan(_frame: RawCanFrame): Promise<void> {
-    throw new Error(
-      'SerialPort0183Driver.txCan not implemented (0183 driver carries no CAN)',
-    );
+    throw new Error('SerialPort0183Driver.txCan not implemented (0183 driver carries no CAN)');
   }
 
   async tx0183(_port: number, _text: string): Promise<void> {
@@ -594,6 +583,7 @@ git commit -m "feat(bridge/0183): add SerialPort0183Driver with line framing"
 ## Task 4: NMEA 0183 channel mapper (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/nmea0183/channel-mapper.ts`
 - Test: `packages/bridge/src/nmea0183/channel-mapper.test.ts`
 
@@ -619,9 +609,7 @@ describe('mapSentenceToSamples — MWV', () => {
     const channels = samples.map((s) => s.channel);
     expect(channels).toContain(Channels.Wind.ApparentAngle);
     expect(channels).toContain(Channels.Wind.ApparentSpeed);
-    const speed = samples.find(
-      (s) => s.channel === Channels.Wind.ApparentSpeed,
-    )?.value;
+    const speed = samples.find((s) => s.channel === Channels.Wind.ApparentSpeed)?.value;
     // 5.8 knots → 2.984 m/s, with rounding.
     expect(speed).toEqual({
       kind: 'scalar',
@@ -648,8 +636,7 @@ describe('mapSentenceToSamples — VHW', () => {
     const samples = mapSentenceToSamples(at('$VWVHW,,T,,M,5.2,N,9.6,K*4F'));
     const ch = samples.map((s) => s.channel);
     expect(ch).toContain(Channels.Boat.SpeedWater);
-    const v = samples.find((s) => s.channel === Channels.Boat.SpeedWater)
-      ?.value;
+    const v = samples.find((s) => s.channel === Channels.Boat.SpeedWater)?.value;
     expect(v).toEqual({
       kind: 'scalar',
       value: 5.2 * 0.514444,
@@ -663,8 +650,7 @@ describe('mapSentenceToSamples — HDG', () => {
     const samples = mapSentenceToSamples(at('$HCHDG,98.3,1.2,W,5.6,E*32'));
     const ch = samples.map((s) => s.channel);
     expect(ch).toContain(Channels.Boat.HeadingMagnetic);
-    const v = samples.find((s) => s.channel === Channels.Boat.HeadingMagnetic)
-      ?.value;
+    const v = samples.find((s) => s.channel === Channels.Boat.HeadingMagnetic)?.value;
     expect(v).toEqual({
       kind: 'scalar',
       value: (98.3 * Math.PI) / 180,
@@ -675,9 +661,7 @@ describe('mapSentenceToSamples — HDG', () => {
 
 describe('mapSentenceToSamples — VTG', () => {
   it('extracts cog (true) and sog', () => {
-    const samples = mapSentenceToSamples(
-      at('$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48'),
-    );
+    const samples = mapSentenceToSamples(at('$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48'));
     const ch = samples.map((s) => s.channel);
     expect(ch).toContain(Channels.Nav.Cog);
     expect(ch).toContain(Channels.Nav.Sog);
@@ -726,13 +710,9 @@ const scalar = (value: number, unit?: string): ChannelValue => ({
   unit,
 });
 
-const sourceTag = (raw: Raw0183Sentence, addr: string): string =>
-  `0183:port${raw.port}:${addr}`;
+const sourceTag = (raw: Raw0183Sentence, addr: string): string => `0183:port${raw.port}:${addr}`;
 
-type Mapper = (
-  parsed: ParsedSentence,
-  raw: Raw0183Sentence,
-) => Sample[];
+type Mapper = (parsed: ParsedSentence, raw: Raw0183Sentence) => Sample[];
 
 const mappers: Record<string, Mapper> = {
   // MWV: Wind angle and speed (apparent or true).
@@ -745,22 +725,17 @@ const mappers: Record<string, Mapper> = {
     const speedRaw = Number(s.fields[2]);
     const unit = s.fields[3] ?? '';
     if (!Number.isFinite(angleDeg) || !Number.isFinite(speedRaw)) return [];
-    const speed =
-      unit === 'N' ? speedRaw * KNOTS_TO_MS : unit === 'K' ? speedRaw / 3.6 : speedRaw;
+    const speed = unit === 'N' ? speedRaw * KNOTS_TO_MS : unit === 'K' ? speedRaw / 3.6 : speedRaw;
     const isApparent = ref === 'R';
     const out: Sample[] = [];
     out.push({
-      channel: isApparent
-        ? Channels.Wind.ApparentAngle
-        : Channels.Wind.TrueAngle,
+      channel: isApparent ? Channels.Wind.ApparentAngle : Channels.Wind.TrueAngle,
       t_ns: raw.rxTimestamp,
       value: scalar(angleDeg * DEG_TO_RAD, 'rad'),
       source: sourceTag(raw, `${s.talker}${s.type}`),
     });
     out.push({
-      channel: isApparent
-        ? Channels.Wind.ApparentSpeed
-        : Channels.Wind.TrueSpeed,
+      channel: isApparent ? Channels.Wind.ApparentSpeed : Channels.Wind.TrueSpeed,
       t_ns: raw.rxTimestamp,
       value: scalar(speed, 'm/s'),
       source: sourceTag(raw, `${s.talker}${s.type}`),
@@ -848,6 +823,7 @@ git commit -m "feat(bridge/0183): map MWV, VHW, HDG, VTG sentences to channels"
 ## Task 5: Bridge orchestrator subscribes to rx0183
 
 **Files:**
+
 - Modify: `packages/bridge/src/bridge.ts`
 - Modify: `packages/bridge/src/bridge.test.ts`
 - Modify: `packages/bridge/src/index.ts`
@@ -901,15 +877,13 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
         }),
     );
     subs.push(
-      driver.rx0183
-        .pipe(mergeMap((s) => from(mapSentenceToSamples(s))))
-        .subscribe({
-          next: (sample) => bus.publish(sample),
-          error: (err) => {
-            // eslint-disable-next-line no-console
-            console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
-          },
-        }),
+      driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
+        next: (sample) => bus.publish(sample),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
+        },
+      }),
     );
   }
 
@@ -1000,6 +974,7 @@ git commit -m "feat(bridge): orchestrator subscribes to rx0183 from all drivers"
 ## Task 6: Extend N2K mapper for motion PGNs (127251 rate-of-turn, 127257 attitude)
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts`
 - Modify: `packages/bridge/src/channel-mapper.ts`
 - Modify: `packages/bridge/src/channel-mapper.test.ts`
@@ -1039,33 +1014,31 @@ npm run build --workspace=@h6000/core
 In `packages/bridge/src/channel-mapper.test.ts`, append:
 
 ```ts
-  it('maps PGN 127251 rate-of-turn to motion.rateOfTurn', () => {
-    const decoded = make(127251, { 'Rate of Turn': 0.0123 });
-    const samples = mapPgnToSamples(decoded);
-    expect(samples.map((s) => s.channel)).toEqual([
-      Channels.Motion.RateOfTurn,
-    ]);
-    expect(samples[0]?.value).toEqual({
-      kind: 'scalar',
-      value: 0.0123,
-      unit: 'rad/s',
-    });
+it('maps PGN 127251 rate-of-turn to motion.rateOfTurn', () => {
+  const decoded = make(127251, { 'Rate of Turn': 0.0123 });
+  const samples = mapPgnToSamples(decoded);
+  expect(samples.map((s) => s.channel)).toEqual([Channels.Motion.RateOfTurn]);
+  expect(samples[0]?.value).toEqual({
+    kind: 'scalar',
+    value: 0.0123,
+    unit: 'rad/s',
   });
+});
 
-  it('maps PGN 127257 attitude to heel, pitch, yaw', () => {
-    const decoded = make(127257, {
-      Yaw: 1.23,
-      Pitch: -0.05,
-      Roll: 0.18,
-    });
-    const samples = mapPgnToSamples(decoded);
-    const channels = samples.map((s) => s.channel).sort();
-    expect(channels).toEqual(
-      [Channels.Motion.Heel, Channels.Motion.Pitch, Channels.Motion.Yaw].sort(),
-    );
-    const heel = samples.find((s) => s.channel === Channels.Motion.Heel);
-    expect(heel?.value).toEqual({ kind: 'scalar', value: 0.18, unit: 'rad' });
+it('maps PGN 127257 attitude to heel, pitch, yaw', () => {
+  const decoded = make(127257, {
+    Yaw: 1.23,
+    Pitch: -0.05,
+    Roll: 0.18,
   });
+  const samples = mapPgnToSamples(decoded);
+  const channels = samples.map((s) => s.channel).sort();
+  expect(channels).toEqual(
+    [Channels.Motion.Heel, Channels.Motion.Pitch, Channels.Motion.Yaw].sort(),
+  );
+  const heel = samples.find((s) => s.channel === Channels.Motion.Heel);
+  expect(heel?.value).toEqual({ kind: 'scalar', value: 0.18, unit: 'rad' });
+});
 ```
 
 - [ ] **Step 4: Run tests — expect failure**
@@ -1144,6 +1117,7 @@ git commit -m "feat: map PGN 127251 (rate of turn) and 127257 (attitude) to moti
 ## Task 7: Session logger (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/persistence/session-logger.ts`
 - Test: `packages/bridge/src/persistence/session-logger.test.ts`
 
@@ -1165,16 +1139,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { Subject } from 'rxjs';
-import {
-  startSessionLogger,
-  type SessionLogger,
-} from './session-logger.js';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import { startSessionLogger, type SessionLogger } from './session-logger.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 import { EMPTY, of, BehaviorSubject } from 'rxjs';
 
 class FakeDriver implements WireDriver {
@@ -1277,10 +1243,7 @@ describe('startSessionLogger', () => {
     await logger.close();
 
     const filePath = path.join(dir, 'flush.jsonl.gz');
-    const lines = gunzipSync(readFileSync(filePath))
-      .toString('utf8')
-      .trim()
-      .split('\n');
+    const lines = gunzipSync(readFileSync(filePath)).toString('utf8').trim().split('\n');
     // 1 header + 50 events
     expect(lines.length).toBe(51);
   });
@@ -1318,9 +1281,7 @@ export interface SessionLogger {
  * BigInt timestamps are stringified — JSON.stringify cannot serialize bigint
  * directly; the replay reader rebuilds them via `BigInt(line.t_ns)`.
  */
-export async function startSessionLogger(
-  opts: StartSessionLoggerOptions,
-): Promise<SessionLogger> {
+export async function startSessionLogger(opts: StartSessionLoggerOptions): Promise<SessionLogger> {
   await mkdir(opts.dir, { recursive: true });
   const filePath = path.join(opts.dir, `${opts.sessionId}.jsonl.gz`);
   const fileStream = createWriteStream(filePath);
@@ -1348,9 +1309,7 @@ export async function startSessionLogger(
     subs.push(
       driver.rxCan.subscribe((frame) => {
         if (closed) return;
-        const data = Array.from(frame.data, (b) =>
-          b.toString(16).padStart(2, '0'),
-        ).join('');
+        const data = Array.from(frame.data, (b) => b.toString(16).padStart(2, '0')).join('');
         void writeLine({
           kind: 'can',
           t_ns: frame.rxTimestamp.toString(),
@@ -1411,6 +1370,7 @@ git commit -m "feat(bridge): session logger writing gzipped JSONL of all driver 
 ## Task 8: Replay driver (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/persistence/replay-driver.ts`
 - Test: `packages/bridge/src/persistence/replay-driver.test.ts`
 
@@ -1426,12 +1386,7 @@ import path from 'node:path';
 import { firstValueFrom, take, toArray } from 'rxjs';
 import { startSessionLogger } from './session-logger.js';
 import { ReplayDriver } from './replay-driver.js';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 import { Subject, BehaviorSubject } from 'rxjs';
 
 class FakeDriver implements WireDriver {
@@ -1534,12 +1489,7 @@ import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { Subject, BehaviorSubject, EMPTY, type Observable } from 'rxjs';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 
 export interface ReplayDriverOptions {
   filePath: string;
@@ -1683,6 +1633,7 @@ git commit -m "feat(bridge): replay driver reads .jsonl.gz session logs"
 ## Task 9: Persistence + replay barrel exports
 
 **Files:**
+
 - Modify: `packages/bridge/src/index.ts`
 
 Add to the existing barrel:
@@ -1714,6 +1665,7 @@ git commit -m "chore(bridge): export persistence and replay surface"
 ## Task 10: Wire 0183 driver, session logger, and replay flag into autopilot-server
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 
 Adds optional 0183 input via `NMEA0183_PATHS=/dev/ttyUSB1,/dev/ttyUSB2`, optional session logging via `SESSION_LOG_DIR=...`, and replay mode via `REPLAY=path/to/session.jsonl.gz`.
@@ -1747,8 +1699,7 @@ const NMEA0183_PATHS = (process.env.NMEA0183_PATHS ?? '')
   .filter((s) => s.length > 0);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
-const REPLAY_MODE: 'asap' | 'realtime' =
-  process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
+const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
@@ -1823,17 +1774,12 @@ async function main(): Promise<void> {
       sessionId,
     });
     // eslint-disable-next-line no-console
-    console.log(
-      `[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`,
-    );
+    console.log(`[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`);
     teardown.push(() => logger!.close());
   }
 
   // Start Next.js pointing at the @h6000/web package directory.
-  const webDir = path.resolve(
-    fileURLToPath(import.meta.url),
-    '../../../../packages/web',
-  );
+  const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
   const handle = app.getRequestHandler();
@@ -1866,6 +1812,7 @@ main().catch((err) => {
 - [ ] **Step 2: Smoke-test replay mode**
 
 You'll need a session file. Easiest path:
+
 1. Build the workspace: `npm run build --workspace=@h6000/core` (the bridge package consumes core via TS source so doesn't need building).
 2. Run a tiny one-off script that records a synthetic 0183 sentence to a session file. (Skip this if you'd rather verify on real hardware later.)
 3. Or, run a session that includes only the 0183 logger and replay it back through the same process.
@@ -1904,6 +1851,7 @@ npm test
 ```
 
 Expected: all packages pass. Approximate count:
+
 - `core/bus.test.ts`: 6
 - `core/json-safe.test.ts`: 2
 - `bridge/ngt-driver.test.ts`: 2
@@ -1948,6 +1896,7 @@ git commit -m "chore: prettier formatting after 0183/persistence/replay landing"
 ## Closing notes
 
 After this plan lands:
+
 - The bridge ingests N2K + 0183 + can be replayed offline from disk.
 - Motion data flows from your existing B&G hardware (Precision-9 + H5000 motion sensor) over the same N2K path.
 - Every minute of sailing produces a `.jsonl.gz` you can re-feed through the entire stack at home — perfect-fidelity replay.
@@ -1955,6 +1904,7 @@ After this plan lands:
 The next plan should pick up the **calibration + true-wind compute** path: SQLite + Drizzle for the boat-config DB, true-wind pipeline (cal table → vector subtraction → bus output), AWS/AWA cal table editor, tack-test wizard, polars editor (Expedition CSV import), and N2K transmit (so the calibrated true wind makes it back to the Zeus SR plotter).
 
 Out of this plan we deliberately did NOT add:
+
 - Compute pipelines or calibration tables (next plan)
 - N2K TX (next plan)
 - Authentication, log rotation, multi-session interleaving (later)

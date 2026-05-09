@@ -70,6 +70,54 @@ const mappers: Record<number, MapperFn> = {
       },
     ];
   },
+
+  // PGN 127251 — rate of turn (rad/s).
+  127251: (pgn) => {
+    const v = pgn.fields['Rate of Turn'];
+    if (typeof v !== 'number') return [];
+    return [
+      {
+        channel: Channels.Motion.RateOfTurn,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(v, 'rad/s'),
+        source: sourceTag(pgn),
+      },
+    ];
+  },
+
+  // PGN 127257 — attitude (yaw/pitch/roll, all in radians).
+  // Sailing convention: roll = heel.
+  127257: (pgn) => {
+    const yaw = pgn.fields['Yaw'];
+    const pitch = pgn.fields['Pitch'];
+    const roll = pgn.fields['Roll'];
+    const out: Sample[] = [];
+    if (typeof yaw === 'number') {
+      out.push({
+        channel: Channels.Motion.Yaw,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(yaw, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    if (typeof pitch === 'number') {
+      out.push({
+        channel: Channels.Motion.Pitch,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(pitch, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    if (typeof roll === 'number') {
+      out.push({
+        channel: Channels.Motion.Heel,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(roll, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    return out;
+  },
 };
 
 export function mapPgnToSamples(pgn: DecodedPgn): Sample[] {
