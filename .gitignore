@@ -27,3 +27,13 @@ Thumbs.db
 # Session logs (large, per-deployment)
 sessions/
 *.jsonl.gz
+
+# Build artifacts (top-level dist/ from earlier covers all workspace dist/ as well)
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Next.js (top-level .next/ covers all workspace .next/ as well)
+packages/*/out/
+apps/*/out/

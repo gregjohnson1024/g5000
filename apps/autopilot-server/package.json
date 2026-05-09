@@ -1,0 +1,30 @@
+{
+  "name": "@h6000/autopilot-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "predev": "tsc -b ../../packages/core",
+    "prebuild": "tsc -b ../../packages/core",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@h6000/bridge": "*",
+    "@h6000/core": "*",
+    "@h6000/web": "*",
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19",
+    "rxjs": "^7",
+    "serialport": "^12"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5.7"
+  }
+}

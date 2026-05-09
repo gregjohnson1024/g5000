@@ -1,0 +1,33 @@
+{
+  "name": "autopilot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "prettier": "^3.4",
+    "tsx": "^4",
+    "typescript": "^5.7",
+    "vitest": "^2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@canboat/canboatjs": "^2.12.3",
+    "rxjs": "^7.8.2",
+    "serialport": "^12.0.0"
+  }
+}

@@ -1,0 +1,76 @@
+import { describe, it, expect } from 'vitest';
+import { mapPgnToSamples } from './channel-mapper.js';
+import type { DecodedPgn } from './decoder.js';
+import { Channels } from '@h6000/core';
+
+const make = (pgn: number, fields: Record<string, unknown>): DecodedPgn => ({
+  pgn,
+  prio: 2,
+  src: 17,
+  dst: 255,
+  fields,
+  rxTimestamp: 1_700_000_000_000_000_000n,
+});
+
+describe('mapPgnToSamples', () => {
+  it('maps PGN 130306 wind fields to apparent angle and speed', () => {
+    const decoded = make(130306, {
+      'Wind Speed': 5.2,
+      'Wind Angle': 0.785, // radians (~45°)
+      Reference: 'Apparent',
+    });
+    const samples = mapPgnToSamples(decoded);
+    const channels = samples.map((s) => s.channel);
+    expect(channels).toContain(Channels.Wind.ApparentSpeed);
+    expect(channels).toContain(Channels.Wind.ApparentAngle);
+    const angle = samples.find((s) => s.channel === Channels.Wind.ApparentAngle);
+    expect(angle?.value).toEqual({
+      kind: 'scalar',
+      value: 0.785,
+      unit: 'rad',
+    });
+  });
+
+  it('maps PGN 130306 wind with True reference to true.angle/speed', () => {
+    const decoded = make(130306, {
+      'Wind Speed': 7.5,
+      'Wind Angle': 1.05,
+      Reference: 'True (boat referenced)',
+    });
+    const samples = mapPgnToSamples(decoded);
+    const channels = samples.map((s) => s.channel);
+    expect(channels).toContain(Channels.Wind.TrueAngle);
+    expect(channels).toContain(Channels.Wind.TrueSpeed);
+  });
+
+  it('maps PGN 128259 to boat.speed.water', () => {
+    const decoded = make(128259, { 'Speed Water Referenced': 3.4 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.SpeedWater]);
+    expect(samples[0]?.value).toEqual({
+      kind: 'scalar',
+      value: 3.4,
+      unit: 'm/s',
+    });
+  });
+
+  it('maps PGN 127250 magnetic heading to boat.heading.magnetic', () => {
+    const decoded = make(127250, {
+      Heading: 1.234,
+      Reference: 'Magnetic',
+    });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.HeadingMagnetic]);
+  });
+
+  it('returns empty array for unknown PGN', () => {
+    const decoded = make(999999, { irrelevant: 1 });
+    expect(mapPgnToSamples(decoded)).toEqual([]);
+  });
+
+  it('tags samples with a source identifying the PGN and source addr', () => {
+    const decoded = make(128259, { 'Speed Water Referenced': 3.4 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples[0]?.source).toBe('n2k:128259@0x11');
+  });
+});

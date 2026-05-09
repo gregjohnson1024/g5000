@@ -7,6 +7,7 @@
 **Architecture:** npm-workspaces monorepo. Three packages (`core`, `bridge`, `web`) and one app (`autopilot-server`) that composes them in a single Node process. `core` defines types and an in-process RxJS pub/sub bus. `bridge` reads NGT-1 binary, decodes PGNs via canboatjs, maps decoded fields to hierarchical channel names, and publishes onto the bus. `web` is a Next.js app whose SSE route subscribes to the bus and streams to a `/inspect` page. `autopilot-server` boots the bridge, then starts Next.js with a custom server so both run in one process.
 
 **Tech Stack:**
+
 - Node.js 22 LTS, TypeScript 5.7
 - npm workspaces (no Turbo/pnpm to keep bootstrap minimal)
 - `rxjs@^7` for the bus
@@ -93,6 +94,7 @@ autopilot/
 ## Task 1: Workspace bootstrap
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.base.json`
 - Create: `.prettierrc.json`
@@ -108,10 +110,7 @@ autopilot/
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
@@ -243,9 +242,11 @@ git commit -m "chore: bootstrap npm workspaces with TypeScript, prettier, vitest
 - [ ] **Step 1: Install core runtime deps at workspace root**
 
 Run:
+
 ```bash
 npm install rxjs@^7 serialport@^12 @canboat/canboatjs@^2
 ```
+
 Expected: completes; `package-lock.json` updated; `rxjs`, `serialport`, `@canboat/canboatjs` appear under root `dependencies`. Note: workspaces will reference these via root resolution; we'll formalize per-package deps in their own `package.json` files in later tasks.
 
 - [ ] **Step 2: Verify canboatjs imports and decodes a sample PGN**
@@ -261,8 +262,7 @@ console.log('canboatjs exports:', Object.keys(canboat));
 // FromPgn parses canboat's "Actisense ASCII" line format:
 //   "<timestamp>,<prio>,<pgn>,<src>,<dst>,<len>,<hex bytes>"
 // Example: a wind PGN 130306 frame from a real bus
-const sampleLine =
-  '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa';
+const sampleLine = '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa';
 
 const { FromPgn } = canboat;
 const parser = new FromPgn();
@@ -292,6 +292,7 @@ git commit -m "chore: add runtime deps (rxjs, serialport, canboatjs)"
 ## Task 3: `core` package — types and channel constants
 
 **Files:**
+
 - Create: `packages/core/package.json`
 - Create: `packages/core/tsconfig.json`
 - Create: `packages/core/src/types.ts`
@@ -427,6 +428,7 @@ git commit -m "feat(core): add Sample/Channel types and channel constants"
 ## Task 4: `core` Bus implementation (TDD)
 
 **Files:**
+
 - Test: `packages/core/src/bus.test.ts`
 - Create: `packages/core/src/bus.ts`
 
@@ -587,6 +589,7 @@ git commit -m "feat(core): add RxJS-backed Bus with pattern subscriptions"
 ## Task 5: `bridge` package — WireDriver interface and Ngt1Driver (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/package.json`
 - Create: `packages/bridge/tsconfig.json`
 - Create: `packages/bridge/src/wire-driver.ts`
@@ -726,8 +729,7 @@ describe('Ngt1Driver', () => {
 
   it('parses an Actisense ASCII wind-PGN line into a RawCanFrame', async () => {
     // PGN 130306 (wind), prio 2, src 17, dst 255, 8-byte payload.
-    const line =
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n';
+    const line = '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n';
     const framePromise = firstValueFrom(driver.rxCan);
     source.emit(line);
     const frame = await framePromise;
@@ -917,6 +919,7 @@ git commit -m "feat(bridge): add WireDriver interface and Ngt1Driver with ASCII 
 ## Task 6: N2K decoder via canboatjs (TDD)
 
 **Files:**
+
 - Test: `packages/bridge/src/decoder.test.ts`
 - Create: `packages/bridge/src/decoder.ts`
 
@@ -934,8 +937,7 @@ import { parseActisenseLine } from './ngt-driver.js';
 
 describe('decodeFrames', () => {
   it('decodes a wind PGN 130306 from a raw CAN frame', async () => {
-    const line =
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa';
+    const line = '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa';
     const frame = parseActisenseLine(line);
     expect(frame).toBeTruthy();
     const decoded = await firstValueFrom(decodeFrames(of(frame!)));
@@ -945,11 +947,7 @@ describe('decodeFrames', () => {
     // canboat exposes wind speed and angle; field names may vary slightly,
     // but at least one of these is present:
     const fieldKeys = Object.keys(decoded.fields);
-    expect(
-      fieldKeys.some((k) =>
-        ['Wind Speed', 'Wind Angle', 'Reference'].includes(k),
-      ),
-    ).toBe(true);
+    expect(fieldKeys.some((k) => ['Wind Speed', 'Wind Angle', 'Reference'].includes(k))).toBe(true);
   });
 
   it('emits one DecodedPgn per single-frame input', async () => {
@@ -1018,9 +1016,7 @@ export interface DecodedPgn {
  * pay a string round-trip per frame, but at <1000 frames/sec on a CM5 this
  * is in the noise.
  */
-export function decodeFrames(
-  frames$: Observable<RawCanFrame>,
-): Observable<DecodedPgn> {
+export function decodeFrames(frames$: Observable<RawCanFrame>): Observable<DecodedPgn> {
   return new Observable<DecodedPgn>((subscriber) => {
     const parser = new FromPgn();
     const pendingTimestamps = new Map<number, bigint>(); // pgn → most-recent rxTimestamp
@@ -1041,9 +1037,7 @@ export function decodeFrames(
         const src = frame.id & 0xff;
         const prio = (frame.id >> 26) & 0x7;
         pendingTimestamps.set(pgn, frame.rxTimestamp);
-        const hex = Array.from(frame.data, (b) =>
-          b.toString(16).padStart(2, '0'),
-        );
+        const hex = Array.from(frame.data, (b) => b.toString(16).padStart(2, '0'));
         const line = `${new Date().toISOString()},${prio},${pgn},${src},255,${frame.data.length},${hex.join(',')}`;
         parser.parseString(line);
       },
@@ -1095,6 +1089,7 @@ git commit -m "feat(bridge): decode RawCanFrames to canboat PGNs"
 ## Task 7: Channel mapper (TDD)
 
 **Files:**
+
 - Test: `packages/bridge/src/channel-mapper.test.ts`
 - Create: `packages/bridge/src/channel-mapper.ts`
 
@@ -1167,9 +1162,7 @@ describe('mapPgnToSamples', () => {
       Reference: 'Magnetic',
     });
     const samples = mapPgnToSamples(decoded);
-    expect(samples.map((s) => s.channel)).toEqual([
-      Channels.Boat.HeadingMagnetic,
-    ]);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.HeadingMagnetic]);
   });
 
   it('returns empty array for unknown PGN', () => {
@@ -1214,12 +1207,8 @@ const mappers: Record<number, MapperFn> = {
     const speed = pgn.fields['Wind Speed'];
     const angle = pgn.fields['Wind Angle'];
     const isApparent = ref === 'Apparent';
-    const speedChan = isApparent
-      ? Channels.Wind.ApparentSpeed
-      : Channels.Wind.TrueSpeed;
-    const angleChan = isApparent
-      ? Channels.Wind.ApparentAngle
-      : Channels.Wind.TrueAngle;
+    const speedChan = isApparent ? Channels.Wind.ApparentSpeed : Channels.Wind.TrueSpeed;
+    const angleChan = isApparent ? Channels.Wind.ApparentAngle : Channels.Wind.TrueAngle;
     const out: Sample[] = [];
     if (typeof speed === 'number') {
       out.push({
@@ -1259,10 +1248,7 @@ const mappers: Record<number, MapperFn> = {
     const ref = String(pgn.fields['Reference'] ?? '');
     const v = pgn.fields['Heading'];
     if (typeof v !== 'number') return [];
-    const channel =
-      ref === 'True'
-        ? Channels.Boat.HeadingTrue
-        : Channels.Boat.HeadingMagnetic;
+    const channel = ref === 'True' ? Channels.Boat.HeadingTrue : Channels.Boat.HeadingMagnetic;
     return [
       {
         channel,
@@ -1297,6 +1283,7 @@ git commit -m "feat(bridge): add channel mapper for wind, speed, heading PGNs"
 ## Task 8: Bridge orchestrator (TDD)
 
 **Files:**
+
 - Test: `packages/bridge/src/bridge.test.ts`
 - Create: `packages/bridge/src/bridge.ts`
 - Create: `packages/bridge/src/index.ts`
@@ -1345,9 +1332,7 @@ describe('runBridge', () => {
     const received: Sample[] = [];
     bus.subscribe('wind.**', (s) => received.push(s));
 
-    source.emit(
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n',
-    );
+    source.emit('2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n');
 
     // Allow the RxJS chain to settle.
     await new Promise((r) => setTimeout(r, 10));
@@ -1355,8 +1340,7 @@ describe('runBridge', () => {
     expect(received.length).toBeGreaterThan(0);
     const channels = new Set(received.map((s) => s.channel));
     expect(
-      channels.has(Channels.Wind.ApparentAngle) ||
-        channels.has(Channels.Wind.ApparentSpeed),
+      channels.has(Channels.Wind.ApparentAngle) || channels.has(Channels.Wind.ApparentSpeed),
     ).toBe(true);
 
     await stop();
@@ -1442,6 +1426,7 @@ git commit -m "feat(bridge): orchestrator wires driver to decoder to mapper to b
 ## Task 9: `apps/autopilot-server` entry that opens a real serial port
 
 **Files:**
+
 - Create: `apps/autopilot-server/package.json`
 - Create: `apps/autopilot-server/tsconfig.json`
 - Create: `apps/autopilot-server/src/index.ts`
@@ -1488,10 +1473,7 @@ This is the runnable Node entry that opens `/dev/ttyUSB0` (or whatever the NGT-1
   },
   "include": ["src/**/*"],
   "exclude": ["**/*.test.ts"],
-  "references": [
-    { "path": "../../packages/core" },
-    { "path": "../../packages/bridge" }
-  ]
+  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/bridge" }]
 }
 ```
 
@@ -1571,6 +1553,7 @@ git commit -m "feat(server): autopilot-server entry that opens NGT-1 and prints 
 ## Task 10: `web` package — Next.js skeleton with Tailwind v4
 
 **Files:**
+
 - Create: `packages/web/package.json`
 - Create: `packages/web/tsconfig.json`
 - Create: `packages/web/next.config.ts`
@@ -1624,12 +1607,7 @@ git commit -m "feat(server): autopilot-server entry that opens NGT-1 and prints 
     "incremental": true,
     "plugins": [{ "name": "next" }]
   },
-  "include": [
-    "next-env.d.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", ".next"],
   "references": [{ "path": "../core" }]
 }
@@ -1672,7 +1650,11 @@ export default {
 body {
   background: #0b0e14;
   color: #cdd6f4;
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 ```
 
@@ -1693,11 +1675,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="min-h-screen">{children}</body>
@@ -1743,6 +1721,7 @@ git commit -m "feat(web): Next.js skeleton with Tailwind v4"
 ## Task 11: Bus singleton in `core` and SSE route handler in `web`
 
 **Files:**
+
 - Modify: `packages/core/src/index.ts`
 - Create: `packages/core/src/bus-singleton.ts`
 - Create: `packages/web/src/app/api/stream/route.ts`
@@ -1879,6 +1858,7 @@ git commit -m "feat(web): SSE route streaming shared bus samples"
 ## Task 12: `/inspect` page
 
 **Files:**
+
 - Create: `packages/web/src/app/inspect/page.tsx`
 
 A simple table of every channel's most recent sample, updated live via the SSE feed.
@@ -1914,9 +1894,7 @@ function formatValue(s: Sample): string {
 }
 
 export default function InspectPage() {
-  const [channels, setChannels] = useState<Map<string, ChannelEntry>>(
-    new Map(),
-  );
+  const [channels, setChannels] = useState<Map<string, ChannelEntry>>(new Map());
 
   useEffect(() => {
     const es = new EventSource('/api/stream');
@@ -1941,9 +1919,7 @@ export default function InspectPage() {
     return () => es.close();
   }, []);
 
-  const sorted = Array.from(channels.entries()).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
+  const sorted = Array.from(channels.entries()).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <main className="p-6">
@@ -2001,6 +1977,7 @@ git commit -m "feat(web): /inspect page with live channel table"
 ## Task 13: Single-process integration — autopilot-server boots Next.js
 
 **Files:**
+
 - Modify: `apps/autopilot-server/package.json` (add `next` dep)
 - Modify: `apps/autopilot-server/src/index.ts`
 
@@ -2075,10 +2052,7 @@ async function main(): Promise<void> {
   }
 
   // 2. Start Next.js pointing at the @h6000/web package directory.
-  const webDir = path.resolve(
-    fileURLToPath(import.meta.url),
-    '../../../../packages/web',
-  );
+  const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
   const handle = app.getRequestHandler();
@@ -2117,6 +2091,7 @@ Expected: Next.js prints "ready" on http://localhost:3000; bridge is skipped. Vi
 - [ ] **Step 5: Run the unified server with the bridge attempting a real serial open**
 
 If you have an NGT-1 attached:
+
 - Identify its device path: `ls /dev/tty.usbserial-* /dev/ttyUSB*` (paths vary by OS).
 - Run: `NGT1_PATH=/dev/tty.usbserial-XXXX npm run dev --workspace=@h6000/autopilot-server`
 - Expected: `[autopilot] bridge online via …`; `/inspect` shows live PGN-derived channels populated by real bus traffic.
@@ -2147,6 +2122,7 @@ Expected: no errors.
 - [ ] **Final commit pointer**
 
 The repo now ends Phase 0a with:
+
 - a working `npm run dev --workspace=@h6000/autopilot-server` that boots a single-process server,
 - decoded PGN samples streaming on the bus when an NGT-1 is connected,
 - `/inspect` showing live channel values in a browser,

@@ -1,0 +1,23 @@
+{
+  "name": "@h6000/bridge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@h6000/core": "*",
+    "@canboat/canboatjs": "^2",
+    "rxjs": "^7",
+    "serialport": "^12"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.7",
+    "vitest": "^2"
+  }
+}
