@@ -24,9 +24,7 @@ export interface SessionLogger {
  * BigInt timestamps are stringified — JSON.stringify cannot serialize bigint
  * directly; the replay reader rebuilds them via `BigInt(line.t_ns)`.
  */
-export async function startSessionLogger(
-  opts: StartSessionLoggerOptions,
-): Promise<SessionLogger> {
+export async function startSessionLogger(opts: StartSessionLoggerOptions): Promise<SessionLogger> {
   await mkdir(opts.dir, { recursive: true });
   const filePath = path.join(opts.dir, `${opts.sessionId}.jsonl.gz`);
   const fileStream = createWriteStream(filePath);
@@ -54,9 +52,7 @@ export async function startSessionLogger(
     subs.push(
       driver.rxCan.subscribe((frame) => {
         if (closed) return;
-        const data = Array.from(frame.data, (b) =>
-          b.toString(16).padStart(2, '0'),
-        ).join('');
+        const data = Array.from(frame.data, (b) => b.toString(16).padStart(2, '0')).join('');
         void writeLine({
           kind: 'can',
           t_ns: frame.rxTimestamp.toString(),
@@ -84,9 +80,7 @@ export async function startSessionLogger(
       closed = true;
       for (const s of subs) s.unsubscribe();
       await new Promise<void>((resolve, reject) => {
-        gzip.end((err?: NodeJS.ErrnoException | null) =>
-          err ? reject(err) : resolve(),
-        );
+        gzip.end((err?: NodeJS.ErrnoException | null) => (err ? reject(err) : resolve()));
       });
       await new Promise<void>((resolve) => {
         if (fileStream.closed) resolve();

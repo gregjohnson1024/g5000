@@ -12,9 +12,7 @@ export interface ParsedSentence {
   fields: readonly string[];
 }
 
-export type ParseResult =
-  | { ok: true; sentence: ParsedSentence }
-  | { ok: false; error: string };
+export type ParseResult = { ok: true; sentence: ParsedSentence } | { ok: false; error: string };
 
 /**
  * Parse one NMEA 0183 ASCII sentence. Returns `{ok: true, sentence}` if the

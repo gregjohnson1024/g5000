@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import {
-  SerialPort0183Driver,
-  type Sentence0183Source,
-} from './serial-driver.js';
+import { SerialPort0183Driver, type Sentence0183Source } from './serial-driver.js';
 
 class MemorySource implements Sentence0183Source {
   private listener: ((c: Buffer) => void) | null = null;

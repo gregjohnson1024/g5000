@@ -42,15 +42,13 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
         }),
     );
     subs.push(
-      driver.rx0183
-        .pipe(mergeMap((s) => from(mapSentenceToSamples(s))))
-        .subscribe({
-          next: (sample) => bus.publish(sample),
-          error: (err) => {
-            // eslint-disable-next-line no-console
-            console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
-          },
-        }),
+      driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
+        next: (sample) => bus.publish(sample),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
+        },
+      }),
     );
   }
 

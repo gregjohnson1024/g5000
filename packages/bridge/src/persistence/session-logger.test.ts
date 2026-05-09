@@ -4,16 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { Subject, BehaviorSubject } from 'rxjs';
-import {
-  startSessionLogger,
-  type SessionLogger,
-} from './session-logger.js';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import { startSessionLogger, type SessionLogger } from './session-logger.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 
 class FakeDriver implements WireDriver {
   rxCan = new Subject<RawCanFrame>();
@@ -118,10 +110,7 @@ describe('startSessionLogger', () => {
     logger = null;
 
     const filePath = path.join(dir, 'flush.jsonl.gz');
-    const lines = gunzipSync(readFileSync(filePath))
-      .toString('utf8')
-      .trim()
-      .split('\n');
+    const lines = gunzipSync(readFileSync(filePath)).toString('utf8').trim().split('\n');
     // 1 header + 50 events
     expect(lines.length).toBe(51);
   });

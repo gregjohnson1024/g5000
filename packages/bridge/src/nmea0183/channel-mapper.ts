@@ -11,13 +11,9 @@ const scalar = (value: number, unit?: string): ChannelValue => ({
   unit,
 });
 
-const sourceTag = (raw: Raw0183Sentence, addr: string): string =>
-  `0183:port${raw.port}:${addr}`;
+const sourceTag = (raw: Raw0183Sentence, addr: string): string => `0183:port${raw.port}:${addr}`;
 
-type Mapper = (
-  parsed: ParsedSentence,
-  raw: Raw0183Sentence,
-) => Sample[];
+type Mapper = (parsed: ParsedSentence, raw: Raw0183Sentence) => Sample[];
 
 const mappers: Record<string, Mapper> = {
   // MWV: Wind angle and speed (apparent or true reference).
@@ -30,22 +26,17 @@ const mappers: Record<string, Mapper> = {
     const speedRaw = Number(s.fields[2]);
     const unit = s.fields[3] ?? '';
     if (!Number.isFinite(angleDeg) || !Number.isFinite(speedRaw)) return [];
-    const speed =
-      unit === 'N' ? speedRaw * KNOTS_TO_MS : unit === 'K' ? speedRaw / 3.6 : speedRaw;
+    const speed = unit === 'N' ? speedRaw * KNOTS_TO_MS : unit === 'K' ? speedRaw / 3.6 : speedRaw;
     const isApparent = ref === 'R';
     const out: Sample[] = [];
     out.push({
-      channel: isApparent
-        ? Channels.Wind.ApparentAngle
-        : Channels.Wind.TrueAngle,
+      channel: isApparent ? Channels.Wind.ApparentAngle : Channels.Wind.TrueAngle,
       t_ns: raw.rxTimestamp,
       value: scalar(angleDeg * DEG_TO_RAD, 'rad'),
       source: sourceTag(raw, `${s.talker}${s.type}`),
     });
     out.push({
-      channel: isApparent
-        ? Channels.Wind.ApparentSpeed
-        : Channels.Wind.TrueSpeed,
+      channel: isApparent ? Channels.Wind.ApparentSpeed : Channels.Wind.TrueSpeed,
       t_ns: raw.rxTimestamp,
       value: scalar(speed, 'm/s'),
       source: sourceTag(raw, `${s.talker}${s.type}`),

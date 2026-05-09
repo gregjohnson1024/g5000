@@ -2,12 +2,7 @@ import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { Subject, BehaviorSubject, type Observable } from 'rxjs';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 
 export interface ReplayDriverOptions {
   filePath: string;

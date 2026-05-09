@@ -5,12 +5,7 @@ import path from 'node:path';
 import { Subject, BehaviorSubject } from 'rxjs';
 import { startSessionLogger } from './session-logger.js';
 import { ReplayDriver } from './replay-driver.js';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from '../wire-driver.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from '../wire-driver.js';
 
 class FakeDriver implements WireDriver {
   rxCan = new Subject<RawCanFrame>();
@@ -50,8 +45,7 @@ describe('ReplayDriver', () => {
       dir,
       sessionId: 'rt',
     });
-    const ts = (n: number) =>
-      BigInt(1_700_000_000_000n) * 1_000_000n + BigInt(n) * 1_000_000n;
+    const ts = (n: number) => BigInt(1_700_000_000_000n) * 1_000_000n + BigInt(n) * 1_000_000n;
     fake.rxCan.next({
       id: 0x09fd0211,
       ext: true,
@@ -86,11 +80,7 @@ describe('ReplayDriver', () => {
           resolve();
         } else if (Date.now() - startedAt > 2000) {
           clearInterval(id);
-          reject(
-            new Error(
-              `timeout: got ${canFrames.length} CAN, ${sentences.length} 0183`,
-            ),
-          );
+          reject(new Error(`timeout: got ${canFrames.length} CAN, ${sentences.length} 0183`));
         }
       }, 5);
     });

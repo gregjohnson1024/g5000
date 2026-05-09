@@ -15,9 +15,7 @@ describe('mapSentenceToSamples — MWV', () => {
     const channels = samples.map((s) => s.channel);
     expect(channels).toContain(Channels.Wind.ApparentAngle);
     expect(channels).toContain(Channels.Wind.ApparentSpeed);
-    const speed = samples.find(
-      (s) => s.channel === Channels.Wind.ApparentSpeed,
-    )?.value;
+    const speed = samples.find((s) => s.channel === Channels.Wind.ApparentSpeed)?.value;
     expect(speed).toEqual({
       kind: 'scalar',
       value: 5.8 * 0.514444,
@@ -43,8 +41,7 @@ describe('mapSentenceToSamples — VHW', () => {
     const samples = mapSentenceToSamples(at('$VWVHW,,T,,M,5.2,N,9.6,K*5C'));
     const ch = samples.map((s) => s.channel);
     expect(ch).toContain(Channels.Boat.SpeedWater);
-    const v = samples.find((s) => s.channel === Channels.Boat.SpeedWater)
-      ?.value;
+    const v = samples.find((s) => s.channel === Channels.Boat.SpeedWater)?.value;
     expect(v).toEqual({
       kind: 'scalar',
       value: 5.2 * 0.514444,
@@ -58,8 +55,7 @@ describe('mapSentenceToSamples — HDG', () => {
     const samples = mapSentenceToSamples(at('$HCHDG,98.3,1.2,W,5.6,E*62'));
     const ch = samples.map((s) => s.channel);
     expect(ch).toContain(Channels.Boat.HeadingMagnetic);
-    const v = samples.find((s) => s.channel === Channels.Boat.HeadingMagnetic)
-      ?.value;
+    const v = samples.find((s) => s.channel === Channels.Boat.HeadingMagnetic)?.value;
     expect(v).toEqual({
       kind: 'scalar',
       value: (98.3 * Math.PI) / 180,
@@ -70,9 +66,7 @@ describe('mapSentenceToSamples — HDG', () => {
 
 describe('mapSentenceToSamples — VTG', () => {
   it('extracts cog (true) and sog', () => {
-    const samples = mapSentenceToSamples(
-      at('$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48'),
-    );
+    const samples = mapSentenceToSamples(at('$GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48'));
     const ch = samples.map((s) => s.channel);
     expect(ch).toContain(Channels.Nav.Cog);
     expect(ch).toContain(Channels.Nav.Sog);

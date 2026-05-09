@@ -77,9 +77,7 @@ describe('mapPgnToSamples', () => {
   it('maps PGN 127251 rate-of-turn to motion.rateOfTurn', () => {
     const decoded = make(127251, { 'Rate of Turn': 0.0123 });
     const samples = mapPgnToSamples(decoded);
-    expect(samples.map((s) => s.channel)).toEqual([
-      Channels.Motion.RateOfTurn,
-    ]);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Motion.RateOfTurn]);
     expect(samples[0]?.value).toEqual({
       kind: 'scalar',
       value: 0.0123,
