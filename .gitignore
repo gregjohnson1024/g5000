@@ -27,3 +27,17 @@ Thumbs.db
 # Session logs (large, per-deployment)
 sessions/
 *.jsonl.gz
+
+# Build artifacts
+*.tsbuildinfo
+packages/*/dist/
+apps/*/dist/
+
+# Coverage
+coverage/
+
+# Next.js (package-scoped)
+packages/*/.next/
+apps/*/.next/
+packages/*/out/
+apps/*/out/
