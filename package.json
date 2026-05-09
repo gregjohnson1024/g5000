@@ -24,5 +24,10 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@canboat/canboatjs": "^2.12.3",
+    "rxjs": "^7.8.2",
+    "serialport": "^12.0.0"
   }
 }
