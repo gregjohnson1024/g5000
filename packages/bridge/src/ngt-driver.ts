@@ -1,5 +1,5 @@
-import { Subject, type Observable, BehaviorSubject } from 'rxjs';
-import type { RawCanFrame, WireDriver, DriverHealth } from './wire-driver.js';
+import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from './wire-driver.js';
 
 /**
  * Anything that emits 'data' Buffer events. The serialport SerialPort class
@@ -26,6 +26,7 @@ export interface Ngt1DriverOptions {
  */
 export class Ngt1Driver implements WireDriver {
   readonly rxCan: Observable<RawCanFrame>;
+  readonly rx0183: Observable<Raw0183Sentence> = EMPTY;
   readonly health: Observable<DriverHealth>;
 
   private readonly rxSubject = new Subject<RawCanFrame>();
@@ -58,6 +59,10 @@ export class Ngt1Driver implements WireDriver {
   async txCan(_frame: RawCanFrame): Promise<void> {
     // TX support arrives in a later plan (Phase 0a milestone is read-only).
     throw new Error('Ngt1Driver.txCan not implemented in Phase 0a');
+  }
+
+  async tx0183(_port: number, _text: string): Promise<void> {
+    throw new Error('Ngt1Driver.tx0183 not implemented (NGT-1 has no 0183)');
   }
 
   private onData(chunk: Buffer): void {
