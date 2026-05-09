@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #0b0e14;
+  color: #cdd6f4;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
