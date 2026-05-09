@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.next/
+*.log
+
+# Plugin and tool scratch dirs
+.remember/
+.code-review-graph/
+
+# Reference PDFs (large, vendor-distributed)
+*.pdf
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Session logs (large, per-deployment)
+sessions/
+*.jsonl.gz
