@@ -26,5 +26,6 @@ export const Channels = {
     Heel: 'motion.heel',
     Pitch: 'motion.pitch',
     Yaw: 'motion.yaw',
+    RateOfTurn: 'motion.rateOfTurn',
   },
 } as const;

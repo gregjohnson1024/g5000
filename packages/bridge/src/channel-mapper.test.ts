@@ -73,4 +73,32 @@ describe('mapPgnToSamples', () => {
     const samples = mapPgnToSamples(decoded);
     expect(samples[0]?.source).toBe('n2k:128259@0x11');
   });
+
+  it('maps PGN 127251 rate-of-turn to motion.rateOfTurn', () => {
+    const decoded = make(127251, { 'Rate of Turn': 0.0123 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([
+      Channels.Motion.RateOfTurn,
+    ]);
+    expect(samples[0]?.value).toEqual({
+      kind: 'scalar',
+      value: 0.0123,
+      unit: 'rad/s',
+    });
+  });
+
+  it('maps PGN 127257 attitude to heel, pitch, yaw', () => {
+    const decoded = make(127257, {
+      Yaw: 1.23,
+      Pitch: -0.05,
+      Roll: 0.18,
+    });
+    const samples = mapPgnToSamples(decoded);
+    const channels = samples.map((s) => s.channel).sort();
+    expect(channels).toEqual(
+      [Channels.Motion.Heel, Channels.Motion.Pitch, Channels.Motion.Yaw].sort(),
+    );
+    const heel = samples.find((s) => s.channel === Channels.Motion.Heel);
+    expect(heel?.value).toEqual({ kind: 'scalar', value: 0.18, unit: 'rad' });
+  });
 });
