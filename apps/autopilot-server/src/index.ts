@@ -1,15 +1,19 @@
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
 import { getSharedBus } from '@h6000/core';
+import { ConfigStore, setSharedConfigStore } from '@h6000/db';
+import { startTrueWindPipeline } from '@h6000/compute';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
   ReplayDriver,
   runBridge,
   startSessionLogger,
+  startTrueWindTx,
   type WireDriver,
   type SessionLogger,
 } from '@h6000/bridge';
@@ -24,14 +28,27 @@ const NMEA0183_PATHS = (process.env.NMEA0183_PATHS ?? '')
   .filter((s) => s.length > 0);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
-const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
+const REPLAY_MODE: 'asap' | 'realtime' =
+  process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
+const CONFIG_DB_PATH = process.env.CONFIG_DB ?? './data/config.db';
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
   const drivers: WireDriver[] = [];
   const teardown: Array<() => Promise<void>> = [];
 
-  // Replay mode short-circuits all live driver setup.
+  // 0. Open ConfigStore so any code path (web routes, compute pipeline) can
+  //    resolve it. This must precede driver setup — even if drivers fail,
+  //    the web UI should still work for cal-table editing.
+  const dataDir = path.dirname(CONFIG_DB_PATH);
+  await mkdir(dataDir, { recursive: true });
+  const store = await ConfigStore.open(CONFIG_DB_PATH);
+  setSharedConfigStore(store);
+  teardown.push(() => store.close());
+  // eslint-disable-next-line no-console
+  console.log(`[autopilot] config db: ${CONFIG_DB_PATH}`);
+
+  // 1. Driver setup (live or replay).
   if (REPLAY) {
     const driver = new ReplayDriver({ filePath: REPLAY, mode: REPLAY_MODE });
     drivers.push(driver);
@@ -83,13 +100,13 @@ async function main(): Promise<void> {
     }
   }
 
+  // 2. Bridge orchestrator.
   if (drivers.length > 0) {
     const stop = await runBridge({ bus, drivers });
     teardown.push(stop);
   }
 
-  // Optional session logger — independent of which drivers are active. In
-  // replay mode we skip logging (don't re-record the same data).
+  // 3. Optional session logger (skipped in replay mode).
   let logger: SessionLogger | null = null;
   if (SESSION_LOG_DIR && !REPLAY) {
     const sessionId = new Date().toISOString().replace(/[:.]/g, '-');
@@ -99,12 +116,38 @@ async function main(): Promise<void> {
       sessionId,
     });
     // eslint-disable-next-line no-console
-    console.log(`[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`);
+    console.log(
+      `[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`,
+    );
     teardown.push(() => logger!.close());
   }
 
-  // Start Next.js pointing at the @h6000/web package directory.
-  const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
+  // 4. True-wind compute pipeline (subscribes to bus + ConfigStore,
+  //    publishes wind.true.calibrated.* back to the bus).
+  const stopCompute = await startTrueWindPipeline({
+    bus,
+    configStore: store,
+  });
+  teardown.push(stopCompute);
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] true-wind compute pipeline online');
+
+  // 5. True-wind TX wiring. Picks the first driver that supports txPgn —
+  //    only the NGT-1 in Phase 0a (others throw). Skipped in replay mode
+  //    (we don't transmit when reading from a recorded session).
+  const ngt = drivers.find((d) => d instanceof Ngt1Driver);
+  if (ngt && !REPLAY) {
+    const stopTx = await startTrueWindTx({ bus, driver: ngt });
+    teardown.push(stopTx);
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] true-wind TX online via NGT-1');
+  }
+
+  // 6. Start Next.js pointing at the @h6000/web package directory.
+  const webDir = path.resolve(
+    fileURLToPath(import.meta.url),
+    '../../../../packages/web',
+  );
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
   const handle = app.getRequestHandler();
@@ -116,6 +159,7 @@ async function main(): Promise<void> {
     console.log(`[autopilot] web UI on http://0.0.0.0:${HTTP_PORT}`);
   });
 
+  // Graceful shutdown — reverse the start order.
   const shutdown = async () => {
     // eslint-disable-next-line no-console
     console.log('[autopilot] shutting down');

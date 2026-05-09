@@ -28,6 +28,9 @@ Thumbs.db
 sessions/
 *.jsonl.gz
 
+# Runtime data (config.db created by autopilot-server at boot)
+data/
+
 # Build artifacts (top-level dist/ from earlier covers all workspace dist/ as well)
 *.tsbuildinfo
 

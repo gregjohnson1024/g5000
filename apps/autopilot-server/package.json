@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "predev": "tsc -b ../../packages/core",
-    "prebuild": "tsc -b ../../packages/core",
+    "predev": "tsc -b ../../packages/core ../../packages/db",
+    "prebuild": "tsc -b ../../packages/core ../../packages/db",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -b",
@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@h6000/bridge": "*",
+    "@h6000/compute": "*",
     "@h6000/core": "*",
+    "@h6000/db": "*",
     "@h6000/web": "*",
     "next": "^16",
     "react": "^19",
