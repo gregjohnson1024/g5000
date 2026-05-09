@@ -1,0 +1,22 @@
+{
+  "name": "@h6000/compute",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@h6000/core": "*",
+    "@h6000/db": "*",
+    "rxjs": "^7"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.7",
+    "vitest": "^2"
+  }
+}

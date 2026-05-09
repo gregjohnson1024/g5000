@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/db" },
+    { "path": "./packages/compute" },
     { "path": "./packages/bridge" },
     { "path": "./apps/autopilot-server" }
   ]
