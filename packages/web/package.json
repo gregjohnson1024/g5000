@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@h6000/core": "*",
+    "@h6000/db": "*",
     "next": "^16",
     "react": "^19",
     "react-dom": "^19"
