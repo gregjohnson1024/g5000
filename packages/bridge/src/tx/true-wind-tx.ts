@@ -17,9 +17,7 @@ export interface TrueWindTxOptions {
  * H5000 / Zeus SR family expects for TWS/TWA values referenced to the boat
  * (not ground-true wind direction — that's "True (ground referenced)").
  */
-export async function startTrueWindTx(
-  opts: TrueWindTxOptions,
-): Promise<() => Promise<void>> {
+export async function startTrueWindTx(opts: TrueWindTxOptions): Promise<() => Promise<void>> {
   const { bus, driver } = opts;
   const throttleMs = opts.throttleMs ?? 200;
 
@@ -43,9 +41,7 @@ export async function startTrueWindTx(
   ];
 
   const rxSub: Subscription = trigger
-    .pipe(
-      throttleTime(throttleMs, undefined, { leading: true, trailing: true }),
-    )
+    .pipe(throttleTime(throttleMs, undefined, { leading: true, trailing: true }))
     .subscribe(() => {
       if (speed === undefined || angle === undefined) return;
       void driver.txPgn({

@@ -1,12 +1,6 @@
 import { combineLatest, firstValueFrom, type Subscription } from 'rxjs';
 import { Bus, Channels, type Sample } from '@h6000/core';
-import type {
-  AwsAwaCalTable,
-  BoatConfig,
-  BspCal,
-  CompassDeviation,
-  ConfigStore,
-} from '@h6000/db';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@h6000/db';
 import { computeTrueWind } from './math.js';
 
 export interface TrueWindPipelineOptions {
@@ -51,8 +45,7 @@ export async function startTrueWindPipeline(
   function recompute(): void {
     if (!latest.aws || !latest.awa || !latest.bsp || !latest.hdg) return;
     const now_ns = BigInt(Date.now()) * 1_000_000n;
-    const stale = (t: bigint): boolean =>
-      Number((now_ns - t) / 1_000_000n) > staleAfterMs;
+    const stale = (t: bigint): boolean => Number((now_ns - t) / 1_000_000n) > staleAfterMs;
     if (
       stale(latest.aws.t_ns) ||
       stale(latest.awa.t_ns) ||

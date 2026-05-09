@@ -1,9 +1,4 @@
-import type {
-  AwsAwaCalTable,
-  BoatConfig,
-  BspCal,
-  CompassDeviation,
-} from '@h6000/db';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@h6000/db';
 
 export interface TrueWindInputs {
   /** Apparent wind speed at the masthead, m/s. */
@@ -154,12 +149,7 @@ export function bilinearInterpolate2D(
   const c01 = grid[xi.lo]![yi.hi]!;
   const c10 = grid[xi.hi]![yi.lo]!;
   const c11 = grid[xi.hi]![yi.hi]!;
-  return (
-    c00 * (1 - fx) * (1 - fy) +
-    c10 * fx * (1 - fy) +
-    c01 * (1 - fx) * fy +
-    c11 * fx * fy
-  );
+  return c00 * (1 - fx) * (1 - fy) + c10 * fx * (1 - fy) + c01 * (1 - fx) * fy + c11 * fx * fy;
 }
 
 function locate(bins: number[], v: number): { lo: number; hi: number } {
@@ -187,10 +177,7 @@ export function applyBspCal(bsp: number, cal: BspCal): number {
   return bsp * m;
 }
 
-export function applyCompassDeviation(
-  headingRad: number,
-  cal: CompassDeviation,
-): number {
+export function applyCompassDeviation(headingRad: number, cal: CompassDeviation): number {
   if (cal.deviation.length === 0) return headingRad;
   // Normalize heading to [0, 2π)
   const TWO_PI = 2 * Math.PI;
@@ -198,9 +185,6 @@ export function applyCompassDeviation(
   if (h < 0) h += TWO_PI;
   // 36 bins of 10° each = π/18 radians.
   const binWidth = TWO_PI / cal.deviation.length;
-  const idx = Math.min(
-    cal.deviation.length - 1,
-    Math.floor(h / binWidth),
-  );
+  const idx = Math.min(cal.deviation.length - 1, Math.floor(h / binWidth));
   return headingRad + cal.deviation[idx]!;
 }

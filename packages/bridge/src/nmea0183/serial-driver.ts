@@ -1,5 +1,11 @@
 import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
-import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth, OutgoingPgn } from '../wire-driver.js';
+import type {
+  RawCanFrame,
+  Raw0183Sentence,
+  WireDriver,
+  DriverHealth,
+  OutgoingPgn,
+} from '../wire-driver.js';
 
 /**
  * The minimal shape of a serial source: any object that emits `Buffer`

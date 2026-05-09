@@ -19,10 +19,7 @@ export async function PUT(req: Request): Promise<Response> {
     return Response.json({ error: 'invalid JSON' }, { status: 400 });
   }
   if (!validateAwsAwaCal(body)) {
-    return Response.json(
-      { error: 'invalid cal table shape' },
-      { status: 422 },
-    );
+    return Response.json({ error: 'invalid cal table shape' }, { status: 422 });
   }
   await store.setAwsAwaCal(body);
   return Response.json({ ok: true });

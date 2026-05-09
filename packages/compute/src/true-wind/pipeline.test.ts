@@ -77,9 +77,7 @@ describe('startTrueWindPipeline', () => {
     const cal = await firstValueFrom(store.awsAwaCal$);
     const cal2 = {
       ...cal,
-      angleCorrection: cal.angleCorrection.map((row) =>
-        row.map(() => 0.1),
-      ),
+      angleCorrection: cal.angleCorrection.map((row) => row.map(() => 0.1)),
     };
     await store.setAwsAwaCal(cal2);
     const now2_ns = BigInt(Date.now()) * 1_000_000n;

@@ -28,8 +28,7 @@ const NMEA0183_PATHS = (process.env.NMEA0183_PATHS ?? '')
   .filter((s) => s.length > 0);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
-const REPLAY_MODE: 'asap' | 'realtime' =
-  process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
+const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
 const CONFIG_DB_PATH = process.env.CONFIG_DB ?? './data/config.db';
 
 async function main(): Promise<void> {
@@ -116,9 +115,7 @@ async function main(): Promise<void> {
       sessionId,
     });
     // eslint-disable-next-line no-console
-    console.log(
-      `[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`,
-    );
+    console.log(`[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`);
     teardown.push(() => logger!.close());
   }
 
@@ -144,10 +141,7 @@ async function main(): Promise<void> {
   }
 
   // 6. Start Next.js pointing at the @h6000/web package directory.
-  const webDir = path.resolve(
-    fileURLToPath(import.meta.url),
-    '../../../../packages/web',
-  );
+  const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
   const handle = app.getRequestHandler();

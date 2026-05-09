@@ -12,12 +12,7 @@ import {
   type BspCal,
   type CompassDeviation,
 } from './defaults.js';
-import {
-  awsAwaCal,
-  bspCal,
-  boatConfig as boatConfigTable,
-  compassDeviation,
-} from './schema.js';
+import { awsAwaCal, bspCal, boatConfig as boatConfigTable, compassDeviation } from './schema.js';
 
 const SINGLETON = 'singleton';
 
@@ -75,8 +70,7 @@ export class ConfigStore {
       const rows = db.select().from(table).where(eq(table.id, SINGLETON)).all();
       const row = rows[0];
       if (row) return JSON.parse((row as { value: string }).value) as T;
-      db
-        .insert(table)
+      db.insert(table)
         .values({ id: SINGLETON, value: JSON.stringify(defaultValue) })
         .run();
       return defaultValue;
@@ -86,10 +80,7 @@ export class ConfigStore {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
       bspCal: loadOrInsert<BspCal>(bspCal, DEFAULT_BSP_CAL),
-      compassDeviation: loadOrInsert<CompassDeviation>(
-        compassDeviation,
-        DEFAULT_COMPASS_DEVIATION,
-      ),
+      compassDeviation: loadOrInsert<CompassDeviation>(compassDeviation, DEFAULT_COMPASS_DEVIATION),
     };
 
     return new ConfigStore(raw, db, initial);

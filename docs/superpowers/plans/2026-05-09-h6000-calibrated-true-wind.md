@@ -5,6 +5,7 @@
 **Goal:** Stand up a true-wind compute pipeline that consumes the boat's raw N2K + 0183 inputs, applies a calibration table (initially zero/identity), and re-broadcasts calibrated PGN 130306 onto the bus so the existing Zeus SR plotter and any other displays show our values. Cal table data lives in SQLite and is hot-reloadable; editing is via direct DB write or REST API for now (Plan 3B adds the wizard UI and polars).
 
 **Architecture:**
+
 - New package `@h6000/db`: Drizzle schema + `ConfigStore` class exposing typed observables for cal tables. Single SQLite file `config.db` (path configurable via env var).
 - New package `@h6000/compute`: pure-function true-wind math (motion correction, 2D bilinear cal-table interpolation, vector subtraction → TWS/TWA/TWD) plus an RxJS pipeline that subscribes to bus channels via the ConfigStore.
 - `@h6000/bridge` extension: a new `txPgn(pgn)` method on `WireDriver`, implemented on `Ngt1Driver` via canboatjs's ASCII encoder, stubbed (throws) on the others.
@@ -12,6 +13,7 @@
 - `@h6000/autopilot-server`: instantiates ConfigStore, starts compute pipeline, wires TX to the live NGT-1.
 
 **Tech Stack additions:**
+
 - `drizzle-orm` and `better-sqlite3` (the same pair the rest of the user's workspace uses).
 - No new compute deps — math is straightforward, RxJS handles streaming.
 
@@ -97,6 +99,7 @@ autopilot/
 ## Task 1: Bootstrap `@h6000/db` package
 
 **Files:**
+
 - Create: `packages/db/package.json`
 - Create: `packages/db/tsconfig.json`
 - Modify: root `package.json` (add `drizzle-orm`, `better-sqlite3` to root deps)
@@ -190,6 +193,7 @@ git commit -m "feat(db): bootstrap @h6000/db package with Drizzle and better-sql
 ## Task 2: Drizzle schema for boat config and cal tables
 
 **Files:**
+
 - Create: `packages/db/src/schema.ts`
 - Create: `packages/db/src/defaults.ts`
 
@@ -321,6 +325,7 @@ git commit -m "feat(db): add Drizzle schema and identity defaults"
 ## Task 3: ConfigStore with hot-reload (TDD)
 
 **Files:**
+
 - Create: `packages/db/src/config-store.ts`
 - Test: `packages/db/src/config-store.test.ts`
 - Create: `packages/db/src/index.ts`
@@ -336,11 +341,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { firstValueFrom, skip, take } from 'rxjs';
 import { ConfigStore } from './config-store.js';
-import {
-  DEFAULT_BOAT_CONFIG,
-  DEFAULT_AWS_AWA_CAL,
-  type BoatConfig,
-} from './defaults.js';
+import { DEFAULT_BOAT_CONFIG, DEFAULT_AWS_AWA_CAL, type BoatConfig } from './defaults.js';
 
 describe('ConfigStore', () => {
   let dir: string;
@@ -365,9 +366,7 @@ describe('ConfigStore', () => {
   });
 
   it('emits the new value on the observable when setBoatConfig is called', async () => {
-    const next: Promise<BoatConfig> = firstValueFrom(
-      store.boatConfig$.pipe(skip(1), take(1)),
-    );
+    const next: Promise<BoatConfig> = firstValueFrom(store.boatConfig$.pipe(skip(1), take(1)));
     await store.setBoatConfig({ ...DEFAULT_BOAT_CONFIG, magVarDeg: -15.3 });
     const v = await next;
     expect(v.magVarDeg).toBe(-15.3);
@@ -418,12 +417,7 @@ import {
   type BspCal,
   type CompassDeviation,
 } from './defaults.js';
-import {
-  awsAwaCal,
-  bspCal,
-  boatConfig as boatConfigTable,
-  compassDeviation,
-} from './schema.js';
+import { awsAwaCal, bspCal, boatConfig as boatConfigTable, compassDeviation } from './schema.js';
 
 const SINGLETON = 'singleton';
 
@@ -472,15 +466,8 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS compass_deviation (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
-    const ensure = <T>(
-      table: typeof boatConfigTable,
-      defaultValue: T,
-    ): T => {
-      const row = db
-        .select()
-        .from(table)
-        .where(eq(table.id, SINGLETON))
-        .all()[0];
+    const ensure = <T>(table: typeof boatConfigTable, defaultValue: T): T => {
+      const row = db.select().from(table).where(eq(table.id, SINGLETON)).all()[0];
       if (row) return JSON.parse(row.value) as T;
       db.insert(table)
         .values({ id: SINGLETON, value: JSON.stringify(defaultValue) })
@@ -492,10 +479,7 @@ export class ConfigStore {
       boatConfig: ensure<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: ensure<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
       bspCal: ensure<BspCal>(bspCal, DEFAULT_BSP_CAL),
-      compassDeviation: ensure<CompassDeviation>(
-        compassDeviation,
-        DEFAULT_COMPASS_DEVIATION,
-      ),
+      compassDeviation: ensure<CompassDeviation>(compassDeviation, DEFAULT_COMPASS_DEVIATION),
     };
 
     return new ConfigStore(raw, db, initial);
@@ -580,6 +564,7 @@ git commit -m "feat(db): ConfigStore with SQLite persistence and hot-reload obse
 ## Task 4: Bootstrap `@h6000/compute` package
 
 **Files:**
+
 - Create: `packages/compute/package.json`
 - Create: `packages/compute/tsconfig.json`
 - Modify: root `tsconfig.json` (add the new package to references)
@@ -659,6 +644,7 @@ git commit -m "feat(compute): bootstrap @h6000/compute package"
 ## Task 5: True wind math (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/true-wind/math.ts`
 - Test: `packages/compute/src/true-wind/math.test.ts`
 
@@ -700,9 +686,7 @@ describe('computeTrueWind — round trip', () => {
   it('produces sensible TWS/TWA when AW = vector(BSP, 0) (boat steaming straight into apparent wind)', () => {
     // Apparent wind aligned with bow at 5 m/s, boat moving forward at 3 m/s.
     // True wind should be 2 m/s, on the bow.
-    const out = computeTrueWind(
-      baseInputs({ aws: 5, awa: 0, bsp: 3 }),
-    );
+    const out = computeTrueWind(baseInputs({ aws: 5, awa: 0, bsp: 3 }));
     expect(out.tws).toBeCloseTo(2, 4);
     expect(out.twa).toBeCloseTo(0, 4);
   });
@@ -711,9 +695,7 @@ describe('computeTrueWind — round trip', () => {
     // If AW = (BSP, 0) at the masthead, the boat is generating all the apparent
     // wind itself: true wind is zero. We test a case where TW is non-zero but
     // simple: apparent at 90°.
-    const out = computeTrueWind(
-      baseInputs({ aws: 3, awa: Math.PI / 2, bsp: 3 }),
-    );
+    const out = computeTrueWind(baseInputs({ aws: 3, awa: Math.PI / 2, bsp: 3 }));
     // TW magnitude = sqrt(3^2 + 3^2) = ~4.24, on the beam-aft direction.
     expect(out.tws).toBeCloseTo(Math.sqrt(18), 3);
   });
@@ -815,12 +797,7 @@ describe('applyCompassDeviation', () => {
 - [ ] **Step 3: Implement `packages/compute/src/true-wind/math.ts`**
 
 ```ts
-import type {
-  AwsAwaCalTable,
-  BoatConfig,
-  BspCal,
-  CompassDeviation,
-} from '@h6000/db';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@h6000/db';
 
 export interface TrueWindInputs {
   /** Apparent wind speed at the masthead, m/s. */
@@ -968,12 +945,7 @@ export function bilinearInterpolate2D(
   const c01 = grid[xi.lo]![yi.hi]!;
   const c10 = grid[xi.hi]![yi.lo]!;
   const c11 = grid[xi.hi]![yi.hi]!;
-  return (
-    c00 * (1 - fx) * (1 - fy) +
-    c10 * fx * (1 - fy) +
-    c01 * (1 - fx) * fy +
-    c11 * fx * fy
-  );
+  return c00 * (1 - fx) * (1 - fy) + c10 * fx * (1 - fy) + c01 * (1 - fx) * fy + c11 * fx * fy;
 }
 
 function locate(bins: number[], v: number): { lo: number; hi: number } {
@@ -1001,10 +973,7 @@ export function applyBspCal(bsp: number, cal: BspCal): number {
   return bsp * m;
 }
 
-export function applyCompassDeviation(
-  headingRad: number,
-  cal: CompassDeviation,
-): number {
+export function applyCompassDeviation(headingRad: number, cal: CompassDeviation): number {
   if (cal.deviation.length === 0) return headingRad;
   // Normalize heading to [0, 2π)
   const TWO_PI = 2 * Math.PI;
@@ -1012,10 +981,7 @@ export function applyCompassDeviation(
   if (h < 0) h += TWO_PI;
   // 36 bins of 10° each = π/18 radians.
   const binWidth = TWO_PI / cal.deviation.length;
-  const idx = Math.min(
-    cal.deviation.length - 1,
-    Math.floor(h / binWidth),
-  );
+  const idx = Math.min(cal.deviation.length - 1, Math.floor(h / binWidth));
   return headingRad + cal.deviation[idx]!;
 }
 ```
@@ -1040,6 +1006,7 @@ git commit -m "feat(compute): true-wind math with cal-table interpolation"
 ## Task 6: True wind compute pipeline (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/true-wind/pipeline.ts`
 - Test: `packages/compute/src/true-wind/pipeline.test.ts`
 - Create: `packages/compute/src/index.ts`
@@ -1120,9 +1087,7 @@ describe('startTrueWindPipeline', () => {
     const cal = await firstValueFrom(store.awsAwaCal$);
     const cal2 = {
       ...cal,
-      angleCorrection: cal.angleCorrection.map((row) =>
-        row.map(() => 0.1),
-      ),
+      angleCorrection: cal.angleCorrection.map((row) => row.map(() => 0.1)),
     };
     await store.setAwsAwaCal(cal2);
     bus.publish(sample(Channels.Wind.ApparentSpeed, 5.01));
@@ -1130,7 +1095,6 @@ describe('startTrueWindPipeline', () => {
     expect(received.length).toBeGreaterThan(initialCount);
   });
 });
-
 ```
 
 - [ ] **Step 2: Run — expect failure**
@@ -1146,13 +1110,7 @@ Module not found.
 ```ts
 import { combineLatest, firstValueFrom, type Subscription } from 'rxjs';
 import { Bus, Channels, type Sample } from '@h6000/core';
-import type {
-  AwsAwaCalTable,
-  BoatConfig,
-  BspCal,
-  CompassDeviation,
-  ConfigStore,
-} from '@h6000/db';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@h6000/db';
 import { computeTrueWind } from './math.js';
 
 export interface TrueWindPipelineOptions {
@@ -1224,17 +1182,11 @@ export async function startTrueWindPipeline(
   );
 
   function recompute(): void {
-    if (
-      !latest.aws ||
-      !latest.awa ||
-      !latest.bsp ||
-      !latest.hdg
-    ) {
+    if (!latest.aws || !latest.awa || !latest.bsp || !latest.hdg) {
       return;
     }
     const now_ns = BigInt(Date.now()) * 1_000_000n;
-    const stale = (t: bigint): boolean =>
-      Number((now_ns - t) / 1_000_000n) > staleAfterMs;
+    const stale = (t: bigint): boolean => Number((now_ns - t) / 1_000_000n) > staleAfterMs;
     if (
       stale(latest.aws.t_ns) ||
       stale(latest.awa.t_ns) ||
@@ -1274,7 +1226,6 @@ function make(channel: string, value: number, t_ns: bigint): Sample {
     source: 'computed:true_wind',
   };
 }
-
 ```
 
 - [ ] **Step 4: Add `packages/compute/src/index.ts`**
@@ -1304,6 +1255,7 @@ git commit -m "feat(compute): true-wind pipeline with hot-reloading cal tables"
 ## Task 7: Add `txPgn` to WireDriver, stub on existing drivers
 
 **Files:**
+
 - Modify: `packages/bridge/src/wire-driver.ts`
 - Modify: `packages/bridge/src/ngt-driver.ts`
 - Modify: `packages/bridge/src/nmea0183/serial-driver.ts`
@@ -1380,6 +1332,7 @@ git commit -m "feat(bridge): add txPgn(pgn) to WireDriver, stub on drivers"
 ## Task 8: Implement `Ngt1Driver.txPgn` (TDD)
 
 **Files:**
+
 - Modify: `packages/bridge/src/ngt-driver.ts`
 - Modify: `packages/bridge/src/ngt-driver.test.ts`
 
@@ -1536,6 +1489,7 @@ git commit -m "feat(bridge): Ngt1Driver.txPgn encodes via canboatjs and writes t
 ## Task 9: TX wiring — subscribe to compute output, throttle, send (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/tx/true-wind-tx.ts`
 - Test: `packages/bridge/src/tx/true-wind-tx.test.ts`
 
@@ -1662,9 +1616,7 @@ export interface TrueWindTxOptions {
  * H5000 / Zeus SR family expects for TWS/TWA values referenced to the boat
  * (not ground-true wind direction — that's "True (ground referenced)").
  */
-export async function startTrueWindTx(
-  opts: TrueWindTxOptions,
-): Promise<() => Promise<void>> {
+export async function startTrueWindTx(opts: TrueWindTxOptions): Promise<() => Promise<void>> {
   const { bus, driver } = opts;
   const throttleMs = opts.throttleMs ?? 200;
 
@@ -1737,6 +1689,7 @@ git commit -m "feat(bridge): TX wiring for calibrated true wind PGN 130306"
 ## Task 10: Web API — `/api/config/aws-awa` GET/PUT
 
 **Files:**
+
 - Create: `packages/web/src/app/api/config/aws-awa/route.ts`
 
 A minimal pair of endpoints so the cal table can be read and overwritten without writing SQL. Plan 3B will replace this with a proper editor UI; for now, having an HTTP surface lets you `curl` the table.
@@ -1910,10 +1863,12 @@ git commit -m "feat(web): minimal /api/config/aws-awa GET and PUT"
 ## Task 11: autopilot-server integration
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 - Modify: `apps/autopilot-server/package.json`
 
 Boot order:
+
 1. Open `ConfigStore` at `<dataDir>/config.db` (env var or default `./data/config.db`).
 2. Set the singleton (so the web side's `/api/config/aws-awa` route can find it).
 3. Boot drivers as before.
@@ -1969,35 +1924,35 @@ const CONFIG_DB_PATH = process.env.CONFIG_DB ?? './data/config.db';
 Inside `main()`, before the `bus`/drivers block:
 
 ```ts
-  // 0. Open ConfigStore so any code path (web routes, compute pipeline)
-  //    can resolve it.
-  const dataDir = path.dirname(CONFIG_DB_PATH);
-  await mkdir(dataDir, { recursive: true });
-  const store = await ConfigStore.open(CONFIG_DB_PATH);
-  setSharedConfigStore(store);
-  teardown.push(() => store.close());
+// 0. Open ConfigStore so any code path (web routes, compute pipeline)
+//    can resolve it.
+const dataDir = path.dirname(CONFIG_DB_PATH);
+await mkdir(dataDir, { recursive: true });
+const store = await ConfigStore.open(CONFIG_DB_PATH);
+setSharedConfigStore(store);
+teardown.push(() => store.close());
 ```
 
 After `runBridge`:
 
 ```ts
-  // Start the true-wind compute pipeline (subscribes to the bus and the
-  // ConfigStore, publishes wind.true.calibrated.* back to the bus).
-  const stopCompute = await startTrueWindPipeline({
-    bus,
-    configStore: store,
-  });
-  teardown.push(stopCompute);
+// Start the true-wind compute pipeline (subscribes to the bus and the
+// ConfigStore, publishes wind.true.calibrated.* back to the bus).
+const stopCompute = await startTrueWindPipeline({
+  bus,
+  configStore: store,
+});
+teardown.push(stopCompute);
 
-  // Start the true-wind TX wiring. Picks the first driver that supports
-  // txPgn (i.e. the NGT-1, which throws on others).
-  const ngt = drivers.find((d) => d instanceof Ngt1Driver);
-  if (ngt && !REPLAY) {
-    const stopTx = await startTrueWindTx({ bus, driver: ngt });
-    teardown.push(stopTx);
-    // eslint-disable-next-line no-console
-    console.log('[autopilot] true-wind TX online via NGT-1');
-  }
+// Start the true-wind TX wiring. Picks the first driver that supports
+// txPgn (i.e. the NGT-1, which throws on others).
+const ngt = drivers.find((d) => d instanceof Ngt1Driver);
+if (ngt && !REPLAY) {
+  const stopTx = await startTrueWindTx({ bus, driver: ngt });
+  teardown.push(stopTx);
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] true-wind TX online via NGT-1');
+}
 ```
 
 - [ ] **Step 4: Smoke-test (SKIP_BRIDGE path)**
@@ -2075,18 +2030,21 @@ git commit -m "chore: prettier formatting after Plan 3 landing"
 ## Closing notes
 
 After this plan lands:
+
 - The H6000 computes calibrated true wind from raw inputs and emits PGN 130306 onto the N2K bus.
-- Identity / zero cal means the *value* will look similar to whatever was already on the bus — but it's now coming from us, with the cal infrastructure in place to start tuning.
+- Identity / zero cal means the _value_ will look similar to whatever was already on the bus — but it's now coming from us, with the cal infrastructure in place to start tuning.
 - Cal tables can be edited via `curl -X PUT /api/config/aws-awa` (no UI yet).
 - Hot-reload works: edit the table, the next compute tick uses the new values.
 
 Plan 3B picks up:
+
 - Web UI for the AWS/AWA cal grid (visual heat-map editor).
 - Tack-test wizard.
 - Polars editor (Expedition CSV import, target speed compute, %polar, target VMG).
 - BSP and compass-deviation calibration procedures (the tables already exist; the UI to fill them is what's missing).
 
 Out of scope still and beyond Plan 3B:
+
 - Leeway / current pipelines (Plan 4 with the hybrid Option-C model).
 - Layline projection (Plan 5).
 - Autopilot decode → shadow → live (Plan 6).

@@ -30,9 +30,7 @@ describe('computeTrueWind — round trip', () => {
   it('produces sensible TWS/TWA when AW = vector(BSP, 0) (boat steaming straight into apparent wind)', () => {
     // Apparent wind aligned with bow at 5 m/s, boat moving forward at 3 m/s.
     // True wind should be 2 m/s, on the bow.
-    const out = computeTrueWind(
-      baseInputs({ aws: 5, awa: 0, bsp: 3 }),
-    );
+    const out = computeTrueWind(baseInputs({ aws: 5, awa: 0, bsp: 3 }));
     expect(out.tws).toBeCloseTo(2, 4);
     expect(out.twa).toBeCloseTo(0, 4);
   });
@@ -40,9 +38,7 @@ describe('computeTrueWind — round trip', () => {
   it('produces a non-trivial TWS when apparent wind is on the beam at boat speed', () => {
     // AW = (0, 3) at the masthead, V = (3, 0). True wind = (-3, 3).
     // |TW| = 3*sqrt(2) ≈ 4.24
-    const out = computeTrueWind(
-      baseInputs({ aws: 3, awa: Math.PI / 2, bsp: 3 }),
-    );
+    const out = computeTrueWind(baseInputs({ aws: 3, awa: Math.PI / 2, bsp: 3 }));
     expect(out.tws).toBeCloseTo(Math.sqrt(18), 3);
   });
 
@@ -58,7 +54,7 @@ describe('computeTrueWind — round trip', () => {
     // TWA can be negative; TWD is normalized to [0, 2π).
     // We check that the difference is ~0 modulo 2π.
     const diff = out.twd - out.twa;
-    const norm = ((diff + Math.PI * 4) % (Math.PI * 2));
+    const norm = (diff + Math.PI * 4) % (Math.PI * 2);
     expect(Math.min(norm, Math.PI * 2 - norm)).toBeLessThan(1e-6);
   });
 

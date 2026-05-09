@@ -1,6 +1,12 @@
 import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
 import canboat from '@canboat/canboatjs';
-import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth, OutgoingPgn } from './wire-driver.js';
+import type {
+  RawCanFrame,
+  Raw0183Sentence,
+  WireDriver,
+  DriverHealth,
+  OutgoingPgn,
+} from './wire-driver.js';
 
 const { pgnToActisenseSerialFormat } = canboat as unknown as {
   pgnToActisenseSerialFormat: (pgn: {
@@ -26,10 +32,7 @@ export interface Ngt1Source {
  * (.write()). A test harness can implement just this shape.
  */
 export interface Ngt1Sink {
-  write(
-    buf: Buffer | string,
-    cb?: (err?: Error | null) => void,
-  ): boolean;
+  write(buf: Buffer | string, cb?: (err?: Error | null) => void): boolean;
 }
 
 export interface Ngt1DriverOptions {
@@ -99,14 +102,10 @@ export class Ngt1Driver implements WireDriver {
     }
     const sink = this.source as unknown as Ngt1Sink;
     if (typeof sink.write !== 'function') {
-      throw new Error(
-        'Ngt1Driver.txPgn: source has no .write() method (test sink missing it?)',
-      );
+      throw new Error('Ngt1Driver.txPgn: source has no .write() method (test sink missing it?)');
     }
     await new Promise<void>((resolve, reject) => {
-      sink.write(line + '\n', (err) =>
-        err ? reject(err) : resolve(),
-      );
+      sink.write(line + '\n', (err) => (err ? reject(err) : resolve()));
     });
   }
 

@@ -4,11 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { firstValueFrom, take, skip } from 'rxjs';
 import { ConfigStore } from './config-store.js';
-import {
-  DEFAULT_BOAT_CONFIG,
-  DEFAULT_AWS_AWA_CAL,
-  type BoatConfig,
-} from './defaults.js';
+import { DEFAULT_BOAT_CONFIG, DEFAULT_AWS_AWA_CAL, type BoatConfig } from './defaults.js';
 
 describe('ConfigStore', () => {
   let dir: string;
@@ -33,9 +29,7 @@ describe('ConfigStore', () => {
   });
 
   it('emits the new value on the observable when setBoatConfig is called', async () => {
-    const next: Promise<BoatConfig> = firstValueFrom(
-      store.boatConfig$.pipe(skip(1), take(1)),
-    );
+    const next: Promise<BoatConfig> = firstValueFrom(store.boatConfig$.pipe(skip(1), take(1)));
     await store.setBoatConfig({ ...DEFAULT_BOAT_CONFIG, magVarDeg: -15.3 });
     const v = await next;
     expect(v.magVarDeg).toBe(-15.3);
