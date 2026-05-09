@@ -1,5 +1,15 @@
 import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
-import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from './wire-driver.js';
+import canboat from '@canboat/canboatjs';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth, OutgoingPgn } from './wire-driver.js';
+
+const { pgnToActisenseSerialFormat } = canboat as unknown as {
+  pgnToActisenseSerialFormat: (pgn: {
+    pgn: number;
+    prio?: number;
+    dst?: number;
+    fields: Record<string, unknown>;
+  }) => string;
+};
 
 /**
  * Anything that emits 'data' Buffer events. The serialport SerialPort class
@@ -8,6 +18,18 @@ import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from './w
 export interface Ngt1Source {
   on(event: 'data', cb: (chunk: Buffer) => void): this;
   off(event: 'data', cb: (chunk: Buffer) => void): this;
+}
+
+/**
+ * The write-side of the serial port. The NGT-1 source also doubles as a sink
+ * for TX: Node.js SerialPort implements both Readable (events) and Writable
+ * (.write()). A test harness can implement just this shape.
+ */
+export interface Ngt1Sink {
+  write(
+    buf: Buffer | string,
+    cb?: (err?: Error | null) => void,
+  ): boolean;
 }
 
 export interface Ngt1DriverOptions {
@@ -63,6 +85,29 @@ export class Ngt1Driver implements WireDriver {
 
   async tx0183(_port: number, _text: string): Promise<void> {
     throw new Error('Ngt1Driver.tx0183 not implemented (NGT-1 has no 0183)');
+  }
+
+  async txPgn(pgn: OutgoingPgn): Promise<void> {
+    const line = pgnToActisenseSerialFormat({
+      pgn: pgn.pgn,
+      prio: pgn.prio ?? 6,
+      dst: pgn.dst ?? 255,
+      fields: pgn.fields,
+    });
+    if (!line || line.length === 0) {
+      throw new Error(`canboatjs returned empty encoding for PGN ${pgn.pgn}`);
+    }
+    const sink = this.source as unknown as Ngt1Sink;
+    if (typeof sink.write !== 'function') {
+      throw new Error(
+        'Ngt1Driver.txPgn: source has no .write() method (test sink missing it?)',
+      );
+    }
+    await new Promise<void>((resolve, reject) => {
+      sink.write(line + '\n', (err) =>
+        err ? reject(err) : resolve(),
+      );
+    });
   }
 
   private onData(chunk: Buffer): void {
