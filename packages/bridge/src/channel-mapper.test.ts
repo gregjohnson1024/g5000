@@ -60,9 +60,7 @@ describe('mapPgnToSamples', () => {
       Reference: 'Magnetic',
     });
     const samples = mapPgnToSamples(decoded);
-    expect(samples.map((s) => s.channel)).toEqual([
-      Channels.Boat.HeadingMagnetic,
-    ]);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.HeadingMagnetic]);
   });
 
   it('returns empty array for unknown PGN', () => {

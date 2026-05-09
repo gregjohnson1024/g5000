@@ -34,8 +34,7 @@ describe('Ngt1Driver', () => {
 
   it('parses an Actisense ASCII wind-PGN line into a RawCanFrame', async () => {
     // PGN 130306 (wind), prio 2, src 17, dst 255, 8-byte payload.
-    const line =
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n';
+    const line = '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n';
     const framePromise = firstValueFrom(driver.rxCan);
     source.emit(line);
     const frame = await framePromise;

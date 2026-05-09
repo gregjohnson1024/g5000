@@ -35,19 +35,15 @@ describe('runBridge', () => {
     const received: Sample[] = [];
     bus.subscribe('wind.**', (s) => received.push(s));
 
-    source.emit(
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,02,fa,fa\n',
-    );
+    source.emit('2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,02,fa,fa\n');
 
     // Allow the RxJS chain to settle.
     await new Promise((r) => setTimeout(r, 10));
 
     expect(received.length).toBeGreaterThan(0);
     const channels = new Set(received.map((s) => s.channel));
-    expect(
-      channels.has(Channels.Wind.ApparentAngle) ||
-        channels.has(Channels.Wind.ApparentSpeed),
-    ).toBe(true);
+    expect(channels.has(Channels.Wind.ApparentAngle)).toBe(true);
+    expect(channels.has(Channels.Wind.ApparentSpeed)).toBe(true);
 
     await stop();
   });

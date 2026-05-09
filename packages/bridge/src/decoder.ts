@@ -37,9 +37,7 @@ export interface DecodedPgn {
  * pay a string round-trip per frame, but at <1000 frames/sec on a CM5 this
  * is in the noise.
  */
-export function decodeFrames(
-  frames$: Observable<RawCanFrame>,
-): Observable<DecodedPgn> {
+export function decodeFrames(frames$: Observable<RawCanFrame>): Observable<DecodedPgn> {
   return new Observable<DecodedPgn>((subscriber) => {
     const parser = new FromPgn();
     const pendingTimestamps = new Map<number, bigint>(); // pgn → most-recent rxTimestamp
@@ -60,9 +58,7 @@ export function decodeFrames(
         const src = frame.id & 0xff;
         const prio = (frame.id >> 26) & 0x7;
         pendingTimestamps.set(pgn, frame.rxTimestamp);
-        const hex = Array.from(frame.data, (b) =>
-          b.toString(16).padStart(2, '0'),
-        );
+        const hex = Array.from(frame.data, (b) => b.toString(16).padStart(2, '0'));
         const line = `${new Date().toISOString()},${prio},${pgn},${src},255,${frame.data.length},${hex.join(',')}`;
         parser.parseString(line);
       },

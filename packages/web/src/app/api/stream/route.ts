@@ -1,4 +1,4 @@
-import { getSharedBus } from '@h6000/core';
+import { getSharedBus, toJsonSafe, type Sample } from '@h6000/core';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,14 +18,14 @@ export async function GET(req: Request): Promise<Response> {
 
   const stream = new ReadableStream({
     start(controller) {
-      const latest = new Map<string, unknown>();
+      const latest = new Map<string, Sample>();
       let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
       const flush = (): void => {
         flushTimer = null;
         if (latest.size === 0) return;
         for (const [channel, sample] of latest) {
-          const payload = JSON.stringify({ channel, sample });
+          const payload = JSON.stringify({ channel, sample: toJsonSafe(sample) });
           controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
         }
         latest.clear();

@@ -45,10 +45,7 @@ async function main(): Promise<void> {
   }
 
   // 2. Start Next.js pointing at the @h6000/web package directory.
-  const webDir = path.resolve(
-    fileURLToPath(import.meta.url),
-    '../../../../packages/web',
-  );
+  const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
   const handle = app.getRequestHandler();

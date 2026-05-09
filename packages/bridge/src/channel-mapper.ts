@@ -19,12 +19,8 @@ const mappers: Record<number, MapperFn> = {
     const speed = pgn.fields['Wind Speed'];
     const angle = pgn.fields['Wind Angle'];
     const isApparent = ref === 'Apparent';
-    const speedChan = isApparent
-      ? Channels.Wind.ApparentSpeed
-      : Channels.Wind.TrueSpeed;
-    const angleChan = isApparent
-      ? Channels.Wind.ApparentAngle
-      : Channels.Wind.TrueAngle;
+    const speedChan = isApparent ? Channels.Wind.ApparentSpeed : Channels.Wind.TrueSpeed;
+    const angleChan = isApparent ? Channels.Wind.ApparentAngle : Channels.Wind.TrueAngle;
     const out: Sample[] = [];
     if (typeof speed === 'number') {
       out.push({
@@ -64,10 +60,7 @@ const mappers: Record<number, MapperFn> = {
     const ref = String(pgn.fields['Reference'] ?? '');
     const v = pgn.fields['Heading'];
     if (typeof v !== 'number') return [];
-    const channel =
-      ref === 'True'
-        ? Channels.Boat.HeadingTrue
-        : Channels.Boat.HeadingMagnetic;
+    const channel = ref === 'True' ? Channels.Boat.HeadingTrue : Channels.Boat.HeadingMagnetic;
     return [
       {
         channel,

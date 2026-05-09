@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Sample } from '@h6000/core';
+import type { JsonSafeSample } from '@h6000/core';
 
 interface ChannelEntry {
-  sample: Sample;
+  sample: JsonSafeSample;
   receivedAtMs: number;
 }
 
-function formatValue(s: Sample): string {
+function formatValue(s: JsonSafeSample): string {
   switch (s.value.kind) {
     case 'scalar':
       return s.value.unit
@@ -26,9 +26,7 @@ function formatValue(s: Sample): string {
 }
 
 export default function InspectPage() {
-  const [channels, setChannels] = useState<Map<string, ChannelEntry>>(
-    new Map(),
-  );
+  const [channels, setChannels] = useState<Map<string, ChannelEntry>>(new Map());
 
   useEffect(() => {
     const es = new EventSource('/api/stream');
@@ -36,7 +34,7 @@ export default function InspectPage() {
       try {
         const { channel, sample } = JSON.parse(ev.data) as {
           channel: string;
-          sample: Sample;
+          sample: JsonSafeSample;
         };
         setChannels((prev) => {
           const next = new Map(prev);
@@ -53,9 +51,7 @@ export default function InspectPage() {
     return () => es.close();
   }, []);
 
-  const sorted = Array.from(channels.entries()).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
+  const sorted = Array.from(channels.entries()).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <main className="p-6">

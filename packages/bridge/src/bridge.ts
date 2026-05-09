@@ -27,9 +27,12 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
       .subscribe({
         next: (sample) => bus.publish(sample),
         error: (err) => {
-          // Errors should not kill the pipeline; log and continue.
+          // The current pipeline terminates this driver's subscription on
+          // first error. For Phase 0a (stable canboatjs, well-defined NGT-1
+          // framing) this is acceptable; restart the process to recover.
+          // Future plans should add catchError + resubscribe.
           // eslint-disable-next-line no-console
-          console.error('[bridge] pipeline error', err);
+          console.error('[bridge] pipeline error (subscription terminated)', err);
         },
       });
   });

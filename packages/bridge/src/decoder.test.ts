@@ -5,8 +5,7 @@ import { parseActisenseLine } from './ngt-driver.js';
 
 describe('decodeFrames', () => {
   it('decodes a wind PGN 130306 from a raw CAN frame', async () => {
-    const line =
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa';
+    const line = '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa';
     const frame = parseActisenseLine(line);
     expect(frame).toBeTruthy();
     const decoded = await firstValueFrom(decodeFrames(of(frame!)));
@@ -16,11 +15,7 @@ describe('decodeFrames', () => {
     // canboat exposes wind speed and angle; field names may vary slightly,
     // but at least one of these is present:
     const fieldKeys = Object.keys(decoded.fields);
-    expect(
-      fieldKeys.some((k) =>
-        ['Wind Speed', 'Wind Angle', 'Reference'].includes(k),
-      ),
-    ).toBe(true);
+    expect(fieldKeys.some((k) => ['Wind Speed', 'Wind Angle', 'Reference'].includes(k))).toBe(true);
   });
 
   it('emits one DecodedPgn per single-frame input', async () => {
