@@ -12,6 +12,9 @@ import type { Sample, Channel } from './types.js';
  * Implementation: a single RxJS Subject<Sample> with per-subscriber filtering.
  * Sufficient for our scale (≤ a few thousand samples/sec, dozens of
  * subscribers).
+ *
+ * Lifecycle: Bus is intended to live for the process lifetime; no `complete()`
+ * is exposed. Drop the reference to let the GC collect it.
  */
 export class Bus {
   private readonly subject = new Subject<Sample>();
@@ -32,13 +35,19 @@ export class Bus {
 /**
  * Compile a channel pattern into a predicate. Patterns use dots as segment
  * separators, `*` matches any single segment, `**` matches any number of
- * trailing segments (must appear last).
+ * trailing segments and MUST appear as the last segment (validated at
+ * subscribe time so typos like "wind.**.angle" fail loudly).
  */
 function compilePattern(pattern: string): (channel: string) => boolean {
   if (!pattern.includes('*')) {
     return (ch) => ch === pattern;
   }
   const segs = pattern.split('.');
+  for (let i = 0; i < segs.length - 1; i++) {
+    if (segs[i] === '**') {
+      throw new Error(`Pattern "${pattern}": ** must appear only as the trailing segment`);
+    }
+  }
   const trailingDoubleStar = segs[segs.length - 1] === '**';
   const fixed = trailingDoubleStar ? segs.slice(0, -1) : segs;
   return (ch) => {

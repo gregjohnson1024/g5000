@@ -56,4 +56,14 @@ describe('Bus', () => {
     bus.publish(sample('wind.apparent.angle', 2));
     expect(received).toHaveLength(1);
   });
+
+  it('throws when ** appears mid-pattern', () => {
+    const bus = new Bus();
+    expect(() => bus.subscribe('wind.**.angle', () => {})).toThrow(
+      /\*\* must appear only as the trailing segment/,
+    );
+    expect(() => bus.subscribe('**.angle', () => {})).toThrow(
+      /\*\* must appear only as the trailing segment/,
+    );
+  });
 });
