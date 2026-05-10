@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "predev": "tsc -b ../../packages/core ../../packages/db",
-    "prebuild": "tsc -b ../../packages/core ../../packages/db",
+    "predev": "tsc -b ../../packages/core ../../packages/db ../../packages/compute",
+    "prebuild": "tsc -b ../../packages/core ../../packages/db ../../packages/compute",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -b",
