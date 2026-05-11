@@ -1,6 +1,7 @@
 import net from 'node:net';
 import type { AddressInfo } from 'node:net';
 import type { Bus, Sample, ChannelValue } from '@g5000/core';
+import { createDamper } from '@g5000/core';
 import {
   CHANNEL_TO_FUNCTIONS,
   FUNCTION_TABLE,
@@ -25,6 +26,16 @@ export interface HlinkServerOptions {
    * deterministically drive the throttle. Defaults to `Date.now`.
    */
   now?: () => number;
+  /**
+   * Optional getter returning the current per-channel damping config
+   * (channel name → time constant in seconds). Looked up on each sample;
+   * missing or 0/undefined entries mean no damping for that channel.
+   *
+   * When omitted, no damping is applied — useful for tests and minimal
+   * deployments. The autopilot-server boot wires this to the ConfigStore's
+   * `getDampingConfig()`.
+   */
+  getDamping?: () => Record<string, number>;
 }
 
 export interface HlinkServerHandle {
@@ -61,8 +72,27 @@ interface ClientState {
  * each sample.
  */
 export function startHlinkServer(opts: HlinkServerOptions): HlinkServerHandle {
-  const { bus, port, host = '0.0.0.0', now = Date.now } = opts;
+  const { bus, port, host = '0.0.0.0', now = Date.now, getDamping } = opts;
   const clients = new Set<ClientState>();
+
+  // ─── Damping ────────────────────────────────────────────────────────
+  // One damper shared across all clients: damping is a property of the
+  // outgoing-display layer, not per-connection. Reconnects therefore see
+  // already-warmed state, which is fine because the EMA self-warms in a
+  // single sample anyway. Memory cost is one entry per channel that's
+  // ever been touched.
+  //
+  // The damper is also consulted before populating `lastValueCache`, so
+  // one-shot #OV reads return the same damped value the streaming path
+  // would produce.
+  const damper = createDamper();
+
+  // ─── Last-value cache ────────────────────────────────────────────────
+  // Per-channel cache so #OV one-shot reads can answer with real data
+  // immediately instead of waiting for the next sample. Populated by
+  // `onSample` below with the DAMPED value (so one-shot reads match
+  // what the streaming path would produce). Memory cost is trivial.
+  const lastValueCache = new Map<string, ChannelValue>();
 
   // ─── Bus subscription ────────────────────────────────────────────────
   // One subscription, fan out to all clients on every sample. Cheaper
@@ -72,7 +102,18 @@ export function startHlinkServer(opts: HlinkServerOptions): HlinkServerHandle {
     onSample(sample);
   });
 
-  function onSample(sample: Sample): void {
+  function onSample(rawSample: Sample): void {
+    // Apply damping FIRST, on every sample, so the EMA's Δt corresponds to
+    // real sample spacing. Doing it later (e.g. inside the per-client
+    // throttle gate) would mean the EMA only advances at the throttle rate
+    // and α = exp(-Δt/τ) would be wrong.
+    const tau = getDamping?.()[rawSample.channel];
+    const sample = damper(rawSample, tau);
+
+    // Cache the (damped) value so #OV one-shot reads return the same value
+    // a streaming client would see.
+    lastValueCache.set(sample.channel, sample.value);
+
     if (clients.size === 0) return;
     const t = now();
 
@@ -239,14 +280,6 @@ export function startHlinkServer(opts: HlinkServerOptions): HlinkServerHandle {
     }
   }
 
-  // ─── Last-value cache ────────────────────────────────────────────────
-  // Per-channel cache so #OV one-shot reads can answer with real data
-  // immediately instead of waiting for the next sample. Updated on every
-  // bus sample. Memory cost is trivial (≤ a few dozen entries).
-  const lastValueCache = new Map<string, ChannelValue>();
-  bus.subscribe('**', (s) => {
-    lastValueCache.set(s.channel, s.value);
-  });
 
   // ─── Listen ──────────────────────────────────────────────────────────
   let resolveListening!: () => void;

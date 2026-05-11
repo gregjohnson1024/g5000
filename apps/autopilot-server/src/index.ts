@@ -290,7 +290,14 @@ async function main(): Promise<void> {
   //     Spec on serial is 115200/8N1; we use TCP because every modern client
   //     supports it just as well.
   if (HLINK_ENABLED) {
-    const hlink = startHlinkServer({ bus, port: HLINK_PORT, host: '0.0.0.0' });
+    const hlink = startHlinkServer({
+      bus,
+      port: HLINK_PORT,
+      host: '0.0.0.0',
+      // Cheap sync read of the current damping config on every sample.
+      // ConfigStore keeps a BehaviorSubject under the hood; `.value` access.
+      getDamping: () => store.getDampingConfig(),
+    });
     try {
       await hlink.listening;
       // eslint-disable-next-line no-console

@@ -224,6 +224,59 @@ describe('startHlinkServer — integration', () => {
     await client.close();
   });
 
+  it('applies damping when getDamping is provided (V values reflect smoothed scalar)', async () => {
+    // Spin up a separate server with a getDamping returning a 1s τ on boat
+    // speed. Two samples 1s apart should produce the EMA value:
+    //   damped[1] = α·5 + (1-α)·10, α=e^-1
+    // → ≈ 0.368·5 + 0.632·10 = 1.84 + 6.32 = 8.16 m/s → 15.86 kn → "15.86" or so
+    const localBus = new Bus();
+    const localHandle = startHlinkServer({
+      bus: localBus,
+      port: 0,
+      host: '127.0.0.1',
+      getDamping: () => ({ 'boat.speed.water': 1.0 }),
+    });
+    await localHandle.listening;
+    const localPort = localHandle.getAddress().port;
+
+    const client = await makeClient(localPort);
+    client.send(withCsum('#OV,1,1,65,1'));
+    client.send(withCsum('#OS,1'));
+    await new Promise((r) => setTimeout(r, 30));
+
+    // First sample initializes the EMA — emits raw (5 m/s = 9.72 kn).
+    localBus.publish({
+      channel: 'boat.speed.water',
+      t_ns: 0n,
+      value: { kind: 'scalar', value: 5, unit: 'm/s' },
+      source: 'test',
+    });
+    // Wait past the 200 ms throttle, then send another sample 1 s of t_ns later.
+    await new Promise((r) => setTimeout(r, 250));
+    localBus.publish({
+      channel: 'boat.speed.water',
+      t_ns: 1_000_000_000n, // 1 second later in sample time
+      value: { kind: 'scalar', value: 10, unit: 'm/s' },
+      source: 'test',
+    });
+
+    const buf = await client.waitFor((b) => (b.match(/V001,001,065,/g) ?? []).length >= 2);
+    // Parse all V lines and convert to numbers.
+    const matches = [...buf.matchAll(/V001,001,065,([\d.]+)\*/g)].map((m) => Number(m[1]));
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    // First should be raw 5 m/s → 9.72 kn.
+    expect(matches[0]).toBeCloseTo(5 * (1 / 0.514444), 1);
+    // Second should be damped: α=e^-1 ≈ 0.3679, damped m/s = 0.3679*5 + 0.6321*10 ≈ 8.161
+    const alpha = Math.exp(-1);
+    const expectedMps = alpha * 5 + (1 - alpha) * 10;
+    expect(matches[1]).toBeCloseTo(expectedMps * (1 / 0.514444), 1);
+    // Sanity: damped value should differ from raw 10 → 19.43.
+    expect(matches[1]).toBeLessThan(10 * (1 / 0.514444));
+
+    await client.close();
+    await localHandle.teardown();
+  });
+
   it('cleans up state when a client disconnects', async () => {
     const client = await makeClient(port);
     client.send(withCsum('#OV,1,1,65,1'));
