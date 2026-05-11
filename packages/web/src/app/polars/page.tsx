@@ -7,9 +7,7 @@ import { PolarCellEditor } from './PolarCellEditor';
 
 export default function PolarsPage() {
   const [polar, setPolar] = useState<PolarTable | null>(null);
-  const [selected, setSelected] = useState<{ twsIdx: number; twaIdx: number } | null>(
-    null,
-  );
+  const [selected, setSelected] = useState<{ twsIdx: number; twaIdx: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,9 +104,7 @@ export default function PolarsPage() {
             selected={selected ?? undefined}
             onSelect={(c) => setSelected(c)}
           />
-          {selected && (
-            <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />
-          )}
+          {selected && <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />}
         </section>
       )}
 

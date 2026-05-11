@@ -14,7 +14,13 @@ import {
   type CompassDeviation,
   type PolarTable,
 } from './defaults.js';
-import { awsAwaCal, bspCal, boatConfig as boatConfigTable, compassDeviation, polars } from './schema.js';
+import {
+  awsAwaCal,
+  bspCal,
+  boatConfig as boatConfigTable,
+  compassDeviation,
+  polars,
+} from './schema.js';
 
 const SINGLETON = 'singleton';
 

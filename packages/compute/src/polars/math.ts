@@ -4,11 +4,7 @@ import type { PolarTable } from '@g5000/db';
  * Bilinear interpolation of target boat speed at (TWS, |TWA|) on a polar grid.
  * Inputs outside the grid are clamped to the nearest edge.
  */
-export function interpolatePolarSpeed(
-  polar: PolarTable,
-  tws: number,
-  twaAbs: number,
-): number {
+export function interpolatePolarSpeed(polar: PolarTable, tws: number, twaAbs: number): number {
   return bilinear(polar.twsBins, polar.twaBins, polar.boatSpeed, tws, twaAbs);
 }
 
@@ -31,7 +27,8 @@ export function optimalTwaForVmg(
   tws: number,
   direction: 'upwind' | 'downwind',
 ): number {
-  let bestTwa = direction === 'upwind' ? polar.twaBins[1]! : polar.twaBins[polar.twaBins.length - 2]!;
+  let bestTwa =
+    direction === 'upwind' ? polar.twaBins[1]! : polar.twaBins[polar.twaBins.length - 2]!;
   let bestVmg = -Infinity;
   for (const twa of polar.twaBins) {
     if (direction === 'upwind' && twa >= Math.PI / 2) continue;
@@ -69,12 +66,7 @@ function bilinear(
   const c01 = grid[xi.lo]![yi.hi]!;
   const c10 = grid[xi.hi]![yi.lo]!;
   const c11 = grid[xi.hi]![yi.hi]!;
-  return (
-    c00 * (1 - fx) * (1 - fy) +
-    c10 * fx * (1 - fy) +
-    c01 * (1 - fx) * fy +
-    c11 * fx * fy
-  );
+  return c00 * (1 - fx) * (1 - fy) + c10 * fx * (1 - fy) + c01 * (1 - fx) * fy + c11 * fx * fy;
 }
 
 function locate(bins: number[], v: number): { lo: number; hi: number } {

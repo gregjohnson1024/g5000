@@ -14,10 +14,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     polar = parseExpeditionPolar(csv);
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 422 },
-    );
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 422 });
   }
   await store.setPolars(polar);
   return Response.json({

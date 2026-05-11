@@ -5,6 +5,7 @@
 **Goal:** Import a polar table (Expedition CSV), edit cells in a browser, and have the compute pipeline publish target boat speed, %polar, current VMG, target VMG, and target TWA upwind/downwind back onto the bus. This is the first feature where the G5000 tells you something your H5000 doesn't — the calibrated, boat-specific performance numbers a polar table unlocks.
 
 **Architecture:**
+
 - New `polars` table in `@g5000/db` (single-row, JSON payload — same pattern as the cal tables). New `PolarTable` interface + a built-in cat-shaped default polar for first boot. ConfigStore gets a fourth observable: `polars$`.
 - New `polars/` module in `@g5000/compute` with: an Expedition CSV parser (`parseExpeditionPolar`), the math primitives (`interpolatePolarSpeed`, `optimalTwaForVmg`), and a `startPolarPipeline()` that subscribes to `wind.true.calibrated.*` and `boat.speed.water`, computes the performance numbers per tick, and publishes them as `performance.*` channels on the bus.
 - New `/api/config/polars` GET / PUT and `/api/config/polars/import` POST endpoints. PUT takes the full structured table; the import POST takes a raw CSV body and replaces the table.
@@ -77,6 +78,7 @@ autopilot/
 ## Task 1: Polar schema, defaults, and ConfigStore observable (TDD-extension)
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts` — add `PolarTable` interface + `DEFAULT_POLARS`
 - Modify: `packages/db/src/schema.ts` — add `polars` table
 - Modify: `packages/db/src/config-store.ts` — add `polars$` observable, `setPolars()` setter, initialization
@@ -161,6 +163,7 @@ export const polars = sqliteTable('polars', {
 In `packages/db/src/config-store.ts`:
 
 1. Add to imports:
+
 ```ts
 import {
   ...,
@@ -172,6 +175,7 @@ import { polars, ... } from './schema.js';
 ```
 
 2. Extend the constructor's `subjects` object literal type, add `polars` initial-value parameter, and add it to the subjects:
+
 ```ts
 private readonly subjects: {
   boatConfig: BehaviorSubject<BoatConfig>;
@@ -191,6 +195,7 @@ private readonly subjects: {
 6. Initialize `subjects.polars` from `initial.polars` in the constructor.
 
 7. Add the getter:
+
 ```ts
 get polars$(): Observable<PolarTable> {
   return this.subjects.polars.asObservable();
@@ -198,6 +203,7 @@ get polars$(): Observable<PolarTable> {
 ```
 
 8. Add the setter:
+
 ```ts
 async setPolars(value: PolarTable): Promise<void> {
   this.upsert(polars, value);
@@ -223,9 +229,7 @@ it('returns the default polar on a fresh database', async () => {
 });
 
 it('emits a new polar when setPolars is called', async () => {
-  const next: Promise<PolarTable> = firstValueFrom(
-    store.polars$.pipe(skip(1), take(1)),
-  );
+  const next: Promise<PolarTable> = firstValueFrom(store.polars$.pipe(skip(1), take(1)));
   const updated: PolarTable = {
     ...DEFAULT_POLARS,
     boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map(() => 0)),
@@ -270,12 +274,14 @@ git commit -m "feat(db): add PolarTable schema, defaults, and ConfigStore.polars
 ## Task 2: Expedition CSV parser (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/polars/csv-parser.ts`
 - Test: `packages/compute/src/polars/csv-parser.test.ts`
 
 Expedition's polar format uses tab or comma separation, with TWS values in the header row (after a `twa/tws` label) and TWA values in the leftmost column. All values are in knots and degrees by Expedition convention; we convert to m/s and radians internally so downstream code is consistently SI.
 
 Example input:
+
 ```
 twa/tws	4	6	8	10	12
 0	0	0	0	0	0
@@ -394,30 +400,22 @@ export function parseExpeditionPolar(csv: string): PolarTable {
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith('#'));
   if (lines.length < 2) {
-    throw new Error(
-      'parseExpeditionPolar: need at least a header line and one data row',
-    );
+    throw new Error('parseExpeditionPolar: need at least a header line and one data row');
   }
   const headerTokens = splitLine(lines[0]!);
   if (headerTokens.length < 2) {
-    throw new Error(
-      `parseExpeditionPolar: header has too few columns: "${lines[0]}"`,
-    );
+    throw new Error(`parseExpeditionPolar: header has too few columns: "${lines[0]}"`);
   }
   const headerLabel = headerTokens[0]!.toLowerCase().replace(/\s/g, '');
   // Accept any header that includes "twa" or "tws" or starts with a label
   // followed by numeric TWS values. We tolerate "twa/tws", "twa\\tws", etc.
   if (!/twa|tws|^[a-z]/.test(headerLabel)) {
-    throw new Error(
-      `parseExpeditionPolar: header doesn't look like a polar header: "${lines[0]}"`,
-    );
+    throw new Error(`parseExpeditionPolar: header doesn't look like a polar header: "${lines[0]}"`);
   }
   const twsBinsKn = headerTokens.slice(1).map((s) => {
     const n = Number(s);
     if (!Number.isFinite(n)) {
-      throw new Error(
-        `parseExpeditionPolar: non-numeric TWS in header: "${s}"`,
-      );
+      throw new Error(`parseExpeditionPolar: non-numeric TWS in header: "${s}"`);
     }
     return n;
   });
@@ -434,18 +432,14 @@ export function parseExpeditionPolar(csv: string): PolarTable {
     }
     const twaDeg = Number(tokens[0]);
     if (!Number.isFinite(twaDeg)) {
-      throw new Error(
-        `parseExpeditionPolar: row ${i + 1} TWA is not numeric: "${tokens[0]}"`,
-      );
+      throw new Error(`parseExpeditionPolar: row ${i + 1} TWA is not numeric: "${tokens[0]}"`);
     }
     twaBinsDeg.push(twaDeg);
     boatSpeedKnByTwa.push(
       tokens.slice(1).map((s, j) => {
         const n = Number(s);
         if (!Number.isFinite(n)) {
-          throw new Error(
-            `parseExpeditionPolar: row ${i + 1} col ${j + 2} is not numeric: "${s}"`,
-          );
+          throw new Error(`parseExpeditionPolar: row ${i + 1} col ${j + 2} is not numeric: "${s}"`);
         }
         return n;
       }),
@@ -454,9 +448,7 @@ export function parseExpeditionPolar(csv: string): PolarTable {
 
   // Convert to SI and reshape to [twsIdx][twaIdx].
   const twsBins = twsBinsKn.map((kn) => kn * KNOTS_TO_MS);
-  const twaBins = twaBinsDeg.map((deg) =>
-    Math.round(deg * DEG_TO_RAD * 1e6) / 1e6,
-  );
+  const twaBins = twaBinsDeg.map((deg) => Math.round(deg * DEG_TO_RAD * 1e6) / 1e6);
   const boatSpeed: number[][] = twsBins.map((_, twsIdx) =>
     boatSpeedKnByTwa.map((row) => row[twsIdx]! * KNOTS_TO_MS),
   );
@@ -496,10 +488,12 @@ git commit -m "feat(compute): Expedition polar CSV parser (TWA degrees / TWS kno
 ## Task 3: Polar math — interpolation, VMG, optimal TWA (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/polars/math.ts`
 - Test: `packages/compute/src/polars/math.test.ts`
 
 Pure functions:
+
 - `interpolatePolarSpeed(polar, tws, twaAbs)` — bilinear interp → target boat speed (m/s)
 - `vmgFor(bsp, twa)` — signed VMG; positive = upwind progress, negative = downwind progress
 - `optimalTwaForVmg(polar, tws, direction)` — for the given TWS row, return the TWA (radians) that maximizes upwind or downwind VMG by scanning the table
@@ -508,22 +502,14 @@ Pure functions:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import {
-  interpolatePolarSpeed,
-  vmgFor,
-  optimalTwaForVmg,
-} from './math.js';
+import { interpolatePolarSpeed, vmgFor, optimalTwaForVmg } from './math.js';
 import { DEFAULT_POLARS } from '@g5000/db';
 
 describe('interpolatePolarSpeed', () => {
   it('returns the cell value at an exact (TWS, TWA) bin match', () => {
     // DEFAULT_POLARS has TWS bin index 2 = 6 m/s, TWA bin index 2 = 45°.
     const expected = DEFAULT_POLARS.boatSpeed[2]![2]!;
-    const v = interpolatePolarSpeed(
-      DEFAULT_POLARS,
-      6,
-      (45 * Math.PI) / 180,
-    );
+    const v = interpolatePolarSpeed(DEFAULT_POLARS, 6, (45 * Math.PI) / 180);
     expect(v).toBeCloseTo(expected, 6);
   });
 
@@ -549,17 +535,11 @@ describe('interpolatePolarSpeed', () => {
 
 describe('vmgFor', () => {
   it('returns positive VMG upwind (TWA < π/2)', () => {
-    expect(vmgFor(5, (45 * Math.PI) / 180)).toBeCloseTo(
-      5 * Math.cos((45 * Math.PI) / 180),
-      6,
-    );
+    expect(vmgFor(5, (45 * Math.PI) / 180)).toBeCloseTo(5 * Math.cos((45 * Math.PI) / 180), 6);
   });
 
   it('returns negative VMG downwind (TWA > π/2)', () => {
-    expect(vmgFor(5, (135 * Math.PI) / 180)).toBeCloseTo(
-      5 * Math.cos((135 * Math.PI) / 180),
-      6,
-    );
+    expect(vmgFor(5, (135 * Math.PI) / 180)).toBeCloseTo(5 * Math.cos((135 * Math.PI) / 180), 6);
   });
 });
 
@@ -597,11 +577,7 @@ import type { PolarTable } from '@g5000/db';
  * Bilinear interpolation of target boat speed at (TWS, |TWA|) on a polar grid.
  * Inputs outside the grid are clamped to the nearest edge.
  */
-export function interpolatePolarSpeed(
-  polar: PolarTable,
-  tws: number,
-  twaAbs: number,
-): number {
+export function interpolatePolarSpeed(polar: PolarTable, tws: number, twaAbs: number): number {
   return bilinear(polar.twsBins, polar.twaBins, polar.boatSpeed, tws, twaAbs);
 }
 
@@ -624,7 +600,8 @@ export function optimalTwaForVmg(
   tws: number,
   direction: 'upwind' | 'downwind',
 ): number {
-  let bestTwa = direction === 'upwind' ? polar.twaBins[1]! : polar.twaBins[polar.twaBins.length - 2]!;
+  let bestTwa =
+    direction === 'upwind' ? polar.twaBins[1]! : polar.twaBins[polar.twaBins.length - 2]!;
   let bestVmg = -Infinity;
   for (const twa of polar.twaBins) {
     if (direction === 'upwind' && twa >= Math.PI / 2) continue;
@@ -662,12 +639,7 @@ function bilinear(
   const c01 = grid[xi.lo]![yi.hi]!;
   const c10 = grid[xi.hi]![yi.lo]!;
   const c11 = grid[xi.hi]![yi.hi]!;
-  return (
-    c00 * (1 - fx) * (1 - fy) +
-    c10 * fx * (1 - fy) +
-    c01 * (1 - fx) * fy +
-    c11 * fx * fy
-  );
+  return c00 * (1 - fx) * (1 - fy) + c10 * fx * (1 - fy) + c01 * (1 - fx) * fy + c11 * fx * fy;
 }
 
 function locate(bins: number[], v: number): { lo: number; hi: number } {
@@ -703,17 +675,20 @@ git commit -m "feat(compute): polar interpolation, VMG, optimal-TWA-for-VMG"
 ## Task 4: Polar compute pipeline (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/polars/pipeline.ts`
 - Test: `packages/compute/src/polars/pipeline.test.ts`
 - Modify: `packages/compute/src/index.ts` — re-export polar surface
 
 Subscribes to:
+
 - `wind.true.calibrated.speed`
 - `wind.true.calibrated.angle`
 - `boat.speed.water`
 - ConfigStore's `polars$`
 
 Publishes:
+
 - `performance.target.boatSpeed` — interpolated at current (TWS, |TWA|)
 - `performance.percentPolar` — bsp_actual / target × 100 (or 0 if target is 0)
 - `performance.vmg` — current signed VMG
@@ -844,11 +819,7 @@ const firstValueFromBehavior = firstValueFrom;
 import { combineLatest, firstValueFrom, type Subscription } from 'rxjs';
 import { Bus, type Sample } from '@g5000/core';
 import type { ConfigStore, PolarTable } from '@g5000/db';
-import {
-  interpolatePolarSpeed,
-  optimalTwaForVmg,
-  vmgFor,
-} from './math.js';
+import { interpolatePolarSpeed, optimalTwaForVmg, vmgFor } from './math.js';
 
 export interface PolarPipelineOptions {
   bus: Bus;
@@ -863,9 +834,7 @@ interface LatestValues {
   bsp?: { value: number; t_ns: bigint };
 }
 
-export async function startPolarPipeline(
-  opts: PolarPipelineOptions,
-): Promise<() => Promise<void>> {
+export async function startPolarPipeline(opts: PolarPipelineOptions): Promise<() => Promise<void>> {
   const { bus, configStore } = opts;
   const staleAfterMs = opts.staleAfterMs ?? 2000;
   const latest: LatestValues = {};
@@ -877,13 +846,8 @@ export async function startPolarPipeline(
   function recompute(): void {
     if (!latest.tws || !latest.twa || !latest.bsp) return;
     const now_ns = BigInt(Date.now()) * 1_000_000n;
-    const stale = (t: bigint): boolean =>
-      Number((now_ns - t) / 1_000_000n) > staleAfterMs;
-    if (
-      stale(latest.tws.t_ns) ||
-      stale(latest.twa.t_ns) ||
-      stale(latest.bsp.t_ns)
-    ) {
+    const stale = (t: bigint): boolean => Number((now_ns - t) / 1_000_000n) > staleAfterMs;
+    if (stale(latest.tws.t_ns) || stale(latest.twa.t_ns) || stale(latest.bsp.t_ns)) {
       return;
     }
     const tws = latest.tws.value;
@@ -934,12 +898,7 @@ export async function startPolarPipeline(
   };
 }
 
-function make(
-  channel: string,
-  value: number,
-  t_ns: bigint,
-  unit: string,
-): Sample {
+function make(channel: string, value: number, t_ns: bigint, unit: string): Sample {
   return {
     channel,
     t_ns,
@@ -985,6 +944,7 @@ git commit -m "feat(compute): polar performance pipeline publishes performance.*
 ## Task 5: REST endpoints — `/api/config/polars` GET / PUT / import
 
 **Files:**
+
 - Create: `packages/web/src/app/api/config/polars/route.ts`
 - Create: `packages/web/src/app/api/config/polars/import/route.ts`
 
@@ -1014,10 +974,7 @@ export async function PUT(req: Request): Promise<Response> {
     return Response.json({ error: 'invalid JSON' }, { status: 400 });
   }
   if (!validatePolar(body)) {
-    return Response.json(
-      { error: 'invalid polar table shape' },
-      { status: 422 },
-    );
+    return Response.json({ error: 'invalid polar table shape' }, { status: 422 });
   }
   await store.setPolars(body);
   return Response.json({ ok: true });
@@ -1058,10 +1015,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     polar = parseExpeditionPolar(csv);
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 422 },
-    );
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 422 });
   }
   await store.setPolars(polar);
   return Response.json({
@@ -1090,6 +1044,7 @@ git commit -m "feat(web): /api/config/polars GET/PUT and /api/config/polars/impo
 ## Task 6: `/polars` page — heatmap + CSV import + cell editor
 
 **Files:**
+
 - Create: `packages/web/src/app/polars/page.tsx`
 - Create: `packages/web/src/app/polars/PolarHeatmap.tsx`
 - Create: `packages/web/src/app/polars/PolarCellEditor.tsx`
@@ -1147,8 +1102,7 @@ export function PolarHeatmap({ polar, selected, onSelect }: PolarHeatmapProps) {
               </th>
               {polar.twaBins.map((_, twaIdx) => {
                 const v = polar.boatSpeed[twsIdx]![twaIdx]!;
-                const isSelected =
-                  selected?.twsIdx === twsIdx && selected.twaIdx === twaIdx;
+                const isSelected = selected?.twsIdx === twsIdx && selected.twaIdx === twaIdx;
                 return (
                   <td
                     key={twaIdx}
@@ -1216,9 +1170,7 @@ export function PolarCellEditor({ polar, cell, onApply }: PolarCellEditorProps) 
     const updated: PolarTable = {
       ...polar,
       boatSpeed: polar.boatSpeed.map((row, i) =>
-        i === cell.twsIdx
-          ? row.map((v, j) => (j === cell.twaIdx ? newMs : v))
-          : row.slice(),
+        i === cell.twsIdx ? row.map((v, j) => (j === cell.twaIdx ? newMs : v)) : row.slice(),
       ),
     };
     setBusy(true);
@@ -1238,8 +1190,8 @@ export function PolarCellEditor({ polar, cell, onApply }: PolarCellEditorProps) 
   return (
     <div className="border border-slate-700 rounded p-4 space-y-3">
       <div className="text-sm text-slate-300">
-        Editing cell at <span className="font-mono">TWS {twsAt.toFixed(1)} kn</span>{' '}
-        × <span className="font-mono">TWA {twaAt.toFixed(0)}°</span>
+        Editing cell at <span className="font-mono">TWS {twsAt.toFixed(1)} kn</span> ×{' '}
+        <span className="font-mono">TWA {twaAt.toFixed(0)}°</span>
       </div>
       <label className="block text-sm">
         <span className="text-slate-400">Target boat speed (knots):</span>
@@ -1276,9 +1228,7 @@ import { PolarCellEditor } from './PolarCellEditor';
 
 export default function PolarsPage() {
   const [polar, setPolar] = useState<PolarTable | null>(null);
-  const [selected, setSelected] = useState<{ twsIdx: number; twaIdx: number } | null>(
-    null,
-  );
+  const [selected, setSelected] = useState<{ twsIdx: number; twaIdx: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1375,9 +1325,7 @@ export default function PolarsPage() {
             selected={selected ?? undefined}
             onSelect={(c) => setSelected(c)}
           />
-          {selected && (
-            <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />
-          )}
+          {selected && <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />}
         </section>
       )}
 
@@ -1405,6 +1353,7 @@ git commit -m "feat(web): /polars page with heatmap, cell editor, and CSV import
 ## Task 7: autopilot-server wires the polar compute pipeline
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 
 The polar pipeline runs alongside the true-wind pipeline. Same shape.
@@ -1420,13 +1369,13 @@ import { startTrueWindPipeline, startPolarPipeline } from '@g5000/compute';
 After the existing `const stopCompute = await startTrueWindPipeline(...)` + `teardown.push(stopCompute)` block, add:
 
 ```ts
-  const stopPolarPipeline = await startPolarPipeline({
-    bus,
-    configStore: store,
-  });
-  teardown.push(stopPolarPipeline);
-  // eslint-disable-next-line no-console
-  console.log('[autopilot] polar pipeline online');
+const stopPolarPipeline = await startPolarPipeline({
+  bus,
+  configStore: store,
+});
+teardown.push(stopPolarPipeline);
+// eslint-disable-next-line no-console
+console.log('[autopilot] polar pipeline online');
 ```
 
 ### Step 3: Smoke-test
@@ -1484,7 +1433,7 @@ Commit any prettier diffs.
 
 - [ ] **Step 4: Optional manual demo via replay**
 
-If you have any captured session file, replay it with the polar pipeline online and observe the performance.* channels showing up in `/inspect`:
+If you have any captured session file, replay it with the polar pipeline online and observe the performance.\* channels showing up in `/inspect`:
 
 ```
 REPLAY=./sessions/<some-session>.jsonl.gz REPLAY_MODE=asap npm run dev --workspace=@g5000/autopilot-server
@@ -1504,6 +1453,7 @@ git commit -m "chore: prettier formatting after Plan 7"
 ## Closing notes
 
 After this plan:
+
 - Sail with G5000 connected to your N2K bus → `/inspect` shows live target speed for your current TWS/TWA → "I should be doing 6.2 m/s right now, I'm only at 4.8, what's wrong?" feedback you currently don't get from any vendor product without the H5000 Performance Pack license.
 - Polar table is editable via the web UI or via a single `curl -X POST -H 'Content-Type: text/csv' --data-binary @my-polar.csv http://device:3000/api/config/polars/import`.
 - The performance pipeline is parallel to true-wind, so adding more derived channels (laylines, leeway, current) follows the same template.

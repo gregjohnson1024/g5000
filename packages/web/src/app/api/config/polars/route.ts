@@ -19,10 +19,7 @@ export async function PUT(req: Request): Promise<Response> {
     return Response.json({ error: 'invalid JSON' }, { status: 400 });
   }
   if (!validatePolar(body)) {
-    return Response.json(
-      { error: 'invalid polar table shape' },
-      { status: 422 },
-    );
+    return Response.json({ error: 'invalid polar table shape' }, { status: 422 });
   }
   await store.setPolars(body);
   return Response.json({ ok: true });

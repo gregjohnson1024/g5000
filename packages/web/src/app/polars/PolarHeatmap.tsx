@@ -46,8 +46,7 @@ export function PolarHeatmap({ polar, selected, onSelect }: PolarHeatmapProps) {
               </th>
               {polar.twaBins.map((_, twaIdx) => {
                 const v = polar.boatSpeed[twsIdx]![twaIdx]!;
-                const isSelected =
-                  selected?.twsIdx === twsIdx && selected.twaIdx === twaIdx;
+                const isSelected = selected?.twsIdx === twsIdx && selected.twaIdx === twaIdx;
                 return (
                   <td
                     key={twaIdx}

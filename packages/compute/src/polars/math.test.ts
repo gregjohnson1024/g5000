@@ -1,20 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import {
-  interpolatePolarSpeed,
-  vmgFor,
-  optimalTwaForVmg,
-} from './math.js';
+import { interpolatePolarSpeed, vmgFor, optimalTwaForVmg } from './math.js';
 import { DEFAULT_POLARS } from '@g5000/db';
 
 describe('interpolatePolarSpeed', () => {
   it('returns the cell value at an exact (TWS, TWA) bin match', () => {
     // DEFAULT_POLARS has TWS bin index 2 = 6 m/s, TWA bin index 2 = 45°.
     const expected = DEFAULT_POLARS.boatSpeed[2]![2]!;
-    const v = interpolatePolarSpeed(
-      DEFAULT_POLARS,
-      6,
-      (45 * Math.PI) / 180,
-    );
+    const v = interpolatePolarSpeed(DEFAULT_POLARS, 6, (45 * Math.PI) / 180);
     expect(v).toBeCloseTo(expected, 6);
   });
 
@@ -40,17 +32,11 @@ describe('interpolatePolarSpeed', () => {
 
 describe('vmgFor', () => {
   it('returns positive VMG upwind (TWA < π/2)', () => {
-    expect(vmgFor(5, (45 * Math.PI) / 180)).toBeCloseTo(
-      5 * Math.cos((45 * Math.PI) / 180),
-      6,
-    );
+    expect(vmgFor(5, (45 * Math.PI) / 180)).toBeCloseTo(5 * Math.cos((45 * Math.PI) / 180), 6);
   });
 
   it('returns negative VMG downwind (TWA > π/2)', () => {
-    expect(vmgFor(5, (135 * Math.PI) / 180)).toBeCloseTo(
-      5 * Math.cos((135 * Math.PI) / 180),
-      6,
-    );
+    expect(vmgFor(5, (135 * Math.PI) / 180)).toBeCloseTo(5 * Math.cos((135 * Math.PI) / 180), 6);
   });
 });
 

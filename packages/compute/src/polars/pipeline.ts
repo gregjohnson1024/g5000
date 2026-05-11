@@ -1,11 +1,7 @@
 import { firstValueFrom, type Subscription } from 'rxjs';
 import { Bus, type Sample } from '@g5000/core';
 import type { ConfigStore, PolarTable } from '@g5000/db';
-import {
-  interpolatePolarSpeed,
-  optimalTwaForVmg,
-  vmgFor,
-} from './math.js';
+import { interpolatePolarSpeed, optimalTwaForVmg, vmgFor } from './math.js';
 
 export interface PolarPipelineOptions {
   bus: Bus;
@@ -20,9 +16,7 @@ interface LatestValues {
   bsp?: { value: number; t_ns: bigint };
 }
 
-export async function startPolarPipeline(
-  opts: PolarPipelineOptions,
-): Promise<() => Promise<void>> {
+export async function startPolarPipeline(opts: PolarPipelineOptions): Promise<() => Promise<void>> {
   const { bus, configStore } = opts;
   const staleAfterMs = opts.staleAfterMs ?? 2000;
   const latest: LatestValues = {};
@@ -34,13 +28,8 @@ export async function startPolarPipeline(
   function recompute(): void {
     if (!latest.tws || !latest.twa || !latest.bsp) return;
     const now_ns = BigInt(Date.now()) * 1_000_000n;
-    const stale = (t: bigint): boolean =>
-      Number((now_ns - t) / 1_000_000n) > staleAfterMs;
-    if (
-      stale(latest.tws.t_ns) ||
-      stale(latest.twa.t_ns) ||
-      stale(latest.bsp.t_ns)
-    ) {
+    const stale = (t: bigint): boolean => Number((now_ns - t) / 1_000_000n) > staleAfterMs;
+    if (stale(latest.tws.t_ns) || stale(latest.twa.t_ns) || stale(latest.bsp.t_ns)) {
       return;
     }
     const tws = latest.tws.value;
@@ -91,12 +80,7 @@ export async function startPolarPipeline(
   };
 }
 
-function make(
-  channel: string,
-  value: number,
-  t_ns: bigint,
-  unit: string,
-): Sample {
+function make(channel: string, value: number, t_ns: bigint, unit: string): Sample {
   return {
     channel,
     t_ns,

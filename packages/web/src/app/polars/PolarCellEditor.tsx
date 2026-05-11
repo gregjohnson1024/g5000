@@ -34,9 +34,7 @@ export function PolarCellEditor({ polar, cell, onApply }: PolarCellEditorProps) 
     const updated: PolarTable = {
       ...polar,
       boatSpeed: polar.boatSpeed.map((row, i) =>
-        i === cell.twsIdx
-          ? row.map((v, j) => (j === cell.twaIdx ? newMs : v))
-          : row.slice(),
+        i === cell.twsIdx ? row.map((v, j) => (j === cell.twaIdx ? newMs : v)) : row.slice(),
       ),
     };
     setBusy(true);
@@ -56,8 +54,8 @@ export function PolarCellEditor({ polar, cell, onApply }: PolarCellEditorProps) 
   return (
     <div className="border border-slate-700 rounded p-4 space-y-3">
       <div className="text-sm text-slate-300">
-        Editing cell at <span className="font-mono">TWS {twsAt.toFixed(1)} kn</span>{' '}
-        × <span className="font-mono">TWA {twaAt.toFixed(0)}°</span>
+        Editing cell at <span className="font-mono">TWS {twsAt.toFixed(1)} kn</span> ×{' '}
+        <span className="font-mono">TWA {twaAt.toFixed(0)}°</span>
       </div>
       <label className="block text-sm">
         <span className="text-slate-400">Target boat speed (knots):</span>
