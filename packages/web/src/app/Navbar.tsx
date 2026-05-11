@@ -15,6 +15,7 @@ const ITEMS: NavItem[] = [
   { href: '/calibration/wind', label: 'Wind cal' },
   { href: '/calibration/bsp', label: 'BSP cal' },
   { href: '/calibration/compass', label: 'Compass' },
+  { href: '/damping', label: 'Damping' },
   { href: '/boat', label: 'Boat' },
   { href: '/autopilot', label: 'Autopilot' },
   { href: '/devices', label: 'Devices' },
