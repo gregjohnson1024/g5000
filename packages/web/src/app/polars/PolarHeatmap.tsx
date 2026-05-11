@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import type { PolarTable } from '@g5000/db';
-import { setCell } from '@g5000/compute';
+import {
+  addTwaBin,
+  addTwsBin,
+  canAddTwaBin,
+  canAddTwsBin,
+  MIN_BINS,
+  removeTwaBin,
+  removeTwsBin,
+  setCell,
+} from '@g5000/compute';
 
 export interface PolarHeatmapProps {
   polar: PolarTable;
@@ -58,6 +67,48 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
     await onChange(updated);
   };
 
+  const handleAddTwa = async (): Promise<void> => {
+    if (!onChange) return;
+    if (!canAddTwaBin(polar)) {
+      alert('Cannot add TWA bin: already at 180°.');
+      return;
+    }
+    await onChange(addTwaBin(polar));
+  };
+
+  const handleRemoveTwa = async (twaIdx: number): Promise<void> => {
+    if (!onChange) return;
+    if (polar.twaBins.length <= MIN_BINS) {
+      alert(`Cannot shrink TWA bins below ${MIN_BINS}.`);
+      return;
+    }
+    const deg = (polar.twaBins[twaIdx]! * RAD_TO_DEG).toFixed(0);
+    if (!confirm(`Remove TWA ${deg}° bin? This will delete that column.`)) return;
+    await onChange(removeTwaBin(polar, twaIdx));
+  };
+
+  const handleAddTws = async (): Promise<void> => {
+    if (!onChange) return;
+    if (!canAddTwsBin(polar)) return;
+    await onChange(addTwsBin(polar));
+  };
+
+  const handleRemoveTws = async (twsIdx: number): Promise<void> => {
+    if (!onChange) return;
+    if (polar.twsBins.length <= MIN_BINS) {
+      alert(`Cannot shrink TWS bins below ${MIN_BINS}.`);
+      return;
+    }
+    const kn = (polar.twsBins[twsIdx]! * MS_TO_KNOTS).toFixed(0);
+    if (!confirm(`Remove TWS ${kn} kn bin? This will delete that row.`)) return;
+    await onChange(removeTwsBin(polar, twsIdx));
+  };
+
+  const canShrinkTwa = polar.twaBins.length > MIN_BINS && !!onChange;
+  const canShrinkTws = polar.twsBins.length > MIN_BINS && !!onChange;
+  const canExpandTwa = canAddTwaBin(polar) && !!onChange;
+  const canExpandTws = canAddTwsBin(polar) && !!onChange;
+
   return (
     <div className="overflow-x-auto">
       <table className="border-collapse text-xs font-mono">
@@ -65,17 +116,54 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
           <tr>
             <th className="p-1 text-slate-500">TWS \ TWA</th>
             {polar.twaBins.map((twa, i) => (
-              <th key={i} className="p-1 text-slate-500 text-right">
-                {(twa * RAD_TO_DEG).toFixed(0)}°
+              <th key={i} className="p-1 text-slate-500 text-right align-bottom">
+                <div className="flex flex-col items-end gap-0.5">
+                  <span>{(twa * RAD_TO_DEG).toFixed(0)}°</span>
+                  {canShrinkTwa && (
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveTwa(i)}
+                      title={`Remove ${(twa * RAD_TO_DEG).toFixed(0)}° column`}
+                      className="w-4 h-4 leading-none text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded text-[10px]"
+                    >
+                      −
+                    </button>
+                  )}
+                </div>
               </th>
             ))}
+            {onChange && (
+              <th className="p-1 text-slate-500 align-bottom">
+                <button
+                  type="button"
+                  onClick={() => void handleAddTwa()}
+                  disabled={!canExpandTwa}
+                  title="Add a new TWA bin at the high-angle end"
+                  className="w-5 h-5 leading-none rounded bg-slate-800 text-amber-400 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
+                >
+                  +
+                </button>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
           {polar.twsBins.map((tws, twsIdx) => (
             <tr key={twsIdx}>
-              <th className="p-1 text-slate-500 text-right pr-2">
-                {(tws * MS_TO_KNOTS).toFixed(0)} kn
+              <th className="p-1 text-slate-500 text-right pr-2 align-middle">
+                <div className="flex items-center justify-end gap-1">
+                  {canShrinkTws && (
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveTws(twsIdx)}
+                      title={`Remove ${(tws * MS_TO_KNOTS).toFixed(0)} kn row`}
+                      className="w-4 h-4 leading-none text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded text-[10px]"
+                    >
+                      −
+                    </button>
+                  )}
+                  <span>{(tws * MS_TO_KNOTS).toFixed(0)} kn</span>
+                </div>
               </th>
               {polar.twaBins.map((_, twaIdx) => {
                 const v = polar.boatSpeed[twsIdx]![twaIdx]!;
@@ -106,13 +194,31 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
                   </td>
                 );
               })}
+              {onChange && <td />}
             </tr>
           ))}
+          {onChange && (
+            <tr>
+              <th className="p-1 text-right">
+                <button
+                  type="button"
+                  onClick={() => void handleAddTws()}
+                  disabled={!canExpandTws}
+                  title="Add a new TWS bin at the high-wind end"
+                  className="w-5 h-5 leading-none rounded bg-slate-800 text-amber-400 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
+                >
+                  +
+                </button>
+              </th>
+              <td colSpan={polar.twaBins.length + 1} />
+            </tr>
+          )}
         </tbody>
       </table>
       <p className="text-xs text-slate-500 mt-2">
-        Boat speed shown in knots. Click to select, double-click to edit. Press Enter to save, Esc
-        to cancel.
+        Boat speed shown in knots. Click to select, double-click to edit. Use{' '}
+        <span className="text-amber-400">+</span> / <span className="text-red-400">−</span> to
+        add/remove bins.
       </p>
     </div>
   );
