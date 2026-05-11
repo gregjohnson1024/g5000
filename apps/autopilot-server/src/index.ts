@@ -21,6 +21,7 @@ import {
 } from '@g5000/bridge';
 import { startDemoInjector } from './demo-injector.js';
 import { createSourceModeController } from './source-mode-controller.js';
+import { installLogStream } from './log-stream-impl.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -39,6 +40,7 @@ const SKIP_BRIDGE = process.env.SKIP_BRIDGE === '1';
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
+  installLogStream();
   const teardown: Array<() => Promise<void>> = [];
 
   // 0. Open ConfigStore so any code path (web routes, compute pipeline) can
