@@ -14,6 +14,7 @@ import {
   runBridge,
   startSessionLogger,
   startTrueWindTx,
+  getSharedDeviceRegistry,
   type WireDriver,
   type SessionLogger,
 } from '@g5000/bridge';
@@ -138,6 +139,12 @@ async function main(): Promise<void> {
     teardown.push(stopTx);
     // eslint-disable-next-line no-console
     console.log('[autopilot] true-wind TX online via NGT-1');
+
+    // Register the NGT-1 as the device-registry's refresh target so
+    // /api/devices/refresh can broadcast ISO Request (PGN 59904).
+    getSharedDeviceRegistry().registerTxer((pgn) => ngt.txPgn(pgn));
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] device-registry refresh target = NGT-1');
   }
 
   // 6. Start Next.js pointing at the @g5000/web package directory.
