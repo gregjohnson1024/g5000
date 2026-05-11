@@ -9,9 +9,6 @@ build/
 .code-review-graph/
 .claude/
 
-# Reference PDFs (large, vendor-distributed)
-*.pdf
-
 # Environment
 .env
 .env.local
