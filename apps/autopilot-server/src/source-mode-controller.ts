@@ -7,6 +7,7 @@ import {
   type SourceModeController,
   type SourceModeStatus,
   type BaseSourceHandle,
+  type BaseSourceFactories,
 } from '@g5000/core';
 import { ReplayDriver, runBridge } from '@g5000/bridge';
 
@@ -24,14 +25,53 @@ export function createSourceModeController(opts: CreateOptions): SourceModeContr
   let baseHandle: BaseSourceHandle | null = null;
   let stashedRestart: (() => Promise<BaseSourceHandle>) | undefined;
   let activeReplayTeardown: (() => Promise<void>) | null = null;
+  let factories: BaseSourceFactories | null = null;
 
   const controller: SourceModeController = {
     getStatus: () => ({ ...status }),
-    setLiveOrDemo: (mode) => {
+    setLiveOrDemo: async (mode) => {
+      if (status.mode === 'replay') {
+        throw new Error(
+          'cannot swap base mode while replay is active — stop the replay first',
+        );
+      }
+      if (baseMode === mode && status.mode === mode && !status.errorMessage) {
+        // No-op: already in the target mode with no error to clear.
+        return;
+      }
+      // Tear down current handle (if any).
+      if (baseHandle) {
+        const prev = baseHandle;
+        baseHandle = null;
+        try {
+          await prev.teardown();
+        } catch (err) {
+          // Log but proceed — we still need to swap to the new mode.
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[source-mode] teardown of ${baseMode} base failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
       baseMode = mode;
-      if (status.mode !== 'replay') {
+      // Start the new handle via factory (if registered).
+      if (factories) {
+        try {
+          baseHandle = await factories[mode]();
+          status = { mode };
+        } catch (err) {
+          status = {
+            mode,
+            errorMessage: err instanceof Error ? err.message : String(err),
+          };
+        }
+      } else {
+        // No factories registered: still report the new mode.
         status = { mode };
       }
+    },
+    setBaseSourceFactories: (f) => {
+      factories = f;
     },
     setBaseSource: (handle) => {
       baseHandle = handle;

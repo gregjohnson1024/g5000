@@ -22,9 +22,15 @@ export interface BaseSourceHandle {
   restart?: () => Promise<BaseSourceHandle>;
 }
 
+export interface BaseSourceFactories {
+  live: () => Promise<BaseSourceHandle>;
+  demo: () => Promise<BaseSourceHandle>;
+}
+
 export interface SourceModeController {
   getStatus(): SourceModeStatus;
-  setLiveOrDemo(mode: 'live' | 'demo'): void;
+  setLiveOrDemo(mode: 'live' | 'demo'): Promise<void>;
+  setBaseSourceFactories(factories: BaseSourceFactories): void;
   setBaseSource(handle: BaseSourceHandle | null): void;
   startReplay(args: { sessionId: string; paceMode: PaceMode }): Promise<void>;
   stopReplay(): Promise<void>;

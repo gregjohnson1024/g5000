@@ -65,6 +65,14 @@ export class DeviceRegistry {
     this.txer = fn;
   }
 
+  unregisterTxer(fn?: DeviceTxer): void {
+    // If a specific txer is provided, only clear when it matches (avoids
+    // clobbering a newer registration). With no arg, unconditionally clear.
+    if (fn === undefined || this.txer === fn) {
+      this.txer = null;
+    }
+  }
+
   /**
    * Issue ISO Request (PGN 59904) to prompt devices to re-broadcast their
    * identity. With no `target`, broadcasts for PGN 60928 (all devices reply).

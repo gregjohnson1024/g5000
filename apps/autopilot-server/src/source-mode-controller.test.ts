@@ -31,9 +31,9 @@ describe('SourceModeController', () => {
     expect(c.getStatus().mode).toBe('live');
   });
 
-  it('reports demo mode when setLiveOrDemo("demo") is called', () => {
+  it('reports demo mode when setLiveOrDemo("demo") is called', async () => {
     const c = createSourceModeController({ bus: new Bus(), sessionsDir: '/tmp' });
-    c.setLiveOrDemo('demo');
+    await c.setLiveOrDemo('demo');
     expect(c.getStatus().mode).toBe('demo');
   });
 
@@ -53,7 +53,7 @@ describe('SourceModeController', () => {
         };
       };
       const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
-      c.setLiveOrDemo('demo');
+      await c.setLiveOrDemo('demo');
       c.setBaseSource(makeBaseHandle());
       expect(baseRunning).toBe(true);
 
@@ -79,7 +79,7 @@ describe('SourceModeController', () => {
 
       let baseRunning = true;
       const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
-      c.setLiveOrDemo('live');
+      await c.setLiveOrDemo('live');
       c.setBaseSource({
         teardown: async () => { baseRunning = false; },
       });
@@ -123,5 +123,107 @@ describe('SourceModeController', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it('setLiveOrDemo swaps base source via registered factory', async () => {
+    let liveRunning = false;
+    let demoRunning = false;
+    let liveTeardowns = 0;
+    let demoTeardowns = 0;
+
+    const c = createSourceModeController({ bus: new Bus(), sessionsDir: '/tmp' });
+    c.setBaseSourceFactories({
+      live: async () => {
+        liveRunning = true;
+        return {
+          teardown: async () => {
+            liveRunning = false;
+            liveTeardowns++;
+          },
+        };
+      },
+      demo: async () => {
+        demoRunning = true;
+        return {
+          teardown: async () => {
+            demoRunning = false;
+            demoTeardowns++;
+          },
+        };
+      },
+    });
+
+    await c.setLiveOrDemo('demo');
+    expect(demoRunning).toBe(true);
+    expect(liveRunning).toBe(false);
+    expect(c.getStatus().mode).toBe('demo');
+
+    await c.setLiveOrDemo('live');
+    expect(demoRunning).toBe(false);
+    expect(demoTeardowns).toBe(1);
+    expect(liveRunning).toBe(true);
+    expect(c.getStatus().mode).toBe('live');
+
+    await c.setLiveOrDemo('demo');
+    expect(liveRunning).toBe(false);
+    expect(liveTeardowns).toBe(1);
+    expect(demoRunning).toBe(true);
+  });
+
+  it('setLiveOrDemo refuses to swap while replay is active', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'g5000-srcmode-'));
+    try {
+      const driver = fakeDriver();
+      const logger = await startSessionLogger({ drivers: [driver], dir, sessionId: 'fixture' });
+      await logger.close();
+
+      let demoRunning = false;
+      const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
+      c.setBaseSourceFactories({
+        live: async () => ({ teardown: async () => {} }),
+        demo: async () => {
+          demoRunning = true;
+          return { teardown: async () => { demoRunning = false; } };
+        },
+      });
+      await c.setLiveOrDemo('demo');
+      expect(demoRunning).toBe(true);
+
+      await c.startReplay({ sessionId: 'fixture', paceMode: 'asap' });
+      expect(c.getStatus().mode).toBe('replay');
+
+      await expect(c.setLiveOrDemo('live')).rejects.toThrow(/replay.*active/i);
+
+      await c.stopReplay();
+      // After stopReplay we can swap again.
+      await c.setLiveOrDemo('live');
+      expect(c.getStatus().mode).toBe('live');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('setLiveOrDemo surfaces factory errors via status.errorMessage', async () => {
+    // Design choice: factory failures are captured into status (with the
+    // target mode set + errorMessage) rather than throwing to the caller.
+    // This lets the UI show the error and the user retry without the
+    // POST itself failing. The replay-active rejection still throws.
+    const c = createSourceModeController({ bus: new Bus(), sessionsDir: '/tmp' });
+    c.setBaseSourceFactories({
+      live: async () => {
+        throw new Error('NGT-1 not found at /dev/ttyUSB0');
+      },
+      demo: async () => ({ teardown: async () => {} }),
+    });
+
+    await c.setLiveOrDemo('demo');
+    expect(c.getStatus().mode).toBe('demo');
+    expect(c.getStatus().errorMessage).toBeUndefined();
+
+    // Swap to live — factory throws; controller should NOT propagate.
+    await expect(c.setLiveOrDemo('live')).resolves.toBeUndefined();
+    const status = c.getStatus();
+    expect(status.mode).toBe('live');
+    expect(status.errorMessage).toMatch(/NGT-1 not found/);
   });
 });

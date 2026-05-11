@@ -17,7 +17,7 @@ import {
   startTrueWindTx,
   getSharedDeviceRegistry,
   type WireDriver,
-  type SessionLogger,
+  type OutgoingPgn,
 } from '@g5000/bridge';
 import { startDemoInjector } from './demo-injector.js';
 import { createSourceModeController } from './source-mode-controller.js';
@@ -35,10 +35,10 @@ const REPLAY = process.env.REPLAY ?? null;
 const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
 const CONFIG_DB_PATH = process.env.CONFIG_DB ?? './data/config.db';
 const DEMO_MODE = process.env.DEMO_MODE === '1';
+const SKIP_BRIDGE = process.env.SKIP_BRIDGE === '1';
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
-  const drivers: WireDriver[] = [];
   const teardown: Array<() => Promise<void>> = [];
 
   // 0. Open ConfigStore so any code path (web routes, compute pipeline) can
@@ -55,22 +55,40 @@ async function main(): Promise<void> {
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });
   const sourceModeController = createSourceModeController({ bus, sessionsDir });
-  sourceModeController.setLiveOrDemo(DEMO_MODE ? 'demo' : 'live');
-  // eslint-disable-next-line no-console
-  console.log(
-    `[autopilot] source mode: ${sourceModeController.getStatus().mode} (sessions dir: ${sessionsDir})`,
-  );
 
-  // 1. Driver setup (live or replay).
-  if (REPLAY) {
-    const driver = new ReplayDriver({ filePath: REPLAY, mode: REPLAY_MODE });
-    drivers.push(driver);
+  // Track the most-recently-built base-source teardown for graceful
+  // shutdown. The controller owns the handle internally; we shadow its
+  // teardown here so SIGINT can unwind the live/demo source without
+  // needing a new controller method. Each factory updates this on entry;
+  // teardown clears it.
+  let currentBaseTeardown: (() => Promise<void>) | null = null;
+
+  // Demo factory — synthetic samples published directly to the bus. The
+  // true-wind compute pipeline is NOT started here (demo publishes
+  // calibrated wind directly; running the pipeline would overwrite it).
+  const demoFactory = async (): Promise<BaseSourceHandle> => {
+    const stopDemo = startDemoInjector(bus);
     // eslint-disable-next-line no-console
-    console.log(`[autopilot] replay mode (${REPLAY_MODE}): ${REPLAY}`);
-  } else {
-    const skipBridge = process.env.SKIP_BRIDGE === '1';
+    console.log('[autopilot] demo mode — synthetic samples publishing to the bus');
+    const teardownFn = async (): Promise<void> => {
+      stopDemo();
+      if (currentBaseTeardown === teardownFn) currentBaseTeardown = null;
+    };
+    currentBaseTeardown = teardownFn;
+    return {
+      teardown: teardownFn,
+      restart: demoFactory,
+    };
+  };
 
-    if (!skipBridge) {
+  // Live factory — open NGT-1 + 0183 ports, run bridge, start session
+  // logger + true-wind compute + true-wind TX. The composite teardown
+  // unwinds in reverse start order.
+  const liveFactory = async (): Promise<BaseSourceHandle> => {
+    const drivers: WireDriver[] = [];
+    const stops: Array<() => Promise<void>> = [];
+
+    if (!SKIP_BRIDGE) {
       try {
         const port = new SerialPort({
           path: SERIAL_PATH,
@@ -81,6 +99,12 @@ async function main(): Promise<void> {
           port.open((err) => (err ? reject(err) : resolve()));
         });
         drivers.push(new Ngt1Driver({ source: port }));
+        stops.push(
+          () =>
+            new Promise<void>((resolve) => {
+              port.close(() => resolve());
+            }),
+        );
         // eslint-disable-next-line no-console
         console.log(`[autopilot] NGT-1 online via ${SERIAL_PATH}`);
       } catch (err) {
@@ -101,6 +125,12 @@ async function main(): Promise<void> {
             port.open((err) => (err ? reject(err) : resolve()));
           });
           drivers.push(new SerialPort0183Driver({ source: port, port: i + 1 }));
+          stops.push(
+            () =>
+              new Promise<void>((resolve) => {
+                port.close(() => resolve());
+              }),
+          );
           // eslint-disable-next-line no-console
           console.log(`[autopilot] 0183 port${i + 1} online via ${p183}`);
         } catch (err) {
@@ -111,110 +141,145 @@ async function main(): Promise<void> {
         }
       }
     }
-  }
 
-  // 2. Bridge orchestrator.
-  if (drivers.length > 0) {
-    const stop = await runBridge({ bus, drivers });
-    teardown.push(stop);
-  }
+    // Bridge — even with zero drivers we still spin up an orchestrator so
+    // teardown is symmetric. Doing it conditionally would split the
+    // teardown path.
+    let stopBridgeFn: (() => Promise<void>) | null = null;
+    if (drivers.length > 0) {
+      stopBridgeFn = await runBridge({ bus, drivers });
+    }
 
-  if (!DEMO_MODE && drivers.length > 0) {
-    // Register the live bridge teardown with the controller so replay can stop it.
-    // No restart fn — reopening the NGT-1 mid-process is fragile; live mode requires
-    // a full server restart to re-arm after a replay.
-    sourceModeController.setBaseSource({
-      teardown: async () => {
-        // No-op — the bridge teardown is already in the main teardown[] array.
-        // The controller calls this when entering replay; we don't actually want to
-        // double-stop the bridge here. If you need live→replay→live cycling,
-        // refactor this to share ownership properly.
-      },
-    });
-  }
+    // Optional session logger — only when a log dir was configured.
+    let stopLoggerFn: (() => Promise<void>) | null = null;
+    if (SESSION_LOG_DIR && drivers.length > 0) {
+      const sessionId = new Date().toISOString().replace(/[:.]/g, '-');
+      const logger = await startSessionLogger({
+        drivers,
+        dir: SESSION_LOG_DIR,
+        sessionId,
+      });
+      stopLoggerFn = () => logger.close();
+      // eslint-disable-next-line no-console
+      console.log(
+        `[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`,
+      );
+    }
 
-  // 3. Optional session logger (skipped in replay mode).
-  let logger: SessionLogger | null = null;
-  if (SESSION_LOG_DIR && !REPLAY) {
-    const sessionId = new Date().toISOString().replace(/[:.]/g, '-');
-    logger = await startSessionLogger({
-      drivers,
-      dir: SESSION_LOG_DIR,
-      sessionId,
-    });
-    // eslint-disable-next-line no-console
-    console.log(`[autopilot] session log: ${path.join(SESSION_LOG_DIR, sessionId + '.jsonl.gz')}`);
-    teardown.push(() => logger!.close());
-  }
-
-  // 4. Demo mode OR true-wind compute pipeline.
-  //    When DEMO_MODE is on, the demo injector publishes synthetic
-  //    wind.true.calibrated.* directly, so the true-wind pipeline must be
-  //    skipped — otherwise it would overwrite the demo values.
-  if (DEMO_MODE) {
-    const makeDemoHandle = (): BaseSourceHandle => {
-      const stopDemo = startDemoInjector(bus);
-      return {
-        teardown: async () => stopDemo(),
-        restart: async () => makeDemoHandle(),
-      };
-    };
-    const demoHandle = makeDemoHandle();
-    sourceModeController.setBaseSource(demoHandle);
-    // Idempotent shutdown wrapper — controller may also tear down via startReplay.
-    let demoStopped = false;
-    teardown.push(async () => {
-      if (demoStopped) return;
-      demoStopped = true;
-      const h = sourceModeController.getStatus();
-      if (h.mode === 'replay') return; // controller owns it during replay
-      await demoHandle.teardown();
-    });
-    // eslint-disable-next-line no-console
-    console.log('[autopilot] DEMO_MODE on — synthetic samples publishing to the bus');
-  } else {
-    // True-wind compute pipeline (subscribes to bus + ConfigStore,
-    // publishes wind.true.calibrated.* back to the bus).
-    const stopCompute = await startTrueWindPipeline({
-      bus,
-      configStore: store,
-    });
-    teardown.push(stopCompute);
+    // True-wind compute pipeline — live-only (demo publishes calibrated
+    // wind directly).
+    const stopCompute = await startTrueWindPipeline({ bus, configStore: store });
     // eslint-disable-next-line no-console
     console.log('[autopilot] true-wind compute pipeline online');
-  }
 
-  // 4b. Polar performance pipeline (publishes performance.* channels).
-  const stopPolarPipeline = await startPolarPipeline({
-    bus,
-    configStore: store,
-  });
-  teardown.push(stopPolarPipeline);
-  // eslint-disable-next-line no-console
-  console.log('[autopilot] polar pipeline online');
+    // True-wind TX wiring + device-registry refresh target (NGT-1 only).
+    const ngt = drivers.find((d) => d instanceof Ngt1Driver);
+    let stopTxFn: (() => Promise<void>) | null = null;
+    let registeredTxer: ((pgn: OutgoingPgn) => Promise<void>) | null = null;
+    if (ngt) {
+      stopTxFn = await startTrueWindTx({
+        bus,
+        driver: ngt,
+        shouldTransmit: () => sourceModeController.getStatus().mode === 'live',
+      });
+      // eslint-disable-next-line no-console
+      console.log('[autopilot] true-wind TX online via NGT-1');
 
-  // 5. True-wind TX wiring. Picks the first driver that supports txPgn —
-  //    only the NGT-1 in Phase 0a (others throw). Skipped in replay mode
-  //    (we don't transmit when reading from a recorded session).
-  const ngt = drivers.find((d) => d instanceof Ngt1Driver);
-  if (ngt && !REPLAY) {
-    const stopTx = await startTrueWindTx({
-      bus,
-      driver: ngt,
-      shouldTransmit: () => sourceModeController.getStatus().mode !== 'replay',
+      const registry = getSharedDeviceRegistry();
+      registeredTxer = (pgn) => ngt.txPgn(pgn);
+      registry.registerTxer(registeredTxer);
+      // eslint-disable-next-line no-console
+      console.log('[autopilot] device-registry refresh target = NGT-1');
+    }
+
+    const teardownFn = async (): Promise<void> => {
+      // Reverse order. Best-effort: log + swallow each step's error so
+      // we still unwind the rest.
+      const safe = async (label: string, fn: () => Promise<void>): Promise<void> => {
+        try {
+          await fn();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[autopilot] live teardown ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      };
+      if (registeredTxer) {
+        getSharedDeviceRegistry().unregisterTxer(registeredTxer);
+      }
+      if (stopTxFn) await safe('tx', stopTxFn);
+      await safe('compute', stopCompute);
+      if (stopLoggerFn) await safe('logger', stopLoggerFn);
+      if (stopBridgeFn) await safe('bridge', stopBridgeFn);
+      for (const s of stops.reverse()) await safe('port', s);
+      if (currentBaseTeardown === teardownFn) currentBaseTeardown = null;
+    };
+    currentBaseTeardown = teardownFn;
+    return {
+      teardown: teardownFn,
+      restart: liveFactory,
+    };
+  };
+
+  // 1. REPLAY env-var boot path — bypasses factories, runs a single
+  //    replay-from-boot. Preserved for CLI ergonomics; live↔demo toggle
+  //    not available in this mode (the user can stopReplay via /api).
+  if (REPLAY) {
+    const driver = new ReplayDriver({ filePath: REPLAY, mode: REPLAY_MODE });
+    const stopBridge = await runBridge({ bus, drivers: [driver] });
+    teardown.push(stopBridge);
+    // eslint-disable-next-line no-console
+    console.log(`[autopilot] replay mode (${REPLAY_MODE}): ${REPLAY}`);
+    // Polar pipeline still runs in replay so /polars works against replayed data.
+    const stopPolarPipeline = await startPolarPipeline({ bus, configStore: store });
+    teardown.push(stopPolarPipeline);
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] polar pipeline online');
+  } else {
+    // 2. Register factories with the controller and boot into the requested mode.
+    sourceModeController.setBaseSourceFactories({ live: liveFactory, demo: demoFactory });
+    await sourceModeController.setLiveOrDemo(DEMO_MODE ? 'demo' : 'live');
+    // eslint-disable-next-line no-console
+    console.log(
+      `[autopilot] source mode: ${sourceModeController.getStatus().mode} (sessions dir: ${sessionsDir})`,
+    );
+    const errAtBoot = sourceModeController.getStatus().errorMessage;
+    if (errAtBoot) {
+      // eslint-disable-next-line no-console
+      console.warn(`[autopilot] source-mode boot warning: ${errAtBoot}`);
+    }
+
+    // Polar performance pipeline — always on (consumes calibrated wind
+    // from either the demo injector or the true-wind compute pipeline).
+    const stopPolarPipeline = await startPolarPipeline({ bus, configStore: store });
+    teardown.push(stopPolarPipeline);
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] polar pipeline online');
+
+    // Tear down whatever base source the controller currently owns on shutdown.
+    teardown.push(async () => {
+      const st = sourceModeController.getStatus();
+      if (st.mode === 'replay') {
+        // Replay teardown is owned by the controller via stopReplay.
+        try {
+          await sourceModeController.stopReplay();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (currentBaseTeardown) {
+        try {
+          await currentBaseTeardown();
+        } catch {
+          /* ignore */
+        }
+        currentBaseTeardown = null;
+      }
     });
-    teardown.push(stopTx);
-    // eslint-disable-next-line no-console
-    console.log('[autopilot] true-wind TX online via NGT-1');
-
-    // Register the NGT-1 as the device-registry's refresh target so
-    // /api/devices/refresh can broadcast ISO Request (PGN 59904).
-    getSharedDeviceRegistry().registerTxer((pgn) => ngt.txPgn(pgn));
-    // eslint-disable-next-line no-console
-    console.log('[autopilot] device-registry refresh target = NGT-1');
   }
 
-  // 6. Start Next.js pointing at the @g5000/web package directory.
+  // 3. Start Next.js pointing at the @g5000/web package directory.
   const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
@@ -228,11 +293,17 @@ async function main(): Promise<void> {
   });
 
   // Graceful shutdown — reverse the start order.
-  const shutdown = async () => {
+  const shutdown = async (): Promise<void> => {
     // eslint-disable-next-line no-console
     console.log('[autopilot] shutting down');
     server.close();
-    for (const t of teardown.reverse()) await t();
+    for (const t of teardown.reverse()) {
+      try {
+        await t();
+      } catch {
+        /* ignore */
+      }
+    }
     process.exit(0);
   };
   process.once('SIGINT', shutdown);
