@@ -46,10 +46,19 @@ export default function BspCalPage() {
         let bestDist = Math.abs(prevCal.bins[0]! - bspVal);
         for (let i = 1; i < prevCal.bins.length; i++) {
           const d = Math.abs(prevCal.bins[i]! - bspVal);
-          if (d < bestDist) { bestDist = d; bestIdx = i; }
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
         }
         const newMultiplier = sogVal / bspVal;
-        setCapture({ kind: 'reviewing', bspAvg: bspVal, sogAvg: sogVal, binIdx: bestIdx, newMultiplier });
+        setCapture({
+          kind: 'reviewing',
+          bspAvg: bspVal,
+          sogAvg: sogVal,
+          binIdx: bestIdx,
+          newMultiplier,
+        });
         return prevCal;
       });
     }, CAPTURE_MS);
@@ -64,7 +73,9 @@ export default function BspCalPage() {
     setBusy(true);
     try {
       const res = await fetch('/api/config/bsp', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
       });
       if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
       setCal(next);
@@ -213,9 +224,8 @@ export default function BspCalPage() {
         <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
           <h2 className="text-lg font-semibold">Capture wizard</h2>
           <p className="text-xs text-slate-500">
-            Sail steady in still water (no current) at a known speed. Click Capture
-            to record 5s of BSP and GPS SOG; the wizard computes the multiplier and
-            snaps to the nearest bin.
+            Sail steady in still water (no current) at a known speed. Click Capture to record 5s of
+            BSP and GPS SOG; the wizard computes the multiplier and snaps to the nearest bin.
           </p>
           {capture.kind === 'idle' && (
             <button
@@ -231,15 +241,22 @@ export default function BspCalPage() {
           {capture.kind === 'reviewing' && (
             <div className="space-y-2 text-sm">
               <div className="text-slate-300">
-                BSP avg: <span className="font-mono">{(capture.bspAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
+                BSP avg:{' '}
+                <span className="font-mono">{(capture.bspAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
                 <br />
-                SOG avg: <span className="font-mono">{(capture.sogAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
+                SOG avg:{' '}
+                <span className="font-mono">{(capture.sogAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
                 <br />
-                Bin selected: <span className="font-mono">{(cal.bins[capture.binIdx]! * MS_TO_KNOTS).toFixed(0)} kn</span>
+                Bin selected:{' '}
+                <span className="font-mono">
+                  {(cal.bins[capture.binIdx]! * MS_TO_KNOTS).toFixed(0)} kn
+                </span>
                 <br />
-                New multiplier: <span className="font-mono">{capture.newMultiplier.toFixed(3)}</span>
+                New multiplier:{' '}
+                <span className="font-mono">{capture.newMultiplier.toFixed(3)}</span>
                 <br />
-                (current: <span className="font-mono">{cal.multiplier[capture.binIdx]!.toFixed(3)}</span>)
+                (current:{' '}
+                <span className="font-mono">{cal.multiplier[capture.binIdx]!.toFixed(3)}</span>)
               </div>
               <div className="flex gap-2">
                 <button

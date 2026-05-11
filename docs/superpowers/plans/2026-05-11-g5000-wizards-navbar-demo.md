@@ -10,6 +10,7 @@
 4. **Demo mode** — `DEMO_MODE=1` env var on the autopilot-server starts a synthetic-data injector that publishes plausible wind/boat/motion samples on a loop. Closes the "we have no boat data yet" gap so the polar plot, helm dashboard, and capture wizards can all be visually validated bench-side. Replaces the "replay-driven validation" framing — we can validate without needing to have captured a real session yet.
 
 **Architecture:**
+
 - A new `Navbar.tsx` mounted in the root layout — server component, no SSE, just links.
 - BSP and Compass wizards reuse the existing `useChannelHistory` rolling-buffer hook with a 30s window, same pattern as the tack-test wizard. Capture button kicks off a 30s timer; on completion, snap to nearest bin and PUT the updated cal.
 - Demo injector lives in `apps/autopilot-server/src/demo-injector.ts`. Subscribes to nothing; publishes to the shared bus directly. Started conditionally based on `DEMO_MODE` env var. Writes to `wind.true.calibrated.*`, `wind.apparent.*`, `boat.speed.water`, `boat.heading.magnetic`, `nav.gps.cog`, `nav.gps.sog`, and the motion channels. When DEMO_MODE is on, the true-wind pipeline is skipped (otherwise it would overwrite the demo's `wind.true.calibrated.*` channels).
@@ -44,6 +45,7 @@ autopilot/
 ## Task 1: Navbar
 
 **Files:**
+
 - Create: `packages/web/src/app/Navbar.tsx`
 - Modify: `packages/web/src/app/layout.tsx`
 
@@ -117,7 +119,10 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Navbar } from './Navbar';
 
-export const metadata: Metadata = { title: 'G5000', description: 'Performance instrument processor' };
+export const metadata: Metadata = {
+  title: 'G5000',
+  description: 'Performance instrument processor',
+};
 export const viewport: Viewport = { width: 'device-width', initialScale: 1 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -182,7 +187,10 @@ const startCapture = () => {
     let bestDist = Math.abs(cal.bins[0]! - bsp);
     for (let i = 1; i < cal.bins.length; i++) {
       const d = Math.abs(cal.bins[i]! - bsp);
-      if (d < bestDist) { bestDist = d; bestIdx = i; }
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
     }
     // New multiplier replaces the bin's current value (full replace; tack-test
     // style of accumulating delta would also work, but this is simpler and
@@ -201,7 +209,9 @@ const applyCapture = async () => {
   setBusy(true);
   try {
     const res = await fetch('/api/config/bsp', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next),
     });
     if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
     setCal(next);
@@ -217,68 +227,73 @@ const applyCapture = async () => {
 JSX section to add (after the existing manual editor, before the closing `</main>`):
 
 ```tsx
-{cal && (
-  <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
-    <h2 className="text-lg font-semibold">Capture wizard</h2>
-    <p className="text-xs text-slate-500">
-      Sail steady in still water (no current) at a known speed. Click Capture
-      to record 5s of BSP and GPS SOG; the wizard computes the multiplier and
-      snaps to the nearest bin.
-    </p>
-    {capture.kind === 'idle' && (
-      <button
-        onClick={startCapture}
-        className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
-      >
-        Capture
-      </button>
-    )}
-    {capture.kind === 'capturing' && (
-      <p className="text-sm text-slate-300">Capturing… (5 s)</p>
-    )}
-    {capture.kind === 'reviewing' && (
-      <div className="space-y-2 text-sm">
-        <div className="text-slate-300">
-          BSP avg: <span className="font-mono">{(capture.bspAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
-          <br />
-          SOG avg: <span className="font-mono">{(capture.sogAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
-          <br />
-          Bin selected: <span className="font-mono">{(cal.bins[capture.binIdx]! * MS_TO_KNOTS).toFixed(0)} kn</span>
-          <br />
-          New multiplier: <span className="font-mono">{capture.newMultiplier.toFixed(3)}</span>
-          <br />
-          (current: <span className="font-mono">{cal.multiplier[capture.binIdx]!.toFixed(3)}</span>)
+{
+  cal && (
+    <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
+      <h2 className="text-lg font-semibold">Capture wizard</h2>
+      <p className="text-xs text-slate-500">
+        Sail steady in still water (no current) at a known speed. Click Capture to record 5s of BSP
+        and GPS SOG; the wizard computes the multiplier and snaps to the nearest bin.
+      </p>
+      {capture.kind === 'idle' && (
+        <button
+          onClick={startCapture}
+          className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
+        >
+          Capture
+        </button>
+      )}
+      {capture.kind === 'capturing' && <p className="text-sm text-slate-300">Capturing… (5 s)</p>}
+      {capture.kind === 'reviewing' && (
+        <div className="space-y-2 text-sm">
+          <div className="text-slate-300">
+            BSP avg:{' '}
+            <span className="font-mono">{(capture.bspAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
+            <br />
+            SOG avg:{' '}
+            <span className="font-mono">{(capture.sogAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
+            <br />
+            Bin selected:{' '}
+            <span className="font-mono">
+              {(cal.bins[capture.binIdx]! * MS_TO_KNOTS).toFixed(0)} kn
+            </span>
+            <br />
+            New multiplier: <span className="font-mono">{capture.newMultiplier.toFixed(3)}</span>
+            <br />
+            (current:{' '}
+            <span className="font-mono">{cal.multiplier[capture.binIdx]!.toFixed(3)}</span>)
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={applyCapture}
+              disabled={busy}
+              className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
+            >
+              {busy ? 'Applying…' : 'Apply'}
+            </button>
+            <button
+              onClick={() => setCapture({ kind: 'idle' })}
+              className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+            >
+              Discard
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={applyCapture}
-            disabled={busy}
-            className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
-          >
-            {busy ? 'Applying…' : 'Apply'}
-          </button>
+      )}
+      {capture.kind === 'applied' && (
+        <div className="space-y-2">
+          <p className="text-sm text-green-400">Applied.</p>
           <button
             onClick={() => setCapture({ kind: 'idle' })}
             className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
           >
-            Discard
+            Capture again
           </button>
         </div>
-      </div>
-    )}
-    {capture.kind === 'applied' && (
-      <div className="space-y-2">
-        <p className="text-sm text-green-400">Applied.</p>
-        <button
-          onClick={() => setCapture({ kind: 'idle' })}
-          className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
-        >
-          Capture again
-        </button>
-      </div>
-    )}
-  </section>
-)}
+      )}
+    </section>
+  );
+}
 ```
 
 ### Typecheck, commit
@@ -301,7 +316,10 @@ Same shape as the BSP wizard. Captures HDG + COG for 5 s, computes deviation, sn
 
 const [boat, setBoat] = useState<BoatConfig | null>(null);
 useEffect(() => {
-  fetch('/api/config/boat').then((r) => r.json()).then(setBoat).catch(() => {});
+  fetch('/api/config/boat')
+    .then((r) => r.json())
+    .then(setBoat)
+    .catch(() => {});
 }, []);
 
 const histHdg = useChannelHistory(channels.get('boat.heading.magnetic'), 6000);
@@ -361,7 +379,9 @@ const applyCapture = async () => {
   setBusy(true);
   try {
     const res = await fetch('/api/config/compass-deviation', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(next),
     });
     if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
     setCal(next);
@@ -377,58 +397,76 @@ const applyCapture = async () => {
 JSX section (similar layout to BSP wizard):
 
 ```tsx
-{cal && (
-  <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
-    <h2 className="text-lg font-semibold">Capture wizard</h2>
-    <p className="text-xs text-slate-500">
-      Sail steady on a single heading (no current). Click Capture to record
-      5 s of compass HDG and GPS COG; deviation for the current heading bin
-      is computed from their difference (with magvar from boat config).
-    </p>
-    {capture.kind === 'idle' && (
-      <button
-        onClick={startCapture}
-        className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
-      >
-        Capture
-      </button>
-    )}
-    {capture.kind === 'capturing' && (
-      <p className="text-sm text-slate-300">Capturing… (5 s)</p>
-    )}
-    {capture.kind === 'reviewing' && (
-      <div className="space-y-2 text-sm">
-        <div className="text-slate-300">
-          HDG avg: <span className="font-mono">{(capture.hdgAvg * RAD_TO_DEG).toFixed(1)}°</span>
-          <br />
-          COG avg: <span className="font-mono">{(capture.cogAvg * RAD_TO_DEG).toFixed(1)}°</span>
-          <br />
-          Bin: <span className="font-mono">{capture.binIdx * 10}°–{capture.binIdx * 10 + 10}°</span>
-          <br />
-          New deviation: <span className="font-mono">{(capture.newDevRad * RAD_TO_DEG).toFixed(2)}°</span>
-          <br />
-          (current: <span className="font-mono">{(cal.deviation[capture.binIdx]! * RAD_TO_DEG).toFixed(2)}°</span>)
-        </div>
-        <div className="flex gap-2">
-          <button onClick={applyCapture} disabled={busy} className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50">
-            {busy ? 'Applying…' : 'Apply'}
-          </button>
-          <button onClick={() => setCapture({ kind: 'idle' })} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
-            Discard
-          </button>
-        </div>
-      </div>
-    )}
-    {capture.kind === 'applied' && (
-      <div className="space-y-2">
-        <p className="text-sm text-green-400">Applied.</p>
-        <button onClick={() => setCapture({ kind: 'idle' })} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
-          Capture again
+{
+  cal && (
+    <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
+      <h2 className="text-lg font-semibold">Capture wizard</h2>
+      <p className="text-xs text-slate-500">
+        Sail steady on a single heading (no current). Click Capture to record 5 s of compass HDG and
+        GPS COG; deviation for the current heading bin is computed from their difference (with
+        magvar from boat config).
+      </p>
+      {capture.kind === 'idle' && (
+        <button
+          onClick={startCapture}
+          className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
+        >
+          Capture
         </button>
-      </div>
-    )}
-  </section>
-)}
+      )}
+      {capture.kind === 'capturing' && <p className="text-sm text-slate-300">Capturing… (5 s)</p>}
+      {capture.kind === 'reviewing' && (
+        <div className="space-y-2 text-sm">
+          <div className="text-slate-300">
+            HDG avg: <span className="font-mono">{(capture.hdgAvg * RAD_TO_DEG).toFixed(1)}°</span>
+            <br />
+            COG avg: <span className="font-mono">{(capture.cogAvg * RAD_TO_DEG).toFixed(1)}°</span>
+            <br />
+            Bin:{' '}
+            <span className="font-mono">
+              {capture.binIdx * 10}°–{capture.binIdx * 10 + 10}°
+            </span>
+            <br />
+            New deviation:{' '}
+            <span className="font-mono">{(capture.newDevRad * RAD_TO_DEG).toFixed(2)}°</span>
+            <br />
+            (current:{' '}
+            <span className="font-mono">
+              {(cal.deviation[capture.binIdx]! * RAD_TO_DEG).toFixed(2)}°
+            </span>
+            )
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={applyCapture}
+              disabled={busy}
+              className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
+            >
+              {busy ? 'Applying…' : 'Apply'}
+            </button>
+            <button
+              onClick={() => setCapture({ kind: 'idle' })}
+              className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+      {capture.kind === 'applied' && (
+        <div className="space-y-2">
+          <p className="text-sm text-green-400">Applied.</p>
+          <button
+            onClick={() => setCapture({ kind: 'idle' })}
+            className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+          >
+            Capture again
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 ```
 
 ### Typecheck, commit
@@ -443,6 +481,7 @@ git commit -m "feat(web): compass deviation capture wizard with GPS COG correlat
 ## Task 4: Demo mode
 
 **Files:**
+
 - Create: `apps/autopilot-server/src/demo-injector.ts`
 - Modify: `apps/autopilot-server/src/index.ts`
 - Create: `packages/web/src/app/api/dev/demo/route.ts`
@@ -479,7 +518,7 @@ export function startDemoInjector(bus: Bus): () => void {
     const bsp = bspKn * KN;
     // Slowly turning heading (one full rotation every 6 min)
     const hdgDeg = (t / 60) * 60;
-    const hdg = ((hdgDeg % 360) + 360) % 360 * DEG;
+    const hdg = (((hdgDeg % 360) + 360) % 360) * DEG;
     const now_ns = BigInt(Date.now()) * 1_000_000n;
     const pub = (channel: string, value: number, unit: string) => {
       bus.publish({
@@ -519,16 +558,16 @@ In `apps/autopilot-server/src/index.ts`:
 3. After the bridge starts but BEFORE the true-wind pipeline starts, if `DEMO_MODE` is true: start the demo injector and **skip** the true-wind pipeline (it would otherwise overwrite the demo's `wind.true.calibrated.*` samples). Polar pipeline still runs — it consumes the demo's true wind directly.
 
 ```ts
-  if (DEMO_MODE) {
-    const stopDemo = startDemoInjector(bus);
-    teardown.push(async () => stopDemo());
-    console.log('[autopilot] DEMO_MODE on — synthetic samples publishing to the bus');
-  } else {
-    // 4. True-wind compute pipeline ... (existing block, only when not demo)
-    const stopCompute = await startTrueWindPipeline({ bus, configStore: store });
-    teardown.push(stopCompute);
-    console.log('[autopilot] true-wind compute pipeline online');
-  }
+if (DEMO_MODE) {
+  const stopDemo = startDemoInjector(bus);
+  teardown.push(async () => stopDemo());
+  console.log('[autopilot] DEMO_MODE on — synthetic samples publishing to the bus');
+} else {
+  // 4. True-wind compute pipeline ... (existing block, only when not demo)
+  const stopCompute = await startTrueWindPipeline({ bus, configStore: store });
+  teardown.push(stopCompute);
+  console.log('[autopilot] true-wind compute pipeline online');
+}
 ```
 
 The polar pipeline (block 4b) and TX wiring (block 5) stay outside the conditional.
@@ -596,6 +635,7 @@ git commit -m "feat: DEMO_MODE synthetic-data injector + DEMO chip in navbar"
 ## Closing notes
 
 After this plan:
+
 - Navbar across every page; no more bouncing between URLs by hand.
 - BSP and compass cal are usable end-to-end (manual entry already worked; wizards make the routine one-tap).
 - `DEMO_MODE=1` lets us demo and visually test the whole stack — polar plot, helm dashboard, wizards — without any boat hardware. Closes the "we can't test the wizards without a session" loop.

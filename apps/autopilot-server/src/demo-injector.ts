@@ -25,7 +25,7 @@ export function startDemoInjector(bus: Bus): () => void {
     const bsp = bspKn * KN;
     // Slowly turning heading (one full rotation every 6 min)
     const hdgDeg = (t / 60) * 60;
-    const hdg = ((hdgDeg % 360) + 360) % 360 * DEG;
+    const hdg = (((hdgDeg % 360) + 360) % 360) * DEG;
     const now_ns = BigInt(Date.now()) * 1_000_000n;
     const pub = (channel: string, value: number, unit: string) => {
       bus.publish({

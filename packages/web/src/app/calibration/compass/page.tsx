@@ -20,7 +20,10 @@ export default function CompassDeviationPage() {
 
   const [boat, setBoat] = useState<BoatConfig | null>(null);
   useEffect(() => {
-    fetch('/api/config/boat').then((r) => r.json()).then(setBoat).catch(() => {});
+    fetch('/api/config/boat')
+      .then((r) => r.json())
+      .then(setBoat)
+      .catch(() => {});
   }, []);
 
   const histHdg = useChannelHistory(channels.get('boat.heading.magnetic'), 6000);
@@ -78,7 +81,9 @@ export default function CompassDeviationPage() {
     setBusy(true);
     try {
       const res = await fetch('/api/config/compass-deviation', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
       });
       if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
       setCal(next);
@@ -227,9 +232,9 @@ export default function CompassDeviationPage() {
         <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
           <h2 className="text-lg font-semibold">Capture wizard</h2>
           <p className="text-xs text-slate-500">
-            Sail steady on a single heading (no current). Click Capture to record
-            5 s of compass HDG and GPS COG; deviation for the current heading bin
-            is computed from their difference (with magvar from boat config).
+            Sail steady on a single heading (no current). Click Capture to record 5 s of compass HDG
+            and GPS COG; deviation for the current heading bin is computed from their difference
+            (with magvar from boat config).
           </p>
           {capture.kind === 'idle' && (
             <button
@@ -245,21 +250,38 @@ export default function CompassDeviationPage() {
           {capture.kind === 'reviewing' && (
             <div className="space-y-2 text-sm">
               <div className="text-slate-300">
-                HDG avg: <span className="font-mono">{(capture.hdgAvg * RAD_TO_DEG).toFixed(1)}°</span>
+                HDG avg:{' '}
+                <span className="font-mono">{(capture.hdgAvg * RAD_TO_DEG).toFixed(1)}°</span>
                 <br />
-                COG avg: <span className="font-mono">{(capture.cogAvg * RAD_TO_DEG).toFixed(1)}°</span>
+                COG avg:{' '}
+                <span className="font-mono">{(capture.cogAvg * RAD_TO_DEG).toFixed(1)}°</span>
                 <br />
-                Bin: <span className="font-mono">{capture.binIdx * 10}°–{capture.binIdx * 10 + 10}°</span>
+                Bin:{' '}
+                <span className="font-mono">
+                  {capture.binIdx * 10}°–{capture.binIdx * 10 + 10}°
+                </span>
                 <br />
-                New deviation: <span className="font-mono">{(capture.newDevRad * RAD_TO_DEG).toFixed(2)}°</span>
+                New deviation:{' '}
+                <span className="font-mono">{(capture.newDevRad * RAD_TO_DEG).toFixed(2)}°</span>
                 <br />
-                (current: <span className="font-mono">{(cal.deviation[capture.binIdx]! * RAD_TO_DEG).toFixed(2)}°</span>)
+                (current:{' '}
+                <span className="font-mono">
+                  {(cal.deviation[capture.binIdx]! * RAD_TO_DEG).toFixed(2)}°
+                </span>
+                )
               </div>
               <div className="flex gap-2">
-                <button onClick={() => void applyCapture()} disabled={busy} className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50">
+                <button
+                  onClick={() => void applyCapture()}
+                  disabled={busy}
+                  className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
+                >
                   {busy ? 'Applying…' : 'Apply'}
                 </button>
-                <button onClick={() => setCapture({ kind: 'idle' })} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
+                <button
+                  onClick={() => setCapture({ kind: 'idle' })}
+                  className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+                >
                   Discard
                 </button>
               </div>
@@ -268,7 +290,10 @@ export default function CompassDeviationPage() {
           {capture.kind === 'applied' && (
             <div className="space-y-2">
               <p className="text-sm text-green-400">Applied.</p>
-              <button onClick={() => setCapture({ kind: 'idle' })} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
+              <button
+                onClick={() => setCapture({ kind: 'idle' })}
+                className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+              >
                 Capture again
               </button>
             </div>
