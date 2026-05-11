@@ -89,3 +89,28 @@ describe('startTrueWindTx', () => {
     expect(driver.sent).toHaveLength(0);
   });
 });
+
+describe('startTrueWindTx — shouldTransmit gate', () => {
+  let bus: Bus;
+  let driver: FakeDriver;
+  let stop: () => Promise<void>;
+
+  afterEach(async () => {
+    await stop();
+  });
+
+  it('skips TX when shouldTransmit() returns false', async () => {
+    bus = new Bus();
+    driver = new FakeDriver();
+    stop = await startTrueWindTx({
+      bus,
+      driver,
+      throttleMs: 10,
+      shouldTransmit: () => false,
+    });
+    bus.publish(sample('wind.true.calibrated.angle', 0.785));
+    bus.publish(sample('wind.true.calibrated.speed', 5.0));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(driver.sent).toHaveLength(0);
+  });
+});

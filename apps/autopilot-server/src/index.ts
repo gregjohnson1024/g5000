@@ -198,7 +198,11 @@ async function main(): Promise<void> {
   //    (we don't transmit when reading from a recorded session).
   const ngt = drivers.find((d) => d instanceof Ngt1Driver);
   if (ngt && !REPLAY) {
-    const stopTx = await startTrueWindTx({ bus, driver: ngt });
+    const stopTx = await startTrueWindTx({
+      bus,
+      driver: ngt,
+      shouldTransmit: () => sourceModeController.getStatus().mode !== 'replay',
+    });
     teardown.push(stopTx);
     // eslint-disable-next-line no-console
     console.log('[autopilot] true-wind TX online via NGT-1');

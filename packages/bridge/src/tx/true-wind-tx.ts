@@ -7,6 +7,8 @@ export interface TrueWindTxOptions {
   driver: WireDriver;
   /** Minimum interval between transmits, ms. Default 200 (5 Hz). */
   throttleMs?: number;
+  /** If provided and returns false, the TX call is skipped. */
+  shouldTransmit?: () => boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export async function startTrueWindTx(opts: TrueWindTxOptions): Promise<() => Pr
     .pipe(throttleTime(throttleMs, undefined, { leading: true, trailing: true }))
     .subscribe(() => {
       if (speed === undefined || angle === undefined) return;
+      if (opts.shouldTransmit && !opts.shouldTransmit()) return;
       void driver.txPgn({
         pgn: 130306,
         prio: 2,
