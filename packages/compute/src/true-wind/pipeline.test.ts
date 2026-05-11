@@ -26,7 +26,7 @@ describe('startTrueWindPipeline', () => {
     store = await ConfigStore.open(path.join(dir, 'config.db'));
     bus = new Bus();
     received = [];
-    bus.subscribe('wind.true.calibrated.**', (s) => received.push(s));
+    bus.subscribe('wind.true.**', (s) => received.push(s));
     stop = await startTrueWindPipeline({
       bus,
       configStore: store,
@@ -41,7 +41,7 @@ describe('startTrueWindPipeline', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('publishes wind.true.calibrated.{angle,speed,direction} when all inputs are present', async () => {
+  it('publishes wind.true.{angle,speed,direction} when all inputs are present', async () => {
     const now_ns = BigInt(Date.now()) * 1_000_000n;
     bus.publish(sample(Channels.Wind.ApparentSpeed, 5, now_ns));
     bus.publish(sample(Channels.Wind.ApparentAngle, 0, now_ns));
@@ -51,9 +51,9 @@ describe('startTrueWindPipeline', () => {
     await new Promise((r) => setTimeout(r, 30));
 
     const channels = new Set(received.map((s) => s.channel));
-    expect(channels.has('wind.true.calibrated.speed')).toBe(true);
-    expect(channels.has('wind.true.calibrated.angle')).toBe(true);
-    expect(channels.has('wind.true.calibrated.direction')).toBe(true);
+    expect(channels.has('wind.true.speed')).toBe(true);
+    expect(channels.has('wind.true.angle')).toBe(true);
+    expect(channels.has('wind.true.direction')).toBe(true);
   });
 
   it('does not emit when only one input is present', async () => {

@@ -12,7 +12,7 @@ export interface TrueWindTxOptions {
 }
 
 /**
- * Subscribe to `wind.true.calibrated.{speed,angle}` on the bus and emit
+ * Subscribe to `wind.true.{speed,angle}` on the bus and emit
  * PGN 130306 frames to the wire-driver at most once every `throttleMs`.
  *
  * The PGN encodes Reference = "True (boat referenced)" which is what the
@@ -28,13 +28,13 @@ export async function startTrueWindTx(opts: TrueWindTxOptions): Promise<() => Pr
   const trigger = new Subject<void>();
 
   const subs = [
-    bus.subscribe('wind.true.calibrated.speed', (s) => {
+    bus.subscribe('wind.true.speed', (s) => {
       if (s.value.kind === 'scalar') {
         speed = s.value.value;
         trigger.next();
       }
     }),
-    bus.subscribe('wind.true.calibrated.angle', (s) => {
+    bus.subscribe('wind.true.angle', (s) => {
       if (s.value.kind === 'scalar') {
         angle = s.value.value;
         trigger.next();

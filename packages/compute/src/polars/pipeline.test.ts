@@ -41,8 +41,8 @@ describe('startPolarPipeline', () => {
 
   it('publishes performance.target.{boatSpeed,vmg,twaUpwind,twaDownwind} when all inputs are present', async () => {
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish(sample('wind.true.calibrated.speed', 8, now)); // 8 m/s TWS
-    bus.publish(sample('wind.true.calibrated.angle', Math.PI / 4, now)); // 45° TWA
+    bus.publish(sample('wind.true.speed', 8, now)); // 8 m/s TWS
+    bus.publish(sample('wind.true.angle', Math.PI / 4, now)); // 45° TWA
     bus.publish(sample('boat.speed.water', 5.5, now));
 
     await new Promise((r) => setTimeout(r, 30));
@@ -58,8 +58,8 @@ describe('startPolarPipeline', () => {
 
   it('emits percentPolar = actual/target × 100 (rough)', async () => {
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish(sample('wind.true.calibrated.speed', 8, now));
-    bus.publish(sample('wind.true.calibrated.angle', Math.PI / 2, now)); // 90° TWA
+    bus.publish(sample('wind.true.speed', 8, now));
+    bus.publish(sample('wind.true.angle', Math.PI / 2, now)); // 90° TWA
     bus.publish(sample('boat.speed.water', 7, now)); // boat speed 7 m/s
 
     await new Promise((r) => setTimeout(r, 30));
@@ -76,7 +76,7 @@ describe('startPolarPipeline', () => {
 
   it('does not emit when any required input is missing', async () => {
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish(sample('wind.true.calibrated.speed', 8, now));
+    bus.publish(sample('wind.true.speed', 8, now));
     // No TWA, no BSP.
     await new Promise((r) => setTimeout(r, 30));
     expect(received).toHaveLength(0);
@@ -84,8 +84,8 @@ describe('startPolarPipeline', () => {
 
   it('recomputes when the polar table changes', async () => {
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish(sample('wind.true.calibrated.speed', 8, now));
-    bus.publish(sample('wind.true.calibrated.angle', Math.PI / 4, now));
+    bus.publish(sample('wind.true.speed', 8, now));
+    bus.publish(sample('wind.true.angle', Math.PI / 4, now));
     bus.publish(sample('boat.speed.water', 5, now));
     await new Promise((r) => setTimeout(r, 30));
     const initial = received.length;

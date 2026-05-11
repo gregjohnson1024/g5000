@@ -65,9 +65,9 @@ export async function startTrueWindPipeline(
       compassDeviation: configSnapshot.compassDeviation,
       boatConfig: configSnapshot.boatConfig,
     });
-    bus.publish(make('wind.true.calibrated.speed', out.tws, now_ns));
-    bus.publish(make('wind.true.calibrated.angle', out.twa, now_ns));
-    bus.publish(make('wind.true.calibrated.direction', out.twd, now_ns));
+    bus.publish(make('wind.true.speed', out.tws, now_ns));
+    bus.publish(make('wind.true.angle', out.twa, now_ns));
+    bus.publish(make('wind.true.direction', out.twd, now_ns));
   }
 
   const trackScalar = (channel: string, key: keyof LatestValues): void => {

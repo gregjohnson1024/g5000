@@ -63,8 +63,8 @@ export async function startPolarPipeline(opts: PolarPipelineOptions): Promise<()
       }),
     );
   };
-  trackScalar('wind.true.calibrated.speed', 'tws');
-  trackScalar('wind.true.calibrated.angle', 'twa');
+  trackScalar('wind.true.speed', 'tws');
+  trackScalar('wind.true.angle', 'twa');
   trackScalar('boat.speed.water', 'bsp');
 
   rxSubs.push(

@@ -40,9 +40,9 @@ export function startDemoInjector(bus: Bus): () => void {
     pub('wind.apparent.angle', twa * 0.8, 'rad');
     // Calibrated true wind — published directly so the polar pipeline sees it
     // without needing the true-wind compute pipeline to run.
-    pub('wind.true.calibrated.speed', tws, 'm/s');
-    pub('wind.true.calibrated.angle', twa, 'rad');
-    pub('wind.true.calibrated.direction', (hdg + twa + 2 * Math.PI) % (2 * Math.PI), 'rad');
+    pub('wind.true.speed', tws, 'm/s');
+    pub('wind.true.angle', twa, 'rad');
+    pub('wind.true.direction', (hdg + twa + 2 * Math.PI) % (2 * Math.PI), 'rad');
     pub('boat.speed.water', bsp, 'm/s');
     pub('boat.heading.magnetic', hdg, 'rad');
     pub('nav.gps.cog', hdg + 0.03, 'rad');

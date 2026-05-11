@@ -60,8 +60,8 @@ describe('startTrueWindTx', () => {
   });
 
   it('emits PGN 130306 with True reference fields when both speed and angle are present', async () => {
-    bus.publish(sample('wind.true.calibrated.angle', 0.785));
-    bus.publish(sample('wind.true.calibrated.speed', 5.2));
+    bus.publish(sample('wind.true.angle', 0.785));
+    bus.publish(sample('wind.true.speed', 5.2));
     await new Promise((r) => setTimeout(r, 30));
     expect(driver.sent.length).toBeGreaterThanOrEqual(1);
     const last = driver.sent[driver.sent.length - 1]!;
@@ -74,8 +74,8 @@ describe('startTrueWindTx', () => {
   it('throttles to roughly the configured interval', async () => {
     // Publish fast — driver should NOT see one TX per publish.
     for (let i = 0; i < 50; i++) {
-      bus.publish(sample('wind.true.calibrated.angle', i * 0.01));
-      bus.publish(sample('wind.true.calibrated.speed', 5));
+      bus.publish(sample('wind.true.angle', i * 0.01));
+      bus.publish(sample('wind.true.speed', 5));
     }
     await new Promise((r) => setTimeout(r, 50));
     // 50ms wall, throttle 10ms → at most ~6 emissions
@@ -84,7 +84,7 @@ describe('startTrueWindTx', () => {
   });
 
   it('does not emit if only one of speed/angle has been seen', async () => {
-    bus.publish(sample('wind.true.calibrated.speed', 5));
+    bus.publish(sample('wind.true.speed', 5));
     await new Promise((r) => setTimeout(r, 30));
     expect(driver.sent).toHaveLength(0);
   });
@@ -108,8 +108,8 @@ describe('startTrueWindTx — shouldTransmit gate', () => {
       throttleMs: 10,
       shouldTransmit: () => false,
     });
-    bus.publish(sample('wind.true.calibrated.angle', 0.785));
-    bus.publish(sample('wind.true.calibrated.speed', 5.0));
+    bus.publish(sample('wind.true.angle', 0.785));
+    bus.publish(sample('wind.true.speed', 5.0));
     await new Promise((r) => setTimeout(r, 50));
     expect(driver.sent).toHaveLength(0);
   });

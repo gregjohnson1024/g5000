@@ -93,8 +93,8 @@ export default function PolarsPage() {
   };
 
   // Live operating-point values from SSE.
-  const twsSample = channels.get('wind.true.calibrated.speed');
-  const twaSample = channels.get('wind.true.calibrated.angle');
+  const twsSample = channels.get('wind.true.speed');
+  const twaSample = channels.get('wind.true.angle');
   const bspSample = channels.get('boat.speed.water');
   const targetSpeedSample = channels.get('performance.target.boatSpeed');
   const targetTwaSample = channels.get('performance.target.twaUpwind'); // simplistic — could pick up/down based on twa sign

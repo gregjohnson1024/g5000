@@ -28,9 +28,9 @@ export interface TackTestWizardProps {
 
 export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
   const { channels } = useSse();
-  const twd = useChannelHistory(channels.get('wind.true.calibrated.direction'), WINDOW_MS);
-  const twa = useChannelHistory(channels.get('wind.true.calibrated.angle'), WINDOW_MS);
-  const tws = useChannelHistory(channels.get('wind.true.calibrated.speed'), WINDOW_MS);
+  const twd = useChannelHistory(channels.get('wind.true.direction'), WINDOW_MS);
+  const twa = useChannelHistory(channels.get('wind.true.angle'), WINDOW_MS);
+  const tws = useChannelHistory(channels.get('wind.true.speed'), WINDOW_MS);
   const aws = useChannelHistory(channels.get('wind.apparent.speed'), WINDOW_MS);
   const awa = useChannelHistory(channels.get('wind.apparent.angle'), WINDOW_MS);
 

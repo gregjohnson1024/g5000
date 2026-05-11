@@ -38,9 +38,7 @@ import type { Sample } from './types.js';
 export const ANGLE_CHANNELS: ReadonlySet<string> = new Set<string>([
   'wind.apparent.angle',
   'wind.true.angle',
-  'wind.true.calibrated.angle',
   'wind.true.direction',
-  'wind.true.calibrated.direction',
   'nav.gps.cog',
   'boat.heading.magnetic',
   'boat.heading.true',

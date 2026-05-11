@@ -76,8 +76,8 @@ export default function HelmPage() {
     await reloadWardrobe();
   };
 
-  const tws = channels.get('wind.true.calibrated.speed');
-  const twa = channels.get('wind.true.calibrated.angle');
+  const tws = channels.get('wind.true.speed');
+  const twa = channels.get('wind.true.angle');
   const awa = channels.get('wind.apparent.angle');
   const bsp = channels.get('boat.speed.water');
   const targetSpeed = channels.get('performance.target.boatSpeed');
