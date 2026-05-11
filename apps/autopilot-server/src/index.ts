@@ -6,7 +6,7 @@ import next from 'next';
 import { SerialPort } from 'serialport';
 import { getSharedBus } from '@g5000/core';
 import { ConfigStore, setSharedConfigStore } from '@g5000/db';
-import { startTrueWindPipeline } from '@g5000/compute';
+import { startTrueWindPipeline, startPolarPipeline } from '@g5000/compute';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -129,6 +129,15 @@ async function main(): Promise<void> {
   teardown.push(stopCompute);
   // eslint-disable-next-line no-console
   console.log('[autopilot] true-wind compute pipeline online');
+
+  // 4b. Polar performance pipeline (publishes performance.* channels).
+  const stopPolarPipeline = await startPolarPipeline({
+    bus,
+    configStore: store,
+  });
+  teardown.push(stopPolarPipeline);
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] polar pipeline online');
 
   // 5. True-wind TX wiring. Picks the first driver that supports txPgn —
   //    only the NGT-1 in Phase 0a (others throw). Skipped in replay mode
