@@ -32,3 +32,8 @@ export const polars = sqliteTable('polars', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded PolarTable
 });
+
+export const sailWardrobe = sqliteTable('sail_wardrobe', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded SailWardrobe
+});

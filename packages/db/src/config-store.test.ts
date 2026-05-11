@@ -8,8 +8,10 @@ import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_POLARS,
+  DEFAULT_WARDROBE,
   type BoatConfig,
   type PolarTable,
+  type SailWardrobe,
 } from './defaults.js';
 
 describe('ConfigStore', () => {
@@ -74,5 +76,73 @@ describe('ConfigStore', () => {
     await store.setPolars(updated);
     const v = await next;
     expect(v.boatSpeed.flat().every((x) => x === 0)).toBe(true);
+  });
+
+  it('returns the default wardrobe on a fresh database', async () => {
+    const w = await firstValueFrom(store.sails$);
+    expect(w.activeConfigId).toBe('default');
+    expect(w.configs).toHaveLength(1);
+    expect(w.configs[0]!.id).toBe('default');
+  });
+
+  it('emits a new wardrobe when setSails is called', async () => {
+    const next: Promise<SailWardrobe> = firstValueFrom(
+      store.sails$.pipe(skip(1), take(1)),
+    );
+    const updated: SailWardrobe = {
+      ...DEFAULT_WARDROBE,
+      configs: [
+        ...DEFAULT_WARDROBE.configs,
+        {
+          id: 'reef1-a2',
+          name: 'Reef 1 + A2',
+          mainState: 'Reef 1',
+          downwindSail: 'A2',
+          polar: DEFAULT_WARDROBE.configs[0]!.polar,
+        },
+      ],
+    };
+    await store.setSails(updated);
+    const v = await next;
+    expect(v.configs).toHaveLength(2);
+  });
+
+  it('rejects setSails with an unknown activeConfigId', async () => {
+    await expect(
+      store.setSails({
+        ...DEFAULT_WARDROBE,
+        activeConfigId: 'does-not-exist',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('activePolar$ tracks the active config polar', async () => {
+    const initial = await firstValueFrom(store.activePolar$);
+    expect(initial.twsBins.length).toBeGreaterThan(0);
+
+    // Add a config with a distinct polar (all zeros) and switch to it.
+    const wardrobe = await firstValueFrom(store.sails$);
+    const distinctPolar = {
+      ...wardrobe.configs[0]!.polar,
+      boatSpeed: wardrobe.configs[0]!.polar.boatSpeed.map((row) =>
+        row.map(() => 0),
+      ),
+    };
+    await store.setSails({
+      configs: [
+        ...wardrobe.configs,
+        { id: 'zeros', name: 'Zeros', polar: distinctPolar },
+      ],
+      activeConfigId: 'zeros',
+    });
+    const after = await firstValueFrom(store.activePolar$);
+    expect(after.boatSpeed.flat().every((x) => x === 0)).toBe(true);
+  });
+
+  it('legacy polars$ tracks active config (backward compat)', async () => {
+    // After Task 1, polars$ is an alias for activePolar$.
+    const a = await firstValueFrom(store.polars$);
+    const b = await firstValueFrom(store.activePolar$);
+    expect(a).toEqual(b);
   });
 });

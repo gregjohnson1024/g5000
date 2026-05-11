@@ -1,18 +1,20 @@
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
-import { BehaviorSubject, type Observable } from 'rxjs';
+import { BehaviorSubject, type Observable, map } from 'rxjs';
 import {
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_BOAT_CONFIG,
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_POLARS,
+  DEFAULT_WARDROBE,
   type AwsAwaCalTable,
   type BoatConfig,
   type BspCal,
   type CompassDeviation,
   type PolarTable,
+  type SailWardrobe,
 } from './defaults.js';
 import {
   awsAwaCal,
@@ -20,9 +22,16 @@ import {
   boatConfig as boatConfigTable,
   compassDeviation,
   polars,
+  sailWardrobe,
 } from './schema.js';
 
 const SINGLETON = 'singleton';
+
+/** Return the active config's polar, or DEFAULT_POLARS if activeConfigId is dangling. */
+function activeConfigPolar(w: SailWardrobe): PolarTable {
+  const config = w.configs.find((c) => c.id === w.activeConfigId);
+  return config?.polar ?? DEFAULT_POLARS;
+}
 
 /**
  * Opens (and migrates as needed) an SQLite-backed config store. Each cal
@@ -36,7 +45,7 @@ export class ConfigStore {
     awsAwaCal: BehaviorSubject<AwsAwaCalTable>;
     bspCal: BehaviorSubject<BspCal>;
     compassDeviation: BehaviorSubject<CompassDeviation>;
-    polars: BehaviorSubject<PolarTable>;
+    sails: BehaviorSubject<SailWardrobe>;
   };
 
   private constructor(
@@ -47,7 +56,7 @@ export class ConfigStore {
       awsAwaCal: AwsAwaCalTable;
       bspCal: BspCal;
       compassDeviation: CompassDeviation;
-      polars: PolarTable;
+      sails: SailWardrobe;
     },
   ) {
     this.subjects = {
@@ -55,7 +64,7 @@ export class ConfigStore {
       awsAwaCal: new BehaviorSubject(initial.awsAwaCal),
       bspCal: new BehaviorSubject(initial.bspCal),
       compassDeviation: new BehaviorSubject(initial.compassDeviation),
-      polars: new BehaviorSubject(initial.polars),
+      sails: new BehaviorSubject(initial.sails),
     };
   }
 
@@ -71,6 +80,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS bsp_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS compass_deviation (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -88,12 +98,40 @@ export class ConfigStore {
       return defaultValue;
     };
 
+    // Migration logic for sail wardrobe:
+    // 1. Load/seed the legacy polars row first (so migration path can use it).
+    // 2. Try to load existing sail_wardrobe row.
+    // 3. If no wardrobe row, wrap the legacy polar in a default wardrobe and insert.
+    const legacyPolar = loadOrInsert<PolarTable>(polars, DEFAULT_POLARS);
+
+    const wardrobeRows = db.select().from(sailWardrobe).where(eq(sailWardrobe.id, SINGLETON)).all();
+    let wardrobeValue: SailWardrobe;
+    if (wardrobeRows[0]) {
+      wardrobeValue = JSON.parse((wardrobeRows[0] as { value: string }).value) as SailWardrobe;
+    } else {
+      // No wardrobe row — seed from the legacy polar (migration) or DEFAULT_WARDROBE.
+      wardrobeValue = {
+        configs: [
+          {
+            id: 'default',
+            name: 'Default',
+            notes: 'Initial baseline polar. Replace with your boat-specific data.',
+            polar: legacyPolar,
+          },
+        ],
+        activeConfigId: 'default',
+      };
+      db.insert(sailWardrobe)
+        .values({ id: SINGLETON, value: JSON.stringify(wardrobeValue) })
+        .run();
+    }
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
       bspCal: loadOrInsert<BspCal>(bspCal, DEFAULT_BSP_CAL),
       compassDeviation: loadOrInsert<CompassDeviation>(compassDeviation, DEFAULT_COMPASS_DEVIATION),
-      polars: loadOrInsert<PolarTable>(polars, DEFAULT_POLARS),
+      sails: wardrobeValue,
     };
 
     return new ConfigStore(raw, db, initial);
@@ -111,8 +149,16 @@ export class ConfigStore {
   get compassDeviation$(): Observable<CompassDeviation> {
     return this.subjects.compassDeviation.asObservable();
   }
+  get sails$(): Observable<SailWardrobe> {
+    return this.subjects.sails.asObservable();
+  }
+  /** Derived from sails$ — returns the active config's polar. */
+  get activePolar$(): Observable<PolarTable> {
+    return this.subjects.sails.pipe(map(activeConfigPolar));
+  }
+  /** Legacy alias — backed by activePolar$ for backward compatibility. */
   get polars$(): Observable<PolarTable> {
-    return this.subjects.polars.asObservable();
+    return this.activePolar$;
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
@@ -131,9 +177,25 @@ export class ConfigStore {
     this.upsert(compassDeviation, value);
     this.subjects.compassDeviation.next(value);
   }
+  async setSails(value: SailWardrobe): Promise<void> {
+    if (!value.configs.find((c) => c.id === value.activeConfigId)) {
+      throw new Error(
+        `activeConfigId "${value.activeConfigId}" does not reference any config in configs[]`,
+      );
+    }
+    this.upsert(sailWardrobe, value);
+    this.subjects.sails.next(value);
+  }
   async setPolars(value: PolarTable): Promise<void> {
-    this.upsert(polars, value);
-    this.subjects.polars.next(value);
+    // Legacy compatibility: redirect to "set the active config's polar".
+    const wardrobe = this.subjects.sails.value;
+    const idx = wardrobe.configs.findIndex((c) => c.id === wardrobe.activeConfigId);
+    if (idx < 0) return; // shouldn't happen
+    const newConfigs = wardrobe.configs.slice();
+    newConfigs[idx] = { ...newConfigs[idx]!, polar: value };
+    const next: SailWardrobe = { ...wardrobe, configs: newConfigs };
+    this.upsert(sailWardrobe, next);
+    this.subjects.sails.next(next);
   }
 
   async close(): Promise<void> {
@@ -142,7 +204,7 @@ export class ConfigStore {
     this.subjects.awsAwaCal.complete();
     this.subjects.bspCal.complete();
     this.subjects.compassDeviation.complete();
-    this.subjects.polars.complete();
+    this.subjects.sails.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
