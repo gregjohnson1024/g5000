@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { firstValueFrom, take, skip } from 'rxjs';
 import { ConfigStore } from './config-store.js';
-import { DEFAULT_BOAT_CONFIG, DEFAULT_AWS_AWA_CAL, type BoatConfig } from './defaults.js';
+import {
+  DEFAULT_BOAT_CONFIG,
+  DEFAULT_AWS_AWA_CAL,
+  DEFAULT_POLARS,
+  type BoatConfig,
+  type PolarTable,
+} from './defaults.js';
 
 describe('ConfigStore', () => {
   let dir: string;
@@ -51,5 +57,22 @@ describe('ConfigStore', () => {
     await store.setBoatConfig({ ...DEFAULT_BOAT_CONFIG, magVarDeg: 5 });
     const v = await firstValueFrom(store.boatConfig$);
     expect(v.magVarDeg).toBe(5);
+  });
+
+  it('returns the default polar on a fresh database', async () => {
+    const polars = await firstValueFrom(store.polars$);
+    expect(polars.twsBins).toEqual(DEFAULT_POLARS.twsBins);
+    expect(polars.boatSpeed.length).toBe(DEFAULT_POLARS.twsBins.length);
+  });
+
+  it('emits a new polar when setPolars is called', async () => {
+    const next: Promise<PolarTable> = firstValueFrom(store.polars$.pipe(skip(1), take(1)));
+    const updated: PolarTable = {
+      ...DEFAULT_POLARS,
+      boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map(() => 0)),
+    };
+    await store.setPolars(updated);
+    const v = await next;
+    expect(v.boatSpeed.flat().every((x) => x === 0)).toBe(true);
   });
 });

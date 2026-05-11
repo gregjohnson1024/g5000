@@ -73,3 +73,60 @@ export const DEFAULT_BSP_CAL: BspCal = {
 export const DEFAULT_COMPASS_DEVIATION: CompassDeviation = {
   deviation: Array.from({ length: 36 }, () => 0),
 };
+
+/**
+ * Boat polar: rows = true wind speed bins, cols = true wind angle bins.
+ * `boatSpeed[twsIdx][twaIdx]` is target boat speed (m/s) at that wind state.
+ * Both bin arrays must be strictly increasing. TWA bins must span [0, π].
+ */
+export interface PolarTable {
+  /** True wind speed bin centers, m/s. */
+  twsBins: number[];
+  /** True wind angle bin centers, radians (always positive — table is symmetric). */
+  twaBins: number[];
+  /** Target boat speed in m/s, indexed [twsIdx][twaIdx]. */
+  boatSpeed: number[][];
+}
+
+/**
+ * Baseline catamaran-ish polar. Values are deliberately rough — the user is
+ * expected to import their own polar via CSV before performance numbers are
+ * trustworthy. Shape: 8 TWS bins × 9 TWA bins.
+ *
+ * Boat speeds chosen to roughly resemble a 40' sport catamaran in displacement
+ * mode. Real boats vary widely.
+ */
+const DEG = Math.PI / 180;
+export const DEFAULT_POLARS: PolarTable = {
+  twsBins: [2, 4, 6, 8, 10, 12, 16, 20], // m/s ≈ 4, 8, 12, 16, 20, 23, 31, 39 kn
+  twaBins: [
+    0 * DEG,
+    30 * DEG,
+    45 * DEG,
+    60 * DEG,
+    90 * DEG,
+    120 * DEG,
+    135 * DEG,
+    150 * DEG,
+    180 * DEG,
+  ],
+  // Rows = TWS (low to high), cols = TWA (0=in-irons, π=dead-down).
+  boatSpeed: [
+    // TWS 2 m/s (~4 kn)
+    [0, 0.8, 1.3, 1.6, 1.6, 1.4, 1.2, 0.9, 0.4],
+    // TWS 4 m/s (~8 kn)
+    [0, 1.8, 2.7, 3.2, 3.4, 3.3, 3.0, 2.6, 1.6],
+    // TWS 6 m/s (~12 kn)
+    [0, 3.0, 4.3, 5.0, 5.4, 5.6, 5.4, 5.0, 3.4],
+    // TWS 8 m/s (~16 kn)
+    [0, 4.0, 5.6, 6.4, 7.0, 7.4, 7.4, 7.1, 5.4],
+    // TWS 10 m/s (~20 kn)
+    [0, 4.5, 6.4, 7.2, 8.1, 8.7, 8.9, 8.6, 6.8],
+    // TWS 12 m/s (~23 kn)
+    [0, 4.8, 6.9, 7.8, 8.9, 9.7, 10.0, 9.7, 7.8],
+    // TWS 16 m/s (~31 kn)
+    [0, 5.0, 7.2, 8.3, 9.7, 10.7, 11.0, 10.8, 8.8],
+    // TWS 20 m/s (~39 kn)
+    [0, 5.0, 7.3, 8.5, 10.0, 11.1, 11.4, 11.2, 9.0],
+  ],
+};
