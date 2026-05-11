@@ -27,3 +27,8 @@ export const compassDeviation = sqliteTable('compass_deviation', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded CompassDeviation
 });
+
+export const polars = sqliteTable('polars', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded PolarTable
+});

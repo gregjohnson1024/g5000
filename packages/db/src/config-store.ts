@@ -7,12 +7,14 @@ import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
+  DEFAULT_POLARS,
   type AwsAwaCalTable,
   type BoatConfig,
   type BspCal,
   type CompassDeviation,
+  type PolarTable,
 } from './defaults.js';
-import { awsAwaCal, bspCal, boatConfig as boatConfigTable, compassDeviation } from './schema.js';
+import { awsAwaCal, bspCal, boatConfig as boatConfigTable, compassDeviation, polars } from './schema.js';
 
 const SINGLETON = 'singleton';
 
@@ -28,6 +30,7 @@ export class ConfigStore {
     awsAwaCal: BehaviorSubject<AwsAwaCalTable>;
     bspCal: BehaviorSubject<BspCal>;
     compassDeviation: BehaviorSubject<CompassDeviation>;
+    polars: BehaviorSubject<PolarTable>;
   };
 
   private constructor(
@@ -38,6 +41,7 @@ export class ConfigStore {
       awsAwaCal: AwsAwaCalTable;
       bspCal: BspCal;
       compassDeviation: CompassDeviation;
+      polars: PolarTable;
     },
   ) {
     this.subjects = {
@@ -45,6 +49,7 @@ export class ConfigStore {
       awsAwaCal: new BehaviorSubject(initial.awsAwaCal),
       bspCal: new BehaviorSubject(initial.bspCal),
       compassDeviation: new BehaviorSubject(initial.compassDeviation),
+      polars: new BehaviorSubject(initial.polars),
     };
   }
 
@@ -59,6 +64,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS aws_awa_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS bsp_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS compass_deviation (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -81,6 +87,7 @@ export class ConfigStore {
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
       bspCal: loadOrInsert<BspCal>(bspCal, DEFAULT_BSP_CAL),
       compassDeviation: loadOrInsert<CompassDeviation>(compassDeviation, DEFAULT_COMPASS_DEVIATION),
+      polars: loadOrInsert<PolarTable>(polars, DEFAULT_POLARS),
     };
 
     return new ConfigStore(raw, db, initial);
@@ -97,6 +104,9 @@ export class ConfigStore {
   }
   get compassDeviation$(): Observable<CompassDeviation> {
     return this.subjects.compassDeviation.asObservable();
+  }
+  get polars$(): Observable<PolarTable> {
+    return this.subjects.polars.asObservable();
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
@@ -115,6 +125,10 @@ export class ConfigStore {
     this.upsert(compassDeviation, value);
     this.subjects.compassDeviation.next(value);
   }
+  async setPolars(value: PolarTable): Promise<void> {
+    this.upsert(polars, value);
+    this.subjects.polars.next(value);
+  }
 
   async close(): Promise<void> {
     this.raw.close();
@@ -122,6 +136,7 @@ export class ConfigStore {
     this.subjects.awsAwaCal.complete();
     this.subjects.bspCal.complete();
     this.subjects.compassDeviation.complete();
+    this.subjects.polars.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
