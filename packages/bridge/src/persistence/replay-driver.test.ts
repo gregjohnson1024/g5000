@@ -30,7 +30,7 @@ describe('ReplayDriver', () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-replay-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-replay-'));
   });
 
   afterEach(() => {

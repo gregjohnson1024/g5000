@@ -1,4 +1,4 @@
-import { Channels, type Sample, type ChannelValue } from '@h6000/core';
+import { Channels, type Sample, type ChannelValue } from '@g5000/core';
 import { parseSentence, type ParsedSentence } from './sentence-parser.js';
 import type { Raw0183Sentence } from '../wire-driver.js';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 
 export interface CalHeatmapProps {
   cal: AwsAwaCalTable;

@@ -1,4 +1,4 @@
-import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@h6000/db';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@g5000/db';
 
 export interface TrueWindInputs {
   /** Apparent wind speed at the masthead, m/s. */

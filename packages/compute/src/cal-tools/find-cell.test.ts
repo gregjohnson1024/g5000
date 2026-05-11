@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { findNearestCalCell, applyAngleCorrectionToCell } from './find-cell.js';
-import { DEFAULT_AWS_AWA_CAL } from '@h6000/db';
+import { DEFAULT_AWS_AWA_CAL } from '@g5000/db';
 
 describe('findNearestCalCell', () => {
   const cal = DEFAULT_AWS_AWA_CAL;

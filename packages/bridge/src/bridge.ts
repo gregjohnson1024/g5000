@@ -1,4 +1,4 @@
-import type { Bus } from '@h6000/core';
+import type { Bus } from '@g5000/core';
 import { mergeMap, from, type Subscription } from 'rxjs';
 import type { WireDriver } from './wire-driver.js';
 import { decode } from './decoder.js';

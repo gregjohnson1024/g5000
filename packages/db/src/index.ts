@@ -7,11 +7,11 @@ import { ConfigStore } from './config-store.js';
 // Store the singleton on globalThis so that module re-evaluations within the
 // same process (e.g. Next.js / Turbopack loading the package a second time)
 // still resolve the instance set by autopilot-server during boot.
-const GLOBAL_KEY = '__h6000_configStore__';
+const GLOBAL_KEY = '__g5000_configStore__';
 
 declare global {
   // eslint-disable-next-line no-var
-  var __h6000_configStore__: ConfigStore | undefined;
+  var __g5000_configStore__: ConfigStore | undefined;
 }
 
 /**

@@ -1,4 +1,4 @@
-# H6000 Plan 4 — AWS/AWA Cal Editor + Tack-Test Wizard
+# G5000 Plan 4 — AWS/AWA Cal Editor + Tack-Test Wizard
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
 
@@ -6,15 +6,15 @@
 
 **Architecture:**
 
-- New cal-tools module in `@h6000/compute` with pure-function helpers: `findNearestCalCell`, `applyAngleCorrectionToCell`, `computeTackCorrection`.
-- Two new React hooks in `@h6000/web/src/hooks/`: `useSse` (latest sample per channel) and `useChannelHistory` (sliding window of recent samples with averaging helpers).
+- New cal-tools module in `@g5000/compute` with pure-function helpers: `findNearestCalCell`, `applyAngleCorrectionToCell`, `computeTackCorrection`.
+- Two new React hooks in `@g5000/web/src/hooks/`: `useSse` (latest sample per channel) and `useChannelHistory` (sliding window of recent samples with averaging helpers).
 - React components: `CalHeatmap` (visualizes the AWS/AWA grid), `CellEditor` (manual cell value entry), `TackTestWizard` (state-machine UI for capture → suggest → apply).
 - New page at `/calibration/wind` combining the heatmap, the editor, and the wizard.
 - No new packages, no new runtime deps. All math is pure-function TDD; React parts get manual smoke testing.
 
 **Tech Stack additions:** none. We already have Next.js 16, React 19, Tailwind v4, SSE, and the REST PUT endpoint.
 
-**Reference spec:** `docs/superpowers/specs/2026-05-08-h6000-design.md`. Implements build-sequence step 13 (cal-table editor + tack-test wizard).
+**Reference spec:** `docs/superpowers/specs/2026-05-08-g5000-design.md`. Implements build-sequence step 13 (cal-table editor + tack-test wizard).
 
 ---
 
@@ -84,7 +84,7 @@ autopilot/
 ```ts
 import { describe, it, expect } from 'vitest';
 import { findNearestCalCell, applyAngleCorrectionToCell, type CellIndex } from './find-cell.js';
-import { DEFAULT_AWS_AWA_CAL, type AwsAwaCalTable } from '@h6000/db';
+import { DEFAULT_AWS_AWA_CAL, type AwsAwaCalTable } from '@g5000/db';
 
 describe('findNearestCalCell', () => {
   const cal = DEFAULT_AWS_AWA_CAL; // 8 AWS bins [2,4,...,20], 13 AWA bins [0,15°,…,180°]
@@ -153,7 +153,7 @@ npx vitest run packages/compute/src/cal-tools/find-cell.test.ts
 - [ ] **Step 3: Implement `packages/compute/src/cal-tools/find-cell.ts`**
 
 ```ts
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 
 export interface CellIndex {
   awsIdx: number;
@@ -279,7 +279,7 @@ We'll write tests with synthetic capture data that asserts both magnitude and si
 ```ts
 import { describe, it, expect } from 'vitest';
 import { computeTackCorrection, type TackCapture } from './tack-correction.js';
-import { DEFAULT_AWS_AWA_CAL } from '@h6000/db';
+import { DEFAULT_AWS_AWA_CAL } from '@g5000/db';
 
 const cap = (overrides: Partial<TackCapture>): TackCapture => ({
   twd: 0,
@@ -349,7 +349,7 @@ describe('computeTackCorrection', () => {
 - [ ] **Step 3: Implement `packages/compute/src/cal-tools/tack-correction.ts`**
 
 ```ts
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 import { findNearestCalCell, applyAngleCorrectionToCell, type CellIndex } from './find-cell.js';
 
 /**
@@ -451,7 +451,7 @@ git commit -m "feat(compute): cal-tools — computeTackCorrection with wraparoun
 - Modify: `packages/compute/package.json` — point `main` at `dist/`
 - Modify: `apps/autopilot-server/package.json` — extend `predev`/`prebuild` to build compute
 
-`@h6000/web` needs to import `findNearestCalCell` and `computeTackCorrection` from `@h6000/compute`. Next.js consumes workspace packages via their compiled `dist/` (the Plan 1 finding), so `compute` must follow the same pattern as `core` and `db`.
+`@g5000/web` needs to import `findNearestCalCell` and `computeTackCorrection` from `@g5000/compute`. Next.js consumes workspace packages via their compiled `dist/` (the Plan 1 finding), so `compute` must follow the same pattern as `core` and `db`.
 
 - [ ] **Step 1: Update `packages/compute/package.json`**
 
@@ -465,7 +465,7 @@ Change `main` and `types`:
 - [ ] **Step 2: Build it**
 
 ```
-npm run build --workspace=@h6000/compute
+npm run build --workspace=@g5000/compute
 ```
 
 Verify `packages/compute/dist/index.js`, `packages/compute/dist/index.d.ts`, and per-source artifacts.
@@ -479,22 +479,22 @@ In `apps/autopilot-server/package.json`, update `predev` and `prebuild`:
 "prebuild": "tsc -b ../../packages/core ../../packages/db ../../packages/compute",
 ```
 
-- [ ] **Step 4: Add `@h6000/compute` to `packages/web/package.json` deps**
+- [ ] **Step 4: Add `@g5000/compute` to `packages/web/package.json` deps**
 
-Insert after `@h6000/db`:
+Insert after `@g5000/db`:
 
 ```json
-"@h6000/compute": "*",
+"@g5000/compute": "*",
 ```
 
 Run `npm install`.
 
 - [ ] **Step 5: Update Next.js `serverExternalPackages`**
 
-In `packages/web/next.config.ts`, the `serverExternalPackages` array currently contains `['@h6000/core', '@h6000/db']`. Add `@h6000/compute`:
+In `packages/web/next.config.ts`, the `serverExternalPackages` array currently contains `['@g5000/core', '@g5000/db']`. Add `@g5000/compute`:
 
 ```ts
-serverExternalPackages: ['@h6000/core', '@h6000/db', '@h6000/compute'],
+serverExternalPackages: ['@g5000/core', '@g5000/db', '@g5000/compute'],
 ```
 
 (For pure-JS packages this is optional, but consistent with the pattern. Without it the dynamic import works but Turbopack may try to bundle the cjs-vs-esm mix awkwardly. Better to be explicit.)
@@ -502,7 +502,7 @@ serverExternalPackages: ['@h6000/core', '@h6000/db', '@h6000/compute'],
 - [ ] **Step 6: Verify typecheck**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 - [ ] **Step 7: Commit**
@@ -528,7 +528,7 @@ A reusable hook that subscribes to `/api/stream`, maintains a `Map<channel, Json
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { JsonSafeSample } from '@h6000/core';
+import type { JsonSafeSample } from '@g5000/core';
 
 export interface UseSseResult {
   /** Latest sample per channel. Updated as SSE events arrive. */
@@ -579,7 +579,7 @@ export function useSse(): UseSseResult {
 - [ ] **Step 2: Verify the hook typechecks**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 Clean.
@@ -607,7 +607,7 @@ A hook that maintains a rolling buffer of the last N seconds of samples on a spe
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { JsonSafeSample } from '@h6000/core';
+import type { JsonSafeSample } from '@g5000/core';
 
 export interface ChannelHistoryPoint {
   t_ms: number;
@@ -682,7 +682,7 @@ export function useChannelHistory(
 - [ ] **Step 2: Verify typecheck**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 - [ ] **Step 3: Commit**
@@ -707,7 +707,7 @@ A visual grid of the AWS/AWA cal table. Rows = AWS bins, columns = |AWA| bins. E
 ```tsx
 'use client';
 
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 
 export interface CalHeatmapProps {
   cal: AwsAwaCalTable;
@@ -779,7 +779,7 @@ export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
 - [ ] **Step 2: Verify typecheck**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 - [ ] **Step 3: Commit**
@@ -805,7 +805,7 @@ When a cell is selected, show a form with the current value, an input for a new 
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
@@ -923,8 +923,8 @@ The wizard listens to live `wind.true.calibrated.{angle,speed,direction}` channe
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
-import { computeTackCorrection, type TackCapture } from '@h6000/compute';
+import type { AwsAwaCalTable } from '@g5000/db';
+import { computeTackCorrection, type TackCapture } from '@g5000/compute';
 import { useSse } from '../../../hooks/use-sse.js';
 import { useChannelHistory } from '../../../hooks/use-channel-history.js';
 
@@ -1130,7 +1130,7 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
 - [ ] **Step 2: Typecheck**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 Clean.
@@ -1158,7 +1158,7 @@ The page combines `CalHeatmap`, `CellEditor` (when a cell is selected), and `Tac
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 import { CalHeatmap } from './CalHeatmap.js';
 import { CellEditor } from './CellEditor.js';
 import { TackTestWizard } from './TackTestWizard.js';
@@ -1235,7 +1235,7 @@ export default function CalibrationWindPage() {
 Boot the integrated server:
 
 ```
-SKIP_BRIDGE=1 npm run dev --workspace=@h6000/autopilot-server > /tmp/cal-wizard.log 2>&1 &
+SKIP_BRIDGE=1 npm run dev --workspace=@g5000/autopilot-server > /tmp/cal-wizard.log 2>&1 &
 SERVER_PID=$!
 sleep 12
 curl -s -o /dev/null -w "/calibration/wind: %{http_code}\n" -m 5 http://localhost:3000/calibration/wind
@@ -1247,7 +1247,7 @@ Expected: 200. Manual visual confirmation: visit `http://localhost:3000/calibrat
 - [ ] **Step 3: Typecheck**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 Clean.
@@ -1323,7 +1323,7 @@ After this plan:
 - Tack-test wizard: sail upwind on port, tap Capture, tack, sail steady on starboard, tap Capture, review correction, Apply. The cell is updated and the compute pipeline hot-reloads.
 - Plan 3's REST PUT endpoint is now exercised by real UI.
 
-The math has been independently TDD-tested; the UI is manually verified. The first real-boat test of the wizard will be the moment the H6000 starts beating the H5000 in calibration quality (assuming you actually save corrections).
+The math has been independently TDD-tested; the UI is manually verified. The first real-boat test of the wizard will be the moment the G5000 starts beating the H5000 in calibration quality (assuming you actually save corrections).
 
 Plan 5 candidates:
 

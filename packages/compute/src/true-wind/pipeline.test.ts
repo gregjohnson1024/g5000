@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { firstValueFrom } from 'rxjs';
-import { Bus, Channels, type Sample } from '@h6000/core';
-import { ConfigStore } from '@h6000/db';
+import { Bus, Channels, type Sample } from '@g5000/core';
+import { ConfigStore } from '@g5000/db';
 import { startTrueWindPipeline } from './pipeline.js';
 
 const sample = (channel: string, value: number, t_ns = 1n): Sample => ({
@@ -22,7 +22,7 @@ describe('startTrueWindPipeline', () => {
   let received: Sample[];
 
   beforeEach(async () => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-pipeline-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-pipeline-'));
     store = await ConfigStore.open(path.join(dir, 'config.db'));
     bus = new Bus();
     received = [];

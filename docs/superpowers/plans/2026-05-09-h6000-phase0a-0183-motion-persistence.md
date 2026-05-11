@@ -1,4 +1,4 @@
-# H6000 Phase 0a — NMEA 0183, B&G Motion PGNs, Session Persistence, Replay
+# G5000 Phase 0a — NMEA 0183, B&G Motion PGNs, Session Persistence, Replay
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -11,7 +11,7 @@
 - Adds: zero new runtime deps. NMEA 0183 parsing is implemented from scratch (sentences are simple). Gzip via Node's built-in `zlib`. File I/O via `node:fs/promises`.
 - Existing: TypeScript, RxJS, vitest, canboatjs, serialport.
 
-**Reference spec:** `docs/superpowers/specs/2026-05-08-h6000-design.md`. Implements build-sequence steps 6 (0183 input + decoder), 8 (persistence), 9 (replay), plus motion PGN extensions to step 4. Step 7 (IMU driver) is dropped — the boat has dedicated B&G sensors emitting these channels via N2K.
+**Reference spec:** `docs/superpowers/specs/2026-05-08-g5000-design.md`. Implements build-sequence steps 6 (0183 input + decoder), 8 (persistence), 9 (replay), plus motion PGN extensions to step 4. Step 7 (IMU driver) is dropped — the boat has dedicated B&G sensors emitting these channels via N2K.
 
 ---
 
@@ -593,7 +593,7 @@ Maps `Raw0183Sentence` → typed `Sample[]` after running through `parseSentence
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { Channels } from '@h6000/core';
+import { Channels } from '@g5000/core';
 import { mapSentenceToSamples } from './channel-mapper.js';
 import type { Raw0183Sentence } from '../wire-driver.js';
 
@@ -697,7 +697,7 @@ describe('mapSentenceToSamples — source tagging', () => {
 - [ ] **Step 3: Implement `channel-mapper.ts`**
 
 ```ts
-import { Channels, type Sample, type ChannelValue } from '@h6000/core';
+import { Channels, type Sample, type ChannelValue } from '@g5000/core';
 import { parseSentence, type ParsedSentence } from './sentence-parser.js';
 import type { Raw0183Sentence } from '../wire-driver.js';
 
@@ -833,7 +833,7 @@ The orchestrator currently merges only `rxCan`. Add a parallel pipeline that tak
 - [ ] **Step 1: Update `bridge.ts`**
 
 ```ts
-import type { Bus } from '@h6000/core';
+import type { Bus } from '@g5000/core';
 import { mergeMap, from, type Subscription } from 'rxjs';
 import type { WireDriver } from './wire-driver.js';
 import { decode } from './decoder.js';
@@ -1006,7 +1006,7 @@ In the `Motion` block, append `RateOfTurn`:
 Because Next.js consumes core via `dist/`, it must be rebuilt:
 
 ```
-npm run build --workspace=@h6000/core
+npm run build --workspace=@g5000/core
 ```
 
 - [ ] **Step 3: Add tests for the two new PGN mappers**
@@ -1167,7 +1167,7 @@ describe('startSessionLogger', () => {
   let logger: SessionLogger;
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-log-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-log-'));
   });
 
   afterEach(async () => {
@@ -1209,7 +1209,7 @@ describe('startSessionLogger', () => {
     expect(header.kind).toBe('header');
     expect(typeof header.startedAt).toBe('string');
     expect(header.sessionId).toBe('abc');
-    expect(header.format).toBe('h6000-session-v1');
+    expect(header.format).toBe('g5000-session-v1');
 
     // CAN line
     const canLine = JSON.parse(lines[1]!);
@@ -1300,7 +1300,7 @@ export async function startSessionLogger(opts: StartSessionLoggerOptions): Promi
   // Header
   await writeLine({
     kind: 'header',
-    format: 'h6000-session-v1',
+    format: 'g5000-session-v1',
     sessionId: opts.sessionId,
     startedAt: new Date().toISOString(),
   });
@@ -1412,7 +1412,7 @@ describe('ReplayDriver', () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-replay-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-replay-'));
   });
 
   afterEach(() => {
@@ -1678,7 +1678,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus } from '@h6000/core';
+import { getSharedBus } from '@g5000/core';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -1687,7 +1687,7 @@ import {
   startSessionLogger,
   type WireDriver,
   type SessionLogger,
-} from '@h6000/bridge';
+} from '@g5000/bridge';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -1778,7 +1778,7 @@ async function main(): Promise<void> {
     teardown.push(() => logger!.close());
   }
 
-  // Start Next.js pointing at the @h6000/web package directory.
+  // Start Next.js pointing at the @g5000/web package directory.
   const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
@@ -1813,14 +1813,14 @@ main().catch((err) => {
 
 You'll need a session file. Easiest path:
 
-1. Build the workspace: `npm run build --workspace=@h6000/core` (the bridge package consumes core via TS source so doesn't need building).
+1. Build the workspace: `npm run build --workspace=@g5000/core` (the bridge package consumes core via TS source so doesn't need building).
 2. Run a tiny one-off script that records a synthetic 0183 sentence to a session file. (Skip this if you'd rather verify on real hardware later.)
 3. Or, run a session that includes only the 0183 logger and replay it back through the same process.
 
 For an automated check that the integration code at least compiles and boots:
 
 ```
-SKIP_BRIDGE=1 timeout 10 npm run dev --workspace=@h6000/autopilot-server
+SKIP_BRIDGE=1 timeout 10 npm run dev --workspace=@g5000/autopilot-server
 ```
 
 Expect: server boots, logs no NGT-1 attempt and no 0183 attempt (because SKIP_BRIDGE=1 short-circuits both), `/inspect` returns the same empty page as before. This proves the new code paths don't regress the existing scenario.

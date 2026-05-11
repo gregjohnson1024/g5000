@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Bus, type Sample } from '@h6000/core';
+import { Bus, type Sample } from '@g5000/core';
 import { Subject, BehaviorSubject } from 'rxjs';
 import { startTrueWindTx } from './true-wind-tx.js';
 import type {

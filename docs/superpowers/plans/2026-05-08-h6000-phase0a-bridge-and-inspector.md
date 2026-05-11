@@ -1,4 +1,4 @@
-# H6000 Phase 0a — Bridge & Channel Inspector Implementation Plan
+# G5000 Phase 0a — Bridge & Channel Inspector Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -17,7 +17,7 @@
 - `next@^16`, React 19, Tailwind CSS v4 for the web UI
 - `prettier`, `tsx` for tooling
 
-**Reference spec:** `docs/superpowers/specs/2026-05-08-h6000-design.md`. This plan implements build-sequence steps 1–5 plus 10–11 (workspace, core types, NGT-1 driver, decoder, mapper, bridge, Next.js + SSE + `/inspect`). Steps 6–9 (0183, IMU, persistence, replay) and 12+ (compute, calibration, autopilot) are out of scope and will land in subsequent plans.
+**Reference spec:** `docs/superpowers/specs/2026-05-08-g5000-design.md`. This plan implements build-sequence steps 1–5 plus 10–11 (workspace, core types, NGT-1 driver, decoder, mapper, bridge, Next.js + SSE + `/inspect`). Steps 6–9 (0183, IMU, persistence, replay) and 12+ (compute, calibration, autopilot) are out of scope and will land in subsequent plans.
 
 ---
 
@@ -303,7 +303,7 @@ git commit -m "chore: add runtime deps (rxjs, serialport, canboatjs)"
 
 ```json
 {
-  "name": "@h6000/core",
+  "name": "@g5000/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -600,7 +600,7 @@ git commit -m "feat(core): add RxJS-backed Bus with pattern subscriptions"
 
 ```json
 {
-  "name": "@h6000/bridge",
+  "name": "@g5000/bridge",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -611,7 +611,7 @@ git commit -m "feat(core): add RxJS-backed Bus with pattern subscriptions"
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
+    "@g5000/core": "*",
     "@canboat/canboatjs": "^2",
     "rxjs": "^7",
     "serialport": "^12"
@@ -642,7 +642,7 @@ git commit -m "feat(core): add RxJS-backed Bus with pattern subscriptions"
 - [ ] **Step 3: Re-run `npm install` to wire workspace symlinks**
 
 Run: `npm install`
-Expected: creates `node_modules/@h6000/core` symlink to `packages/core`.
+Expected: creates `node_modules/@g5000/core` symlink to `packages/core`.
 
 - [ ] **Step 4: Create `packages/bridge/src/wire-driver.ts`**
 
@@ -1103,7 +1103,7 @@ Maps decoded PGN field values to channel-name samples. Phase 0a starts with thre
 import { describe, it, expect } from 'vitest';
 import { mapPgnToSamples } from './channel-mapper.js';
 import type { DecodedPgn } from './decoder.js';
-import { Channels } from '@h6000/core';
+import { Channels } from '@g5000/core';
 
 const make = (pgn: number, fields: Record<string, unknown>): DecodedPgn => ({
   pgn,
@@ -1186,7 +1186,7 @@ Expected: FAIL with `Cannot find module './channel-mapper.js'`.
 - [ ] **Step 3: Implement `packages/bridge/src/channel-mapper.ts`**
 
 ```ts
-import { Channels, type Sample, type ChannelValue } from '@h6000/core';
+import { Channels, type Sample, type ChannelValue } from '@g5000/core';
 import type { DecodedPgn } from './decoder.js';
 
 type MapperFn = (pgn: DecodedPgn) => Sample[];
@@ -1296,7 +1296,7 @@ The bridge composes driver → decoder → mapper → bus. It also exposes a way
 
 ```ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Bus, Channels, type Sample } from '@h6000/core';
+import { Bus, Channels, type Sample } from '@g5000/core';
 import { runBridge } from './bridge.js';
 import { Ngt1Driver, type Ngt1Source } from './ngt-driver.js';
 
@@ -1356,7 +1356,7 @@ Expected: FAIL with `Cannot find module './bridge.js'`.
 - [ ] **Step 3: Implement `packages/bridge/src/bridge.ts`**
 
 ```ts
-import type { Bus } from '@h6000/core';
+import type { Bus } from '@g5000/core';
 import { mergeMap, from, type Subscription } from 'rxjs';
 import type { WireDriver } from './wire-driver.js';
 import { decode } from './decoder.js';
@@ -1437,7 +1437,7 @@ This is the runnable Node entry that opens `/dev/ttyUSB0` (or whatever the NGT-1
 
 ```json
 {
-  "name": "@h6000/autopilot-server",
+  "name": "@g5000/autopilot-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -1449,8 +1449,8 @@ This is the runnable Node entry that opens `/dev/ttyUSB0` (or whatever the NGT-1
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/bridge": "*",
-    "@h6000/core": "*",
+    "@g5000/bridge": "*",
+    "@g5000/core": "*",
     "rxjs": "^7",
     "serialport": "^12"
   },
@@ -1481,8 +1481,8 @@ This is the runnable Node entry that opens `/dev/ttyUSB0` (or whatever the NGT-1
 
 ```ts
 import { SerialPort } from 'serialport';
-import { Bus } from '@h6000/core';
-import { Ngt1Driver, runBridge } from '@h6000/bridge';
+import { Bus } from '@g5000/core';
+import { Ngt1Driver, runBridge } from '@g5000/bridge';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -1534,7 +1534,7 @@ main().catch((err) => {
 - [ ] **Step 4: Reinstall to wire workspace symlinks**
 
 Run: `npm install`
-Expected: `node_modules/@h6000/autopilot-server` exists; symlinks to `@h6000/bridge` and `@h6000/core` resolve.
+Expected: `node_modules/@g5000/autopilot-server` exists; symlinks to `@g5000/bridge` and `@g5000/core` resolve.
 
 - [ ] **Step 5: Smoke-test the entry without an NGT-1**
 
@@ -1566,7 +1566,7 @@ git commit -m "feat(server): autopilot-server entry that opens NGT-1 and prints 
 
 ```json
 {
-  "name": "@h6000/web",
+  "name": "@g5000/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -1577,7 +1577,7 @@ git commit -m "feat(server): autopilot-server entry that opens NGT-1 and prints 
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
+    "@g5000/core": "*",
     "next": "^16",
     "react": "^19",
     "react-dom": "^19"
@@ -1666,7 +1666,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
-  title: 'H6000',
+  title: 'G5000',
   description: 'Performance instrument processor',
 };
 
@@ -1690,7 +1690,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 export default function Home() {
   return (
     <main className="p-6 space-y-2">
-      <h1 className="text-2xl font-semibold">H6000</h1>
+      <h1 className="text-2xl font-semibold">G5000</h1>
       <p className="text-slate-400">
         Performance instrument processor. See{' '}
         <a className="underline" href="/inspect">
@@ -1706,7 +1706,7 @@ export default function Home() {
 - [ ] **Step 8: Install web deps and verify the dev server boots**
 
 Run: `npm install`
-Then: `npm run dev --workspace=@h6000/web`
+Then: `npm run dev --workspace=@g5000/web`
 Expected: Next.js prints `Local: http://localhost:3000`, no errors. `Ctrl+C` to stop. Visit the URL in a browser to confirm the home page renders. (This step is manual — the agent should pause until the user confirms the dev server boots, then continue.)
 
 - [ ] **Step 9: Commit**
@@ -1766,7 +1766,7 @@ export * from './bus-singleton.js';
 - [ ] **Step 3: Create `packages/web/src/app/api/stream/route.ts`**
 
 ```ts
-import { getSharedBus } from '@h6000/core';
+import { getSharedBus } from '@g5000/core';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -1836,7 +1836,7 @@ export async function GET(req: Request): Promise<Response> {
 
 - [ ] **Step 4: Smoke-test the SSE route via curl**
 
-Start dev server: `npm run dev --workspace=@h6000/web`
+Start dev server: `npm run dev --workspace=@g5000/web`
 
 In another terminal, with a sample published manually (we don't yet have the bridge wired into Next.js dev — that's Task 12), at least verify the endpoint responds with the right headers and the initial `: connected` comment:
 
@@ -1869,7 +1869,7 @@ A simple table of every channel's most recent sample, updated live via the SSE f
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Sample } from '@h6000/core';
+import type { Sample } from '@g5000/core';
 
 interface ChannelEntry {
   sample: Sample;
@@ -1963,7 +1963,7 @@ export default function InspectPage() {
 
 - [ ] **Step 2: Manual smoke test**
 
-Start the dev server: `npm run dev --workspace=@h6000/web`. Visit `http://localhost:3000/inspect`. Expected: the page loads, shows "Waiting for samples…" — at this point the bridge isn't connected to the same process, so no data flows. We fix that in Task 13.
+Start the dev server: `npm run dev --workspace=@g5000/web`. Visit `http://localhost:3000/inspect`. Expected: the page loads, shows "Waiting for samples…" — at this point the bridge isn't connected to the same process, so no data flows. We fix that in Task 13.
 
 - [ ] **Step 3: Commit**
 
@@ -1981,7 +1981,7 @@ git commit -m "feat(web): /inspect page with live channel table"
 - Modify: `apps/autopilot-server/package.json` (add `next` dep)
 - Modify: `apps/autopilot-server/src/index.ts`
 
-Next.js can be started programmatically via its `next()` factory and a custom Node `http.Server`. This is documented at https://nextjs.org/docs/app/guides/custom-server. We boot the bridge (publishing to the shared bus singleton), then start Next pointing at the `@h6000/web` package directory, both in the same process.
+Next.js can be started programmatically via its `next()` factory and a custom Node `http.Server`. This is documented at https://nextjs.org/docs/app/guides/custom-server. We boot the bridge (publishing to the shared bus singleton), then start Next pointing at the `@g5000/web` package directory, both in the same process.
 
 - [ ] **Step 1: Update `apps/autopilot-server/package.json`**
 
@@ -1989,9 +1989,9 @@ Replace its dependencies block with:
 
 ```json
 "dependencies": {
-  "@h6000/bridge": "*",
-  "@h6000/core": "*",
-  "@h6000/web": "*",
+  "@g5000/bridge": "*",
+  "@g5000/core": "*",
+  "@g5000/web": "*",
   "next": "^16",
   "react": "^19",
   "react-dom": "^19",
@@ -2013,8 +2013,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus } from '@h6000/core';
-import { Ngt1Driver, runBridge } from '@h6000/bridge';
+import { getSharedBus } from '@g5000/core';
+import { Ngt1Driver, runBridge } from '@g5000/bridge';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -2051,7 +2051,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // 2. Start Next.js pointing at the @h6000/web package directory.
+  // 2. Start Next.js pointing at the @g5000/web package directory.
   const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();
@@ -2085,7 +2085,7 @@ main().catch((err) => {
 
 - [ ] **Step 4: Run the unified server in dev mode without an NGT-1**
 
-Run: `SKIP_BRIDGE=1 npm run dev --workspace=@h6000/autopilot-server`
+Run: `SKIP_BRIDGE=1 npm run dev --workspace=@g5000/autopilot-server`
 Expected: Next.js prints "ready" on http://localhost:3000; bridge is skipped. Visit `/inspect` — it should show "Waiting for samples…". Stop with `Ctrl+C`.
 
 - [ ] **Step 5: Run the unified server with the bridge attempting a real serial open**
@@ -2093,7 +2093,7 @@ Expected: Next.js prints "ready" on http://localhost:3000; bridge is skipped. Vi
 If you have an NGT-1 attached:
 
 - Identify its device path: `ls /dev/tty.usbserial-* /dev/ttyUSB*` (paths vary by OS).
-- Run: `NGT1_PATH=/dev/tty.usbserial-XXXX npm run dev --workspace=@h6000/autopilot-server`
+- Run: `NGT1_PATH=/dev/tty.usbserial-XXXX npm run dev --workspace=@g5000/autopilot-server`
 - Expected: `[autopilot] bridge online via …`; `/inspect` shows live PGN-derived channels populated by real bus traffic.
 
 If no NGT-1 is available, this step is deferred to first boat-side test.
@@ -2123,7 +2123,7 @@ Expected: no errors.
 
 The repo now ends Phase 0a with:
 
-- a working `npm run dev --workspace=@h6000/autopilot-server` that boots a single-process server,
+- a working `npm run dev --workspace=@g5000/autopilot-server` that boots a single-process server,
 - decoded PGN samples streaming on the bus when an NGT-1 is connected,
 - `/inspect` showing live channel values in a browser,
 - `/api/stream` SSE feed available for any future web view to subscribe to.

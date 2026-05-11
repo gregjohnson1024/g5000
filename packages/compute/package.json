@@ -1,5 +1,5 @@
 {
-  "name": "@h6000/compute",
+  "name": "@g5000/compute",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
-    "@h6000/db": "*",
+    "@g5000/core": "*",
+    "@g5000/db": "*",
     "rxjs": "^7"
   },
   "devDependencies": {

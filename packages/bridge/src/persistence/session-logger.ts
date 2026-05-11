@@ -43,7 +43,7 @@ export async function startSessionLogger(opts: StartSessionLoggerOptions): Promi
   // Header
   await writeLine({
     kind: 'header',
-    format: 'h6000-session-v1',
+    format: 'g5000-session-v1',
     sessionId: opts.sessionId,
     startedAt: new Date().toISOString(),
   });

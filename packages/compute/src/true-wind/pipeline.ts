@@ -1,6 +1,6 @@
 import { combineLatest, firstValueFrom, type Subscription } from 'rxjs';
-import { Bus, Channels, type Sample } from '@h6000/core';
-import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@h6000/db';
+import { Bus, Channels, type Sample } from '@g5000/core';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@g5000/db';
 import { computeTrueWind } from './math.js';
 
 export interface TrueWindPipelineOptions {

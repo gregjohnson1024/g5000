@@ -11,7 +11,7 @@ describe('ConfigStore', () => {
   let store: ConfigStore;
 
   beforeEach(async () => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-cfg-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-cfg-'));
     store = await ConfigStore.open(path.join(dir, 'config.db'));
   });
 

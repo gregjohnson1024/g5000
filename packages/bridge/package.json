@@ -1,5 +1,5 @@
 {
-  "name": "@h6000/bridge",
+  "name": "@g5000/bridge",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
+    "@g5000/core": "*",
     "@canboat/canboatjs": "^2",
     "rxjs": "^7",
     "serialport": "^12"

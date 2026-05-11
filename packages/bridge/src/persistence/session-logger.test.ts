@@ -31,7 +31,7 @@ describe('startSessionLogger', () => {
   let logger: SessionLogger | null = null;
 
   beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-log-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-log-'));
   });
 
   afterEach(async () => {
@@ -75,7 +75,7 @@ describe('startSessionLogger', () => {
     expect(header.kind).toBe('header');
     expect(typeof header.startedAt).toBe('string');
     expect(header.sessionId).toBe('abc');
-    expect(header.format).toBe('h6000-session-v1');
+    expect(header.format).toBe('g5000-session-v1');
 
     // CAN line
     const canLine = JSON.parse(lines[1]!);

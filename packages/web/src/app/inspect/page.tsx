@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { JsonSafeSample } from '@h6000/core';
+import type { JsonSafeSample } from '@g5000/core';
 
 interface ChannelEntry {
   sample: JsonSafeSample;
