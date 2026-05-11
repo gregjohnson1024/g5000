@@ -57,6 +57,7 @@ Six new files, no modifications to anything else.
 ## Task 1: Boat config — API + `/boat` page
 
 **Files:**
+
 - Create: `packages/web/src/app/api/config/boat/route.ts`
 - Create: `packages/web/src/app/boat/page.tsx`
 
@@ -199,9 +200,7 @@ export default function BoatConfigPage() {
                 type="number"
                 step={f.step}
                 value={edits[f.key] ?? ''}
-                onChange={(e) =>
-                  setEdits((prev) => ({ ...prev, [f.key]: e.target.value }))
-                }
+                onChange={(e) => setEdits((prev) => ({ ...prev, [f.key]: e.target.value }))}
                 className="block w-40 mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200 font-mono"
               />
             </label>
@@ -216,8 +215,8 @@ export default function BoatConfigPage() {
         </div>
       )}
       <p className="text-xs text-slate-500 pt-4 border-t border-slate-800">
-        Mast height is used by the true-wind pipeline to correct for masthead
-        motion. If it&apos;s wrong, true wind will appear noisy in turning maneuvers.
+        Mast height is used by the true-wind pipeline to correct for masthead motion. If it&apos;s
+        wrong, true wind will appear noisy in turning maneuvers.
       </p>
     </main>
   );
@@ -242,6 +241,7 @@ git commit -m "feat(web): /boat config form + /api/config/boat GET/PUT"
 ## Task 2: BSP cal — API + `/calibration/bsp` page
 
 **Files:**
+
 - Create: `packages/web/src/app/api/config/bsp/route.ts`
 - Create: `packages/web/src/app/calibration/bsp/page.tsx`
 
@@ -370,8 +370,8 @@ export default function BspCalPage() {
         <div>SOG (GPS speed): {fmt(sog as never)}</div>
       </div>
       <p className="text-xs text-slate-500 max-w-xl">
-        In still water with no current, ideal multiplier ≈ SOG / BSP. Note the
-        ratio at each speed bin and edit cells accordingly.
+        In still water with no current, ideal multiplier ≈ SOG / BSP. Note the ratio at each speed
+        bin and edit cells accordingly.
       </p>
 
       {cal && (
@@ -458,6 +458,7 @@ git commit -m "feat(web): /calibration/bsp page + /api/config/bsp GET/PUT"
 ## Task 3: Compass deviation — API + `/calibration/compass` page
 
 **Files:**
+
 - Create: `packages/web/src/app/api/config/compass-deviation/route.ts`
 - Create: `packages/web/src/app/calibration/compass/page.tsx`
 
@@ -589,9 +590,8 @@ export default function CompassDeviationPage() {
         <div>GPS COG: {fmtAngle(cog as never)}</div>
       </div>
       <p className="text-xs text-slate-500 max-w-xl">
-        Deviation = HDG_observed − HDG_true. With no current and a known
-        variation, you can derive deviation per heading bin by comparing the
-        compass against GPS COG on long straight runs.
+        Deviation = HDG_observed − HDG_true. With no current and a known variation, you can derive
+        deviation per heading bin by comparing the compass against GPS COG on long straight runs.
       </p>
 
       {cal && (
@@ -630,7 +630,9 @@ export default function CompassDeviationPage() {
             <div className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
               <div className="text-sm text-slate-300">
                 Editing bin at{' '}
-                <span className="font-mono">{selected * 10}°–{selected * 10 + 10}°</span>{' '}
+                <span className="font-mono">
+                  {selected * 10}°–{selected * 10 + 10}°
+                </span>{' '}
                 heading
               </div>
               <label className="block text-sm">
