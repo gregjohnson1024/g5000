@@ -4,3 +4,4 @@ export * from './bus.js';
 export * from './bus-singleton.js';
 export * from './json-safe.js';
 export * from './source-mode.js';
+export * from './log-stream.js';
