@@ -273,6 +273,7 @@ export default function SailsPage() {
                         polar={c.polar}
                         selected={selectedCell ?? undefined}
                         onSelect={(cell) => setSelectedCell(cell)}
+                        onChange={(updated) => applyPolarChange(c.id, updated)}
                       />
                       {selectedCell && (
                         <PolarCellEditor

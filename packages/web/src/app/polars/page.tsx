@@ -36,17 +36,21 @@ export default function PolarsPage() {
     void reload();
   }, [reload]);
 
-  const handleApply = async (updated: PolarTable) => {
-    const res = await fetch('/api/config/polars', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`PUT failed: ${res.status} ${t}`);
+  const handleApply = async (updated: PolarTable): Promise<void> => {
+    try {
+      const res = await fetch('/api/config/polars', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`PUT failed: ${res.status} ${t}`);
+      }
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     }
-    await reload();
   };
 
   const switchActive = async (configId: string) => {
@@ -164,6 +168,7 @@ export default function PolarsPage() {
               polar={polar}
               selected={selected ?? undefined}
               onSelect={(c) => setSelected(c)}
+              onChange={handleApply}
             />
             {selected && <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />}
           </section>
