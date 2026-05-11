@@ -130,3 +130,44 @@ export const DEFAULT_POLARS: PolarTable = {
     [0, 5.0, 7.3, 8.5, 10.0, 11.1, 11.4, 11.2, 9.0],
   ],
 };
+
+/**
+ * One sail-configuration entry in the wardrobe. Carries its own polar table
+ * plus metadata so the user knows which configuration they're picking.
+ */
+export interface SailConfig {
+  /** Stable unique ID (e.g. 'default', 'full-j1', 'reef1-a2'). */
+  id: string;
+  /** Human-readable name (e.g. 'Full main + J1'). */
+  name: string;
+  /** Optional structured metadata for filtering / sorting. */
+  mainState?: string;
+  headsail?: string;
+  downwindSail?: string;
+  notes?: string;
+  /** This config's polar table. */
+  polar: PolarTable;
+}
+
+/**
+ * The sail wardrobe: list of configurations + which one is currently active.
+ * The compute pipeline reads the active config's polar.
+ */
+export interface SailWardrobe {
+  configs: SailConfig[];
+  /** ID of the active configuration. Must reference a configs[].id. */
+  activeConfigId: string;
+}
+
+/** Default wardrobe: one config wrapping the existing DEFAULT_POLARS. */
+export const DEFAULT_WARDROBE: SailWardrobe = {
+  configs: [
+    {
+      id: 'default',
+      name: 'Default',
+      notes: 'Initial baseline polar. Replace with your boat-specific data.',
+      polar: DEFAULT_POLARS,
+    },
+  ],
+  activeConfigId: 'default',
+};

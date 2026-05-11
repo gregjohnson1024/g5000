@@ -1,6 +1,8 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import type { JsonSafeSample } from '@g5000/core';
+import type { SailWardrobe } from '@g5000/db';
 import { useSse } from '../../hooks/use-sse';
 import { HelmTile } from './HelmTile';
 
@@ -49,6 +51,30 @@ function percentSeverity(s: JsonSafeSample | undefined): 'good' | 'ok' | 'bad' |
 
 export default function HelmPage() {
   const { channels, connected } = useSse();
+  const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
+
+  const reloadWardrobe = useCallback(async () => {
+    try {
+      const r = await fetch('/api/sails', { cache: 'no-store' });
+      if (!r.ok) return;
+      setWardrobe((await r.json()) as SailWardrobe);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadWardrobe();
+  }, [reloadWardrobe]);
+
+  const swapActive = async (configId: string) => {
+    await fetch('/api/sails/active', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ configId }),
+    });
+    await reloadWardrobe();
+  };
 
   const tws = channels.get('wind.true.calibrated.speed');
   const twa = channels.get('wind.true.calibrated.angle');
@@ -69,6 +95,26 @@ export default function HelmPage() {
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
         <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
       </div>
+
+      {wardrobe && (
+        <div className="flex items-center gap-2 mb-3 text-sm bg-slate-900 border border-slate-800 rounded px-3 py-2">
+          <span className="text-slate-400">Sails:</span>
+          <select
+            value={wardrobe.activeConfigId}
+            onChange={(e) => swapActive(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded text-slate-200 px-2 py-1 text-sm"
+          >
+            {wardrobe.configs.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
+            manage
+          </a>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" />

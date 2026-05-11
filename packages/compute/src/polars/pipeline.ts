@@ -23,7 +23,7 @@ export async function startPolarPipeline(opts: PolarPipelineOptions): Promise<()
   const subs: Array<() => void> = [];
   const rxSubs: Subscription[] = [];
 
-  let polar: PolarTable = await firstValueFrom(configStore.polars$);
+  let polar: PolarTable = await firstValueFrom(configStore.activePolar$);
 
   function recompute(): void {
     if (!latest.tws || !latest.twa || !latest.bsp) return;
@@ -68,7 +68,7 @@ export async function startPolarPipeline(opts: PolarPipelineOptions): Promise<()
   trackScalar('boat.speed.water', 'bsp');
 
   rxSubs.push(
-    configStore.polars$.subscribe((next) => {
+    configStore.activePolar$.subscribe((next) => {
       polar = next;
       recompute();
     }),
