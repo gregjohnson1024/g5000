@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AwsAwaCalTable } from '@h6000/db';
-import { CalHeatmap } from './CalHeatmap.js';
-import { CellEditor } from './CellEditor.js';
-import { TackTestWizard } from './TackTestWizard.js';
+import { CalHeatmap } from './CalHeatmap';
+import { CellEditor } from './CellEditor';
+import { TackTestWizard } from './TackTestWizard';
 
 export default function CalibrationWindPage() {
   const [cal, setCal] = useState<AwsAwaCalTable | null>(null);
