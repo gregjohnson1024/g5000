@@ -157,6 +157,23 @@ export interface SailWardrobe {
   activeConfigId: string;
 }
 
+/**
+ * Per-channel damping configuration. Maps channel name → time constant in
+ * seconds. A missing entry (or value of 0) means no damping is applied to
+ * that channel.
+ *
+ * Used at the outgoing-client boundary (SSE writer, H-LINK V emit) to
+ * low-pass-filter samples for display. Internal compute pipelines see raw
+ * samples.
+ */
+export type DampingConfig = Record<string, number>;
+
+/**
+ * Default damping config: empty map. Users opt in to damping per channel via
+ * the /damping UI page; nothing is smoothed by default.
+ */
+export const DEFAULT_DAMPING_CONFIG: DampingConfig = {};
+
 /** Default wardrobe: one config wrapping the existing DEFAULT_POLARS. */
 export const DEFAULT_WARDROBE: SailWardrobe = {
   configs: [

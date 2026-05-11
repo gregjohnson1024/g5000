@@ -7,12 +7,14 @@ import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
+  DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
   DEFAULT_WARDROBE,
   type AwsAwaCalTable,
   type BoatConfig,
   type BspCal,
   type CompassDeviation,
+  type DampingConfig,
   type PolarTable,
   type SailWardrobe,
 } from './defaults.js';
@@ -21,6 +23,7 @@ import {
   bspCal,
   boatConfig as boatConfigTable,
   compassDeviation,
+  dampingConfig as dampingConfigTable,
   polars,
   sailWardrobe,
 } from './schema.js';
@@ -46,6 +49,7 @@ export class ConfigStore {
     bspCal: BehaviorSubject<BspCal>;
     compassDeviation: BehaviorSubject<CompassDeviation>;
     sails: BehaviorSubject<SailWardrobe>;
+    dampingConfig: BehaviorSubject<DampingConfig>;
   };
 
   private constructor(
@@ -57,6 +61,7 @@ export class ConfigStore {
       bspCal: BspCal;
       compassDeviation: CompassDeviation;
       sails: SailWardrobe;
+      dampingConfig: DampingConfig;
     },
   ) {
     this.subjects = {
@@ -65,6 +70,7 @@ export class ConfigStore {
       bspCal: new BehaviorSubject(initial.bspCal),
       compassDeviation: new BehaviorSubject(initial.compassDeviation),
       sails: new BehaviorSubject(initial.sails),
+      dampingConfig: new BehaviorSubject(initial.dampingConfig),
     };
   }
 
@@ -81,6 +87,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS compass_deviation (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS damping_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -132,6 +139,7 @@ export class ConfigStore {
       bspCal: loadOrInsert<BspCal>(bspCal, DEFAULT_BSP_CAL),
       compassDeviation: loadOrInsert<CompassDeviation>(compassDeviation, DEFAULT_COMPASS_DEVIATION),
       sails: wardrobeValue,
+      dampingConfig: loadOrInsert<DampingConfig>(dampingConfigTable, DEFAULT_DAMPING_CONFIG),
     };
 
     return new ConfigStore(raw, db, initial);
@@ -151,6 +159,18 @@ export class ConfigStore {
   }
   get sails$(): Observable<SailWardrobe> {
     return this.subjects.sails.asObservable();
+  }
+  get dampingConfig$(): Observable<DampingConfig> {
+    return this.subjects.dampingConfig.asObservable();
+  }
+  /**
+   * Synchronous read of the current damping config. Used on the SSE / H-LINK
+   * hot path to look up the per-channel time constant without subscribing on
+   * every sample. Returns the live map by reference — callers MUST treat it
+   * as read-only.
+   */
+  getDampingConfig(): DampingConfig {
+    return this.subjects.dampingConfig.value;
   }
   /** Derived from sails$ — returns the active config's polar. */
   get activePolar$(): Observable<PolarTable> {
@@ -186,6 +206,17 @@ export class ConfigStore {
     this.upsert(sailWardrobe, value);
     this.subjects.sails.next(value);
   }
+  async setDampingConfig(value: DampingConfig): Promise<void> {
+    // Drop entries with zero / negative / non-finite τ — they are passthrough
+    // anyway and stripping keeps the persisted form minimal.
+    const cleaned: DampingConfig = {};
+    for (const [channel, tau] of Object.entries(value)) {
+      if (typeof tau !== 'number' || !Number.isFinite(tau) || tau <= 0) continue;
+      cleaned[channel] = tau;
+    }
+    this.upsert(dampingConfigTable, cleaned);
+    this.subjects.dampingConfig.next(cleaned);
+  }
   async setPolars(value: PolarTable): Promise<void> {
     // Legacy compatibility: redirect to "set the active config's polar".
     const wardrobe = this.subjects.sails.value;
@@ -205,6 +236,7 @@ export class ConfigStore {
     this.subjects.bspCal.complete();
     this.subjects.compassDeviation.complete();
     this.subjects.sails.complete();
+    this.subjects.dampingConfig.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

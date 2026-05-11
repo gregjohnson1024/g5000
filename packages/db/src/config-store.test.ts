@@ -7,9 +7,11 @@ import { ConfigStore } from './config-store.js';
 import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_AWS_AWA_CAL,
+  DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
   DEFAULT_WARDROBE,
   type BoatConfig,
+  type DampingConfig,
   type PolarTable,
   type SailWardrobe,
 } from './defaults.js';
@@ -130,6 +132,41 @@ describe('ConfigStore', () => {
     });
     const after = await firstValueFrom(store.activePolar$);
     expect(after.boatSpeed.flat().every((x) => x === 0)).toBe(true);
+  });
+
+  it('returns the default damping config (empty) on a fresh database', async () => {
+    const c = await firstValueFrom(store.dampingConfig$);
+    expect(c).toEqual(DEFAULT_DAMPING_CONFIG);
+    expect(Object.keys(c)).toHaveLength(0);
+    expect(store.getDampingConfig()).toEqual({});
+  });
+
+  it('persists damping config across reopens', async () => {
+    await store.setDampingConfig({ 'boat.speed.water': 2.5, 'wind.true.speed': 3.0 });
+    await store.close();
+    const reopened = await ConfigStore.open(path.join(dir, 'config.db'));
+    const c = await firstValueFrom(reopened.dampingConfig$);
+    expect(c).toEqual({ 'boat.speed.water': 2.5, 'wind.true.speed': 3.0 });
+    await reopened.close();
+    store = reopened;
+  });
+
+  it('strips zero / negative / non-finite tau values on setDampingConfig', async () => {
+    const next: Promise<DampingConfig> = firstValueFrom(
+      store.dampingConfig$.pipe(skip(1), take(1)),
+    );
+    await store.setDampingConfig({
+      'boat.speed.water': 2.0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'should.strip.zero': 0 as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'should.strip.negative': -1 as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'should.strip.nan': NaN as any,
+    });
+    const v = await next;
+    expect(Object.keys(v).sort()).toEqual(['boat.speed.water']);
+    expect(v['boat.speed.water']).toBe(2.0);
   });
 
   it('legacy polars$ tracks active config (backward compat)', async () => {

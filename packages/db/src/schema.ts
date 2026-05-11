@@ -37,3 +37,8 @@ export const sailWardrobe = sqliteTable('sail_wardrobe', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded SailWardrobe
 });
+
+export const dampingConfig = sqliteTable('damping_config', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded DampingConfig (Record<string, number>)
+});
