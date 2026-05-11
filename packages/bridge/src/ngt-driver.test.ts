@@ -1,12 +1,40 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import { Ngt1Driver, type Ngt1Source } from './ngt-driver.js';
+import { Ngt1Driver, parseActisenseLine, type Ngt1Source } from './ngt-driver.js';
+import { encodeN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
 
 /**
- * A minimal in-memory Ngt1Source: the driver accepts any object that emits
- * 'data' Buffer events. We emit pre-recorded canboat ASCII lines, which is
- * the simplest form Ngt1Driver must understand.
+ * Hand-crafted PGN 130306 wind payload (8 bytes). The exact bytes don't
+ * matter for these tests — we're asserting that the driver decodes the
+ * framing correctly and produces a RawCanFrame, not that the payload
+ * itself round-trips through canboat's PGN database.
  */
+const WIND_PAYLOAD = Buffer.from([0xa0, 0x16, 0x02, 0x02, 0x7f, 0xff, 0xfa, 0xfa]);
+const SPEED_PAYLOAD = Buffer.from([0xa0, 0x01, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff]);
+const HEADING_PAYLOAD = Buffer.from([0xa0, 0x01, 0xd0, 0x07, 0xff, 0xff, 0xfc, 0xff]);
+
+const windFrame = encodeN2KActisense({
+  pgn: 130306,
+  data: WIND_PAYLOAD,
+  prio: 2,
+  src: 17,
+  dst: 255,
+});
+const speedFrame = encodeN2KActisense({
+  pgn: 128259,
+  data: SPEED_PAYLOAD,
+  prio: 2,
+  src: 17,
+  dst: 255,
+});
+const headingFrame = encodeN2KActisense({
+  pgn: 127250,
+  data: HEADING_PAYLOAD,
+  prio: 3,
+  src: 17,
+  dst: 255,
+});
+
 class MemorySource implements Ngt1Source {
   private listener: ((chunk: Buffer) => void) | null = null;
   on(event: 'data', cb: (chunk: Buffer) => void): this {
@@ -17,10 +45,65 @@ class MemorySource implements Ngt1Source {
     this.listener = null;
     return this;
   }
-  emit(text: string): void {
-    this.listener?.(Buffer.from(text, 'utf8'));
+  emit(buf: Buffer): void {
+    this.listener?.(buf);
   }
 }
+
+describe('Ngt1Driver — Actisense binary input', () => {
+  let source: MemorySource;
+  let driver: Ngt1Driver;
+
+  beforeEach(async () => {
+    source = new MemorySource();
+    driver = new Ngt1Driver({ source });
+    await driver.start();
+  });
+
+  it('decodes one binary Actisense frame into a RawCanFrame', async () => {
+    const promised = firstValueFrom(driver.rxCan);
+    source.emit(windFrame);
+    const frame = await promised;
+    expect(frame.ext).toBe(true);
+    expect(frame.data).toBeInstanceOf(Uint8Array);
+    expect(frame.data.length).toBe(WIND_PAYLOAD.length);
+    expect(frame.id).toBeGreaterThan(0);
+    expect(frame.rxTimestamp).toBeTypeOf('bigint');
+    // The encoded source address survives the round-trip.
+    expect(frame.id & 0xff).toBe(17);
+  });
+
+  it('emits one frame per binary packet, multiple packets in one chunk', async () => {
+    const collected = firstValueFrom(driver.rxCan.pipe(take(3), toArray()));
+    const combined = Buffer.concat([windFrame, speedFrame, headingFrame]);
+    source.emit(combined);
+    const frames = await collected;
+    expect(frames).toHaveLength(3);
+  });
+
+  it('handles a packet split across two chunks', async () => {
+    // Cut the wind frame at an arbitrary midpoint.
+    const halfway = Math.floor(windFrame.length / 2);
+    const chunk1 = windFrame.subarray(0, halfway);
+    const chunk2 = windFrame.subarray(halfway);
+    const promised = firstValueFrom(driver.rxCan);
+    source.emit(chunk1);
+    // No frame should have arrived yet (only partial).
+    source.emit(chunk2);
+    const frame = await promised;
+    expect(frame.data.length).toBe(WIND_PAYLOAD.length);
+  });
+});
+
+describe('parseActisenseLine — still useful as a fixture helper', () => {
+  it('parses one canboat-format ASCII line into a RawCanFrame', () => {
+    const f = parseActisenseLine(
+      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,02,7f,ff,fa,fa',
+    );
+    expect(f?.ext).toBe(true);
+    expect(f?.data.length).toBe(8);
+  });
+});
 
 describe('Ngt1Driver.txPgn', () => {
   it('encodes a PGN 130306 wind frame and writes the line to the serial sink', async () => {
@@ -38,7 +121,7 @@ describe('Ngt1Driver.txPgn', () => {
         return true;
       },
     };
-    const driver = new Ngt1Driver({ source: sinkSource as any });
+    const driver = new Ngt1Driver({ source: sinkSource as unknown as Ngt1Source });
     await driver.start();
     await driver.txPgn({
       pgn: 130306,
@@ -54,43 +137,5 @@ describe('Ngt1Driver.txPgn', () => {
     const text = Buffer.concat(writes).toString('utf8');
     expect(text).toMatch(/130306/);
     expect(text.endsWith('\n')).toBe(true);
-  });
-});
-
-describe('Ngt1Driver', () => {
-  let source: MemorySource;
-  let driver: Ngt1Driver;
-
-  beforeEach(async () => {
-    source = new MemorySource();
-    driver = new Ngt1Driver({ source });
-    await driver.start();
-  });
-
-  it('parses an Actisense ASCII wind-PGN line into a RawCanFrame', async () => {
-    // PGN 130306 (wind), prio 2, src 17, dst 255, 8-byte payload.
-    const line = '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n';
-    const framePromise = firstValueFrom(driver.rxCan);
-    source.emit(line);
-    const frame = await framePromise;
-    expect(frame.ext).toBe(true);
-    expect(frame.data).toBeInstanceOf(Uint8Array);
-    expect(frame.data.length).toBe(8);
-    // ID encodes prio (3 bits) + PGN (17 bits) + source (8 bits).
-    // For PGN 130306 with prio 2 and src 17: see J1939 packing.
-    expect(frame.id).toBeGreaterThan(0);
-    expect(frame.rxTimestamp).toBeTypeOf('bigint');
-  });
-
-  it('emits one frame per line', async () => {
-    const lines = [
-      '2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,ff,fa,fa\n',
-      '2024-01-01-12:00:00.100,2,128259,17,255,8,a0,01,00,00,00,00,ff,ff\n',
-      '2024-01-01-12:00:00.200,3,127250,17,255,8,a0,01,d0,07,ff,ff,fc,ff\n',
-    ];
-    const collected = firstValueFrom(driver.rxCan.pipe(take(3), toArray()));
-    for (const l of lines) source.emit(l);
-    const frames = await collected;
-    expect(frames).toHaveLength(3);
   });
 });

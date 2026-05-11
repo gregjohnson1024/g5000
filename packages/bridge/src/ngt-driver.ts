@@ -1,5 +1,6 @@
 import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
 import canboat from '@canboat/canboatjs';
+import { readN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
 import type {
   RawCanFrame,
   Raw0183Sentence,
@@ -13,6 +14,7 @@ const { pgnToActisenseSerialFormat } = canboat as unknown as {
     pgn: number;
     prio?: number;
     dst?: number;
+    src?: number;
     fields: Record<string, unknown>;
   }) => string;
 };
@@ -40,14 +42,23 @@ export interface Ngt1DriverOptions {
 }
 
 /**
- * Reads canboat-style Actisense ASCII lines from the underlying source and
- * emits one RawCanFrame per parsed line.
+ * Actisense binary framing constants (per canboatjs/lib/n2k-actisense.js).
  *
- * Why ASCII not binary: the canboatjs binary parser path requires more
- * setup (escape-byte unwrapping, message framing) and the NGT-1 firmware
- * supports an "ASCII out" mode via the canboat actisense-serial preamble.
- * We can swap to binary later if we drop canboat-actisense in favour of
- * raw NGT-1 framing — wire-driver.ts is the seam.
+ *   0x10 0x02 0xd0 LL LL <payload (LL bytes)> 0x10 0x03
+ *
+ * The payload's last two bytes are the ETX marker (0x10 0x03). Total bytes
+ * consumed per packet = 5 (header + length) + LL (payload incl. ETX).
+ */
+const STX_0 = 0x10;
+const STX_1 = 0x02;
+const STX_2 = 0xd0;
+const HEADER_LEN = 5; // STX(3) + length(2)
+
+/**
+ * NGT-1 driver. Reads Actisense binary frames from the serial source,
+ * decodes them via canboatjs's readN2KActisense, and emits a RawCanFrame
+ * per received PGN. ASCII text framing is NOT used at the wire level —
+ * the parseActisenseLine helper remains exported for test-fixture use.
  */
 export class Ngt1Driver implements WireDriver {
   readonly rxCan: Observable<RawCanFrame>;
@@ -62,7 +73,7 @@ export class Ngt1Driver implements WireDriver {
     errorCount: 0,
   });
   private readonly source: Ngt1Source;
-  private buffer = '';
+  private buffer: Buffer = Buffer.alloc(0);
   private dataHandler = this.onData.bind(this);
 
   constructor(opts: Ngt1DriverOptions) {
@@ -82,8 +93,7 @@ export class Ngt1Driver implements WireDriver {
   }
 
   async txCan(_frame: RawCanFrame): Promise<void> {
-    // TX support arrives in a later plan (Phase 0a milestone is read-only).
-    throw new Error('Ngt1Driver.txCan not implemented in Phase 0a');
+    throw new Error('Ngt1Driver.txCan not implemented (use txPgn)');
   }
 
   async tx0183(_port: number, _text: string): Promise<void> {
@@ -102,7 +112,7 @@ export class Ngt1Driver implements WireDriver {
     }
     const sink = this.source as unknown as Ngt1Sink;
     if (typeof sink.write !== 'function') {
-      throw new Error('Ngt1Driver.txPgn: source has no .write() method (test sink missing it?)');
+      throw new Error('Ngt1Driver.txPgn: source has no .write() method');
     }
     await new Promise<void>((resolve, reject) => {
       sink.write(line + '\n', (err) => (err ? reject(err) : resolve()));
@@ -110,20 +120,54 @@ export class Ngt1Driver implements WireDriver {
   }
 
   private onData(chunk: Buffer): void {
-    this.buffer += chunk.toString('utf8');
-    let nl: number;
-    while ((nl = this.buffer.indexOf('\n')) >= 0) {
-      const line = this.buffer.slice(0, nl).trim();
-      this.buffer = this.buffer.slice(nl + 1);
-      if (line.length === 0) continue;
+    this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
+    while (true) {
+      // Find the next start-of-frame marker.
+      const start = this.findStart(this.buffer);
+      if (start < 0) {
+        // No header in buffer — keep at most the last 2 bytes (a partial header could span).
+        if (this.buffer.length > 2) this.buffer = this.buffer.subarray(-2);
+        return;
+      }
+      // Drop any pre-header garbage.
+      if (start > 0) this.buffer = this.buffer.subarray(start);
+      if (this.buffer.length < HEADER_LEN) return; // need the length field
+      const payloadLen = this.buffer.readUInt16LE(3);
+      const totalLen = HEADER_LEN + payloadLen;
+      if (this.buffer.length < totalLen) return; // incomplete packet
+      const packet = this.buffer.subarray(0, totalLen);
+      this.buffer = this.buffer.subarray(totalLen);
       try {
-        const frame = parseActisenseLine(line);
-        if (frame) this.rxSubject.next(frame);
-      } catch (err) {
+        readN2KActisense(packet, false, {}, (result) => {
+          this.emitFrame(result);
+        });
+      } catch (_err) {
         const h = this.healthSubject.value;
         this.healthSubject.next({ ...h, errorCount: h.errorCount + 1 });
       }
     }
+  }
+
+  private findStart(buf: Buffer): number {
+    for (let i = 0; i + 2 < buf.length; i++) {
+      if (buf[i] === STX_0 && buf[i + 1] === STX_1 && buf[i + 2] === STX_2) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private emitFrame(result: {
+    pgn: { pgn: number; src: number; dst: number; prio: number };
+    data: Buffer;
+  }): void {
+    const id = encodeJ1939Id(result.pgn.prio, result.pgn.pgn, result.pgn.src);
+    this.rxSubject.next({
+      id,
+      ext: true,
+      data: new Uint8Array(result.data),
+      rxTimestamp: BigInt(Date.now()) * 1_000_000n,
+    });
   }
 }
 
@@ -134,6 +178,10 @@ export class Ngt1Driver implements WireDriver {
  *
  * We construct the 29-bit CAN ID per J1939: bits 26-28 are priority,
  * bits 8-25 hold the PGN with PF/PS handling, bits 0-7 hold source address.
+ *
+ * Still exported as a test-fixture helper for decoder.test.ts and
+ * channel-mapper.test.ts, which construct synthetic frames from ASCII.
+ * This function is NOT in the live RX path — onData() uses binary framing.
  */
 export function parseActisenseLine(line: string): RawCanFrame | null {
   const parts = line.split(',');
