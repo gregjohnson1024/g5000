@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@h6000/compute": "*",
     "@h6000/core": "*",
     "@h6000/db": "*",
     "next": "^16",
