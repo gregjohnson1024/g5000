@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Bus, Channels, type Sample } from '@g5000/core';
+import { encodeN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
 import { runBridge } from './bridge.js';
 import { Ngt1Driver, type Ngt1Source } from './ngt-driver.js';
 import { SerialPort0183Driver, type Sentence0183Source } from './nmea0183/serial-driver.js';
@@ -14,8 +15,8 @@ class MemorySource implements Ngt1Source {
     this.listener = null;
     return this;
   }
-  emit(text: string) {
-    this.listener?.(Buffer.from(text, 'utf8'));
+  emit(buf: Buffer) {
+    this.listener?.(buf);
   }
 }
 
@@ -32,11 +33,21 @@ describe('runBridge', () => {
     stop = await runBridge({ bus, drivers: [driver] });
   });
 
-  it('publishes wind samples to the bus when an NGT-1 line arrives', async () => {
+  it('publishes wind samples to the bus when an NGT-1 binary frame arrives', async () => {
     const received: Sample[] = [];
     bus.subscribe('wind.**', (s) => received.push(s));
 
-    source.emit('2024-01-01-12:00:00.000,2,130306,17,255,8,a0,16,02,fe,7f,02,fa,fa\n');
+    // PGN 130306 (Wind Data) binary layout: SID(8)+Speed(16)+Angle(16)+Reference(3)+...
+    // byte[5] low 3 bits = Reference; 0x02 decodes to "Apparent".
+    const windPayload = Buffer.from([0xa0, 0x16, 0x02, 0xfe, 0x7f, 0x02, 0xfa, 0xfa]);
+    const frame = encodeN2KActisense({
+      pgn: 130306,
+      data: windPayload,
+      prio: 2,
+      src: 17,
+      dst: 255,
+    });
+    source.emit(frame);
 
     // Allow the RxJS chain to settle.
     await new Promise((r) => setTimeout(r, 10));
