@@ -19,6 +19,7 @@ const ITEMS: NavItem[] = [
   { href: '/boat', label: 'Boat' },
   { href: '/autopilot', label: 'Autopilot' },
   { href: '/devices', label: 'Devices' },
+  { href: '/sources', label: 'Sources' },
   { href: '/sessions', label: 'Sessions' },
   { href: '/logs', label: 'Logs' },
   { href: '/inspect', label: 'Inspect' },
