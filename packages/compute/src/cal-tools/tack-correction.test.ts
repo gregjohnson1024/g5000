@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeTackCorrection, type TackCapture } from './tack-correction.js';
-import { DEFAULT_AWS_AWA_CAL } from '@h6000/db';
+import { DEFAULT_AWS_AWA_CAL } from '@g5000/db';
 
 const cap = (overrides: Partial<TackCapture>): TackCapture => ({
   twd: 0,

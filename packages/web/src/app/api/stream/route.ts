@@ -1,4 +1,4 @@
-import { getSharedBus, toJsonSafe, type Sample } from '@h6000/core';
+import { getSharedBus, toJsonSafe, type Sample } from '@g5000/core';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

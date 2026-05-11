@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;

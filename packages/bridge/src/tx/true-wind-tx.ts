@@ -1,5 +1,5 @@
 import { Subject, throttleTime, type Subscription } from 'rxjs';
-import type { Bus } from '@h6000/core';
+import type { Bus } from '@g5000/core';
 import type { WireDriver } from '../wire-driver.js';
 
 export interface TrueWindTxOptions {

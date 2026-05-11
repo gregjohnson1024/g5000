@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
-import { computeTackCorrection, type TackCapture } from '@h6000/compute';
+import type { AwsAwaCalTable } from '@g5000/db';
+import { computeTackCorrection, type TackCapture } from '@g5000/compute';
 import { useSse } from '../../../hooks/use-sse';
 import { useChannelHistory } from '../../../hooks/use-channel-history';
 

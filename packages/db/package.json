@@ -1,5 +1,5 @@
 {
-  "name": "@h6000/db",
+  "name": "@g5000/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
+    "@g5000/core": "*",
     "better-sqlite3": "^11",
     "drizzle-orm": "^0.36",
     "rxjs": "^7"

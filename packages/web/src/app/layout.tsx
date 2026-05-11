@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
-  title: 'H6000',
+  title: 'G5000',
   description: 'Performance instrument processor',
 };
 

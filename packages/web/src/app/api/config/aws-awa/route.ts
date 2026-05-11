@@ -1,5 +1,5 @@
 import { firstValueFrom } from 'rxjs';
-import { getSharedConfigStore, type AwsAwaCalTable } from '@h6000/db';
+import { getSharedConfigStore, type AwsAwaCalTable } from '@g5000/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

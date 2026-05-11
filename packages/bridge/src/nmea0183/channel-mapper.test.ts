@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Channels } from '@h6000/core';
+import { Channels } from '@g5000/core';
 import { mapSentenceToSamples } from './channel-mapper.js';
 import type { Raw0183Sentence } from '../wire-driver.js';
 

@@ -11,7 +11,7 @@ import {
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_BOAT_CONFIG,
-} from '@h6000/db';
+} from '@g5000/db';
 
 const baseInputs = (overrides: Partial<TrueWindInputs> = {}): TrueWindInputs => ({
   aws: 5, // m/s

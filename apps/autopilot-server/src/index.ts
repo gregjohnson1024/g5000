@@ -4,9 +4,9 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus } from '@h6000/core';
-import { ConfigStore, setSharedConfigStore } from '@h6000/db';
-import { startTrueWindPipeline } from '@h6000/compute';
+import { getSharedBus } from '@g5000/core';
+import { ConfigStore, setSharedConfigStore } from '@g5000/db';
+import { startTrueWindPipeline } from '@g5000/compute';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -16,7 +16,7 @@ import {
   startTrueWindTx,
   type WireDriver,
   type SessionLogger,
-} from '@h6000/bridge';
+} from '@g5000/bridge';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
     console.log('[autopilot] true-wind TX online via NGT-1');
   }
 
-  // 6. Start Next.js pointing at the @h6000/web package directory.
+  // 6. Start Next.js pointing at the @g5000/web package directory.
   const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const app = next({ dev: DEV, dir: webDir });
   await app.prepare();

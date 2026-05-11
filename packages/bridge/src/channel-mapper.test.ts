@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mapPgnToSamples } from './channel-mapper.js';
 import type { DecodedPgn } from './decoder.js';
-import { Channels } from '@h6000/core';
+import { Channels } from '@g5000/core';
 
 const make = (pgn: number, fields: Record<string, unknown>): DecodedPgn => ({
   pgn,

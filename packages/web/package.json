@@ -1,5 +1,5 @@
 {
-  "name": "@h6000/web",
+  "name": "@g5000/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/compute": "*",
-    "@h6000/core": "*",
-    "@h6000/db": "*",
+    "@g5000/compute": "*",
+    "@g5000/core": "*",
+    "@g5000/db": "*",
     "next": "^16",
     "react": "^19",
     "react-dom": "^19"

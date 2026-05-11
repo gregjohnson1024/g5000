@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Bus, Channels, type Sample } from '@h6000/core';
+import { Bus, Channels, type Sample } from '@g5000/core';
 import { runBridge } from './bridge.js';
 import { Ngt1Driver, type Ngt1Source } from './ngt-driver.js';
 import { SerialPort0183Driver, type Sentence0183Source } from './nmea0183/serial-driver.js';

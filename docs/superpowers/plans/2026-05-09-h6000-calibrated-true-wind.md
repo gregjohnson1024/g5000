@@ -1,4 +1,4 @@
-# H6000 Plan 3 — Calibrated True Wind, End to End
+# G5000 Plan 3 — Calibrated True Wind, End to End
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,18 +6,18 @@
 
 **Architecture:**
 
-- New package `@h6000/db`: Drizzle schema + `ConfigStore` class exposing typed observables for cal tables. Single SQLite file `config.db` (path configurable via env var).
-- New package `@h6000/compute`: pure-function true-wind math (motion correction, 2D bilinear cal-table interpolation, vector subtraction → TWS/TWA/TWD) plus an RxJS pipeline that subscribes to bus channels via the ConfigStore.
-- `@h6000/bridge` extension: a new `txPgn(pgn)` method on `WireDriver`, implemented on `Ngt1Driver` via canboatjs's ASCII encoder, stubbed (throws) on the others.
-- `@h6000/web`: a minimal `/api/config/aws-awa` endpoint pair (GET/PUT) so the cal table can be poked from the browser (or curl) without writing SQL. **No wizard UI yet** — that's Plan 3B.
-- `@h6000/autopilot-server`: instantiates ConfigStore, starts compute pipeline, wires TX to the live NGT-1.
+- New package `@g5000/db`: Drizzle schema + `ConfigStore` class exposing typed observables for cal tables. Single SQLite file `config.db` (path configurable via env var).
+- New package `@g5000/compute`: pure-function true-wind math (motion correction, 2D bilinear cal-table interpolation, vector subtraction → TWS/TWA/TWD) plus an RxJS pipeline that subscribes to bus channels via the ConfigStore.
+- `@g5000/bridge` extension: a new `txPgn(pgn)` method on `WireDriver`, implemented on `Ngt1Driver` via canboatjs's ASCII encoder, stubbed (throws) on the others.
+- `@g5000/web`: a minimal `/api/config/aws-awa` endpoint pair (GET/PUT) so the cal table can be poked from the browser (or curl) without writing SQL. **No wizard UI yet** — that's Plan 3B.
+- `@g5000/autopilot-server`: instantiates ConfigStore, starts compute pipeline, wires TX to the live NGT-1.
 
 **Tech Stack additions:**
 
 - `drizzle-orm` and `better-sqlite3` (the same pair the rest of the user's workspace uses).
 - No new compute deps — math is straightforward, RxJS handles streaming.
 
-**Reference spec:** `docs/superpowers/specs/2026-05-08-h6000-design.md`. Implements build-sequence steps 11 (config DB), 12 (true-wind compute), and 15 (N2K TX). Steps 13 (cal-table editor wizard) and 14 (polars) are deferred to Plan 3B. BSP cal and compass deviation calibrations (also part of step 17 in the broader plan) are out of scope here — only AWS/AWA cal lands now.
+**Reference spec:** `docs/superpowers/specs/2026-05-08-g5000-design.md`. Implements build-sequence steps 11 (config DB), 12 (true-wind compute), and 15 (N2K TX). Steps 13 (cal-table editor wizard) and 14 (polars) are deferred to Plan 3B. BSP cal and compass deviation calibrations (also part of step 17 in the broader plan) are out of scope here — only AWS/AWA cal lands now.
 
 ---
 
@@ -34,7 +34,7 @@
 - True-wind compute pipeline: RxJS-based, subscribes to needed input channels via `combineLatest`, applies math, publishes to `wind.true.calibrated.*` channels.
 - New `txPgn(pgn)` method on `WireDriver` (typed PGN object → bus). `Ngt1Driver.txPgn` implementation using `canboatjs.pgnToActisenseN2KAsciiFormat` + serial write. Other drivers throw.
 - TX wiring: subscribes to `wind.true.calibrated.*`, throttles to 5 Hz, builds PGN 130306, calls `Ngt1Driver.txPgn`.
-- A minimal REST API in `@h6000/web` for AWS/AWA cal CRUD (`GET /api/config/aws-awa`, `PUT /api/config/aws-awa`).
+- A minimal REST API in `@g5000/web` for AWS/AWA cal CRUD (`GET /api/config/aws-awa`, `PUT /api/config/aws-awa`).
 - `autopilot-server` integration: ConfigStore + compute + TX wired into the existing single-process boot.
 
 ## What's NOT in scope (Plan 3B and beyond)
@@ -96,7 +96,7 @@ autopilot/
 
 ---
 
-## Task 1: Bootstrap `@h6000/db` package
+## Task 1: Bootstrap `@g5000/db` package
 
 **Files:**
 
@@ -117,7 +117,7 @@ npm install -D @types/better-sqlite3@^7
 
 ```json
 {
-  "name": "@h6000/db",
+  "name": "@g5000/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -128,7 +128,7 @@ npm install -D @types/better-sqlite3@^7
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
+    "@g5000/core": "*",
     "better-sqlite3": "^11",
     "drizzle-orm": "^0.36",
     "rxjs": "^7"
@@ -163,7 +163,7 @@ npm install -D @types/better-sqlite3@^7
 npm install
 ```
 
-Expected: `node_modules/@h6000/db` symlink exists.
+Expected: `node_modules/@g5000/db` symlink exists.
 
 - [ ] **Step 5: Update root `tsconfig.json`** to include the new package
 
@@ -185,7 +185,7 @@ Expected: `node_modules/@h6000/db` symlink exists.
 
 ```bash
 git add packages/db/package.json packages/db/tsconfig.json package.json package-lock.json tsconfig.json
-git commit -m "feat(db): bootstrap @h6000/db package with Drizzle and better-sqlite3"
+git commit -m "feat(db): bootstrap @g5000/db package with Drizzle and better-sqlite3"
 ```
 
 ---
@@ -348,7 +348,7 @@ describe('ConfigStore', () => {
   let store: ConfigStore;
 
   beforeEach(async () => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-cfg-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-cfg-'));
     store = await ConfigStore.open(path.join(dir, 'config.db'));
   });
 
@@ -561,7 +561,7 @@ git commit -m "feat(db): ConfigStore with SQLite persistence and hot-reload obse
 
 ---
 
-## Task 4: Bootstrap `@h6000/compute` package
+## Task 4: Bootstrap `@g5000/compute` package
 
 **Files:**
 
@@ -573,7 +573,7 @@ git commit -m "feat(db): ConfigStore with SQLite persistence and hot-reload obse
 
 ```json
 {
-  "name": "@h6000/compute",
+  "name": "@g5000/compute",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -584,8 +584,8 @@ git commit -m "feat(db): ConfigStore with SQLite persistence and hot-reload obse
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@h6000/core": "*",
-    "@h6000/db": "*",
+    "@g5000/core": "*",
+    "@g5000/db": "*",
     "rxjs": "^7"
   },
   "devDependencies": {
@@ -636,7 +636,7 @@ npm install
 
 ```bash
 git add packages/compute/package.json packages/compute/tsconfig.json tsconfig.json package-lock.json
-git commit -m "feat(compute): bootstrap @h6000/compute package"
+git commit -m "feat(compute): bootstrap @g5000/compute package"
 ```
 
 ---
@@ -667,7 +667,7 @@ import {
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_BOAT_CONFIG,
-} from '@h6000/db';
+} from '@g5000/db';
 
 const baseInputs = (overrides: Partial<TrueWindInputs> = {}): TrueWindInputs => ({
   aws: 5, // m/s
@@ -797,7 +797,7 @@ describe('applyCompassDeviation', () => {
 - [ ] **Step 3: Implement `packages/compute/src/true-wind/math.ts`**
 
 ```ts
-import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@h6000/db';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@g5000/db';
 
 export interface TrueWindInputs {
   /** Apparent wind speed at the masthead, m/s. */
@@ -1020,8 +1020,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Bus, Channels, type Sample } from '@h6000/core';
-import { ConfigStore } from '@h6000/db';
+import { Bus, Channels, type Sample } from '@g5000/core';
+import { ConfigStore } from '@g5000/db';
 import { startTrueWindPipeline } from './pipeline.js';
 
 const sample = (channel: string, value: number, t_ns = 1n): Sample => ({
@@ -1039,7 +1039,7 @@ describe('startTrueWindPipeline', () => {
   let received: Sample[];
 
   beforeEach(async () => {
-    dir = mkdtempSync(path.join(tmpdir(), 'h6000-pipeline-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'g5000-pipeline-'));
     store = await ConfigStore.open(path.join(dir, 'config.db'));
     bus = new Bus();
     received = [];
@@ -1109,8 +1109,8 @@ Module not found.
 
 ```ts
 import { combineLatest, firstValueFrom, type Subscription } from 'rxjs';
-import { Bus, Channels, type Sample } from '@h6000/core';
-import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@h6000/db';
+import { Bus, Channels, type Sample } from '@g5000/core';
+import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@g5000/db';
 import { computeTrueWind } from './math.js';
 
 export interface TrueWindPipelineOptions {
@@ -1499,7 +1499,7 @@ The TX wiring subscribes to `wind.true.calibrated.{speed,angle}` channels, combi
 
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Bus, type Sample } from '@h6000/core';
+import { Bus, type Sample } from '@g5000/core';
 import { startTrueWindTx } from './true-wind-tx.js';
 import type { OutgoingPgn, WireDriver } from '../wire-driver.js';
 import { Subject, BehaviorSubject } from 'rxjs';
@@ -1598,7 +1598,7 @@ Module not found.
 
 ```ts
 import { Subject, throttleTime, type Subscription } from 'rxjs';
-import type { Bus } from '@h6000/core';
+import type { Bus } from '@g5000/core';
 import type { WireDriver } from '../wire-driver.js';
 
 export interface TrueWindTxOptions {
@@ -1694,14 +1694,14 @@ git commit -m "feat(bridge): TX wiring for calibrated true wind PGN 130306"
 
 A minimal pair of endpoints so the cal table can be read and overwritten without writing SQL. Plan 3B will replace this with a proper editor UI; for now, having an HTTP surface lets you `curl` the table.
 
-This task assumes a `getConfigStore()` accessor will exist in `@h6000/core`'s shared-singleton pattern (analogous to `getSharedBus`). Wire it up in this task as well.
+This task assumes a `getConfigStore()` accessor will exist in `@g5000/core`'s shared-singleton pattern (analogous to `getSharedBus`). Wire it up in this task as well.
 
-- [ ] **Step 1: Add `config-store-singleton.ts` to `@h6000/core`**
+- [ ] **Step 1: Add `config-store-singleton.ts` to `@g5000/core`**
 
 Create `packages/core/src/config-store-singleton.ts`:
 
 ```ts
-import type { ConfigStore } from '@h6000/db';
+import type { ConfigStore } from '@g5000/db';
 
 let instance: ConfigStore | null = null;
 
@@ -1727,9 +1727,9 @@ export function _resetSharedConfigStoreForTests(): void {
 }
 ```
 
-**However:** `@h6000/core` cannot import from `@h6000/db` (would create a cycle: db depends on core). Instead, type the singleton as `unknown` and cast at the call sites:
+**However:** `@g5000/core` cannot import from `@g5000/db` (would create a cycle: db depends on core). Instead, type the singleton as `unknown` and cast at the call sites:
 
-Actually, the cleanest move is: put the singleton accessor in `@h6000/db` itself. Update `packages/db/src/index.ts` to also export a process-wide singleton:
+Actually, the cleanest move is: put the singleton accessor in `@g5000/db` itself. Update `packages/db/src/index.ts` to also export a process-wide singleton:
 
 ```ts
 // packages/db/src/index.ts
@@ -1761,16 +1761,16 @@ export function _resetSharedConfigStoreForTests(): void {
 
 (Don't create the `config-store-singleton.ts` in core; place the singleton in db's index.ts as shown.)
 
-- [ ] **Step 2: Add `@h6000/db` as a dependency of `@h6000/web`**
+- [ ] **Step 2: Add `@g5000/db` as a dependency of `@g5000/web`**
 
-Edit `packages/web/package.json` to add `"@h6000/db": "*"` to its `dependencies`.
+Edit `packages/web/package.json` to add `"@g5000/db": "*"` to its `dependencies`.
 
 Run `npm install` to wire the symlink.
 
 - [ ] **Step 3: Build the db package**
 
 ```
-npm run build --workspace=@h6000/db
+npm run build --workspace=@g5000/db
 ```
 
 Required because Next.js consumes core via the compiled `dist/` (Plan 1 finding) — same applies to db.
@@ -1788,7 +1788,7 @@ Then rebuild.
 
 ```ts
 import { firstValueFrom } from 'rxjs';
-import { getSharedConfigStore, type AwsAwaCalTable } from '@h6000/db';
+import { getSharedConfigStore, type AwsAwaCalTable } from '@g5000/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -1846,7 +1846,7 @@ function validateAwsAwaCal(cal: unknown): cal is AwsAwaCalTable {
 - [ ] **Step 5: Typecheck**
 
 ```
-npm run typecheck --workspace=@h6000/web
+npm run typecheck --workspace=@g5000/web
 ```
 
 Clean.
@@ -1877,13 +1877,13 @@ Boot order:
 6. Start true-wind TX (only if a driver supporting `txPgn` is present — i.e., NGT-1).
 7. Boot Next.js.
 
-- [ ] **Step 1: Add `@h6000/db` and `@h6000/compute` deps**
+- [ ] **Step 1: Add `@g5000/db` and `@g5000/compute` deps**
 
 Edit `apps/autopilot-server/package.json` and add to `dependencies`:
 
 ```json
-"@h6000/db": "*",
-"@h6000/compute": "*",
+"@g5000/db": "*",
+"@g5000/compute": "*",
 ```
 
 Run `npm install`.
@@ -1891,8 +1891,8 @@ Run `npm install`.
 - [ ] **Step 2: Build core + db before continuing**
 
 ```
-npm run build --workspace=@h6000/core
-npm run build --workspace=@h6000/db
+npm run build --workspace=@g5000/core
+npm run build --workspace=@g5000/db
 ```
 
 (Update the `predev`/`prebuild` scripts to include both. The script in `apps/autopilot-server/package.json`:
@@ -1910,9 +1910,9 @@ Add to imports:
 
 ```ts
 import { mkdir } from 'node:fs/promises';
-import { ConfigStore, setSharedConfigStore } from '@h6000/db';
-import { startTrueWindPipeline } from '@h6000/compute';
-import { startTrueWindTx, type WireDriver, Ngt1Driver } from '@h6000/bridge';
+import { ConfigStore, setSharedConfigStore } from '@g5000/db';
+import { startTrueWindPipeline } from '@g5000/compute';
+import { startTrueWindTx, type WireDriver, Ngt1Driver } from '@g5000/bridge';
 ```
 
 Add new env var:
@@ -1958,9 +1958,9 @@ if (ngt && !REPLAY) {
 - [ ] **Step 4: Smoke-test (SKIP_BRIDGE path)**
 
 ```bash
-npm run build --workspace=@h6000/core
-npm run build --workspace=@h6000/db
-SKIP_BRIDGE=1 timeout 20 npm run dev --workspace=@h6000/autopilot-server > /tmp/autopilot-task11.log 2>&1
+npm run build --workspace=@g5000/core
+npm run build --workspace=@g5000/db
+SKIP_BRIDGE=1 timeout 20 npm run dev --workspace=@g5000/autopilot-server > /tmp/autopilot-task11.log 2>&1
 cat /tmp/autopilot-task11.log
 ```
 
@@ -2031,7 +2031,7 @@ git commit -m "chore: prettier formatting after Plan 3 landing"
 
 After this plan lands:
 
-- The H6000 computes calibrated true wind from raw inputs and emits PGN 130306 onto the N2K bus.
+- The G5000 computes calibrated true wind from raw inputs and emits PGN 130306 onto the N2K bus.
 - Identity / zero cal means the _value_ will look similar to whatever was already on the bus — but it's now coming from us, with the cal infrastructure in place to start tuning.
 - Cal tables can be edited via `curl -X PUT /api/config/aws-awa` (no UI yet).
 - Hot-reload works: edit the table, the next compute tick uses the new values.

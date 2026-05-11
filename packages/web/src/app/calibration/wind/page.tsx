@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 import { CalHeatmap } from './CalHeatmap';
 import { CellEditor } from './CellEditor';
 import { TackTestWizard } from './TackTestWizard';

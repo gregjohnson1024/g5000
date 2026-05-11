@@ -1,4 +1,4 @@
-import type { AwsAwaCalTable } from '@h6000/db';
+import type { AwsAwaCalTable } from '@g5000/db';
 import { findNearestCalCell, applyAngleCorrectionToCell, type CellIndex } from './find-cell.js';
 
 /**

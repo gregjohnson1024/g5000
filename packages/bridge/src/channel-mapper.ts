@@ -1,4 +1,4 @@
-import { Channels, type Sample, type ChannelValue } from '@h6000/core';
+import { Channels, type Sample, type ChannelValue } from '@g5000/core';
 import type { DecodedPgn } from './decoder.js';
 
 type MapperFn = (pgn: DecodedPgn) => Sample[];

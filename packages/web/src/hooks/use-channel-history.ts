@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { JsonSafeSample } from '@h6000/core';
+import type { JsonSafeSample } from '@g5000/core';
 
 export interface ChannelHistoryPoint {
   t_ms: number;
