@@ -4,9 +4,10 @@ import { DEFAULT_POLARS } from '@g5000/db';
 
 describe('interpolatePolarSpeed', () => {
   it('returns the cell value at an exact (TWS, TWA) bin match', () => {
-    // DEFAULT_POLARS has TWS bin index 2 = 6 m/s, TWA bin index 2 = 45°.
+    const tws = DEFAULT_POLARS.twsBins[2]!;
+    const twa = DEFAULT_POLARS.twaBins[2]!;
     const expected = DEFAULT_POLARS.boatSpeed[2]![2]!;
-    const v = interpolatePolarSpeed(DEFAULT_POLARS, 6, (45 * Math.PI) / 180);
+    const v = interpolatePolarSpeed(DEFAULT_POLARS, tws, twa);
     expect(v).toBeCloseTo(expected, 6);
   });
 
@@ -22,10 +23,11 @@ describe('interpolatePolarSpeed', () => {
   });
 
   it('interpolates linearly between bins', () => {
-    // Mid-way between TWS bin 2 (6) and 3 (8) m/s, at exact TWA bin 4 (90°).
+    const midTws = (DEFAULT_POLARS.twsBins[2]! + DEFAULT_POLARS.twsBins[3]!) / 2;
+    const twa = DEFAULT_POLARS.twaBins[4]!;
     const a = DEFAULT_POLARS.boatSpeed[2]![4]!;
     const b = DEFAULT_POLARS.boatSpeed[3]![4]!;
-    const v = interpolatePolarSpeed(DEFAULT_POLARS, 7, (90 * Math.PI) / 180);
+    const v = interpolatePolarSpeed(DEFAULT_POLARS, midTws, twa);
     expect(v).toBeCloseTo((a + b) / 2, 6);
   });
 });

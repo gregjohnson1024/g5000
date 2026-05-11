@@ -97,37 +97,32 @@ export interface PolarTable {
  * mode. Real boats vary widely.
  */
 const DEG = Math.PI / 180;
+const KN = 0.514444; // knots → m/s
+
+// Bin centres are written in knots and degrees in the source for legibility,
+// then converted to SI (m/s, radians) for storage.
 export const DEFAULT_POLARS: PolarTable = {
-  twsBins: [2, 4, 6, 8, 10, 12, 16, 20], // m/s ≈ 4, 8, 12, 16, 20, 23, 31, 39 kn
-  twaBins: [
-    0 * DEG,
-    30 * DEG,
-    45 * DEG,
-    60 * DEG,
-    90 * DEG,
-    120 * DEG,
-    135 * DEG,
-    150 * DEG,
-    180 * DEG,
-  ],
-  // Rows = TWS (low to high), cols = TWA (0=in-irons, π=dead-down).
+  twsBins: [6, 8, 10, 12, 14, 16, 20, 25].map((v) => v * KN),
+  twaBins: [0, 30, 45, 60, 90, 120, 135, 150, 180].map((d) => d * DEG),
+  // Rows = TWS (low to high in kn), cols = TWA (0=in-irons, 180°=dead-down).
+  // Boat-speed values are in knots in source; the `.map(v => v * KN)` converts.
   boatSpeed: [
-    // TWS 2 m/s (~4 kn)
-    [0, 0.8, 1.3, 1.6, 1.6, 1.4, 1.2, 0.9, 0.4],
-    // TWS 4 m/s (~8 kn)
-    [0, 1.8, 2.7, 3.2, 3.4, 3.3, 3.0, 2.6, 1.6],
-    // TWS 6 m/s (~12 kn)
-    [0, 3.0, 4.3, 5.0, 5.4, 5.6, 5.4, 5.0, 3.4],
-    // TWS 8 m/s (~16 kn)
-    [0, 4.0, 5.6, 6.4, 7.0, 7.4, 7.4, 7.1, 5.4],
-    // TWS 10 m/s (~20 kn)
-    [0, 4.5, 6.4, 7.2, 8.1, 8.7, 8.9, 8.6, 6.8],
-    // TWS 12 m/s (~23 kn)
-    [0, 4.8, 6.9, 7.8, 8.9, 9.7, 10.0, 9.7, 7.8],
-    // TWS 16 m/s (~31 kn)
-    [0, 5.0, 7.2, 8.3, 9.7, 10.7, 11.0, 10.8, 8.8],
-    // TWS 20 m/s (~39 kn)
-    [0, 5.0, 7.3, 8.5, 10.0, 11.1, 11.4, 11.2, 9.0],
+    // TWS 6 kn
+    [0, 2.5, 3.5, 4.0, 4.2, 4.0, 3.8, 3.4, 2.0].map((v) => v * KN),
+    // TWS 8 kn
+    [0, 3.0, 4.5, 5.0, 5.4, 5.5, 5.3, 4.8, 3.0].map((v) => v * KN),
+    // TWS 10 kn
+    [0, 3.5, 5.0, 5.8, 6.4, 6.8, 6.7, 6.2, 4.4].map((v) => v * KN),
+    // TWS 12 kn
+    [0, 3.8, 5.6, 6.6, 7.4, 8.0, 7.9, 7.4, 5.8].map((v) => v * KN),
+    // TWS 14 kn
+    [0, 4.0, 6.0, 7.2, 8.2, 9.0, 9.0, 8.6, 7.0].map((v) => v * KN),
+    // TWS 16 kn
+    [0, 4.1, 6.2, 7.5, 8.8, 9.7, 9.8, 9.4, 7.8].map((v) => v * KN),
+    // TWS 20 kn
+    [0, 4.3, 6.4, 7.8, 9.4, 10.5, 10.8, 10.4, 8.8].map((v) => v * KN),
+    // TWS 25 kn
+    [0, 4.4, 6.5, 8.0, 9.8, 11.0, 11.4, 11.0, 9.2].map((v) => v * KN),
   ],
 };
 
