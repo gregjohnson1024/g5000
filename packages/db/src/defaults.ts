@@ -174,6 +174,40 @@ export type DampingConfig = Record<string, number>;
  */
 export const DEFAULT_DAMPING_CONFIG: DampingConfig = {};
 
+/**
+ * Source-priority arbitration rules. When two devices publish the same
+ * channel (e.g. GPS over N2K and over 0183, two wind sensors, …), a selector
+ * picks the highest-priority source whose last sample is younger than a
+ * freshness window. The bus itself is unchanged — every source still
+ * publishes. Compute pipelines opt in via `subscribeSelected`.
+ *
+ * See `@g5000/core` `selector.ts` for the matching rules.
+ */
+export interface SourcePriorityRule {
+  /** Channel pattern (exact channel name or `wind.**`-style wildcard). */
+  channelPattern: string;
+  /**
+   * Ordered list of source patterns. Lower index = higher priority.
+   * Each entry matches against Sample.source either by exact equality or
+   * by trailing-`*` prefix wildcard (e.g. `n2k:*`).
+   */
+  sources: string[];
+  /**
+   * Freshness window in seconds. If the preferred source hasn't published a
+   * sample within this window, the selector falls through to the next source
+   * in the list.
+   */
+  freshnessSeconds: number;
+}
+
+export type SourcePriorityConfig = SourcePriorityRule[];
+
+/**
+ * Default source-priority config: empty array. With no rules, every channel
+ * falls back to last-write-wins on the bus (current behaviour).
+ */
+export const DEFAULT_SOURCE_PRIORITY: SourcePriorityConfig = [];
+
 /** Default wardrobe: one config wrapping the existing DEFAULT_POLARS. */
 export const DEFAULT_WARDROBE: SailWardrobe = {
   configs: [

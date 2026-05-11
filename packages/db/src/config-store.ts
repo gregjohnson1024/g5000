@@ -9,6 +9,7 @@ import {
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
+  DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
   type AwsAwaCalTable,
   type BoatConfig,
@@ -17,6 +18,7 @@ import {
   type DampingConfig,
   type PolarTable,
   type SailWardrobe,
+  type SourcePriorityConfig,
 } from './defaults.js';
 import {
   awsAwaCal,
@@ -26,6 +28,7 @@ import {
   dampingConfig as dampingConfigTable,
   polars,
   sailWardrobe,
+  sourcePriorityConfig as sourcePriorityConfigTable,
 } from './schema.js';
 
 const SINGLETON = 'singleton';
@@ -50,6 +53,7 @@ export class ConfigStore {
     compassDeviation: BehaviorSubject<CompassDeviation>;
     sails: BehaviorSubject<SailWardrobe>;
     dampingConfig: BehaviorSubject<DampingConfig>;
+    sourcePriority: BehaviorSubject<SourcePriorityConfig>;
   };
 
   private constructor(
@@ -62,6 +66,7 @@ export class ConfigStore {
       compassDeviation: CompassDeviation;
       sails: SailWardrobe;
       dampingConfig: DampingConfig;
+      sourcePriority: SourcePriorityConfig;
     },
   ) {
     this.subjects = {
@@ -71,6 +76,7 @@ export class ConfigStore {
       compassDeviation: new BehaviorSubject(initial.compassDeviation),
       sails: new BehaviorSubject(initial.sails),
       dampingConfig: new BehaviorSubject(initial.dampingConfig),
+      sourcePriority: new BehaviorSubject(initial.sourcePriority),
     };
   }
 
@@ -88,6 +94,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS damping_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS source_priority_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -140,6 +147,10 @@ export class ConfigStore {
       compassDeviation: loadOrInsert<CompassDeviation>(compassDeviation, DEFAULT_COMPASS_DEVIATION),
       sails: wardrobeValue,
       dampingConfig: loadOrInsert<DampingConfig>(dampingConfigTable, DEFAULT_DAMPING_CONFIG),
+      sourcePriority: loadOrInsert<SourcePriorityConfig>(
+        sourcePriorityConfigTable,
+        DEFAULT_SOURCE_PRIORITY,
+      ),
     };
 
     return new ConfigStore(raw, db, initial);
@@ -171,6 +182,17 @@ export class ConfigStore {
    */
   getDampingConfig(): DampingConfig {
     return this.subjects.dampingConfig.value;
+  }
+  get sourcePriority$(): Observable<SourcePriorityConfig> {
+    return this.subjects.sourcePriority.asObservable();
+  }
+  /**
+   * Synchronous read of the current source-priority config. Used on the hot
+   * path by `subscribeSelected` so callers don't have to subscribe to the
+   * observable on every sample. Returned array MUST be treated as read-only.
+   */
+  getSourcePriority(): SourcePriorityConfig {
+    return this.subjects.sourcePriority.value;
   }
   /** Derived from sails$ — returns the active config's polar. */
   get activePolar$(): Observable<PolarTable> {
@@ -206,6 +228,27 @@ export class ConfigStore {
     this.upsert(sailWardrobe, value);
     this.subjects.sails.next(value);
   }
+  async setSourcePriority(value: SourcePriorityConfig): Promise<void> {
+    // Sanitise: drop entries that don't validate (missing fields, non-finite
+    // freshness, empty sources). Keep order — order is priority.
+    const cleaned: SourcePriorityConfig = [];
+    for (const rule of value) {
+      if (!rule || typeof rule !== 'object') continue;
+      if (typeof rule.channelPattern !== 'string' || rule.channelPattern.length === 0) continue;
+      if (!Array.isArray(rule.sources)) continue;
+      const sources = rule.sources.filter((s): s is string => typeof s === 'string' && s.length > 0);
+      if (sources.length === 0) continue;
+      if (typeof rule.freshnessSeconds !== 'number' || !Number.isFinite(rule.freshnessSeconds)) continue;
+      if (rule.freshnessSeconds <= 0) continue;
+      cleaned.push({
+        channelPattern: rule.channelPattern,
+        sources,
+        freshnessSeconds: rule.freshnessSeconds,
+      });
+    }
+    this.upsert(sourcePriorityConfigTable, cleaned);
+    this.subjects.sourcePriority.next(cleaned);
+  }
   async setDampingConfig(value: DampingConfig): Promise<void> {
     // Drop entries with zero / negative / non-finite τ — they are passthrough
     // anyway and stripping keeps the persisted form minimal.
@@ -237,6 +280,7 @@ export class ConfigStore {
     this.subjects.compassDeviation.complete();
     this.subjects.sails.complete();
     this.subjects.dampingConfig.complete();
+    this.subjects.sourcePriority.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

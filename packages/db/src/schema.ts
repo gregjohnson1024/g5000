@@ -42,3 +42,8 @@ export const dampingConfig = sqliteTable('damping_config', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded DampingConfig (Record<string, number>)
 });
+
+export const sourcePriorityConfig = sqliteTable('source_priority_config', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded SourcePriorityConfig (SourcePriorityRule[])
+});

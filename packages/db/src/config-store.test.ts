@@ -9,11 +9,13 @@ import {
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
+  DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
   type BoatConfig,
   type DampingConfig,
   type PolarTable,
   type SailWardrobe,
+  type SourcePriorityConfig,
 } from './defaults.js';
 
 describe('ConfigStore', () => {
@@ -167,6 +169,51 @@ describe('ConfigStore', () => {
     const v = await next;
     expect(Object.keys(v).sort()).toEqual(['boat.speed.water']);
     expect(v['boat.speed.water']).toBe(2.0);
+  });
+
+  it('returns the default source-priority config (empty array) on a fresh database', async () => {
+    const c = await firstValueFrom(store.sourcePriority$);
+    expect(c).toEqual(DEFAULT_SOURCE_PRIORITY);
+    expect(Array.isArray(c)).toBe(true);
+    expect(c).toHaveLength(0);
+    expect(store.getSourcePriority()).toEqual([]);
+  });
+
+  it('persists source-priority config across reopens', async () => {
+    const cfg: SourcePriorityConfig = [
+      {
+        channelPattern: 'wind.apparent.angle',
+        sources: ['n2k:127250@dev0x10', 'demo'],
+        freshnessSeconds: 2,
+      },
+    ];
+    await store.setSourcePriority(cfg);
+    await store.close();
+    const reopened = await ConfigStore.open(path.join(dir, 'config.db'));
+    const c = await firstValueFrom(reopened.sourcePriority$);
+    expect(c).toEqual(cfg);
+    await reopened.close();
+    store = reopened;
+  });
+
+  it('strips invalid source-priority rules on setSourcePriority', async () => {
+    const next: Promise<SourcePriorityConfig> = firstValueFrom(
+      store.sourcePriority$.pipe(skip(1), take(1)),
+    );
+    await store.setSourcePriority([
+      // Valid.
+      { channelPattern: 'wind.apparent.angle', sources: ['demo'], freshnessSeconds: 2 },
+      // Empty sources → dropped.
+      { channelPattern: 'wind.true.speed', sources: [], freshnessSeconds: 2 },
+      // Negative freshness → dropped.
+      { channelPattern: 'boat.speed.water', sources: ['demo'], freshnessSeconds: -1 },
+      // Missing channelPattern → dropped.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { channelPattern: '', sources: ['demo'], freshnessSeconds: 2 } as any,
+    ]);
+    const v = await next;
+    expect(v).toHaveLength(1);
+    expect(v[0]!.channelPattern).toBe('wind.apparent.angle');
   });
 
   it('legacy polars$ tracks active config (backward compat)', async () => {
