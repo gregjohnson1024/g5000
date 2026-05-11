@@ -7,10 +7,13 @@ import {
   addTwsBin,
   canAddTwaBin,
   canAddTwsBin,
+  interpolatePolarSpeed,
   MIN_BINS,
+  optimalTwaForVmg,
   removeTwaBin,
   removeTwsBin,
   setCell,
+  vmgFor,
 } from '@g5000/compute';
 
 export interface PolarHeatmapProps {
@@ -213,14 +216,99 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
               <td colSpan={polar.twaBins.length + 1} />
             </tr>
           )}
+
+          {/* Computed target-TWA + target-VMG rows. Read-only, no click handlers. */}
+          <TargetRow
+            polar={polar}
+            label="Target TWA upwind"
+            kind="twa"
+            direction="upwind"
+            hasResizeColumn={!!onChange}
+          />
+          <TargetRow
+            polar={polar}
+            label="Target VMG upwind"
+            kind="vmg"
+            direction="upwind"
+            hasResizeColumn={!!onChange}
+          />
+          <TargetRow
+            polar={polar}
+            label="Target TWA downwind"
+            kind="twa"
+            direction="downwind"
+            hasResizeColumn={!!onChange}
+          />
+          <TargetRow
+            polar={polar}
+            label="Target VMG downwind"
+            kind="vmg"
+            direction="downwind"
+            hasResizeColumn={!!onChange}
+          />
         </tbody>
       </table>
       <p className="text-xs text-slate-500 mt-2">
         Boat speed shown in knots. Click to select, double-click to edit. Use{' '}
         <span className="text-amber-400">+</span> / <span className="text-red-400">−</span> to
-        add/remove bins.
+        add/remove bins. Bottom four rows (<span className="text-sky-400">sky</span> /{' '}
+        <span className="text-orange-400">orange</span>) are computed targets — read-only.
       </p>
     </div>
+  );
+}
+
+/**
+ * Read-only row displaying either the optimal TWA (degrees) or the resulting
+ * target VMG (knots) at each TWS bin, in the requested direction
+ * (upwind / downwind). Uses optimalTwaForVmg + interpolatePolarSpeed +
+ * vmgFor from the compute package — no math re-implementation here.
+ */
+function TargetRow({
+  polar,
+  label,
+  kind,
+  direction,
+  hasResizeColumn,
+}: {
+  polar: PolarTable;
+  label: string;
+  kind: 'twa' | 'vmg';
+  direction: 'upwind' | 'downwind';
+  hasResizeColumn: boolean;
+}): React.JSX.Element {
+  const labelColor = direction === 'upwind' ? 'text-sky-400' : 'text-orange-400';
+  return (
+    <tr className="bg-slate-900/60">
+      <th className={`p-1 pr-2 text-right text-[11px] ${labelColor}`}>{label}</th>
+      {polar.twsBins.map((tws, twsIdx) => {
+        const optimalTwa = optimalTwaForVmg(polar, tws, direction);
+        if (kind === 'twa') {
+          return (
+            <td
+              key={twsIdx}
+              className={`p-2 text-right ${labelColor}`}
+              title={`Optimal ${direction} TWA at TWS ${(tws * MS_TO_KNOTS).toFixed(1)} kn`}
+            >
+              {(optimalTwa * RAD_TO_DEG).toFixed(0)}°
+            </td>
+          );
+        }
+        // kind === 'vmg'
+        const bsp = interpolatePolarSpeed(polar, tws, optimalTwa);
+        const vmg = Math.abs(vmgFor(bsp, optimalTwa)); // magnitude (always positive for display)
+        return (
+          <td
+            key={twsIdx}
+            className={`p-2 text-right ${labelColor}`}
+            title={`Target ${direction} VMG at TWS ${(tws * MS_TO_KNOTS).toFixed(1)} kn`}
+          >
+            {(vmg * MS_TO_KNOTS).toFixed(2)}
+          </td>
+        );
+      })}
+      {hasResizeColumn && <td />}
+    </tr>
   );
 }
 
