@@ -125,6 +125,25 @@ describe('SourceModeController', () => {
     }
   });
 
+  it('setLiveOrDemo("live") on cold boot runs the live factory', async () => {
+    // Regression guard: the default state is mode=live with no base
+    // handle. Calling setLiveOrDemo('live') at boot must actually invoke
+    // the live factory — early-returning here leaves the server in a
+    // half-state with no bridge/compute/TX running.
+    let liveStarts = 0;
+    const c = createSourceModeController({ bus: new Bus(), sessionsDir: '/tmp' });
+    c.setBaseSourceFactories({
+      live: async () => {
+        liveStarts++;
+        return { teardown: async () => {} };
+      },
+      demo: async () => ({ teardown: async () => {} }),
+    });
+    await c.setLiveOrDemo('live');
+    expect(liveStarts).toBe(1);
+    expect(c.getStatus().mode).toBe('live');
+  });
+
   it('setLiveOrDemo swaps base source via registered factory', async () => {
     let liveRunning = false;
     let demoRunning = false;
