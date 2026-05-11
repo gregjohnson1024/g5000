@@ -7,10 +7,15 @@ interface DevicesResponse {
   devices: DeviceInfo[];
 }
 
+interface SourceModeStatus {
+  mode: 'live' | 'demo' | 'replay';
+}
+
 export default function DevicesPage() {
   const [devices, setDevices] = useState<DeviceInfo[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<SourceModeStatus['mode']>('live');
 
   const load = useCallback(async () => {
     try {
@@ -24,9 +29,19 @@ export default function DevicesPage() {
     }
   }, []);
 
+  const loadMode = useCallback(async () => {
+    const res = await fetch('/api/source-mode', { cache: 'no-store' });
+    if (!res.ok) return;
+    const body = (await res.json()) as SourceModeStatus;
+    if (body.mode) setMode(body.mode);
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadMode();
+    const id = setInterval(loadMode, 2000);
+    return () => clearInterval(id);
+  }, [load, loadMode]);
 
   const refresh = async (): Promise<void> => {
     setBusy(true);
@@ -53,14 +68,17 @@ export default function DevicesPage() {
     typeof n === 'number' ? String(n) : fallback;
   const hexSrc = (n: number): string => `0x${n.toString(16).padStart(2, '0')}`;
 
+  const canRefresh = mode === 'live';
+
   return (
     <main className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">N2K devices</h1>
         <button
           onClick={refresh}
-          disabled={busy}
-          className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
+          disabled={busy || !canRefresh}
+          title={canRefresh ? '' : `Refresh sends an ISO Request on the N2K bus — available in live mode only (currently ${mode}).`}
+          className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy ? 'Refreshing…' : 'Refresh devices'}
         </button>
@@ -71,8 +89,9 @@ export default function DevicesPage() {
 
       {devices !== null && devices.length === 0 && (
         <p className="text-slate-400 text-sm">
-          No devices observed yet. Click &ldquo;Refresh devices&rdquo; to send an ISO Request, or
-          wait for devices to announce themselves.
+          {canRefresh
+            ? 'No devices observed yet. Click “Refresh devices” to send an ISO Request, or wait for devices to announce themselves.'
+            : `Device discovery requires live mode (current mode: ${mode}). Switch via the chip in the navbar to enumerate N2K devices.`}
         </p>
       )}
 
