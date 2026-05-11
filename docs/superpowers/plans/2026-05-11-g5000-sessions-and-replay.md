@@ -1,0 +1,1458 @@
+# G5000 Sessions Browser + Replay Control — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Make the existing `.jsonl.gz` session logger and `ReplayDriver` first-class user-visible features: a `/sessions` page that lists, summarises, downloads, and replays recorded sessions, with a navbar chip that always shows the current source mode (live / demo / replay).
+
+**Architecture:** A new `SourceModeController` singleton owns the active wire driver (live NGT-1, demo injector, or replay) and can swap between them at runtime. Replay reuses the existing `ReplayDriver` and `runBridge` plumbing. Web reaches the controller through Next.js route handlers that share the same Node process via the existing `globalThis` singleton pattern. TX is gated off during replay.
+
+**Tech Stack:** Existing — npm workspaces, TypeScript, RxJS, Next.js 16, Tailwind, vitest. No new dependencies.
+
+**Spec:** `docs/superpowers/specs/2026-05-11-g5000-sessions-and-replay-design.md`
+
+---
+
+## Pre-flight (controller-side context the subagents will need)
+
+- The shared bus singleton lives at `packages/core/src/bus-singleton.ts` (`getSharedBus()`).
+- The ConfigStore singleton lives at `packages/db/src/config-store.ts` (`getSharedConfigStore()` / `setSharedConfigStore()`).
+- The `Bus` pattern: `globalThis.__g5000_<name>__ = instance` — survives Turbopack module duplication.
+- `runBridge({ bus, drivers })` from `@g5000/bridge` returns a `() => Promise<void>` teardown. It wires drivers' `rxCan`/`rx0183` through the decoder + channel mappers to the bus.
+- Workspace packages ship `dist/`; after editing source you must `npm run build --workspace=@g5000/<pkg>` for the autopilot-server and Next routes to see the change.
+- Local TSX imports use no `.js` extension; workspace-package imports likewise no extension.
+- `serverExternalPackages` in `packages/web/next.config.ts` includes `@g5000/core`, `@g5000/db`, `@g5000/compute`, `@g5000/bridge`, `@canboat/canboatjs`. Any new workspace package consumed from Next routes must be added here.
+
+---
+
+### Task 1: Session-summary scanner (pure module)
+
+**Files:**
+- Create: `packages/bridge/src/persistence/session-summary.ts`
+- Create: `packages/bridge/src/persistence/session-summary.test.ts`
+- Modify: `packages/bridge/src/index.ts` (add re-exports)
+
+**Why:** The `/api/sessions` route needs cheap directory listings, and `/api/sessions/[id]` needs a one-shot scan that returns counts and time range. Putting it in the bridge package keeps the file-format knowledge with the writer.
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+// packages/bridge/src/persistence/session-summary.test.ts
+import { describe, it, expect } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { Subject, BehaviorSubject } from 'rxjs';
+import { startSessionLogger } from './session-logger.js';
+import { listSessions, summarizeSession } from './session-summary.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver } from '../wire-driver.js';
+
+function fakeDriver(): {
+  driver: WireDriver;
+  pushCan: (f: RawCanFrame) => void;
+  pushOt: (s: Raw0183Sentence) => void;
+} {
+  const can = new Subject<RawCanFrame>();
+  const ot = new Subject<Raw0183Sentence>();
+  const health = new BehaviorSubject({
+    connected: true,
+    bytesPerSecond: 0,
+    framesPerSecond: 0,
+    errorCount: 0,
+  });
+  return {
+    driver: {
+      rxCan: can.asObservable(),
+      rx0183: ot.asObservable(),
+      health: health.asObservable(),
+      txCan: async () => {},
+      tx0183: async () => {},
+    } as unknown as WireDriver,
+    pushCan: (f) => can.next(f),
+    pushOt: (s) => ot.next(s),
+  };
+}
+
+describe('session-summary', () => {
+  it('lists sessions with id, size, mtime, and parsed header startedAt', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'g5000-sess-'));
+    try {
+      const { driver, pushCan } = fakeDriver();
+      const logger = await startSessionLogger({
+        drivers: [driver],
+        dir,
+        sessionId: '2026-05-11T12-00-00',
+      });
+      pushCan({ id: 0x18eeff01, ext: true, data: new Uint8Array([1, 2, 3]), rxTimestamp: 1n });
+      await new Promise((r) => setTimeout(r, 5));
+      await logger.close();
+
+      const list = await listSessions(dir);
+      expect(list).toHaveLength(1);
+      expect(list[0]!.id).toBe('2026-05-11T12-00-00');
+      expect(list[0]!.sizeBytes).toBeGreaterThan(0);
+      expect(list[0]!.startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('summarizes a session: counts by kind, duration, first/last timestamps', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'g5000-sess-'));
+    try {
+      const { driver, pushCan, pushOt } = fakeDriver();
+      const logger = await startSessionLogger({
+        drivers: [driver],
+        dir,
+        sessionId: 'fixture',
+      });
+      pushCan({ id: 0x18eeff01, ext: true, data: new Uint8Array([1]), rxTimestamp: 1_000_000n });
+      pushCan({ id: 0x18eeff01, ext: true, data: new Uint8Array([2]), rxTimestamp: 2_000_000n });
+      pushOt({ text: '$GPGGA,...', port: 1, rxTimestamp: 3_500_000n });
+      await new Promise((r) => setTimeout(r, 5));
+      await logger.close();
+
+      const summary = await summarizeSession(path.join(dir, 'fixture.jsonl.gz'));
+      expect(summary.id).toBe('fixture');
+      expect(summary.canLines).toBe(2);
+      expect(summary.otLines).toBe(1);
+      expect(summary.firstEventNs).toBe('1000000');
+      expect(summary.lastEventNs).toBe('3500000');
+      expect(summary.durationMs).toBe(Math.round((3_500_000 - 1_000_000) / 1_000_000));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('listSessions returns empty array for nonexistent dir', async () => {
+    const list = await listSessions('/tmp/definitely-not-a-real-dir-' + Date.now());
+    expect(list).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to confirm they fail**
+
+Run: `npm test -- --reporter=basic --run packages/bridge/src/persistence/session-summary.test.ts`
+Expected: 3 failures — module not found.
+
+- [ ] **Step 3: Implement the module**
+
+```ts
+// packages/bridge/src/persistence/session-summary.ts
+import { readdir, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { createGunzip } from 'node:zlib';
+import { createInterface } from 'node:readline';
+import path from 'node:path';
+
+const EXT = '.jsonl.gz';
+
+export interface SessionInfo {
+  id: string;
+  sizeBytes: number;
+  mtime: string;
+  startedAt?: string;
+}
+
+export interface SessionSummary extends SessionInfo {
+  canLines: number;
+  otLines: number;
+  durationMs: number;
+  firstEventNs?: string;
+  lastEventNs?: string;
+}
+
+export async function listSessions(dir: string): Promise<SessionInfo[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
+  }
+  const files = entries.filter((e) => e.endsWith(EXT));
+  const out: SessionInfo[] = [];
+  for (const f of files) {
+    const full = path.join(dir, f);
+    const st = await stat(full);
+    out.push({
+      id: f.slice(0, -EXT.length),
+      sizeBytes: st.size,
+      mtime: st.mtime.toISOString(),
+      startedAt: await readHeaderStartedAt(full),
+    });
+  }
+  out.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
+  return out;
+}
+
+async function readHeaderStartedAt(filePath: string): Promise<string | undefined> {
+  const lines = openLineReader(filePath);
+  try {
+    for await (const raw of lines) {
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as { kind?: string; startedAt?: string };
+        if (parsed.kind === 'header') return parsed.startedAt;
+      } catch {
+        return undefined;
+      }
+      return undefined;
+    }
+  } finally {
+    lines.close();
+  }
+  return undefined;
+}
+
+export async function summarizeSession(filePath: string): Promise<SessionSummary> {
+  const st = await stat(filePath);
+  const base = path.basename(filePath);
+  if (!base.endsWith(EXT)) {
+    throw new Error(`Not a session file: ${filePath}`);
+  }
+  const id = base.slice(0, -EXT.length);
+
+  let canLines = 0;
+  let otLines = 0;
+  let firstNs: bigint | undefined;
+  let lastNs: bigint | undefined;
+  let startedAt: string | undefined;
+
+  const lines = openLineReader(filePath);
+  try {
+    for await (const raw of lines) {
+      if (!raw) continue;
+      let parsed: { kind?: string; t_ns?: string; startedAt?: string };
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (parsed.kind === 'header') {
+        startedAt = parsed.startedAt;
+        continue;
+      }
+      if (parsed.kind === 'can') canLines += 1;
+      else if (parsed.kind === '0183') otLines += 1;
+      else continue;
+      if (parsed.t_ns) {
+        const ns = BigInt(parsed.t_ns);
+        if (firstNs === undefined) firstNs = ns;
+        lastNs = ns;
+      }
+    }
+  } finally {
+    lines.close();
+  }
+
+  const durationMs =
+    firstNs !== undefined && lastNs !== undefined
+      ? Math.round(Number((lastNs - firstNs) / 1_000_000n))
+      : 0;
+
+  return {
+    id,
+    sizeBytes: st.size,
+    mtime: st.mtime.toISOString(),
+    startedAt,
+    canLines,
+    otLines,
+    durationMs,
+    firstEventNs: firstNs?.toString(),
+    lastEventNs: lastNs?.toString(),
+  };
+}
+
+function openLineReader(filePath: string) {
+  const file = createReadStream(filePath);
+  const gunzip = createGunzip();
+  return createInterface({ input: file.pipe(gunzip) });
+}
+```
+
+- [ ] **Step 4: Re-export from package index**
+
+In `packages/bridge/src/index.ts`, add:
+
+```ts
+export {
+  listSessions,
+  summarizeSession,
+  type SessionInfo,
+  type SessionSummary,
+} from './persistence/session-summary.js';
+```
+
+- [ ] **Step 5: Run tests to confirm green**
+
+Run: `npm test -- --reporter=basic --run packages/bridge/src/persistence/session-summary.test.ts`
+Expected: 3 pass.
+
+- [ ] **Step 6: Build the package**
+
+Run: `npm run build --workspace=@g5000/bridge`
+Expected: clean exit.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add packages/bridge/src/persistence/session-summary.ts \
+        packages/bridge/src/persistence/session-summary.test.ts \
+        packages/bridge/src/index.ts \
+        packages/bridge/dist/
+git commit -m "feat(bridge): session-summary scanner (listSessions, summarizeSession)"
+```
+
+---
+
+### Task 2: SourceModeController + index.ts wiring
+
+**Files:**
+- Create: `apps/autopilot-server/src/source-mode.ts`
+- Create: `apps/autopilot-server/src/source-mode.test.ts`
+- Modify: `apps/autopilot-server/src/index.ts`
+
+**Why:** Web routes need a process-wide handle that can swap the source between live/demo/replay at runtime, plus a status query for the navbar.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// apps/autopilot-server/src/source-mode.test.ts
+import { describe, it, expect, beforeEach } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { Subject, BehaviorSubject } from 'rxjs';
+import { Bus } from '@g5000/core';
+import { startSessionLogger } from '@g5000/bridge';
+import type { RawCanFrame, Raw0183Sentence, WireDriver } from '@g5000/bridge';
+import {
+  createSourceModeController,
+  _resetSourceModeControllerForTests,
+} from './source-mode.js';
+
+function fakeDriver(): WireDriver {
+  return {
+    rxCan: new Subject<RawCanFrame>().asObservable(),
+    rx0183: new Subject<Raw0183Sentence>().asObservable(),
+    health: new BehaviorSubject({
+      connected: true,
+      bytesPerSecond: 0,
+      framesPerSecond: 0,
+      errorCount: 0,
+    }).asObservable(),
+    txCan: async () => {},
+    tx0183: async () => {},
+  } as unknown as WireDriver;
+}
+
+describe('SourceModeController', () => {
+  beforeEach(() => _resetSourceModeControllerForTests());
+
+  it('defaults to live mode', () => {
+    const c = createSourceModeController({ bus: new Bus(), sessionsDir: '/tmp' });
+    expect(c.getStatus().mode).toBe('live');
+  });
+
+  it('reports demo mode when setLiveOrDemo("demo") is called', () => {
+    const c = createSourceModeController({ bus: new Bus(), sessionsDir: '/tmp' });
+    c.setLiveOrDemo('demo');
+    expect(c.getStatus().mode).toBe('demo');
+  });
+
+  it('startReplay swaps to replay mode and stopReplay restores prior mode', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'g5000-srcmode-'));
+    try {
+      const driver = fakeDriver();
+      const logger = await startSessionLogger({
+        drivers: [driver],
+        dir,
+        sessionId: 'fixture',
+      });
+      await logger.close();
+
+      const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
+      c.setLiveOrDemo('demo');
+      await c.startReplay({ sessionId: 'fixture', paceMode: 'asap' });
+      expect(c.getStatus().mode).toBe('replay');
+      expect(c.getStatus().sessionId).toBe('fixture');
+
+      await c.stopReplay();
+      expect(c.getStatus().mode).toBe('demo');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('startReplay refuses a missing session', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'g5000-srcmode-'));
+    try {
+      const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
+      await expect(
+        c.startReplay({ sessionId: 'nope', paceMode: 'asap' }),
+      ).rejects.toThrow(/not found/i);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a second startReplay while one is running', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'g5000-srcmode-'));
+    try {
+      const driver = fakeDriver();
+      const logger = await startSessionLogger({ drivers: [driver], dir, sessionId: 'f1' });
+      await logger.close();
+      const logger2 = await startSessionLogger({ drivers: [driver], dir, sessionId: 'f2' });
+      await logger2.close();
+
+      const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
+      await c.startReplay({ sessionId: 'f1', paceMode: 'asap' });
+      await expect(
+        c.startReplay({ sessionId: 'f2', paceMode: 'asap' }),
+      ).rejects.toThrow(/already/i);
+      await c.stopReplay();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+```
+
+- [ ] **Step 2: Run the test to confirm it fails**
+
+Run: `npm test -- --reporter=basic --run apps/autopilot-server/src/source-mode.test.ts`
+Expected: failures — module not found.
+
+- [ ] **Step 3: Implement the controller**
+
+```ts
+// apps/autopilot-server/src/source-mode.ts
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import type { Bus } from '@g5000/core';
+import { ReplayDriver, runBridge } from '@g5000/bridge';
+
+export type SourceMode = 'live' | 'demo' | 'replay';
+export type PaceMode = 'realtime' | 'asap';
+export type ReplayPhase = 'running' | 'finished' | 'error';
+
+export interface SourceModeStatus {
+  mode: SourceMode;
+  sessionId?: string;
+  paceMode?: PaceMode;
+  phase?: ReplayPhase;
+  startedAt?: string;
+  errorMessage?: string;
+}
+
+export interface SourceModeController {
+  getStatus(): SourceModeStatus;
+  setLiveOrDemo(mode: 'live' | 'demo'): void;
+  startReplay(args: { sessionId: string; paceMode: PaceMode }): Promise<void>;
+  stopReplay(): Promise<void>;
+}
+
+export interface CreateOptions {
+  bus: Bus;
+  sessionsDir: string;
+}
+
+declare const globalThis: { __g5000_sourceMode__?: SourceModeController };
+
+export function createSourceModeController(opts: CreateOptions): SourceModeController {
+  if (globalThis.__g5000_sourceMode__) return globalThis.__g5000_sourceMode__;
+
+  let baseMode: 'live' | 'demo' = 'live';
+  let status: SourceModeStatus = { mode: 'live' };
+  let activeReplayTeardown: (() => Promise<void>) | null = null;
+  let activeReplayDriver: ReplayDriver | null = null;
+
+  const controller: SourceModeController = {
+    getStatus: () => ({ ...status }),
+    setLiveOrDemo: (mode) => {
+      baseMode = mode;
+      if (status.mode !== 'replay') {
+        status = { mode };
+      }
+    },
+    async startReplay({ sessionId, paceMode }) {
+      if (status.mode === 'replay') {
+        throw new Error(`replay already running for "${status.sessionId}"`);
+      }
+      const filePath = path.join(opts.sessionsDir, `${sessionId}.jsonl.gz`);
+      if (!existsSync(filePath)) {
+        throw new Error(`session "${sessionId}" not found in ${opts.sessionsDir}`);
+      }
+      const driver = new ReplayDriver({ filePath, mode: paceMode });
+      const stopBridge = await runBridge({ bus: opts.bus, drivers: [driver] });
+      await driver.start();
+      activeReplayDriver = driver;
+      activeReplayTeardown = async () => {
+        await driver.stop();
+        await stopBridge();
+      };
+      status = {
+        mode: 'replay',
+        sessionId,
+        paceMode,
+        phase: 'running',
+        startedAt: new Date().toISOString(),
+      };
+    },
+    async stopReplay() {
+      if (activeReplayTeardown) {
+        const t = activeReplayTeardown;
+        activeReplayTeardown = null;
+        activeReplayDriver = null;
+        try {
+          await t();
+        } catch (err) {
+          status = {
+            mode: baseMode,
+            errorMessage: err instanceof Error ? err.message : String(err),
+          };
+          return;
+        }
+      }
+      status = { mode: baseMode };
+    },
+  };
+
+  globalThis.__g5000_sourceMode__ = controller;
+  return controller;
+}
+
+export function getSourceModeController(): SourceModeController | undefined {
+  return globalThis.__g5000_sourceMode__;
+}
+
+export function _resetSourceModeControllerForTests(): void {
+  globalThis.__g5000_sourceMode__ = undefined;
+}
+```
+
+- [ ] **Step 4: Run the test to confirm green**
+
+Run: `npm test -- --reporter=basic --run apps/autopilot-server/src/source-mode.test.ts`
+Expected: 5 pass.
+
+- [ ] **Step 5: Wire into index.ts startup**
+
+Edit `apps/autopilot-server/src/index.ts`. After the existing `// 4. Demo mode OR …` block but before the polar pipeline, add:
+
+```ts
+// 4c. Source-mode controller — owns runtime swap between live/demo/replay.
+//     The web UI talks to this singleton through Next.js route handlers.
+const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
+await mkdir(sessionsDir, { recursive: true });
+const sourceModeController = createSourceModeController({
+  bus,
+  sessionsDir,
+});
+sourceModeController.setLiveOrDemo(DEMO_MODE ? 'demo' : 'live');
+// eslint-disable-next-line no-console
+console.log(
+  `[autopilot] source mode: ${sourceModeController.getStatus().mode} (sessions dir: ${sessionsDir})`,
+);
+```
+
+…and add `createSourceModeController` to the imports from `./source-mode.js`.
+
+Also: make sure `SESSION_LOG_DIR` defaults to that same `sessions/` path if not set, so `startSessionLogger` and the controller share a directory:
+
+```ts
+// Replace the existing SESSION_LOG_DIR const
+const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
+```
+
+Stays the same (env var still takes precedence). The controller's `sessionsDir` falls back to `dataDir/sessions` when no env var is set.
+
+- [ ] **Step 6: Type-check + tests**
+
+Run: `npx tsc -b && npm test -- --reporter=basic --run`
+Expected: clean exit, all tests green.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/autopilot-server/src/source-mode.ts \
+        apps/autopilot-server/src/source-mode.test.ts \
+        apps/autopilot-server/src/index.ts
+git commit -m "feat(server): SourceModeController for live/demo/replay swap at runtime"
+```
+
+---
+
+### Task 3: TX gating during replay
+
+**Files:**
+- Modify: `packages/bridge/src/tx/true-wind-tx.ts`
+- Modify: `packages/bridge/src/tx/true-wind-tx.test.ts`
+
+**Why:** During a replay we must not push synthesised PGN 130306 onto a real N2K bus. The cleanest gate is at the TX subscriber: check the source-mode controller right before transmitting.
+
+- [ ] **Step 1: Read the current TX implementation**
+
+```bash
+sed -n '1,200p' packages/bridge/src/tx/true-wind-tx.ts
+```
+
+Note the existing subscribe-and-transmit shape so the patch is minimal.
+
+- [ ] **Step 2: Add a `shouldTransmit` predicate to `StartTrueWindTxOptions`**
+
+Modify the `StartTrueWindTxOptions` interface in `packages/bridge/src/tx/true-wind-tx.ts` to accept an optional predicate, defaulting to "always transmit":
+
+```ts
+export interface StartTrueWindTxOptions {
+  bus: Bus;
+  driver: { txPgn: (pgn: OutgoingPgn) => Promise<void> };
+  /** If provided and returns false, the TX call is skipped. */
+  shouldTransmit?: () => boolean;
+}
+```
+
+Inside the subscriber that calls `driver.txPgn(...)`, gate the call:
+
+```ts
+if (opts.shouldTransmit && !opts.shouldTransmit()) return;
+await opts.driver.txPgn(pgn);
+```
+
+- [ ] **Step 3: Add a test for the gate**
+
+Append to `packages/bridge/src/tx/true-wind-tx.test.ts`:
+
+```ts
+describe('startTrueWindTx — shouldTransmit gate', () => {
+  it('skips TX when shouldTransmit() returns false', async () => {
+    const bus = new Bus();
+    const txCalls: OutgoingPgn[] = [];
+    const stop = await startTrueWindTx({
+      bus,
+      driver: { txPgn: async (p) => { txCalls.push(p); } },
+      shouldTransmit: () => false,
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueCalibrated.Direction,
+      t_ms: Date.now(),
+      value: { kind: 'scalar', value: 1.234, unit: 'rad' },
+      source: 'computed:true_wind',
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueCalibrated.Speed,
+      t_ms: Date.now(),
+      value: { kind: 'scalar', value: 5.0, unit: 'm/s' },
+      source: 'computed:true_wind',
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(txCalls).toHaveLength(0);
+    await stop();
+  });
+});
+```
+
+(Imports `Bus`, `Channels`, `OutgoingPgn`, `startTrueWindTx` already present at the top of the file — confirm with `grep` and add any missing ones.)
+
+- [ ] **Step 4: Run tests**
+
+```
+npm test -- --reporter=basic --run packages/bridge/src/tx/true-wind-tx.test.ts
+```
+
+Expected: existing tests pass + new test passes.
+
+- [ ] **Step 5: Wire the gate at the call site in index.ts**
+
+In `apps/autopilot-server/src/index.ts`, change the `startTrueWindTx` call to pass `shouldTransmit`:
+
+```ts
+const stopTx = await startTrueWindTx({
+  bus,
+  driver: ngt,
+  shouldTransmit: () => sourceModeController.getStatus().mode !== 'replay',
+});
+```
+
+(`sourceModeController` was constructed in Task 2.)
+
+- [ ] **Step 6: Build and test**
+
+```
+npm run build --workspace=@g5000/bridge && npx tsc -b && npm test -- --run
+```
+
+Expected: clean.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add packages/bridge/src/tx/true-wind-tx.ts \
+        packages/bridge/src/tx/true-wind-tx.test.ts \
+        packages/bridge/dist/ \
+        apps/autopilot-server/src/index.ts
+git commit -m "feat(bridge,server): gate true-wind TX with shouldTransmit; skip during replay"
+```
+
+---
+
+### Task 4: Sessions REST API routes (list, summary, download, delete)
+
+**Files:**
+- Create: `packages/web/src/app/api/sessions/route.ts`
+- Create: `packages/web/src/app/api/sessions/[id]/route.ts`
+- Create: `packages/web/src/app/api/sessions/[id]/download/route.ts`
+
+**Why:** Backing endpoints for the `/sessions` page. Use the helpers from Task 1.
+
+The sessions directory comes from the same env var (`SESSION_LOG_DIR`) or default (`./data/sessions`) used at boot. Centralise the resolution.
+
+- [ ] **Step 1: Create a small helper for sessions-dir resolution**
+
+```ts
+// packages/web/src/app/api/sessions/dir.ts
+import path from 'node:path';
+export function sessionsDir(): string {
+  return (
+    process.env.SESSION_LOG_DIR ??
+    path.resolve(process.cwd(), '..', 'autopilot-server', 'data', 'sessions')
+  );
+}
+```
+
+Note: when Next.js is hosted by `apps/autopilot-server` the CWD is the autopilot-server workspace, so `data/sessions` resolves there. The `path.resolve` is a fallback when running `next dev` standalone from `packages/web`.
+
+- [ ] **Step 2: Implement `GET /api/sessions`**
+
+```ts
+// packages/web/src/app/api/sessions/route.ts
+import { listSessions } from '@g5000/bridge';
+import { sessionsDir } from './dir.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export async function GET(): Promise<Response> {
+  const sessions = await listSessions(sessionsDir());
+  return Response.json({ sessions });
+}
+```
+
+- [ ] **Step 3: Implement `GET /api/sessions/[id]` (summary) and `DELETE`**
+
+```ts
+// packages/web/src/app/api/sessions/[id]/route.ts
+import path from 'node:path';
+import { unlink } from 'node:fs/promises';
+import { summarizeSession } from '@g5000/bridge';
+import { sessionsDir } from '../dir.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+interface Ctx {
+  params: Promise<{ id: string }>;
+}
+
+function safePath(id: string): string {
+  if (id.includes('/') || id.includes('..') || id.length === 0) {
+    throw new Error('invalid session id');
+  }
+  return path.join(sessionsDir(), `${id}.jsonl.gz`);
+}
+
+export async function GET(_req: Request, ctx: Ctx): Promise<Response> {
+  const { id } = await ctx.params;
+  try {
+    const summary = await summarizeSession(safePath(id));
+    return Response.json(summary);
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 404 },
+    );
+  }
+}
+
+export async function DELETE(_req: Request, ctx: Ctx): Promise<Response> {
+  const { id } = await ctx.params;
+  try {
+    await unlink(safePath(id));
+    return Response.json({ ok: true });
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 404 },
+    );
+  }
+}
+```
+
+- [ ] **Step 4: Implement `GET /api/sessions/[id]/download`**
+
+```ts
+// packages/web/src/app/api/sessions/[id]/download/route.ts
+import path from 'node:path';
+import { stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { sessionsDir } from '../../dir.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+interface Ctx {
+  params: Promise<{ id: string }>;
+}
+
+function safePath(id: string): string {
+  if (id.includes('/') || id.includes('..') || id.length === 0) {
+    throw new Error('invalid session id');
+  }
+  return path.join(sessionsDir(), `${id}.jsonl.gz`);
+}
+
+export async function GET(_req: Request, ctx: Ctx): Promise<Response> {
+  const { id } = await ctx.params;
+  let filePath: string;
+  try {
+    filePath = safePath(id);
+    await stat(filePath);
+  } catch {
+    return new Response('not found', { status: 404 });
+  }
+  // ReadableStream from a node stream; cast through `unknown` because Node's
+  // type defs accept NodeReadable here but the lib.dom type is narrower.
+  const stream = createReadStream(filePath) as unknown as ReadableStream<Uint8Array>;
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/gzip',
+      'Content-Disposition': `attachment; filename="${id}.jsonl.gz"`,
+    },
+  });
+}
+```
+
+- [ ] **Step 5: Smoke-test the routes**
+
+After rebuilding the bridge dist (Task 1 already did this) and restarting in DEMO_MODE:
+
+```bash
+curl -s http://localhost:3000/api/sessions | head -c 500
+```
+
+Expected: a JSON object with a `sessions` array (possibly empty if `data/sessions/` is empty).
+
+If empty, drop a tiny fixture file and re-test:
+
+```bash
+mkdir -p apps/autopilot-server/data/sessions
+node -e "
+  const { startSessionLogger } = require('./packages/bridge/dist/index.js');
+  const { Subject, BehaviorSubject } = require('rxjs');
+  (async () => {
+    const can = new Subject(), ot = new Subject();
+    const health = new BehaviorSubject({ connected: true, bytesPerSecond:0, framesPerSecond:0, errorCount:0 });
+    const drv = { rxCan: can.asObservable(), rx0183: ot.asObservable(), health: health.asObservable(), txCan: async()=>{}, tx0183: async()=>{} };
+    const lg = await startSessionLogger({ drivers:[drv], dir:'apps/autopilot-server/data/sessions', sessionId:'fixture-' + Date.now() });
+    can.next({ id: 0x18eeff01, ext:true, data: new Uint8Array([1,2]), rxTimestamp: 1n });
+    await new Promise(r=>setTimeout(r,10));
+    await lg.close();
+  })();
+"
+curl -s http://localhost:3000/api/sessions
+```
+
+Expected: the fixture appears in the list.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add packages/web/src/app/api/sessions/
+git commit -m "feat(web): /api/sessions REST surface (list, summary, download, delete)"
+```
+
+---
+
+### Task 5: Replay control + source-mode REST API routes
+
+**Files:**
+- Create: `packages/web/src/app/api/replay/start/route.ts`
+- Create: `packages/web/src/app/api/replay/stop/route.ts`
+- Create: `packages/web/src/app/api/replay/status/route.ts`
+- Create: `packages/web/src/app/api/source-mode/route.ts`
+- Delete: `packages/web/src/app/api/dev/demo/route.ts` (superseded)
+
+**Why:** Web routes need to read and command the `SourceModeController` constructed by the server.
+
+The controller lives in `apps/autopilot-server` and uses the `globalThis.__g5000_sourceMode__` singleton. We import it through the relative path the way Next.js consumes other workspace code — but `apps/autopilot-server/src/source-mode.ts` is not a published workspace package. Easiest: import directly through the relative path from `packages/web`.
+
+- [ ] **Step 1: Add a shared helper that reaches the singleton**
+
+```ts
+// packages/web/src/lib/source-mode-handle.ts
+import {
+  getSourceModeController,
+  type SourceModeController,
+} from '../../../../apps/autopilot-server/src/source-mode.ts';
+
+export function requireSourceMode(): SourceModeController {
+  const c = getSourceModeController();
+  if (!c) {
+    throw new Error('SourceModeController not initialised — server is not running');
+  }
+  return c;
+}
+```
+
+(This crosses a workspace boundary, but the autopilot-server already imports relative from `packages/web/` at startup; the dependency is symmetric. If TypeScript complains about path resolution, add the path to `packages/web/tsconfig.json`'s `paths` or use a `references` entry.)
+
+- [ ] **Step 2: Implement `GET /api/source-mode`**
+
+```ts
+// packages/web/src/app/api/source-mode/route.ts
+import { requireSourceMode } from '../../../lib/source-mode-handle.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export async function GET(): Promise<Response> {
+  return Response.json(requireSourceMode().getStatus());
+}
+```
+
+- [ ] **Step 3: Implement `POST /api/replay/start`**
+
+```ts
+// packages/web/src/app/api/replay/start/route.ts
+import { requireSourceMode } from '../../../../lib/source-mode-handle.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+interface StartBody {
+  sessionId: string;
+  paceMode: 'realtime' | 'asap';
+}
+
+export async function POST(req: Request): Promise<Response> {
+  let body: StartBody;
+  try {
+    body = (await req.json()) as StartBody;
+  } catch {
+    return Response.json({ error: 'invalid JSON body' }, { status: 400 });
+  }
+  if (!body.sessionId || !body.paceMode) {
+    return Response.json({ error: 'sessionId and paceMode required' }, { status: 400 });
+  }
+  if (body.paceMode !== 'realtime' && body.paceMode !== 'asap') {
+    return Response.json({ error: 'paceMode must be realtime or asap' }, { status: 400 });
+  }
+  try {
+    await requireSourceMode().startReplay(body);
+  } catch (err) {
+    return Response.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 400 },
+    );
+  }
+  return Response.json(requireSourceMode().getStatus());
+}
+```
+
+- [ ] **Step 4: Implement `POST /api/replay/stop` and `GET /api/replay/status`**
+
+```ts
+// packages/web/src/app/api/replay/stop/route.ts
+import { requireSourceMode } from '../../../../lib/source-mode-handle.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export async function POST(): Promise<Response> {
+  await requireSourceMode().stopReplay();
+  return Response.json(requireSourceMode().getStatus());
+}
+```
+
+```ts
+// packages/web/src/app/api/replay/status/route.ts
+import { requireSourceMode } from '../../../../lib/source-mode-handle.js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export async function GET(): Promise<Response> {
+  return Response.json(requireSourceMode().getStatus());
+}
+```
+
+- [ ] **Step 5: Delete the now-unused demo route**
+
+```bash
+rm packages/web/src/app/api/dev/demo/route.ts
+# Leave the parent dirs in place; Next handles empty dirs fine.
+```
+
+- [ ] **Step 6: Smoke-test**
+
+Restart server in DEMO_MODE.
+
+```bash
+curl -s http://localhost:3000/api/source-mode
+# expect: {"mode":"demo"}
+
+curl -s -X POST http://localhost:3000/api/replay/start \
+  -H 'Content-Type: application/json' \
+  -d '{"sessionId":"<id-from-list>","paceMode":"asap"}'
+# expect: status JSON with mode=replay
+
+curl -s http://localhost:3000/api/source-mode
+# expect: {"mode":"replay","sessionId":"...",...}
+
+curl -s -X POST http://localhost:3000/api/replay/stop
+# expect: {"mode":"demo"}
+```
+
+If the import path from `lib/source-mode-handle.ts` doesn't resolve at Next compile time, add `../../apps/autopilot-server/src` to the `serverExternalPackages` or — simpler — copy the controller's interface and singleton-accessor into the web package as a thin re-export. Note: do NOT duplicate state; both ends must hit the same `globalThis.__g5000_sourceMode__` reference, so any web-side helper must just `return (globalThis as any).__g5000_sourceMode__`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add packages/web/src/app/api/replay/ \
+        packages/web/src/app/api/source-mode/ \
+        packages/web/src/lib/source-mode-handle.ts
+git rm packages/web/src/app/api/dev/demo/route.ts
+git commit -m "feat(web): replay control + source-mode REST endpoints"
+```
+
+---
+
+### Task 6: `/sessions` page
+
+**Files:**
+- Create: `packages/web/src/app/sessions/page.tsx`
+
+**Why:** User-facing UI to list, summarise, download, replay, and delete sessions.
+
+- [ ] **Step 1: Implement the page**
+
+```tsx
+// packages/web/src/app/sessions/page.tsx
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+
+interface SessionInfo {
+  id: string;
+  sizeBytes: number;
+  mtime: string;
+  startedAt?: string;
+}
+
+interface SessionSummary extends SessionInfo {
+  canLines: number;
+  otLines: number;
+  durationMs: number;
+}
+
+interface ReplayStatus {
+  mode: 'live' | 'demo' | 'replay';
+  sessionId?: string;
+  paceMode?: 'realtime' | 'asap';
+  phase?: 'running' | 'finished' | 'error';
+  errorMessage?: string;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+export default function SessionsPage() {
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [summaries, setSummaries] = useState<Record<string, SessionSummary>>({});
+  const [status, setStatus] = useState<ReplayStatus>({ mode: 'live' });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const r = await fetch('/api/sessions');
+    const j = (await r.json()) as { sessions: SessionInfo[] };
+    setSessions(j.sessions);
+  }, []);
+
+  const pollStatus = useCallback(async () => {
+    const r = await fetch('/api/source-mode');
+    const j = (await r.json()) as ReplayStatus;
+    setStatus(j);
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    void pollStatus();
+    const id = setInterval(pollStatus, 1000);
+    return () => clearInterval(id);
+  }, [refresh, pollStatus]);
+
+  const summarise = useCallback(async (sessionId: string) => {
+    const r = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`);
+    if (!r.ok) return;
+    const s = (await r.json()) as SessionSummary;
+    setSummaries((prev) => ({ ...prev, [sessionId]: s }));
+  }, []);
+
+  const startReplay = useCallback(
+    async (sessionId: string, paceMode: 'realtime' | 'asap') => {
+      setErrorMessage(null);
+      const r = await fetch('/api/replay/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, paceMode }),
+      });
+      if (!r.ok) {
+        const j = (await r.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(j.error ?? `HTTP ${r.status}`);
+      }
+      await pollStatus();
+    },
+    [pollStatus],
+  );
+
+  const stopReplay = useCallback(async () => {
+    await fetch('/api/replay/stop', { method: 'POST' });
+    await pollStatus();
+  }, [pollStatus]);
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      if (!confirm(`Delete session "${sessionId}"?`)) return;
+      await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const replaying = status.mode === 'replay';
+
+  return (
+    <main className="p-6 max-w-6xl mx-auto text-slate-100">
+      <h1 className="text-2xl font-semibold mb-4">Sessions</h1>
+
+      {/* Status banner */}
+      <div
+        className={`mb-6 p-3 rounded font-mono text-sm ${
+          status.mode === 'live'
+            ? 'bg-emerald-900/40 border border-emerald-800'
+            : status.mode === 'demo'
+              ? 'bg-amber-900/40 border border-amber-800'
+              : 'bg-purple-900/40 border border-purple-800'
+        }`}
+      >
+        Source mode: <b className="uppercase">{status.mode}</b>
+        {replaying && (
+          <>
+            {' — '}replaying <code>{status.sessionId}</code> ({status.paceMode}){' — '}
+            <button
+              type="button"
+              onClick={stopReplay}
+              className="ml-2 px-2 py-0.5 rounded bg-slate-200 text-slate-900 font-medium hover:bg-slate-100"
+            >
+              Stop
+            </button>
+          </>
+        )}
+      </div>
+
+      {errorMessage && (
+        <div className="mb-4 p-2 bg-red-900/40 border border-red-700 rounded text-sm text-red-200">
+          {errorMessage}
+        </div>
+      )}
+
+      <table className="w-full text-sm font-mono border-collapse">
+        <thead>
+          <tr className="text-slate-400 border-b border-slate-700">
+            <th className="text-left py-2 pr-3">Session ID</th>
+            <th className="text-left py-2 pr-3">Started</th>
+            <th className="text-right py-2 pr-3">Size</th>
+            <th className="text-right py-2 pr-3">Samples</th>
+            <th className="text-right py-2 pr-3">Duration</th>
+            <th className="text-right py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sessions.length === 0 && (
+            <tr>
+              <td colSpan={6} className="py-6 text-center text-slate-500">
+                No sessions yet. Run the server with{' '}
+                <code>SESSION_LOG_DIR=./data/sessions</code> to start recording.
+              </td>
+            </tr>
+          )}
+          {sessions.map((s) => {
+            const summary = summaries[s.id];
+            return (
+              <tr
+                key={s.id}
+                className="border-b border-slate-800 hover:bg-slate-900/40"
+                onMouseEnter={() => {
+                  if (!summary) void summarise(s.id);
+                }}
+              >
+                <td className="py-2 pr-3">{s.id}</td>
+                <td className="py-2 pr-3 text-slate-300">
+                  {s.startedAt ?? s.mtime.slice(0, 19).replace('T', ' ')}
+                </td>
+                <td className="py-2 pr-3 text-right">{formatBytes(s.sizeBytes)}</td>
+                <td className="py-2 pr-3 text-right text-slate-300">
+                  {summary
+                    ? `${summary.canLines} can / ${summary.otLines} 0183`
+                    : '…'}
+                </td>
+                <td className="py-2 pr-3 text-right text-slate-300">
+                  {summary ? formatDuration(summary.durationMs) : '…'}
+                </td>
+                <td className="py-2 text-right space-x-1">
+                  <a
+                    href={`/api/sessions/${encodeURIComponent(s.id)}/download`}
+                    className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs"
+                  >
+                    Download
+                  </a>
+                  <button
+                    type="button"
+                    disabled={replaying}
+                    onClick={() => startReplay(s.id, 'realtime')}
+                    className="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs disabled:opacity-40"
+                  >
+                    Replay 1×
+                  </button>
+                  <button
+                    type="button"
+                    disabled={replaying}
+                    onClick={() => startReplay(s.id, 'asap')}
+                    className="px-2 py-1 rounded bg-emerald-900 hover:bg-emerald-800 text-xs disabled:opacity-40"
+                  >
+                    Replay fast
+                  </button>
+                  <button
+                    type="button"
+                    disabled={replaying}
+                    onClick={() => deleteSession(s.id)}
+                    className="px-2 py-1 rounded bg-red-900 hover:bg-red-800 text-xs disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </main>
+  );
+}
+```
+
+- [ ] **Step 2: Build and smoke-test**
+
+Restart in DEMO_MODE. Browse `http://localhost:3000/sessions`. Expect the table to render. With a fixture file present (created in Task 4 Step 5), expect a row with download/replay/delete actions.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/web/src/app/sessions/
+git commit -m "feat(web): /sessions page — list, summarise, download, replay, delete"
+```
+
+---
+
+### Task 7: Navbar tri-state source-mode chip + `/sessions` nav entry
+
+**Files:**
+- Modify: `packages/web/src/app/Navbar.tsx`
+
+**Why:** The chip becomes the always-visible signal of "what is driving the bus right now". Also add a Sessions link to the nav.
+
+- [ ] **Step 1: Modify the Navbar**
+
+Replace the contents of `packages/web/src/app/Navbar.tsx` with:
+
+```tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+
+interface NavItem {
+  href: string;
+  label: string;
+}
+
+const ITEMS: NavItem[] = [
+  { href: '/helm', label: 'Helm' },
+  { href: '/polars', label: 'Polars' },
+  { href: '/sails', label: 'Sails' },
+  { href: '/calibration/wind', label: 'Wind cal' },
+  { href: '/calibration/bsp', label: 'BSP cal' },
+  { href: '/calibration/compass', label: 'Compass' },
+  { href: '/boat', label: 'Boat' },
+  { href: '/autopilot', label: 'Autopilot' },
+  { href: '/devices', label: 'Devices' },
+  { href: '/sessions', label: 'Sessions' },
+  { href: '/inspect', label: 'Inspect' },
+];
+
+interface SourceModeStatus {
+  mode: 'live' | 'demo' | 'replay';
+  sessionId?: string;
+}
+
+const CHIP_STYLES: Record<SourceModeStatus['mode'], string> = {
+  live: 'bg-emerald-700 text-emerald-100',
+  demo: 'bg-amber-600 text-amber-100',
+  replay: 'bg-purple-700 text-purple-100',
+};
+
+export function Navbar() {
+  const pathname = usePathname();
+  const [status, setStatus] = useState<SourceModeStatus>({ mode: 'live' });
+
+  useEffect(() => {
+    const poll = () => {
+      fetch('/api/source-mode')
+        .then((r) => r.json())
+        .then(setStatus)
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <nav className="bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center gap-1 flex-wrap text-sm">
+      <a href="/" className="font-semibold text-slate-100 mr-3">
+        G5000
+      </a>
+      {ITEMS.map((it) => {
+        const active = pathname === it.href || pathname?.startsWith(it.href + '/');
+        return (
+          <a
+            key={it.href}
+            href={it.href}
+            className={`px-2 py-1 rounded ${
+              active
+                ? 'bg-amber-600 text-slate-900 font-medium'
+                : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            {it.label}
+          </a>
+        );
+      })}
+      <a
+        href="/sessions"
+        className={`ml-auto px-2 py-1 rounded text-xs font-mono ${CHIP_STYLES[status.mode]}`}
+        title={
+          status.mode === 'replay'
+            ? `Replaying ${status.sessionId ?? '(unknown)'}`
+            : `Source mode: ${status.mode}`
+        }
+      >
+        {status.mode === 'replay'
+          ? `REPLAY: ${status.sessionId ?? ''}`
+          : status.mode.toUpperCase()}
+      </a>
+    </nav>
+  );
+}
+```
+
+- [ ] **Step 2: Build and smoke-test**
+
+Reload the browser. Expect to see:
+- A new "Sessions" entry in the nav.
+- An amber `DEMO` chip on the right when `DEMO_MODE=1`.
+- The chip turns purple `REPLAY: <id>` when a replay is active, and green `LIVE` when neither.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/web/src/app/Navbar.tsx
+git commit -m "feat(web): navbar tri-state source-mode chip + /sessions link"
+```
+
+---
+
+### Task 8: End-to-end verification + final commit
+
+**Files:** none (verification + cleanup).
+
+- [ ] **Step 1: Full test suite**
+
+```
+npm test -- --reporter=basic --run
+npx tsc -b
+```
+
+Expected: all green.
+
+- [ ] **Step 2: Capture a real session by running the server with SESSION_LOG_DIR**
+
+Boot the server with the logger enabled:
+
+```bash
+SESSION_LOG_DIR=./apps/autopilot-server/data/sessions \
+  DEMO_MODE=1 SKIP_BRIDGE=1 \
+  npm run dev --workspace=@g5000/autopilot-server > /tmp/g5000-sess-test.log 2>&1 &
+```
+
+Wait ~10 s, then SIGINT the server so the logger closes the file cleanly. (Demo mode publishes synthetic samples to the bus but the logger subscribes to drivers' raw streams — so for DEMO_MODE this will produce a header-only log. That is OK for this test; the replay path is exercised via the synthetic-fixture path in earlier tasks.)
+
+For a more realistic capture, run on real boat hardware — out of scope here.
+
+- [ ] **Step 3: Browser walkthrough**
+
+Restart in DEMO_MODE. Visit:
+- `/sessions` — confirm the list renders, hover summarises, Replay 1× kicks off and the banner updates.
+- `/helm` while a replay is active — confirm tiles update from the replay.
+- `/inspect` — confirm channels show replayed sample sources.
+- Navbar chip — confirm `REPLAY: <id>` purple chip is shown.
+
+Click "Stop" on the banner → chip flips back to DEMO.
+
+- [ ] **Step 4: Final commit if any cleanup**
+
+```bash
+git status
+git add -p   # only intended changes
+git commit -m "chore: cleanup after sessions+replay feature"
+```
+
+If nothing to commit, skip.
+
+---
+
+## Self-review checklist (controller runs before dispatching)
+
+- [x] Every task has explicit Files / Steps with exact code (no TBDs).
+- [x] Each task ends with a commit step using the exact file paths it touched.
+- [x] Type names match across tasks: `SessionInfo`, `SessionSummary`, `SourceModeStatus`, `ReplayStatus` collapsed to `SourceModeStatus` (one type, used everywhere).
+- [x] `getSourceModeController()` is the canonical accessor; tests use `_resetSourceModeControllerForTests`.
+- [x] TX gating uses `shouldTransmit?: () => boolean` (Task 3) and is wired at the call site (Task 3 step 5).
+- [x] Spec requirements §4.1–§4.5 all covered by a task.
+- [x] Caching mentioned in spec §4.3 is deferred — not required at first pass; lazy on-hover summary in the UI is enough.
+
+## Execution handoff
+
+Use **superpowers:subagent-driven-development** (per user's standing override).
