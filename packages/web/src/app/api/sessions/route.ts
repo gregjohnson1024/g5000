@@ -1,5 +1,5 @@
 import { listSessions } from '@g5000/bridge';
-import { sessionsDir } from './dir.js';
+import { sessionsDir } from './dir';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

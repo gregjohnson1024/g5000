@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { sessionsDir } from '../../dir.js';
+import { sessionsDir } from '../../dir';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
