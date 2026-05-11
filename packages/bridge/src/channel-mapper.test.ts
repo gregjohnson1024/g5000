@@ -105,7 +105,7 @@ describe('mapPgnToSamples', () => {
       'Steering Mode': 'Heading Control',
       'Heading-To-Steer (Course)': 1.234,
       'Commanded Rudder Angle': -0.05,
-      'Vessel Heading': 1.220,
+      'Vessel Heading': 1.22,
     });
     const samples = mapPgnToSamples(decoded);
     const byCh = new Map(samples.map((s) => [s.channel, s]));
@@ -125,7 +125,7 @@ describe('mapPgnToSamples', () => {
     });
     expect(byCh.get(Channels.Autopilot.ActualHeading)?.value).toEqual({
       kind: 'scalar',
-      value: 1.220,
+      value: 1.22,
       unit: 'rad',
     });
   });

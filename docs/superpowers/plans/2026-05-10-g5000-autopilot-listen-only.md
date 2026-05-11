@@ -5,6 +5,7 @@
 **Goal:** Decode the standard NMEA 2000 autopilot PGN (127237 — Heading/Track Control) into bus channels and build a `/autopilot` page that displays the current autopilot state live. **No TX, no commands.** This is the foundation for shadow-mode and eventually live engagement (spec phases 0b/0c), but for now it's pure observation — see what your H5000 is doing.
 
 **Architecture:**
+
 - Add `Channels.Autopilot.{Mode, TargetHeading, CommandedRudder, ActualHeading}` channel constants to `@g5000/core`.
 - Extend the N2K channel mapper in `@g5000/bridge/src/channel-mapper.ts` to handle PGN 127237 fields.
 - New `/autopilot` page subscribes to the SSE stream, renders mode + target heading + commanded rudder big and clearly.
@@ -13,6 +14,7 @@
 **Tech stack additions:** none.
 
 **What's deferred (Plan 10+):**
+
 - B&G proprietary autopilot PGNs (65302, 65305, 65360, 65371, 65379, 65384). The field names canboatjs uses for these are uncertain without captured boat data; landing them now risks silent miscoding. After the field test we'll have real frames and can verify.
 - TX of any autopilot PGN. Strict listen-only this plan.
 - Shadow-mode diff tool. Plan 11.
@@ -43,6 +45,7 @@ autopilot/
 ## Task 1: Autopilot channel constants
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts` — add `Autopilot` block
 
 ### Step 1: Add to `channels.ts`
@@ -82,6 +85,7 @@ git commit -m "feat(core): add Channels.Autopilot.* constants"
 ## Task 2: PGN 127237 channel mapper (TDD)
 
 **Files:**
+
 - Modify: `packages/bridge/src/channel-mapper.ts` — add 127237 entry
 - Modify: `packages/bridge/src/channel-mapper.test.ts` — add tests
 
@@ -100,60 +104,60 @@ We translate whatever subset of these fields canboatjs actually delivers.
 In `packages/bridge/src/channel-mapper.test.ts`, append to the existing `describe('mapPgnToSamples', ...)` block:
 
 ```ts
-  it('maps PGN 127237 steering mode to autopilot.mode', () => {
-    const decoded = make(127237, {
-      'Steering Mode': 'Heading Control',
-      'Heading-To-Steer (Course)': 1.234,
-      'Commanded Rudder Angle': -0.05,
-      'Vessel Heading': 1.220,
-    });
-    const samples = mapPgnToSamples(decoded);
-    const byCh = new Map(samples.map((s) => [s.channel, s]));
-    expect(byCh.get(Channels.Autopilot.Mode)?.value).toEqual({
-      kind: 'enum',
-      value: 'Heading Control',
-    });
-    expect(byCh.get(Channels.Autopilot.TargetHeading)?.value).toEqual({
-      kind: 'scalar',
-      value: 1.234,
-      unit: 'rad',
-    });
-    expect(byCh.get(Channels.Autopilot.CommandedRudder)?.value).toEqual({
-      kind: 'scalar',
-      value: -0.05,
-      unit: 'rad',
-    });
-    expect(byCh.get(Channels.Autopilot.ActualHeading)?.value).toEqual({
-      kind: 'scalar',
-      value: 1.220,
-      unit: 'rad',
-    });
+it('maps PGN 127237 steering mode to autopilot.mode', () => {
+  const decoded = make(127237, {
+    'Steering Mode': 'Heading Control',
+    'Heading-To-Steer (Course)': 1.234,
+    'Commanded Rudder Angle': -0.05,
+    'Vessel Heading': 1.22,
   });
+  const samples = mapPgnToSamples(decoded);
+  const byCh = new Map(samples.map((s) => [s.channel, s]));
+  expect(byCh.get(Channels.Autopilot.Mode)?.value).toEqual({
+    kind: 'enum',
+    value: 'Heading Control',
+  });
+  expect(byCh.get(Channels.Autopilot.TargetHeading)?.value).toEqual({
+    kind: 'scalar',
+    value: 1.234,
+    unit: 'rad',
+  });
+  expect(byCh.get(Channels.Autopilot.CommandedRudder)?.value).toEqual({
+    kind: 'scalar',
+    value: -0.05,
+    unit: 'rad',
+  });
+  expect(byCh.get(Channels.Autopilot.ActualHeading)?.value).toEqual({
+    kind: 'scalar',
+    value: 1.22,
+    unit: 'rad',
+  });
+});
 
-  it('maps PGN 127237 with track field to autopilot.target.track', () => {
-    const decoded = make(127237, {
-      'Steering Mode': 'Track Control',
-      Track: 0.5,
-    });
-    const samples = mapPgnToSamples(decoded);
-    const byCh = new Map(samples.map((s) => [s.channel, s]));
-    expect(byCh.get(Channels.Autopilot.TargetTrack)?.value).toEqual({
-      kind: 'scalar',
-      value: 0.5,
-      unit: 'rad',
-    });
+it('maps PGN 127237 with track field to autopilot.target.track', () => {
+  const decoded = make(127237, {
+    'Steering Mode': 'Track Control',
+    Track: 0.5,
   });
+  const samples = mapPgnToSamples(decoded);
+  const byCh = new Map(samples.map((s) => [s.channel, s]));
+  expect(byCh.get(Channels.Autopilot.TargetTrack)?.value).toEqual({
+    kind: 'scalar',
+    value: 0.5,
+    unit: 'rad',
+  });
+});
 
-  it('omits missing fields gracefully', () => {
-    const decoded = make(127237, {
-      // Only mode present
-      'Steering Mode': 'Standby',
-    });
-    const samples = mapPgnToSamples(decoded);
-    const channels = new Set(samples.map((s) => s.channel));
-    expect(channels.has(Channels.Autopilot.Mode)).toBe(true);
-    expect(channels.has(Channels.Autopilot.TargetHeading)).toBe(false);
+it('omits missing fields gracefully', () => {
+  const decoded = make(127237, {
+    // Only mode present
+    'Steering Mode': 'Standby',
   });
+  const samples = mapPgnToSamples(decoded);
+  const channels = new Set(samples.map((s) => s.channel));
+  expect(channels.has(Channels.Autopilot.Mode)).toBe(true);
+  expect(channels.has(Channels.Autopilot.TargetHeading)).toBe(false);
+});
 ```
 
 ### Step 2: Run — expect failure
@@ -248,6 +252,7 @@ git commit -m "feat(bridge): map PGN 127237 Heading/Track Control to autopilot c
 ## Task 3: `/autopilot` status page
 
 **Files:**
+
 - Create: `packages/web/src/app/autopilot/page.tsx`
 
 A read-only status display. Big mode chip at top, then a 2-column layout: targets on the left, actuals on the right. Live SSE updates via the existing `useSse` hook.
@@ -321,17 +326,13 @@ export default function AutopilotPage() {
     <main className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Autopilot</h1>
-        <div className="text-xs text-slate-500">
-          {connected ? 'Connected' : 'Reconnecting…'}
-        </div>
+        <div className="text-xs text-slate-500">{connected ? 'Connected' : 'Reconnecting…'}</div>
       </div>
 
       <section>
         <div
           className={`inline-block px-4 py-2 rounded text-2xl font-mono font-semibold ${
-            modeIsActive
-              ? 'bg-amber-600 text-slate-900'
-              : 'bg-slate-700 text-slate-300'
+            modeIsActive ? 'bg-amber-600 text-slate-900' : 'bg-slate-700 text-slate-300'
           }`}
         >
           {fmtMode(mode)}
@@ -384,11 +385,10 @@ export default function AutopilotPage() {
       </section>
 
       <section className="text-xs text-slate-500 pt-4 border-t border-slate-800 max-w-xl">
-        Listen-only. The G5000 does not transmit any autopilot commands. All
-        values above come from PGN 127237 broadcast by your H5000 (or other
-        autopilot computer) on the N2K bus. If "Unknown" / "—" persists, your
-        autopilot may use B&G-proprietary PGNs instead of (or in addition to)
-        standard 127237 — those are decoded in a later plan.
+        Listen-only. The G5000 does not transmit any autopilot commands. All values above come from
+        PGN 127237 broadcast by your H5000 (or other autopilot computer) on the N2K bus. If
+        "Unknown" / "—" persists, your autopilot may use B&G-proprietary PGNs instead of (or in
+        addition to) standard 127237 — those are decoded in a later plan.
       </section>
     </main>
   );
