@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PolarTable, SailWardrobe } from '@g5000/db';
 import { PolarHeatmap } from './PolarHeatmap';
-import { PolarCellEditor } from './PolarCellEditor';
 import { PolarPlot } from '../../components/PolarPlot';
 import { useSse } from '../../hooks/use-sse';
 
@@ -170,7 +169,6 @@ export default function PolarsPage() {
               onSelect={(c) => setSelected(c)}
               onChange={handleApply}
             />
-            {selected && <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />}
           </section>
         </div>
       )}

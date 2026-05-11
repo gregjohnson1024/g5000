@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SailConfig, SailWardrobe, PolarTable } from '@g5000/db';
 import { PolarHeatmap } from '../polars/PolarHeatmap';
-import { PolarCellEditor } from '../polars/PolarCellEditor';
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
@@ -275,13 +274,6 @@ export default function SailsPage() {
                         onSelect={(cell) => setSelectedCell(cell)}
                         onChange={(updated) => applyPolarChange(c.id, updated)}
                       />
-                      {selectedCell && (
-                        <PolarCellEditor
-                          polar={c.polar}
-                          cell={selectedCell}
-                          onApply={(updated) => applyPolarChange(c.id, updated)}
-                        />
-                      )}
                     </div>
                   </div>
                 )}
