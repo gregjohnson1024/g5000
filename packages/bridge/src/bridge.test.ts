@@ -4,6 +4,13 @@ import { encodeN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
 import { runBridge } from './bridge.js';
 import { Ngt1Driver, type Ngt1Source } from './ngt-driver.js';
 import { SerialPort0183Driver, type Sentence0183Source } from './nmea0183/serial-driver.js';
+import { _resetSharedDeviceRegistryForTests } from './index.js';
+
+// Reset the shared device registry before every test to prevent cross-test
+// state leakage (runBridge feeds the singleton registry via observe()).
+beforeEach(() => {
+  _resetSharedDeviceRegistryForTests();
+});
 
 class MemorySource implements Ngt1Source {
   private listener: ((c: Buffer) => void) | null = null;
