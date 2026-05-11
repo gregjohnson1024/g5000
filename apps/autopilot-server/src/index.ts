@@ -23,6 +23,7 @@ import { startDemoInjector } from './demo-injector.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { startHlinkServer } from './hlink/server.js';
+import { installObservedSourcesTracker } from './observed-sources.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -45,6 +46,12 @@ async function main(): Promise<void> {
   const bus = getSharedBus();
   installLogStream();
   const teardown: Array<() => Promise<void>> = [];
+
+  // Observed-sources tracker — records which (channel, source) pairs have
+  // recently published, so the /sources UI page can show competing
+  // publishers. Installed before any source so we don't miss early samples.
+  const observed = installObservedSourcesTracker(bus);
+  teardown.push(async () => observed.teardown());
 
   // 0. Open ConfigStore so any code path (web routes, compute pipeline) can
   //    resolve it. This must precede driver setup — even if drivers fail,
