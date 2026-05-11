@@ -18,6 +18,7 @@ import {
   type WireDriver,
   type SessionLogger,
 } from '@g5000/bridge';
+import { startDemoInjector } from './demo-injector.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -31,6 +32,7 @@ const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
 const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
 const CONFIG_DB_PATH = process.env.CONFIG_DB ?? './data/config.db';
+const DEMO_MODE = process.env.DEMO_MODE === '1';
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
@@ -120,15 +122,26 @@ async function main(): Promise<void> {
     teardown.push(() => logger!.close());
   }
 
-  // 4. True-wind compute pipeline (subscribes to bus + ConfigStore,
-  //    publishes wind.true.calibrated.* back to the bus).
-  const stopCompute = await startTrueWindPipeline({
-    bus,
-    configStore: store,
-  });
-  teardown.push(stopCompute);
-  // eslint-disable-next-line no-console
-  console.log('[autopilot] true-wind compute pipeline online');
+  // 4. Demo mode OR true-wind compute pipeline.
+  //    When DEMO_MODE is on, the demo injector publishes synthetic
+  //    wind.true.calibrated.* directly, so the true-wind pipeline must be
+  //    skipped — otherwise it would overwrite the demo values.
+  if (DEMO_MODE) {
+    const stopDemo = startDemoInjector(bus);
+    teardown.push(async () => stopDemo());
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] DEMO_MODE on — synthetic samples publishing to the bus');
+  } else {
+    // True-wind compute pipeline (subscribes to bus + ConfigStore,
+    // publishes wind.true.calibrated.* back to the bus).
+    const stopCompute = await startTrueWindPipeline({
+      bus,
+      configStore: store,
+    });
+    teardown.push(stopCompute);
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] true-wind compute pipeline online');
+  }
 
   // 4b. Polar performance pipeline (publishes performance.* channels).
   const stopPolarPipeline = await startPolarPipeline({
