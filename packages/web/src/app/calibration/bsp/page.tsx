@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { BspCal } from '@g5000/db';
 import { useSse } from '../../../hooks/use-sse';
+import { useChannelHistory } from '../../../hooks/use-channel-history';
 
 const MS_TO_KNOTS = 1 / 0.514444;
 
@@ -15,6 +16,65 @@ export default function BspCalPage() {
   const { channels } = useSse();
   const bsp = channels.get('boat.speed.water');
   const sog = channels.get('nav.gps.sog');
+
+  const histBsp = useChannelHistory(channels.get('boat.speed.water'), 6000);
+  const histSog = useChannelHistory(channels.get('nav.gps.sog'), 6000);
+
+  type CaptureState =
+    | { kind: 'idle' }
+    | { kind: 'capturing'; startedAt: number }
+    | { kind: 'reviewing'; bspAvg: number; sogAvg: number; binIdx: number; newMultiplier: number }
+    | { kind: 'applied' };
+
+  const [capture, setCapture] = useState<CaptureState>({ kind: 'idle' });
+  const CAPTURE_MS = 5000;
+
+  const startCapture = () => {
+    setCapture({ kind: 'capturing', startedAt: Date.now() });
+    setTimeout(() => {
+      const bspVal = histBsp.average();
+      const sogVal = histSog.average();
+      if (bspVal === null || sogVal === null || bspVal <= 0.1 || sogVal <= 0.1) {
+        setCapture({ kind: 'idle' });
+        setErr('Capture failed: BSP and SOG samples must both be > 0.1 m/s');
+        return;
+      }
+      setCal((prevCal) => {
+        if (!prevCal) return prevCal;
+        // Snap to nearest bin
+        let bestIdx = 0;
+        let bestDist = Math.abs(prevCal.bins[0]! - bspVal);
+        for (let i = 1; i < prevCal.bins.length; i++) {
+          const d = Math.abs(prevCal.bins[i]! - bspVal);
+          if (d < bestDist) { bestDist = d; bestIdx = i; }
+        }
+        const newMultiplier = sogVal / bspVal;
+        setCapture({ kind: 'reviewing', bspAvg: bspVal, sogAvg: sogVal, binIdx: bestIdx, newMultiplier });
+        return prevCal;
+      });
+    }, CAPTURE_MS);
+  };
+
+  const applyCapture = async (): Promise<void> => {
+    if (capture.kind !== 'reviewing' || !cal) return;
+    const next: BspCal = {
+      ...cal,
+      multiplier: cal.multiplier.map((v, i) => (i === capture.binIdx ? capture.newMultiplier : v)),
+    };
+    setBusy(true);
+    try {
+      const res = await fetch('/api/config/bsp', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next),
+      });
+      if (!res.ok) throw new Error(`PUT failed: ${res.status}`);
+      setCal(next);
+      setCapture({ kind: 'applied' });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -148,6 +208,68 @@ export default function BspCalPage() {
             </div>
           )}
         </div>
+      )}
+      {cal && (
+        <section className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
+          <h2 className="text-lg font-semibold">Capture wizard</h2>
+          <p className="text-xs text-slate-500">
+            Sail steady in still water (no current) at a known speed. Click Capture
+            to record 5s of BSP and GPS SOG; the wizard computes the multiplier and
+            snaps to the nearest bin.
+          </p>
+          {capture.kind === 'idle' && (
+            <button
+              onClick={startCapture}
+              className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
+            >
+              Capture
+            </button>
+          )}
+          {capture.kind === 'capturing' && (
+            <p className="text-sm text-slate-300">Capturing… (5 s)</p>
+          )}
+          {capture.kind === 'reviewing' && (
+            <div className="space-y-2 text-sm">
+              <div className="text-slate-300">
+                BSP avg: <span className="font-mono">{(capture.bspAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
+                <br />
+                SOG avg: <span className="font-mono">{(capture.sogAvg * MS_TO_KNOTS).toFixed(2)} kn</span>
+                <br />
+                Bin selected: <span className="font-mono">{(cal.bins[capture.binIdx]! * MS_TO_KNOTS).toFixed(0)} kn</span>
+                <br />
+                New multiplier: <span className="font-mono">{capture.newMultiplier.toFixed(3)}</span>
+                <br />
+                (current: <span className="font-mono">{cal.multiplier[capture.binIdx]!.toFixed(3)}</span>)
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void applyCapture()}
+                  disabled={busy}
+                  className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
+                >
+                  {busy ? 'Applying…' : 'Apply'}
+                </button>
+                <button
+                  onClick={() => setCapture({ kind: 'idle' })}
+                  className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
+          {capture.kind === 'applied' && (
+            <div className="space-y-2">
+              <p className="text-sm text-green-400">Applied.</p>
+              <button
+                onClick={() => setCapture({ kind: 'idle' })}
+                className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
+              >
+                Capture again
+              </button>
+            </div>
+          )}
+        </section>
       )}
     </main>
   );
