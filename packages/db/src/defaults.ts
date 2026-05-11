@@ -44,6 +44,11 @@ export interface CompassDeviation {
   deviation: number[];
 }
 
+// Unit conversions — declared up front so the default tables below can write
+// bin centres in friendly units (knots, degrees) and convert to SI for storage.
+const DEG = Math.PI / 180;
+const KN = 0.514444; // knots → m/s
+
 export const DEFAULT_BOAT_CONFIG: BoatConfig = {
   mastHeight: 18, // meters; rough catamaran value
   mastheadOffsetX: 0,
@@ -66,8 +71,9 @@ export const DEFAULT_AWS_AWA_CAL: AwsAwaCalTable = {
 };
 
 export const DEFAULT_BSP_CAL: BspCal = {
-  bins: [0, 1, 2, 3, 4, 5, 6, 8, 10, 12], // m/s
-  multiplier: Array.from({ length: 10 }, () => 1.0),
+  // Clean knot bins (2, 4, 6, 8, 10, 12, 15, 20 kn) stored as m/s.
+  bins: [2, 4, 6, 8, 10, 12, 15, 20].map((v) => v * KN),
+  multiplier: Array.from({ length: 8 }, () => 1.0),
 };
 
 export const DEFAULT_COMPASS_DEVIATION: CompassDeviation = {
@@ -96,9 +102,6 @@ export interface PolarTable {
  * Boat speeds chosen to roughly resemble a 40' sport catamaran in displacement
  * mode. Real boats vary widely.
  */
-const DEG = Math.PI / 180;
-const KN = 0.514444; // knots → m/s
-
 // Bin centres are written in knots and degrees in the source for legibility,
 // then converted to SI (m/s, radians) for storage.
 export const DEFAULT_POLARS: PolarTable = {

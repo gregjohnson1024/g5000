@@ -1,21 +1,24 @@
 import { Bus } from './bus.js';
 
-let instance: Bus | null = null;
+declare const globalThis: { __g5000_sharedBus__?: Bus };
 
 /**
  * Returns the process-wide shared Bus, creating it lazily.
  *
- * In Phase 0a everything runs in one Node process: the autopilot-server
- * starts the bridge (which publishes to this bus) and serves Next.js
- * Route Handlers (which subscribe to this bus). Tests should construct
- * their own `new Bus()` and never call this function.
+ * Backed by `globalThis` so the bus survives Next.js + Turbopack's tendency
+ * to instantiate a workspace package once per server bundle. Without this,
+ * the autopilot-server's bus and the Next.js route handlers' bus would be
+ * two different objects in the same Node process and SSE would never see
+ * the bridge's publishes. (Same fix applied to ConfigStore in Plan 3.)
  */
 export function getSharedBus(): Bus {
-  if (!instance) instance = new Bus();
-  return instance;
+  if (!globalThis.__g5000_sharedBus__) {
+    globalThis.__g5000_sharedBus__ = new Bus();
+  }
+  return globalThis.__g5000_sharedBus__;
 }
 
 /** Test helper — resets the singleton. Do not call in production code. */
 export function _resetSharedBusForTests(): void {
-  instance = null;
+  globalThis.__g5000_sharedBus__ = undefined;
 }
