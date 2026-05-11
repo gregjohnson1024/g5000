@@ -67,9 +67,7 @@ export default function HelmPage() {
     <main className="p-4 min-h-screen bg-black">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
-        <div className="text-xs text-slate-500">
-          {connected ? 'Live' : 'Reconnecting…'}
-        </div>
+        <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -78,12 +76,7 @@ export default function HelmPage() {
         <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />
 
         <HelmTile label="BSP" value={fmtSpeed(bsp)} unit="kn" />
-        <HelmTile
-          label="Target speed"
-          value={fmtSpeed(targetSpeed)}
-          unit="kn"
-          sub="polar"
-        />
+        <HelmTile label="Target speed" value={fmtSpeed(targetSpeed)} unit="kn" sub="polar" />
         <HelmTile
           label="% polar"
           value={fmtPercent(percentPolar)}

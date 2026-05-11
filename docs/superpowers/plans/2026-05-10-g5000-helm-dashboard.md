@@ -92,7 +92,9 @@ export function HelmTile({
 ```
 
 ### Step 1: Create the file
+
 ### Step 2: Typecheck
+
 ### Step 3: Commit
 
 ```bash
@@ -107,6 +109,7 @@ git commit -m "feat(web): HelmTile component for big-number sailing display"
 **File:** `packages/web/src/app/helm/page.tsx`
 
 Subscribes to `useSse` and renders a responsive grid of tiles. Layout:
+
 - Row 1: wind (TWS large, TWA large, AWA small)
 - Row 2: boat (BSP large, target speed large, %polar large with color)
 - Row 3: VMG (current VMG, target VMG, heading)
@@ -182,9 +185,7 @@ export default function HelmPage() {
     <main className="p-4 min-h-screen bg-black">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
-        <div className="text-xs text-slate-500">
-          {connected ? 'Live' : 'Reconnecting…'}
-        </div>
+        <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -193,12 +194,7 @@ export default function HelmPage() {
         <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />
 
         <HelmTile label="BSP" value={fmtSpeed(bsp)} unit="kn" />
-        <HelmTile
-          label="Target speed"
-          value={fmtSpeed(targetSpeed)}
-          unit="kn"
-          sub="polar"
-        />
+        <HelmTile label="Target speed" value={fmtSpeed(targetSpeed)} unit="kn" sub="polar" />
         <HelmTile
           label="% polar"
           value={fmtPercent(percentPolar)}
@@ -220,7 +216,9 @@ export default function HelmPage() {
 ```
 
 ### Step 1: Create the file
+
 ### Step 2: Typecheck (`npm run typecheck --workspace=@g5000/web`)
+
 ### Step 3: Commit
 
 ```bash
@@ -245,6 +243,7 @@ git commit -m "feat(web): /helm dashboard page with big-number sailing tiles"
 After this plan, `http://localhost:3000/helm` is the daily-use page at the wheel. With real boat data, you'll see live wind, boat speed, target speed, %polar (red/amber/green), VMG, heading, heel/pitch/rate-of-turn. Designed responsive — usable on phone, tablet, or pulled-up laptop.
 
 This is the natural Phase 0a stopping point for the field test. Future plans (after the field test validates the stack):
+
 - Plan 11: B&G proprietary autopilot PGNs decoded (now that we'd have captured frames to verify against)
 - Plan 12: Shadow-mode diff tool
 - Plan 13: Polar plot visualization (radial diagram)
