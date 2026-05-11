@@ -22,6 +22,7 @@ import {
 import { startDemoInjector } from './demo-injector.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
+import { startHlinkServer } from './hlink/server.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -37,6 +38,8 @@ const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'a
 const CONFIG_DB_PATH = process.env.CONFIG_DB ?? './data/config.db';
 const DEMO_MODE = process.env.DEMO_MODE === '1';
 const SKIP_BRIDGE = process.env.SKIP_BRIDGE === '1';
+const HLINK_ENABLED = process.env.HLINK_ENABLED !== '0';
+const HLINK_PORT = Number(process.env.HLINK_PORT ?? 5050);
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
@@ -279,6 +282,26 @@ async function main(): Promise<void> {
         currentBaseTeardown = null;
       }
     });
+  }
+
+  // 2b. H-LINK TCP server — B&G ASCII protocol over TCP, read-only.
+  //     Exposes bus data to tactical-sailing software (Deckman, Expedition
+  //     plugins, etc.) by mimicking the H5000 CPU's serial interface.
+  //     Spec on serial is 115200/8N1; we use TCP because every modern client
+  //     supports it just as well.
+  if (HLINK_ENABLED) {
+    const hlink = startHlinkServer({ bus, port: HLINK_PORT, host: '0.0.0.0' });
+    try {
+      await hlink.listening;
+      // eslint-disable-next-line no-console
+      console.log(`[autopilot] H-LINK server on tcp://0.0.0.0:${HLINK_PORT}`);
+      teardown.push(hlink.teardown);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[autopilot] H-LINK server failed to start: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   // 3. Start Next.js pointing at the @g5000/web package directory.
