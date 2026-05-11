@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@g5000/bridge": "*",
     "@g5000/compute": "*",
     "@g5000/core": "*",
     "@g5000/db": "*",
