@@ -100,33 +100,45 @@ ip addr show tailscale0
 
 ### 4. Mac / Ottawa side
 
-The user's Mac has the **App Store** Tailscale.app (`/Applications/Tailscale.app`,
-v1.96.5 as of writing). That bundle is sandboxed and historically does NOT
-support `--login-server`, so it can't directly join a Headscale tailnet
-while the App Store profile is active.
+The Mac App Store Tailscale.app (`/Applications/Tailscale.app`, v1.96.5+)
+**does** support `--login-server` via its bundled CLI — earlier docs
+(including an earlier version of this file) said otherwise. The CLI lives
+at `/Applications/Tailscale.app/Contents/MacOS/Tailscale` and accepts the
+same flags as the open-source `tailscaled`.
 
-Three options:
+The flow:
 
-1. **Best for boat-only access**: switch the Mac's Tailscale profile to our
-   Headscale tailnet. The App Store app DOES support multiple profiles in
-   newer versions — Tailscale menu → switch account → "Add Account" → pick
-   the "Use custom coordination server" option (if present). If not present,
-   skip to option 2 or 3.
+```bash
+TS=/Applications/Tailscale.app/Contents/MacOS/Tailscale
 
-2. **Standalone CLI**: install the open-source `tailscale` package via
-   Homebrew (`brew install tailscale`). This installs its own daemon, which
-   will conflict with the App Store one — you'd run the brew version
-   manually and turn off auto-launch on the App Store app. Disruptive if the
-   Mac is also using corporate Tailscale.
+# If you've authenticated to headscale before from this Mac, the profile is
+# cached and this resumes it. Otherwise the CLI prints a registration URL
+# (something like https://headscale.rbr-global.com/register/nodekey:...)
+# that the headscale admin completes server-side with `headscale nodes
+# register --user <you> --key <nodekey>`.
+$TS up \
+  --login-server=https://headscale.rbr-global.com \
+  --hostname=$(hostname -s)
 
-3. **Jump host on Headscale**: instead of putting the Mac on Headscale at
-   all, put a small VM somewhere (or use a Pi at the office) on Headscale
-   and `ssh -J jumphost g5000-pi`. The Mac never joins the tailnet; it just
-   hops through the jump host. Lowest disruption.
+$TS status | head -5   # should show this Mac with a 100.64.x.x IP
+$TS ip                 # your tailnet IPs (v4 + v6)
+```
 
-For initial testing, option 3 + a Linux VM (could be a container even) is
-the least-invasive way to verify the round-trip works without breaking
-existing Tailscale setups.
+To leave the tailnet without breaking other Tailscale profiles:
+
+```bash
+$TS down               # stop the network, keep the profile
+# or
+$TS logout             # invalidate this node's key on headscale
+```
+
+Switching back to a different Tailscale account (e.g. a corporate/Inc.
+tailnet) is done via the GUI app's account menu.
+
+Verified working 2026-05-11 from this Mac: registration + `tailscale up`
+succeeded, `tailscale status` returned the full RBR tailnet (~120 nodes,
+~25 online at test time), `tailscale ping tailscale-ottawa` returned
+**49 ms via DERP(tor)**, ICMP via `tailscale0` worked.
 
 ### 5. End-to-end test (from a tailnet-joined machine in Ottawa)
 
