@@ -99,4 +99,59 @@ describe('mapPgnToSamples', () => {
     const heel = samples.find((s) => s.channel === Channels.Motion.Heel);
     expect(heel?.value).toEqual({ kind: 'scalar', value: 0.18, unit: 'rad' });
   });
+
+  it('maps PGN 127237 steering mode to autopilot.mode', () => {
+    const decoded = make(127237, {
+      'Steering Mode': 'Heading Control',
+      'Heading-To-Steer (Course)': 1.234,
+      'Commanded Rudder Angle': -0.05,
+      'Vessel Heading': 1.220,
+    });
+    const samples = mapPgnToSamples(decoded);
+    const byCh = new Map(samples.map((s) => [s.channel, s]));
+    expect(byCh.get(Channels.Autopilot.Mode)?.value).toEqual({
+      kind: 'enum',
+      value: 'Heading Control',
+    });
+    expect(byCh.get(Channels.Autopilot.TargetHeading)?.value).toEqual({
+      kind: 'scalar',
+      value: 1.234,
+      unit: 'rad',
+    });
+    expect(byCh.get(Channels.Autopilot.CommandedRudder)?.value).toEqual({
+      kind: 'scalar',
+      value: -0.05,
+      unit: 'rad',
+    });
+    expect(byCh.get(Channels.Autopilot.ActualHeading)?.value).toEqual({
+      kind: 'scalar',
+      value: 1.220,
+      unit: 'rad',
+    });
+  });
+
+  it('maps PGN 127237 with track field to autopilot.target.track', () => {
+    const decoded = make(127237, {
+      'Steering Mode': 'Track Control',
+      Track: 0.5,
+    });
+    const samples = mapPgnToSamples(decoded);
+    const byCh = new Map(samples.map((s) => [s.channel, s]));
+    expect(byCh.get(Channels.Autopilot.TargetTrack)?.value).toEqual({
+      kind: 'scalar',
+      value: 0.5,
+      unit: 'rad',
+    });
+  });
+
+  it('omits missing fields gracefully', () => {
+    const decoded = make(127237, {
+      // Only mode present
+      'Steering Mode': 'Standby',
+    });
+    const samples = mapPgnToSamples(decoded);
+    const channels = new Set(samples.map((s) => s.channel));
+    expect(channels.has(Channels.Autopilot.Mode)).toBe(true);
+    expect(channels.has(Channels.Autopilot.TargetHeading)).toBe(false);
+  });
 });
