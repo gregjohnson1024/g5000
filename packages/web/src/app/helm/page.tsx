@@ -58,7 +58,9 @@ export default function HelmPage() {
       const r = await fetch('/api/sails', { cache: 'no-store' });
       if (!r.ok) return;
       setWardrobe((await r.json()) as SailWardrobe);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -103,10 +105,14 @@ export default function HelmPage() {
             className="bg-slate-900 border border-slate-700 rounded text-slate-200 px-2 py-1 text-sm"
           >
             {wardrobe.configs.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
-          <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">manage</a>
+          <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
+            manage
+          </a>
         </div>
       )}
 

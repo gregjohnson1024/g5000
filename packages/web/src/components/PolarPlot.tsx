@@ -40,11 +40,7 @@ export function PolarPlot({
 
   // Convert (TWA radians, BSP m/s, side) → (x, y) in SVG coords.
   // TWA = 0 is straight up, sweeps clockwise. side = -1 for port, +1 for starboard.
-  const polarToCartesian = (
-    twa: number,
-    bsp: number,
-    side: 1 | -1,
-  ): { x: number; y: number } => ({
+  const polarToCartesian = (twa: number, bsp: number, side: 1 | -1): { x: number; y: number } => ({
     x: cx + side * bsp * Math.sin(twa) * scale,
     y: cy - bsp * Math.cos(twa) * scale,
   });
@@ -125,22 +121,8 @@ export function PolarPlot({
       })}
 
       {/* Vertical and horizontal axes */}
-      <line
-        x1={cx}
-        y1={margin}
-        x2={cx}
-        y2={size - margin}
-        stroke="rgb(60,70,90)"
-        strokeWidth="1"
-      />
-      <line
-        x1={margin}
-        y1={cy}
-        x2={size - margin}
-        y2={cy}
-        stroke="rgb(60,70,90)"
-        strokeWidth="1"
-      />
+      <line x1={cx} y1={margin} x2={cx} y2={size - margin} stroke="rgb(60,70,90)" strokeWidth="1" />
+      <line x1={margin} y1={cy} x2={size - margin} y2={cy} stroke="rgb(60,70,90)" strokeWidth="1" />
 
       {/* TWS curves */}
       {polar.boatSpeed.map((row, twsIdx) => {
@@ -201,18 +183,9 @@ export function PolarPlot({
         <text fill="rgb(200,210,230)" fontSize="11" fontFamily="monospace">
           {currentTws !== undefined ? `TWS ${(currentTws * MS_TO_KNOTS).toFixed(1)}kn` : 'TWS —'}
         </text>
-        <text
-          fill="rgb(200,210,230)"
-          fontSize="11"
-          fontFamily="monospace"
-          dy="14"
-        >
-          {currentTwa !== undefined
-            ? `TWA ${(currentTwa * RAD_TO_DEG).toFixed(0)}°`
-            : 'TWA —'}
-          {currentBsp !== undefined
-            ? `  BSP ${(currentBsp * MS_TO_KNOTS).toFixed(2)}kn`
-            : ''}
+        <text fill="rgb(200,210,230)" fontSize="11" fontFamily="monospace" dy="14">
+          {currentTwa !== undefined ? `TWA ${(currentTwa * RAD_TO_DEG).toFixed(0)}°` : 'TWA —'}
+          {currentBsp !== undefined ? `  BSP ${(currentBsp * MS_TO_KNOTS).toFixed(2)}kn` : ''}
         </text>
       </g>
     </svg>

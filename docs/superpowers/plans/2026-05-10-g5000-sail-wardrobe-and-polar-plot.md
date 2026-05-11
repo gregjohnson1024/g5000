@@ -3,11 +3,13 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
 
 **Goal:** Three intertwined things the user asked for:
+
 1. **Sail wardrobe** — replace the single global polar with a collection of named sail configurations ("Full main + J1", "Reef 1 + A2", etc.), each with its own polar table.
 2. **Active-config selection** — UI to choose which sails are currently set; the active config's polar drives the live performance pipeline.
 3. **Live polar plot** — SVG radial diagram showing the polar curves with the current operating point overlaid. Updates live via SSE.
 
 **Architecture:**
+
 - Replace the `polars` SQLite singleton with a `sail_wardrobe` row holding `SailWardrobe = { configs: SailConfig[], activeConfigId: string }`. Each `SailConfig` carries its own `PolarTable` plus metadata (name, optional mainState/headsail/downwind notes).
 - ConfigStore gains a `sails$` observable and a derived `activePolar$` observable. Bumps the existing `polars$` getter to be backed by `activePolar$` for API compatibility.
 - The polar performance pipeline (no code change in math; just point at `activePolar$` instead of `polars$`).
@@ -59,6 +61,7 @@ autopilot/
 ## Task 1: Sail wardrobe data model + schema + ConfigStore (TDD)
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts` — add `SailConfig`, `SailWardrobe`, `DEFAULT_WARDROBE`
 - Modify: `packages/db/src/schema.ts` — add `sail_wardrobe` table
 - Modify: `packages/db/src/config-store.ts` — sails$, activePolar$, setSails, migration
@@ -151,9 +154,7 @@ it('returns the default wardrobe on a fresh database', async () => {
 });
 
 it('emits a new wardrobe when setSails is called', async () => {
-  const next: Promise<SailWardrobe> = firstValueFrom(
-    store.sails$.pipe(skip(1), take(1)),
-  );
+  const next: Promise<SailWardrobe> = firstValueFrom(store.sails$.pipe(skip(1), take(1)));
   const updated: SailWardrobe = {
     ...DEFAULT_WARDROBE,
     configs: [
@@ -189,15 +190,10 @@ it('activePolar$ tracks the active config polar', async () => {
   const wardrobe = await firstValueFrom(store.sails$);
   const distinctPolar = {
     ...wardrobe.configs[0]!.polar,
-    boatSpeed: wardrobe.configs[0]!.polar.boatSpeed.map((row) =>
-      row.map(() => 0),
-    ),
+    boatSpeed: wardrobe.configs[0]!.polar.boatSpeed.map((row) => row.map(() => 0)),
   };
   await store.setSails({
-    configs: [
-      ...wardrobe.configs,
-      { id: 'zeros', name: 'Zeros', polar: distinctPolar },
-    ],
+    configs: [...wardrobe.configs, { id: 'zeros', name: 'Zeros', polar: distinctPolar }],
     activeConfigId: 'zeros',
   });
   const after = await firstValueFrom(store.activePolar$);
@@ -244,6 +240,7 @@ The pipeline currently subscribes to `configStore.polars$`. After Task 1 that's 
 ### Step 1: Edit pipeline.ts
 
 Change:
+
 ```ts
 let polar: PolarTable = await firstValueFrom(configStore.polars$);
 // ...
@@ -253,6 +250,7 @@ rxSubs.push(
 ```
 
 To:
+
 ```ts
 let polar: PolarTable = await firstValueFrom(configStore.activePolar$);
 // ...
@@ -270,6 +268,7 @@ npx vitest run packages/compute/src/polars/pipeline.test.ts
 The test uses `store.setPolars(...)` (the legacy setter), which now mutates the active config. The pipeline subscribes to `activePolar$`, which emits when sails$ changes. The cascade works.
 
 Run full compute suite:
+
 ```
 npx vitest run packages/compute
 ```
@@ -292,6 +291,7 @@ git commit -m "feat(compute): polar pipeline reads activePolar\$ directly"
 ## Task 3: REST endpoints for the wardrobe
 
 **Files:**
+
 - Create: `packages/web/src/app/api/sails/route.ts` — GET / PUT full wardrobe
 - Create: `packages/web/src/app/api/sails/active/route.ts` — PUT { configId }
 - Create: `packages/web/src/app/api/sails/import/route.ts` — POST CSV body; `?configId=` query
@@ -325,10 +325,7 @@ export async function PUT(req: Request): Promise<Response> {
   try {
     await store.setSails(body);
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 422 },
-    );
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 422 });
   }
   return Response.json({ ok: true });
 }
@@ -344,11 +341,7 @@ function validate(v: unknown): v is SailWardrobe {
     if (typeof cc.id !== 'string' || typeof cc.name !== 'string') return false;
     if (!cc.polar || typeof cc.polar !== 'object') return false;
     const p = cc.polar as Record<string, unknown>;
-    if (
-      !Array.isArray(p.twsBins) ||
-      !Array.isArray(p.twaBins) ||
-      !Array.isArray(p.boatSpeed)
-    )
+    if (!Array.isArray(p.twsBins) || !Array.isArray(p.twaBins) || !Array.isArray(p.boatSpeed))
       return false;
   }
   return true;
@@ -399,10 +392,7 @@ export async function POST(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const configId = url.searchParams.get('configId');
   if (!configId) {
-    return Response.json(
-      { error: 'configId query param required' },
-      { status: 400 },
-    );
+    return Response.json({ error: 'configId query param required' }, { status: 400 });
   }
   const csv = await req.text();
   if (!csv || csv.length === 0) {
@@ -412,10 +402,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     polar = parseExpeditionPolar(csv);
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 422 },
-    );
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 422 });
   }
   const wardrobe = await firstValueFrom(store.sails$);
   const idx = wardrobe.configs.findIndex((c) => c.id === configId);
@@ -451,6 +438,7 @@ git commit -m "feat(web): REST endpoints for sail wardrobe"
 **File:** `packages/web/src/components/PolarPlot.tsx`
 
 Reusable. Takes a PolarTable + optional currentTws/currentTwa/currentBsp + optional targetTwa/targetBsp. Renders:
+
 - Concentric speed rings (in knots) with labels
 - Compass-style TWA labels at 30°/60°/90°/120°/150°
 - One curve per TWS bin, mirrored across the boat centerline (so the chart shows port and starboard symmetric)
@@ -501,11 +489,7 @@ export function PolarPlot({
 
   // Convert (TWA radians, BSP m/s, side) → (x, y) in SVG coords.
   // TWA = 0 is straight up, sweeps clockwise. side = -1 for port, +1 for starboard.
-  const polarToCartesian = (
-    twa: number,
-    bsp: number,
-    side: 1 | -1,
-  ): { x: number; y: number } => ({
+  const polarToCartesian = (twa: number, bsp: number, side: 1 | -1): { x: number; y: number } => ({
     x: cx + side * bsp * Math.sin(twa) * scale,
     y: cy - bsp * Math.cos(twa) * scale,
   });
@@ -586,22 +570,8 @@ export function PolarPlot({
       })}
 
       {/* Vertical and horizontal axes */}
-      <line
-        x1={cx}
-        y1={margin}
-        x2={cx}
-        y2={size - margin}
-        stroke="rgb(60,70,90)"
-        strokeWidth="1"
-      />
-      <line
-        x1={margin}
-        y1={cy}
-        x2={size - margin}
-        y2={cy}
-        stroke="rgb(60,70,90)"
-        strokeWidth="1"
-      />
+      <line x1={cx} y1={margin} x2={cx} y2={size - margin} stroke="rgb(60,70,90)" strokeWidth="1" />
+      <line x1={margin} y1={cy} x2={size - margin} y2={cy} stroke="rgb(60,70,90)" strokeWidth="1" />
 
       {/* TWS curves */}
       {polar.boatSpeed.map((row, twsIdx) => {
@@ -662,18 +632,9 @@ export function PolarPlot({
         <text fill="rgb(200,210,230)" fontSize="11" fontFamily="monospace">
           {currentTws !== undefined ? `TWS ${(currentTws * MS_TO_KNOTS).toFixed(1)}kn` : 'TWS —'}
         </text>
-        <text
-          fill="rgb(200,210,230)"
-          fontSize="11"
-          fontFamily="monospace"
-          dy="14"
-        >
-          {currentTwa !== undefined
-            ? `TWA ${(currentTwa * RAD_TO_DEG).toFixed(0)}°`
-            : 'TWA —'}
-          {currentBsp !== undefined
-            ? `  BSP ${(currentBsp * MS_TO_KNOTS).toFixed(2)}kn`
-            : ''}
+        <text fill="rgb(200,210,230)" fontSize="11" fontFamily="monospace" dy="14">
+          {currentTwa !== undefined ? `TWA ${(currentTwa * RAD_TO_DEG).toFixed(0)}°` : 'TWA —'}
+          {currentBsp !== undefined ? `  BSP ${(currentBsp * MS_TO_KNOTS).toFixed(2)}kn` : ''}
         </text>
       </g>
     </svg>
@@ -701,9 +662,11 @@ git commit -m "feat(web): PolarPlot SVG component (radial plot with overlays)"
 ## Task 5: `/sails` page — wardrobe management
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/page.tsx`
 
 A page where you:
+
 - See all sail configs as a list
 - Click one to make it active (visual highlight)
 - Click to expand a config — edit name + metadata + polar (via existing heatmap pattern from /polars)
@@ -882,9 +845,7 @@ export default function SailsPage() {
                     <button
                       onClick={() => setActive(c.id)}
                       className={`px-2 py-1 rounded text-xs font-mono ${
-                        isActive
-                          ? 'bg-amber-600 text-slate-900'
-                          : 'bg-slate-700 text-slate-300'
+                        isActive ? 'bg-amber-600 text-slate-900' : 'bg-slate-700 text-slate-300'
                       }`}
                     >
                       {isActive ? 'ACTIVE' : 'Make active'}
@@ -929,7 +890,9 @@ export default function SailsPage() {
                           type="text"
                           placeholder="Full / Reef 1 / Reef 2 / None"
                           value={c.mainState ?? ''}
-                          onChange={(e) => updateConfig(c.id, { mainState: e.target.value || undefined })}
+                          onChange={(e) =>
+                            updateConfig(c.id, { mainState: e.target.value || undefined })
+                          }
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>
@@ -939,7 +902,9 @@ export default function SailsPage() {
                           type="text"
                           placeholder="J1 / J2 / Storm / None"
                           value={c.headsail ?? ''}
-                          onChange={(e) => updateConfig(c.id, { headsail: e.target.value || undefined })}
+                          onChange={(e) =>
+                            updateConfig(c.id, { headsail: e.target.value || undefined })
+                          }
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>
@@ -949,7 +914,9 @@ export default function SailsPage() {
                           type="text"
                           placeholder="A2 / A3 / Code 0 / None"
                           value={c.downwindSail ?? ''}
-                          onChange={(e) => updateConfig(c.id, { downwindSail: e.target.value || undefined })}
+                          onChange={(e) =>
+                            updateConfig(c.id, { downwindSail: e.target.value || undefined })
+                          }
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>
@@ -1005,7 +972,9 @@ export default function SailsPage() {
 ```
 
 ### Step 1: Create the file
+
 ### Step 2: Typecheck
+
 ### Step 3: Commit
 
 ```bash
@@ -1022,6 +991,7 @@ git commit -m "feat(web): /sails page for managing the wardrobe (add, rename, de
 Adds at the top: "Active sails: X [change]" with a dropdown that PUTs `/api/sails/active`. Adds the live PolarPlot side-by-side with the existing heatmap+editor. The plot shows the active polar with live operating-point overlay from SSE channels.
 
 Modify the existing `/polars/page.tsx` to:
+
 1. Fetch the wardrobe (`/api/sails`), display the active config name and a dropdown to switch
 2. Subscribe to SSE for `wind.true.calibrated.{speed,angle}` and `boat.speed.water`
 3. Render `<PolarPlot>` next to the heatmap, passing current TWS/TWA/BSP
@@ -1048,7 +1018,9 @@ export default function PolarsPage() {
   const reload = useCallback(async () => {
     try {
       const [pol, war] = await Promise.all([
-        fetch('/api/config/polars', { cache: 'no-store' }).then((r) => r.json() as Promise<PolarTable>),
+        fetch('/api/config/polars', { cache: 'no-store' }).then(
+          (r) => r.json() as Promise<PolarTable>,
+        ),
         fetch('/api/sails', { cache: 'no-store' }).then((r) => r.json() as Promise<SailWardrobe>),
       ]);
       setPolar(pol);
@@ -1144,10 +1116,7 @@ export default function PolarsPage() {
                 </option>
               ))}
             </select>
-            <a
-              href="/sails"
-              className="text-xs text-slate-500 hover:text-slate-300 underline"
-            >
+            <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
               manage wardrobe →
             </a>
             <input
@@ -1195,9 +1164,7 @@ export default function PolarsPage() {
               selected={selected ?? undefined}
               onSelect={(c) => setSelected(c)}
             />
-            {selected && (
-              <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />
-            )}
+            {selected && <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />}
           </section>
         </div>
       )}
@@ -1209,7 +1176,9 @@ export default function PolarsPage() {
 ```
 
 ### Step 1: Update the file
+
 ### Step 2: Typecheck
+
 ### Step 3: Commit
 
 ```bash
@@ -1237,8 +1206,10 @@ const reloadWardrobe = useCallback(async () => {
   try {
     const r = await fetch('/api/sails', { cache: 'no-store' });
     if (!r.ok) return;
-    setWardrobe(await r.json() as SailWardrobe);
-  } catch { /* ignore */ }
+    setWardrobe((await r.json()) as SailWardrobe);
+  } catch {
+    /* ignore */
+  }
 }, []);
 
 useEffect(() => {
@@ -1255,27 +1226,35 @@ const swapActive = async (configId: string) => {
 };
 
 // In the JSX, ABOVE the grid:
-{wardrobe && (
-  <div className="flex items-center gap-2 mb-3 text-sm bg-slate-900 border border-slate-800 rounded px-3 py-2">
-    <span className="text-slate-400">Sails:</span>
-    <select
-      value={wardrobe.activeConfigId}
-      onChange={(e) => swapActive(e.target.value)}
-      className="bg-slate-900 border border-slate-700 rounded text-slate-200 px-2 py-1 text-sm"
-    >
-      {wardrobe.configs.map((c) => (
-        <option key={c.id} value={c.id}>{c.name}</option>
-      ))}
-    </select>
-    <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">manage</a>
-  </div>
-)}
+{
+  wardrobe && (
+    <div className="flex items-center gap-2 mb-3 text-sm bg-slate-900 border border-slate-800 rounded px-3 py-2">
+      <span className="text-slate-400">Sails:</span>
+      <select
+        value={wardrobe.activeConfigId}
+        onChange={(e) => swapActive(e.target.value)}
+        className="bg-slate-900 border border-slate-700 rounded text-slate-200 px-2 py-1 text-sm"
+      >
+        {wardrobe.configs.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
+        manage
+      </a>
+    </div>
+  );
+}
 ```
 
 Adjust the imports at the top: add `useCallback`, `useEffect`, `useState` from 'react'; import `type SailWardrobe` from `@g5000/db`.
 
 ### Step 1: Update
+
 ### Step 2: Typecheck
+
 ### Step 3: Commit
 
 ```bash
@@ -1299,6 +1278,7 @@ git commit -m "feat(web): /helm page shows active sails + quick-swap selector"
 ## Closing notes
 
 After this plan:
+
 - You can model your real sail wardrobe: full main + J1, reefed main + A2, jib + A0, etc.
 - Each config has its own polar — when you change sails, switch the active config and the compute pipeline instantly uses the right polar.
 - The `/polars` page shows the live polar plot side-by-side with the heatmap editor; the current operating point dot moves around the plot as conditions change.

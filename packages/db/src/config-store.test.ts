@@ -86,9 +86,7 @@ describe('ConfigStore', () => {
   });
 
   it('emits a new wardrobe when setSails is called', async () => {
-    const next: Promise<SailWardrobe> = firstValueFrom(
-      store.sails$.pipe(skip(1), take(1)),
-    );
+    const next: Promise<SailWardrobe> = firstValueFrom(store.sails$.pipe(skip(1), take(1)));
     const updated: SailWardrobe = {
       ...DEFAULT_WARDROBE,
       configs: [
@@ -124,15 +122,10 @@ describe('ConfigStore', () => {
     const wardrobe = await firstValueFrom(store.sails$);
     const distinctPolar = {
       ...wardrobe.configs[0]!.polar,
-      boatSpeed: wardrobe.configs[0]!.polar.boatSpeed.map((row) =>
-        row.map(() => 0),
-      ),
+      boatSpeed: wardrobe.configs[0]!.polar.boatSpeed.map((row) => row.map(() => 0)),
     };
     await store.setSails({
-      configs: [
-        ...wardrobe.configs,
-        { id: 'zeros', name: 'Zeros', polar: distinctPolar },
-      ],
+      configs: [...wardrobe.configs, { id: 'zeros', name: 'Zeros', polar: distinctPolar }],
       activeConfigId: 'zeros',
     });
     const after = await firstValueFrom(store.activePolar$);

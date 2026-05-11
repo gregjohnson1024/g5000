@@ -168,9 +168,7 @@ export default function SailsPage() {
                     <button
                       onClick={() => setActive(c.id)}
                       className={`px-2 py-1 rounded text-xs font-mono ${
-                        isActive
-                          ? 'bg-amber-600 text-slate-900'
-                          : 'bg-slate-700 text-slate-300'
+                        isActive ? 'bg-amber-600 text-slate-900' : 'bg-slate-700 text-slate-300'
                       }`}
                     >
                       {isActive ? 'ACTIVE' : 'Make active'}
@@ -215,7 +213,9 @@ export default function SailsPage() {
                           type="text"
                           placeholder="Full / Reef 1 / Reef 2 / None"
                           value={c.mainState ?? ''}
-                          onChange={(e) => updateConfig(c.id, { mainState: e.target.value || undefined })}
+                          onChange={(e) =>
+                            updateConfig(c.id, { mainState: e.target.value || undefined })
+                          }
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>
@@ -225,7 +225,9 @@ export default function SailsPage() {
                           type="text"
                           placeholder="J1 / J2 / Storm / None"
                           value={c.headsail ?? ''}
-                          onChange={(e) => updateConfig(c.id, { headsail: e.target.value || undefined })}
+                          onChange={(e) =>
+                            updateConfig(c.id, { headsail: e.target.value || undefined })
+                          }
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>
@@ -235,7 +237,9 @@ export default function SailsPage() {
                           type="text"
                           placeholder="A2 / A3 / Code 0 / None"
                           value={c.downwindSail ?? ''}
-                          onChange={(e) => updateConfig(c.id, { downwindSail: e.target.value || undefined })}
+                          onChange={(e) =>
+                            updateConfig(c.id, { downwindSail: e.target.value || undefined })
+                          }
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>

@@ -19,7 +19,9 @@ export default function PolarsPage() {
   const reload = useCallback(async () => {
     try {
       const [pol, war] = await Promise.all([
-        fetch('/api/config/polars', { cache: 'no-store' }).then((r) => r.json() as Promise<PolarTable>),
+        fetch('/api/config/polars', { cache: 'no-store' }).then(
+          (r) => r.json() as Promise<PolarTable>,
+        ),
         fetch('/api/sails', { cache: 'no-store' }).then((r) => r.json() as Promise<SailWardrobe>),
       ]);
       setPolar(pol);
@@ -115,10 +117,7 @@ export default function PolarsPage() {
                 </option>
               ))}
             </select>
-            <a
-              href="/sails"
-              className="text-xs text-slate-500 hover:text-slate-300 underline"
-            >
+            <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
               manage wardrobe →
             </a>
             <input
@@ -166,9 +165,7 @@ export default function PolarsPage() {
               selected={selected ?? undefined}
               onSelect={(c) => setSelected(c)}
             />
-            {selected && (
-              <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />
-            )}
+            {selected && <PolarCellEditor polar={polar} cell={selected} onApply={handleApply} />}
           </section>
         </div>
       )}
