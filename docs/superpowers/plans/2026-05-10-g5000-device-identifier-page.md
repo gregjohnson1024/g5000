@@ -5,6 +5,7 @@
 **Goal:** Build a `/devices` page that lists every node observed on the N2K bus with its manufacturer, model, serial, function, and last-seen time. The page reads PGN 60928 (ISO Address Claim) and PGN 126996 (Product Information) and maintains a per-source-address registry. A "Refresh" button sends PGN 59904 (ISO Request) to prompt devices to re-announce themselves. This becomes the canonical "what's actually on my bus" diagnostic.
 
 **Architecture:**
+
 - A new `DeviceRegistry` class in `@g5000/bridge/src/devices/` consumes the existing `DecodedPgn` stream (the same one that feeds the channel mapper). Updates an internal `Map<srcAddr, DeviceInfo>` from PGN 60928 and 126996 contents, plus a `lastSeenMs` from any PGN at all.
 - Manufacturer codes, device functions, and device classes resolve to human-readable strings via canboatjs's `lookupEnumerationName` (already exported, contains the canonical ISO 11783-7 tables).
 - Registry exposes a snapshot and a `refresh(target?)` method that emits PGN 59904 via a wire driver. The autopilot-server registers the active `Ngt1Driver` as the tx target at boot.
@@ -76,10 +77,12 @@ autopilot/
 ## Task 1: `DeviceRegistry` class (TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/devices/device-registry.ts`
 - Test: `packages/bridge/src/devices/device-registry.test.ts`
 
 The registry has two distinct surfaces:
+
 1. **Inbound**: `observe(pgn: DecodedPgn)` — called by the bridge orchestrator on every decoded PGN. Updates internal state when the PGN is 60928 or 126996; always updates `lastSeenMs` for the source address.
 2. **Outbound**: `snapshot()` returns a structural copy of the state; `registerTxer(fn)` accepts the tx callback; `refresh(target?)` issues PGN 59904.
 
@@ -91,11 +94,7 @@ import { DeviceRegistry, type DeviceInfo } from './device-registry.js';
 import type { DecodedPgn } from '../decoder.js';
 import type { OutgoingPgn } from '../wire-driver.js';
 
-const at = (
-  pgn: number,
-  src: number,
-  fields: Record<string, unknown>,
-): DecodedPgn => ({
+const at = (pgn: number, src: number, fields: Record<string, unknown>): DecodedPgn => ({
   pgn,
   prio: 6,
   src,
@@ -282,8 +281,7 @@ export class DeviceRegistry {
 
   observe(pgn: DecodedPgn): void {
     const existing = this.devices.get(pgn.src);
-    const next: DeviceInfo =
-      existing ?? { src: pgn.src, lastSeenMs: Date.now() };
+    const next: DeviceInfo = existing ?? { src: pgn.src, lastSeenMs: Date.now() };
     next.lastSeenMs = Date.now();
 
     if (pgn.pgn === 60928) {
@@ -297,9 +295,7 @@ export class DeviceRegistry {
 
   snapshot(): Map<number, DeviceInfo> {
     // Shallow copy to prevent callers mutating internal state.
-    return new Map(
-      Array.from(this.devices.entries(), ([k, v]) => [k, { ...v }]),
-    );
+    return new Map(Array.from(this.devices.entries(), ([k, v]) => [k, { ...v }]));
   }
 
   registerTxer(fn: DeviceTxer): void {
@@ -346,12 +342,8 @@ export class DeviceRegistry {
     // field name (likely 'PGN' or 'PGN being requested').
   }
 
-  private applyAddressClaim(
-    info: DeviceInfo,
-    fields: Record<string, unknown>,
-  ): void {
-    if (typeof fields['Unique Number'] === 'number')
-      info.uniqueNumber = fields['Unique Number'];
+  private applyAddressClaim(info: DeviceInfo, fields: Record<string, unknown>): void {
+    if (typeof fields['Unique Number'] === 'number') info.uniqueNumber = fields['Unique Number'];
     if (typeof fields['Manufacturer Code'] === 'number') {
       info.manufacturerCode = fields['Manufacturer Code'] as number;
       info.manufacturerName =
@@ -360,23 +352,16 @@ export class DeviceRegistry {
     }
     if (typeof fields['Device Function'] === 'number') {
       info.deviceFunction = fields['Device Function'] as number;
-      info.deviceFunctionName = safeLookup(
-        'DEVICE_FUNCTION',
-        info.deviceFunction,
-      );
+      info.deviceFunctionName = safeLookup('DEVICE_FUNCTION', info.deviceFunction);
     }
     if (typeof fields['Device Class'] === 'number') {
       info.deviceClass = fields['Device Class'] as number;
       info.deviceClassName = safeLookup('DEVICE_CLASS', info.deviceClass);
     }
-    if (typeof fields['Industry Group'] === 'string')
-      info.industryGroup = fields['Industry Group'];
+    if (typeof fields['Industry Group'] === 'string') info.industryGroup = fields['Industry Group'];
   }
 
-  private applyProductInformation(
-    info: DeviceInfo,
-    fields: Record<string, unknown>,
-  ): void {
+  private applyProductInformation(info: DeviceInfo, fields: Record<string, unknown>): void {
     if (typeof fields['NMEA 2000 Version'] === 'number')
       info.nmea2000Version = fields['NMEA 2000 Version'] as number;
     if (typeof fields['Product Code'] === 'number')
@@ -435,6 +420,7 @@ git commit -m "feat(bridge): DeviceRegistry maintains per-source-address N2K dev
 ## Task 2: Bridge ships from dist; singleton accessor; orchestrator wires registry
 
 **Files:**
+
 - Modify: `packages/bridge/package.json` — `main` → `dist/index.js`
 - Modify: `packages/bridge/src/index.ts` — export DeviceRegistry + singleton
 - Modify: `packages/bridge/src/bridge.ts` — orchestrator pipes DecodedPgn → registry
@@ -444,11 +430,14 @@ Currently `@g5000/bridge`'s `main` points at `./src/index.ts`. Next.js consumes 
 - [ ] **Step 1: Update `packages/bridge/package.json`**
 
 Change:
+
 ```json
 "main": "./src/index.ts",
 "types": "./src/index.ts",
 ```
+
 to:
+
 ```json
 "main": "./dist/index.js",
 "types": "./dist/index.d.ts",
@@ -520,15 +509,13 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
 
     // Existing path: sample publication onto the bus.
     subs.push(
-      decoded$
-        .pipe(mergeMap((pgn) => from(mapPgnToSamples(pgn))))
-        .subscribe({
-          next: (sample) => bus.publish(sample),
-          error: (err) => {
-            // eslint-disable-next-line no-console
-            console.error('[bridge] CAN pipeline error (subscription terminated)', err);
-          },
-        }),
+      decoded$.pipe(mergeMap((pgn) => from(mapPgnToSamples(pgn)))).subscribe({
+        next: (sample) => bus.publish(sample),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] CAN pipeline error (subscription terminated)', err);
+        },
+      }),
     );
 
     // New path: feed every decoded PGN into the device registry.
@@ -544,15 +531,13 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
 
     // 0183 path (unchanged).
     subs.push(
-      driver.rx0183
-        .pipe(mergeMap((s) => from(mapSentenceToSamples(s))))
-        .subscribe({
-          next: (sample) => bus.publish(sample),
-          error: (err) => {
-            // eslint-disable-next-line no-console
-            console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
-          },
-        }),
+      driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
+        next: (sample) => bus.publish(sample),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
+        },
+      }),
     );
   }
 
@@ -602,6 +587,7 @@ git commit -m "feat(bridge): ship from dist; add DeviceRegistry singleton; orche
 ## Task 3: Web depends on `@g5000/bridge`; update predev
 
 **Files:**
+
 - Modify: `packages/web/package.json` — add bridge as dep
 - Modify: `packages/web/next.config.ts` — add bridge to serverExternalPackages
 - Modify: `apps/autopilot-server/package.json` — predev/prebuild build bridge too
@@ -629,11 +615,14 @@ serverExternalPackages: ['@g5000/core', '@g5000/db', '@g5000/compute', '@g5000/b
 - [ ] **Step 3: Update autopilot-server predev/prebuild scripts**
 
 In `apps/autopilot-server/package.json`, change:
+
 ```json
 "predev": "tsc -b ../../packages/core ../../packages/db ../../packages/compute",
 "prebuild": "tsc -b ../../packages/core ../../packages/db ../../packages/compute",
 ```
+
 to:
+
 ```json
 "predev": "tsc -b ../../packages/core ../../packages/db ../../packages/compute ../../packages/bridge",
 "prebuild": "tsc -b ../../packages/core ../../packages/db ../../packages/compute ../../packages/bridge",
@@ -659,6 +648,7 @@ git commit -m "chore: web depends on bridge; autopilot-server prebuilds it"
 ## Task 4: REST API endpoints — `/api/devices` GET + `/api/devices/refresh` POST
 
 **Files:**
+
 - Create: `packages/web/src/app/api/devices/route.ts`
 - Create: `packages/web/src/app/api/devices/refresh/route.ts`
 
@@ -674,9 +664,7 @@ export async function GET(): Promise<Response> {
   const registry = getSharedDeviceRegistry();
   const snap = registry.snapshot();
   // Sort by source address for stable JSON ordering.
-  const devices: DeviceInfo[] = Array.from(snap.values()).sort(
-    (a, b) => a.src - b.src,
-  );
+  const devices: DeviceInfo[] = Array.from(snap.values()).sort((a, b) => a.src - b.src);
   return Response.json({ devices });
 }
 ```
@@ -693,9 +681,7 @@ export async function POST(req: Request): Promise<Response> {
   const registry = getSharedDeviceRegistry();
   let target: number | undefined;
   try {
-    const body = (await req.json().catch(() => null)) as
-      | { target?: number }
-      | null;
+    const body = (await req.json().catch(() => null)) as { target?: number } | null;
     if (body && typeof body.target === 'number') target = body.target;
   } catch {
     /* empty body is fine — broadcast */
@@ -704,10 +690,7 @@ export async function POST(req: Request): Promise<Response> {
     await registry.refresh(target);
     return Response.json({ ok: true, target: target ?? 'broadcast' });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 503 },
-    );
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 503 });
   }
 }
 ```
@@ -732,6 +715,7 @@ git commit -m "feat(web): /api/devices GET snapshot and /api/devices/refresh POS
 ## Task 5: `/devices` page
 
 **Files:**
+
 - Create: `packages/web/src/app/devices/page.tsx`
 
 A simple client-side React component that fetches `/api/devices` on mount and on refresh. The "Refresh devices" button POSTs to `/api/devices/refresh` then refetches the snapshot. No SSE, no auto-polling.
@@ -789,12 +773,10 @@ export default function DevicesPage() {
 
   const now = Date.now();
   const fmtAge = (ms: number): string => `${((now - ms) / 1000).toFixed(1)}s`;
-  const fmt = (s: string | undefined, fallback = '—'): string =>
-    s && s.length > 0 ? s : fallback;
+  const fmt = (s: string | undefined, fallback = '—'): string => (s && s.length > 0 ? s : fallback);
   const fmtNum = (n: number | undefined, fallback = '—'): string =>
     typeof n === 'number' ? String(n) : fallback;
-  const hexSrc = (n: number): string =>
-    `0x${n.toString(16).padStart(2, '0')}`;
+  const hexSrc = (n: number): string => `0x${n.toString(16).padStart(2, '0')}`;
 
   return (
     <main className="p-6 space-y-4">
@@ -810,14 +792,12 @@ export default function DevicesPage() {
       </div>
       {err && <div className="text-red-400 text-sm">Error: {err}</div>}
 
-      {devices === null && !err && (
-        <p className="text-slate-400">Loading…</p>
-      )}
+      {devices === null && !err && <p className="text-slate-400">Loading…</p>}
 
       {devices !== null && devices.length === 0 && (
         <p className="text-slate-400 text-sm">
-          No devices observed yet. Click "Refresh devices" to send an ISO
-          Request, or wait for devices to announce themselves.
+          No devices observed yet. Click "Refresh devices" to send an ISO Request, or wait for
+          devices to announce themselves.
         </p>
       )}
 
@@ -842,12 +822,8 @@ export default function DevicesPage() {
                 <td className="py-1 pr-4">{fmt(d.manufacturerName)}</td>
                 <td className="py-1 pr-4">{fmt(d.modelId)}</td>
                 <td className="py-1 pr-4">{fmt(d.modelSerialCode)}</td>
-                <td className="py-1 pr-4">
-                  {fmt(d.deviceFunctionName, fmtNum(d.deviceFunction))}
-                </td>
-                <td className="py-1 pr-4">
-                  {fmt(d.deviceClassName, fmtNum(d.deviceClass))}
-                </td>
+                <td className="py-1 pr-4">{fmt(d.deviceFunctionName, fmtNum(d.deviceFunction))}</td>
+                <td className="py-1 pr-4">{fmt(d.deviceClassName, fmtNum(d.deviceClass))}</td>
                 <td className="py-1 pr-4">{fmt(d.softwareVersionCode)}</td>
                 <td className="py-1 text-slate-500">{fmtAge(d.lastSeenMs)}</td>
               </tr>
@@ -878,6 +854,7 @@ git commit -m "feat(web): /devices page listing N2K bus members with Refresh but
 ## Task 6: autopilot-server wires the registry's tx target + final verification
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 
 The registry is populated by the bridge orchestrator (Task 2), but `refresh()` won't work until something registers a tx callback. The autopilot-server, which owns the live `Ngt1Driver`, calls `registry.registerTxer(...)` right after the driver is online.
@@ -905,18 +882,18 @@ import {
 The autopilot-server already has a `const ngt = drivers.find((d) => d instanceof Ngt1Driver)` line near where the true-wind TX is wired. **Reuse that exact `ngt` binding** — don't redeclare. Add to the same block where TX is conditionally started:
 
 ```ts
-  const ngt = drivers.find((d) => d instanceof Ngt1Driver); // existing
-  if (ngt && !REPLAY) {
-    const stopTx = await startTrueWindTx({ bus, driver: ngt }); // existing
-    teardown.push(stopTx); // existing
-    // eslint-disable-next-line no-console
-    console.log('[autopilot] true-wind TX online via NGT-1'); // existing
+const ngt = drivers.find((d) => d instanceof Ngt1Driver); // existing
+if (ngt && !REPLAY) {
+  const stopTx = await startTrueWindTx({ bus, driver: ngt }); // existing
+  teardown.push(stopTx); // existing
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] true-wind TX online via NGT-1'); // existing
 
-    // NEW: register NGT-1 as device-registry refresh target
-    getSharedDeviceRegistry().registerTxer((pgn) => ngt.txPgn(pgn));
-    // eslint-disable-next-line no-console
-    console.log('[autopilot] device-registry refresh target = NGT-1');
-  }
+  // NEW: register NGT-1 as device-registry refresh target
+  getSharedDeviceRegistry().registerTxer((pgn) => ngt.txPgn(pgn));
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] device-registry refresh target = NGT-1');
+}
 ```
 
 The new lines slot inside the existing `if (ngt && !REPLAY)` guard.
@@ -939,6 +916,7 @@ pkill -f "tsx watch src/index.ts" 2>&1 || true
 ```
 
 Expected:
+
 - Log shows config, compute, web UI lines as before; no `[autopilot] device-registry refresh target` line because `SKIP_BRIDGE=1` means no NGT-1.
 - `GET /devices` returns 200 (HTML).
 - `GET /api/devices` returns `{"devices":[]}` (empty registry because no decoded PGNs).
@@ -987,6 +965,7 @@ git commit -m "chore: prettier formatting after Plan 6"
 ## Closing notes
 
 After this plan:
+
 - Visit `http://localhost:3000/devices` (when the autopilot-server is running) to see every N2K node observed on the bus.
 - Click "Refresh devices" to issue an ISO Request — useful when a device has just been powered on and hasn't announced itself yet, or when you want to verify a device's product info that didn't come through on its own.
 - The registry observes every decoded PGN's source address (not just 60928/126996), so `lastSeenMs` is accurate even for devices that don't broadcast identity (e.g., they're misconfigured or non-standard).

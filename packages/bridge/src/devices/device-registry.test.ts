@@ -3,11 +3,7 @@ import { DeviceRegistry, type DeviceInfo } from './device-registry.js';
 import type { DecodedPgn } from '../decoder.js';
 import type { OutgoingPgn } from '../wire-driver.js';
 
-const at = (
-  pgn: number,
-  src: number,
-  fields: Record<string, unknown>,
-): DecodedPgn => ({
+const at = (pgn: number, src: number, fields: Record<string, unknown>): DecodedPgn => ({
   pgn,
   prio: 6,
   src,

@@ -7,9 +7,7 @@ export async function POST(req: Request): Promise<Response> {
   const registry = getSharedDeviceRegistry();
   let target: number | undefined;
   try {
-    const body = (await req.json().catch(() => null)) as
-      | { target?: number }
-      | null;
+    const body = (await req.json().catch(() => null)) as { target?: number } | null;
     if (body && typeof body.target === 'number') target = body.target;
   } catch {
     /* empty body is fine — broadcast */
@@ -18,9 +16,6 @@ export async function POST(req: Request): Promise<Response> {
     await registry.refresh(target);
     return Response.json({ ok: true, target: target ?? 'broadcast' });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 503 },
-    );
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 503 });
   }
 }

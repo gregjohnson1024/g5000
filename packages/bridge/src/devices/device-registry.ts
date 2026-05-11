@@ -44,8 +44,7 @@ export class DeviceRegistry {
 
   observe(pgn: DecodedPgn): void {
     const existing = this.devices.get(pgn.src);
-    const next: DeviceInfo =
-      existing ?? { src: pgn.src, lastSeenMs: Date.now() };
+    const next: DeviceInfo = existing ?? { src: pgn.src, lastSeenMs: Date.now() };
     next.lastSeenMs = Date.now();
 
     if (pgn.pgn === 60928) {
@@ -59,9 +58,7 @@ export class DeviceRegistry {
 
   snapshot(): Map<number, DeviceInfo> {
     // Shallow copy to prevent callers mutating internal state.
-    return new Map(
-      Array.from(this.devices.entries(), ([k, v]) => [k, { ...v }]),
-    );
+    return new Map(Array.from(this.devices.entries(), ([k, v]) => [k, { ...v }]));
   }
 
   registerTxer(fn: DeviceTxer): void {
@@ -103,12 +100,8 @@ export class DeviceRegistry {
     }
   }
 
-  private applyAddressClaim(
-    info: DeviceInfo,
-    fields: Record<string, unknown>,
-  ): void {
-    if (typeof fields['Unique Number'] === 'number')
-      info.uniqueNumber = fields['Unique Number'];
+  private applyAddressClaim(info: DeviceInfo, fields: Record<string, unknown>): void {
+    if (typeof fields['Unique Number'] === 'number') info.uniqueNumber = fields['Unique Number'];
     if (typeof fields['Manufacturer Code'] === 'number') {
       info.manufacturerCode = fields['Manufacturer Code'] as number;
       info.manufacturerName =
@@ -117,23 +110,16 @@ export class DeviceRegistry {
     }
     if (typeof fields['Device Function'] === 'number') {
       info.deviceFunction = fields['Device Function'] as number;
-      info.deviceFunctionName = safeLookup(
-        'DEVICE_FUNCTION',
-        info.deviceFunction,
-      );
+      info.deviceFunctionName = safeLookup('DEVICE_FUNCTION', info.deviceFunction);
     }
     if (typeof fields['Device Class'] === 'number') {
       info.deviceClass = fields['Device Class'] as number;
       info.deviceClassName = safeLookup('DEVICE_CLASS', info.deviceClass);
     }
-    if (typeof fields['Industry Group'] === 'string')
-      info.industryGroup = fields['Industry Group'];
+    if (typeof fields['Industry Group'] === 'string') info.industryGroup = fields['Industry Group'];
   }
 
-  private applyProductInformation(
-    info: DeviceInfo,
-    fields: Record<string, unknown>,
-  ): void {
+  private applyProductInformation(info: DeviceInfo, fields: Record<string, unknown>): void {
     if (typeof fields['NMEA 2000 Version'] === 'number')
       info.nmea2000Version = fields['NMEA 2000 Version'] as number;
     if (typeof fields['Product Code'] === 'number')

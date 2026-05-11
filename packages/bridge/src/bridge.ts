@@ -31,15 +31,13 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
 
     // Existing path: PGN → channel mapper → bus.
     subs.push(
-      decoded$
-        .pipe(mergeMap((pgn) => from(mapPgnToSamples(pgn))))
-        .subscribe({
-          next: (sample) => bus.publish(sample),
-          error: (err) => {
-            // eslint-disable-next-line no-console
-            console.error('[bridge] CAN pipeline error (subscription terminated)', err);
-          },
-        }),
+      decoded$.pipe(mergeMap((pgn) => from(mapPgnToSamples(pgn)))).subscribe({
+        next: (sample) => bus.publish(sample),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] CAN pipeline error (subscription terminated)', err);
+        },
+      }),
     );
 
     // New path: every decoded PGN goes to the device registry.
@@ -55,15 +53,13 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
 
     // 0183 path (unchanged).
     subs.push(
-      driver.rx0183
-        .pipe(mergeMap((s) => from(mapSentenceToSamples(s))))
-        .subscribe({
-          next: (sample) => bus.publish(sample),
-          error: (err) => {
-            // eslint-disable-next-line no-console
-            console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
-          },
-        }),
+      driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
+        next: (sample) => bus.publish(sample),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
+        },
+      }),
     );
   }
 

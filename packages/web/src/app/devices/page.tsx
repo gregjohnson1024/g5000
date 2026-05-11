@@ -48,12 +48,10 @@ export default function DevicesPage() {
 
   const now = Date.now();
   const fmtAge = (ms: number): string => `${((now - ms) / 1000).toFixed(1)}s`;
-  const fmt = (s: string | undefined, fallback = '—'): string =>
-    s && s.length > 0 ? s : fallback;
+  const fmt = (s: string | undefined, fallback = '—'): string => (s && s.length > 0 ? s : fallback);
   const fmtNum = (n: number | undefined, fallback = '—'): string =>
     typeof n === 'number' ? String(n) : fallback;
-  const hexSrc = (n: number): string =>
-    `0x${n.toString(16).padStart(2, '0')}`;
+  const hexSrc = (n: number): string => `0x${n.toString(16).padStart(2, '0')}`;
 
   return (
     <main className="p-6 space-y-4">
@@ -69,14 +67,12 @@ export default function DevicesPage() {
       </div>
       {err && <div className="text-red-400 text-sm">Error: {err}</div>}
 
-      {devices === null && !err && (
-        <p className="text-slate-400">Loading…</p>
-      )}
+      {devices === null && !err && <p className="text-slate-400">Loading…</p>}
 
       {devices !== null && devices.length === 0 && (
         <p className="text-slate-400 text-sm">
-          No devices observed yet. Click &ldquo;Refresh devices&rdquo; to send an ISO
-          Request, or wait for devices to announce themselves.
+          No devices observed yet. Click &ldquo;Refresh devices&rdquo; to send an ISO Request, or
+          wait for devices to announce themselves.
         </p>
       )}
 
@@ -101,12 +97,8 @@ export default function DevicesPage() {
                 <td className="py-1 pr-4">{fmt(d.manufacturerName)}</td>
                 <td className="py-1 pr-4">{fmt(d.modelId)}</td>
                 <td className="py-1 pr-4">{fmt(d.modelSerialCode)}</td>
-                <td className="py-1 pr-4">
-                  {fmt(d.deviceFunctionName, fmtNum(d.deviceFunction))}
-                </td>
-                <td className="py-1 pr-4">
-                  {fmt(d.deviceClassName, fmtNum(d.deviceClass))}
-                </td>
+                <td className="py-1 pr-4">{fmt(d.deviceFunctionName, fmtNum(d.deviceFunction))}</td>
+                <td className="py-1 pr-4">{fmt(d.deviceClassName, fmtNum(d.deviceClass))}</td>
                 <td className="py-1 pr-4">{fmt(d.softwareVersionCode)}</td>
                 <td className="py-1 text-slate-500">{fmtAge(d.lastSeenMs)}</td>
               </tr>
