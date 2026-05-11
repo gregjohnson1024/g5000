@@ -84,9 +84,8 @@ export default function CompassDeviationPage() {
         <div>GPS COG: {fmtAngle(cog as never)}</div>
       </div>
       <p className="text-xs text-slate-500 max-w-xl">
-        Deviation = HDG_observed − HDG_true. With no current and a known
-        variation, you can derive deviation per heading bin by comparing the
-        compass against GPS COG on long straight runs.
+        Deviation = HDG_observed − HDG_true. With no current and a known variation, you can derive
+        deviation per heading bin by comparing the compass against GPS COG on long straight runs.
       </p>
 
       {cal && (
@@ -125,7 +124,9 @@ export default function CompassDeviationPage() {
             <div className="border border-slate-700 rounded p-4 space-y-3 max-w-xl">
               <div className="text-sm text-slate-300">
                 Editing bin at{' '}
-                <span className="font-mono">{selected * 10}°–{selected * 10 + 10}°</span>{' '}
+                <span className="font-mono">
+                  {selected * 10}°–{selected * 10 + 10}°
+                </span>{' '}
                 heading
               </div>
               <label className="block text-sm">

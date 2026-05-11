@@ -84,8 +84,8 @@ export default function BspCalPage() {
         <div>SOG (GPS speed): {fmt(sog as never)}</div>
       </div>
       <p className="text-xs text-slate-500 max-w-xl">
-        In still water with no current, ideal multiplier ≈ SOG / BSP. Note the
-        ratio at each speed bin and edit cells accordingly.
+        In still water with no current, ideal multiplier ≈ SOG / BSP. Note the ratio at each speed
+        bin and edit cells accordingly.
       </p>
 
       {cal && (

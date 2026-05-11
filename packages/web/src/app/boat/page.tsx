@@ -92,9 +92,7 @@ export default function BoatConfigPage() {
                 type="number"
                 step={f.step}
                 value={edits[f.key] ?? ''}
-                onChange={(e) =>
-                  setEdits((prev) => ({ ...prev, [f.key]: e.target.value }))
-                }
+                onChange={(e) => setEdits((prev) => ({ ...prev, [f.key]: e.target.value }))}
                 className="block w-40 mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200 font-mono"
               />
             </label>
@@ -109,8 +107,8 @@ export default function BoatConfigPage() {
         </div>
       )}
       <p className="text-xs text-slate-500 pt-4 border-t border-slate-800">
-        Mast height is used by the true-wind pipeline to correct for masthead
-        motion. If it&apos;s wrong, true wind will appear noisy in turning maneuvers.
+        Mast height is used by the true-wind pipeline to correct for masthead motion. If it&apos;s
+        wrong, true wind will appear noisy in turning maneuvers.
       </p>
     </main>
   );
