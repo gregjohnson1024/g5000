@@ -9,3 +9,19 @@ export * from './nmea0183/channel-mapper.js';
 export * from './persistence/session-logger.js';
 export * from './persistence/replay-driver.js';
 export * from './tx/true-wind-tx.js';
+export * from './devices/device-registry.js';
+
+import { DeviceRegistry } from './devices/device-registry.js';
+
+declare const globalThis: { __g5000_deviceRegistry__?: DeviceRegistry };
+
+export function getSharedDeviceRegistry(): DeviceRegistry {
+  if (!globalThis.__g5000_deviceRegistry__) {
+    globalThis.__g5000_deviceRegistry__ = new DeviceRegistry();
+  }
+  return globalThis.__g5000_deviceRegistry__;
+}
+
+export function _resetSharedDeviceRegistryForTests(): void {
+  globalThis.__g5000_deviceRegistry__ = undefined;
+}

@@ -1,9 +1,10 @@
 import type { Bus } from '@g5000/core';
-import { mergeMap, from, type Subscription } from 'rxjs';
+import { mergeMap, from, share, type Subscription } from 'rxjs';
 import type { WireDriver } from './wire-driver.js';
 import { decode } from './decoder.js';
 import { mapPgnToSamples } from './channel-mapper.js';
 import { mapSentenceToSamples } from './nmea0183/channel-mapper.js';
+import { getSharedDeviceRegistry } from './index.js';
 
 export interface BridgeOptions {
   bus: Bus;
@@ -12,43 +13,57 @@ export interface BridgeOptions {
 
 /**
  * Wires each WireDriver's CAN and 0183 streams through their respective
- * decoders/mappers and publishes the resulting Samples on the shared Bus.
- * Returns a stop() function that disconnects the drivers and unsubscribes
- * the pipeline.
+ * decoders/mappers and publishes resulting Samples on the shared Bus.
+ * Also feeds every decoded CAN PGN into the device registry so the
+ * /devices page can show what's on the bus.
  */
 export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void>> {
   const { bus, drivers } = opts;
+  const registry = getSharedDeviceRegistry();
   await Promise.all(drivers.map((d) => d.start()));
 
   const subs: Subscription[] = [];
 
   for (const driver of drivers) {
+    // Decode once and share so both pipelines see the same stream
+    // (avoid running canboatjs twice per frame).
+    const decoded$ = driver.rxCan.pipe(decode(), share());
+
+    // Existing path: PGN → channel mapper → bus.
     subs.push(
-      driver.rxCan
-        .pipe(
-          decode(),
-          mergeMap((pgn) => from(mapPgnToSamples(pgn))),
-        )
+      decoded$
+        .pipe(mergeMap((pgn) => from(mapPgnToSamples(pgn))))
         .subscribe({
           next: (sample) => bus.publish(sample),
           error: (err) => {
-            // The current pipeline terminates this driver's subscription on
-            // first error. For Phase 0a (stable canboatjs, well-defined NGT-1
-            // framing) this is acceptable; restart the process to recover.
-            // Future plans should add catchError + resubscribe.
             // eslint-disable-next-line no-console
             console.error('[bridge] CAN pipeline error (subscription terminated)', err);
           },
         }),
     );
+
+    // New path: every decoded PGN goes to the device registry.
     subs.push(
-      driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
-        next: (sample) => bus.publish(sample),
+      decoded$.subscribe({
+        next: (pgn) => registry.observe(pgn),
         error: (err) => {
           // eslint-disable-next-line no-console
-          console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
+          console.error('[bridge] device-registry pipeline error', err);
         },
       }),
+    );
+
+    // 0183 path (unchanged).
+    subs.push(
+      driver.rx0183
+        .pipe(mergeMap((s) => from(mapSentenceToSamples(s))))
+        .subscribe({
+          next: (sample) => bus.publish(sample),
+          error: (err) => {
+            // eslint-disable-next-line no-console
+            console.error('[bridge] 0183 pipeline error (subscription terminated)', err);
+          },
+        }),
     );
   }
 
