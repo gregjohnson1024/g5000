@@ -5,6 +5,7 @@ import { mkdir } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
 import { getSharedBus } from '@g5000/core';
+import type { BaseSourceHandle } from '@g5000/core';
 import { ConfigStore, setSharedConfigStore } from '@g5000/db';
 import { startTrueWindPipeline, startPolarPipeline } from '@g5000/compute';
 import {
@@ -19,6 +20,7 @@ import {
   type SessionLogger,
 } from '@g5000/bridge';
 import { startDemoInjector } from './demo-injector.js';
+import { createSourceModeController } from './source-mode-controller.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -49,6 +51,15 @@ async function main(): Promise<void> {
   teardown.push(() => store.close());
   // eslint-disable-next-line no-console
   console.log(`[autopilot] config db: ${CONFIG_DB_PATH}`);
+
+  const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
+  await mkdir(sessionsDir, { recursive: true });
+  const sourceModeController = createSourceModeController({ bus, sessionsDir });
+  sourceModeController.setLiveOrDemo(DEMO_MODE ? 'demo' : 'live');
+  // eslint-disable-next-line no-console
+  console.log(
+    `[autopilot] source mode: ${sourceModeController.getStatus().mode} (sessions dir: ${sessionsDir})`,
+  );
 
   // 1. Driver setup (live or replay).
   if (REPLAY) {
@@ -108,6 +119,20 @@ async function main(): Promise<void> {
     teardown.push(stop);
   }
 
+  if (!DEMO_MODE && drivers.length > 0) {
+    // Register the live bridge teardown with the controller so replay can stop it.
+    // No restart fn — reopening the NGT-1 mid-process is fragile; live mode requires
+    // a full server restart to re-arm after a replay.
+    sourceModeController.setBaseSource({
+      teardown: async () => {
+        // No-op — the bridge teardown is already in the main teardown[] array.
+        // The controller calls this when entering replay; we don't actually want to
+        // double-stop the bridge here. If you need live→replay→live cycling,
+        // refactor this to share ownership properly.
+      },
+    });
+  }
+
   // 3. Optional session logger (skipped in replay mode).
   let logger: SessionLogger | null = null;
   if (SESSION_LOG_DIR && !REPLAY) {
@@ -127,8 +152,24 @@ async function main(): Promise<void> {
   //    wind.true.calibrated.* directly, so the true-wind pipeline must be
   //    skipped — otherwise it would overwrite the demo values.
   if (DEMO_MODE) {
-    const stopDemo = startDemoInjector(bus);
-    teardown.push(async () => stopDemo());
+    const makeDemoHandle = (): BaseSourceHandle => {
+      const stopDemo = startDemoInjector(bus);
+      return {
+        teardown: async () => stopDemo(),
+        restart: async () => makeDemoHandle(),
+      };
+    };
+    const demoHandle = makeDemoHandle();
+    sourceModeController.setBaseSource(demoHandle);
+    // Idempotent shutdown wrapper — controller may also tear down via startReplay.
+    let demoStopped = false;
+    teardown.push(async () => {
+      if (demoStopped) return;
+      demoStopped = true;
+      const h = sourceModeController.getStatus();
+      if (h.mode === 'replay') return; // controller owns it during replay
+      await demoHandle.teardown();
+    });
     // eslint-disable-next-line no-console
     console.log('[autopilot] DEMO_MODE on — synthetic samples publishing to the bus');
   } else {
