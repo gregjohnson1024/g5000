@@ -1,9 +1,5 @@
 import type { AwsAwaCalTable } from '@h6000/db';
-import {
-  findNearestCalCell,
-  applyAngleCorrectionToCell,
-  type CellIndex,
-} from './find-cell.js';
+import { findNearestCalCell, applyAngleCorrectionToCell, type CellIndex } from './find-cell.js';
 
 /**
  * One steady-state capture during the tack-test wizard.

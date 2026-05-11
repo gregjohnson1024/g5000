@@ -14,11 +14,7 @@ export interface CellIndex {
  * `awaAbs` is expected to already be non-negative (callers should pass
  * Math.abs(awa)). The cal grid is symmetric across the boat centerline.
  */
-export function findNearestCalCell(
-  cal: AwsAwaCalTable,
-  aws: number,
-  awaAbs: number,
-): CellIndex {
+export function findNearestCalCell(cal: AwsAwaCalTable, aws: number, awaAbs: number): CellIndex {
   return {
     awsIdx: nearestIndex(cal.awsBins, aws),
     awaIdx: nearestIndex(cal.awaBins, awaAbs),

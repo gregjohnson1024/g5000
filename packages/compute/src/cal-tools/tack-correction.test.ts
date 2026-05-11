@@ -50,10 +50,7 @@ describe('computeTackCorrection', () => {
       awa: -0.785,
     });
     const r = computeTackCorrection(DEFAULT_AWS_AWA_CAL, port, starboard);
-    expect(r.previewed.angleCorrection[r.cell.awsIdx]![r.cell.awaIdx]).toBeCloseTo(
-      r.delta,
-      6,
-    );
+    expect(r.previewed.angleCorrection[r.cell.awsIdx]![r.cell.awaIdx]).toBeCloseTo(r.delta, 6);
     expect(r.previewed.angleCorrection[0]![0]).toBe(0);
   });
 });

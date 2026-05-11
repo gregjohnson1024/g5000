@@ -16,9 +16,7 @@ export interface UseSseResult {
  * on every new event (small payloads, batched server-side).
  */
 export function useSse(): UseSseResult {
-  const [channels, setChannels] = useState<Map<string, JsonSafeSample>>(
-    new Map(),
-  );
+  const [channels, setChannels] = useState<Map<string, JsonSafeSample>>(new Map());
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {

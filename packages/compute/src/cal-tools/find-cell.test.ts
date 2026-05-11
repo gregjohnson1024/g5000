@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  findNearestCalCell,
-  applyAngleCorrectionToCell,
-} from './find-cell.js';
+import { findNearestCalCell, applyAngleCorrectionToCell } from './find-cell.js';
 import { DEFAULT_AWS_AWA_CAL } from '@h6000/db';
 
 describe('findNearestCalCell', () => {
@@ -51,11 +48,7 @@ describe('applyAngleCorrectionToCell', () => {
 
   it('throws on an out-of-range cell index', () => {
     const cal = DEFAULT_AWS_AWA_CAL;
-    expect(() =>
-      applyAngleCorrectionToCell(cal, { awsIdx: 999, awaIdx: 0 }, 0.1),
-    ).toThrow();
-    expect(() =>
-      applyAngleCorrectionToCell(cal, { awsIdx: 0, awaIdx: -1 }, 0.1),
-    ).toThrow();
+    expect(() => applyAngleCorrectionToCell(cal, { awsIdx: 999, awaIdx: 0 }, 0.1)).toThrow();
+    expect(() => applyAngleCorrectionToCell(cal, { awsIdx: 0, awaIdx: -1 }, 0.1)).toThrow();
   });
 });

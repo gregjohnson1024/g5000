@@ -33,9 +33,7 @@ export function CellEditor({ cal, cell, onApply }: CellEditorProps) {
     const updated: AwsAwaCalTable = {
       ...cal,
       angleCorrection: cal.angleCorrection.map((row, i) =>
-        i === cell.awsIdx
-          ? row.map((v, j) => (j === cell.awaIdx ? newRad : v))
-          : row.slice(),
+        i === cell.awsIdx ? row.map((v, j) => (j === cell.awaIdx ? newRad : v)) : row.slice(),
       ),
     };
     setBusy(true);
@@ -55,8 +53,7 @@ export function CellEditor({ cal, cell, onApply }: CellEditorProps) {
   return (
     <div className="border border-slate-700 rounded p-4 space-y-3">
       <div className="text-sm text-slate-300">
-        Editing cell at{' '}
-        <span className="font-mono">AWS {awsAt.toFixed(1)} m/s</span> ×{' '}
+        Editing cell at <span className="font-mono">AWS {awsAt.toFixed(1)} m/s</span> ×{' '}
         <span className="font-mono">|AWA| {awaAt.toFixed(0)}°</span>
       </div>
       <label className="block text-sm">

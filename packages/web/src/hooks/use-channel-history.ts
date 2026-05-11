@@ -39,8 +39,7 @@ export function useChannelHistory(
   }, [sample, windowMs]);
 
   const history = historyRef.current;
-  const latest =
-    history.length > 0 ? history[history.length - 1]!.value : null;
+  const latest = history.length > 0 ? history[history.length - 1]!.value : null;
 
   return {
     latest,
@@ -54,10 +53,7 @@ export function useChannelHistory(
       if (history.length < 2) return null;
       const sum = history.reduce((s, p) => s + p.value, 0);
       const mean = sum / history.length;
-      const sumSq = history.reduce(
-        (s, p) => s + (p.value - mean) ** 2,
-        0,
-      );
+      const sumSq = history.reduce((s, p) => s + (p.value - mean) ** 2, 0);
       return Math.sqrt(sumSq / (history.length - 1));
     },
   };

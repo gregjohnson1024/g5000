@@ -12,10 +12,7 @@ export interface CalHeatmapProps {
 const RAD_TO_DEG = 180 / Math.PI;
 
 export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
-  const maxAbs = Math.max(
-    1e-6,
-    ...cal.angleCorrection.flat().map(Math.abs),
-  );
+  const maxAbs = Math.max(1e-6, ...cal.angleCorrection.flat().map(Math.abs));
 
   // Inline style for the cell color since Tailwind v4's JIT may not pick up
   // dynamic arbitrary classnames at every value.
@@ -45,13 +42,10 @@ export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
         <tbody>
           {cal.awsBins.map((aws, awsIdx) => (
             <tr key={awsIdx}>
-              <th className="p-1 text-slate-500 text-right pr-2">
-                {aws.toFixed(0)} m/s
-              </th>
+              <th className="p-1 text-slate-500 text-right pr-2">{aws.toFixed(0)} m/s</th>
               {cal.awaBins.map((_, awaIdx) => {
                 const v = cal.angleCorrection[awsIdx]![awaIdx]!;
-                const isSelected =
-                  selected?.awsIdx === awsIdx && selected.awaIdx === awaIdx;
+                const isSelected = selected?.awsIdx === awsIdx && selected.awaIdx === awaIdx;
                 return (
                   <td
                     key={awaIdx}

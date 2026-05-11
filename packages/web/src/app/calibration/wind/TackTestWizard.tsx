@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { AwsAwaCalTable } from '@h6000/db';
-import {
-  computeTackCorrection,
-  type TackCapture,
-} from '@h6000/compute';
+import { computeTackCorrection, type TackCapture } from '@h6000/compute';
 import { useSse } from '../../../hooks/use-sse.js';
 import { useChannelHistory } from '../../../hooks/use-channel-history.js';
 
@@ -126,7 +123,8 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
       {state.kind === 'portCaptured' && (
         <div className="space-y-2">
           <p className="text-sm text-slate-300">
-            Port captured: TWD {(state.port.twd * RAD_TO_DEG).toFixed(1)}°, TWS {state.port.tws.toFixed(2)} m/s. Now tack to starboard.
+            Port captured: TWD {(state.port.twd * RAD_TO_DEG).toFixed(1)}°, TWS{' '}
+            {state.port.tws.toFixed(2)} m/s. Now tack to starboard.
           </p>
           <button
             onClick={() => setState({ kind: 'awaitingStarboard', port: state.port })}
@@ -160,16 +158,30 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
           <div className="text-slate-300">
             Port TWD: <span className="font-mono">{(state.port.twd * RAD_TO_DEG).toFixed(1)}°</span>
             <br />
-            Starboard TWD: <span className="font-mono">{(state.starboard.twd * RAD_TO_DEG).toFixed(1)}°</span>
+            Starboard TWD:{' '}
+            <span className="font-mono">{(state.starboard.twd * RAD_TO_DEG).toFixed(1)}°</span>
             <br />
-            Difference: <span className="font-mono">{(result.twdDiff * RAD_TO_DEG).toFixed(2)}°</span>
+            Difference:{' '}
+            <span className="font-mono">{(result.twdDiff * RAD_TO_DEG).toFixed(2)}°</span>
           </div>
           <div className="text-slate-200">
-            Suggested correction at cell (AWS <span className="font-mono">{cal.awsBins[result.cell.awsIdx]!.toFixed(0)}</span>, |AWA| <span className="font-mono">{(cal.awaBins[result.cell.awaIdx]! * RAD_TO_DEG).toFixed(0)}°</span>): <span className="font-mono">{(result.delta * RAD_TO_DEG).toFixed(2)}°</span>
+            Suggested correction at cell (AWS{' '}
+            <span className="font-mono">{cal.awsBins[result.cell.awsIdx]!.toFixed(0)}</span>, |AWA|{' '}
+            <span className="font-mono">
+              {(cal.awaBins[result.cell.awaIdx]! * RAD_TO_DEG).toFixed(0)}°
+            </span>
+            ): <span className="font-mono">{(result.delta * RAD_TO_DEG).toFixed(2)}°</span>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleApply} className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium">Apply</button>
-            <button onClick={reset} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">Discard</button>
+            <button
+              onClick={handleApply}
+              className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
+            >
+              Apply
+            </button>
+            <button onClick={reset} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
+              Discard
+            </button>
           </div>
         </div>
       )}
@@ -177,7 +189,9 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
       {state.kind === 'applied' && (
         <div className="space-y-2">
           <p className="text-sm text-green-400">Correction applied.</p>
-          <button onClick={reset} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">Run another tack test</button>
+          <button onClick={reset} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
+            Run another tack test
+          </button>
         </div>
       )}
     </div>

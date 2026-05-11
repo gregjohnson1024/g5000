@@ -5,6 +5,7 @@
 **Goal:** Make the AWS/AWA cal table editable from the browser, both by manual cell entry and by the tack-test wizard — the killer feature for actually getting calibration done at sea. After this plan lands, you can sail upwind, tap two buttons (one per tack), see the suggested correction, and apply it with one more tap. The change hot-reloads into the compute pipeline immediately.
 
 **Architecture:**
+
 - New cal-tools module in `@h6000/compute` with pure-function helpers: `findNearestCalCell`, `applyAngleCorrectionToCell`, `computeTackCorrection`.
 - Two new React hooks in `@h6000/web/src/hooks/`: `useSse` (latest sample per channel) and `useChannelHistory` (sliding window of recent samples with averaging helpers).
 - React components: `CalHeatmap` (visualizes the AWS/AWA grid), `CellEditor` (manual cell value entry), `TackTestWizard` (state-machine UI for capture → suggest → apply).
@@ -70,6 +71,7 @@ autopilot/
 ## Task 1: Cal-tools — `findNearestCalCell` + `applyAngleCorrectionToCell` (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/cal-tools/find-cell.ts`
 - Test: `packages/compute/src/cal-tools/find-cell.test.ts`
 
@@ -81,15 +83,8 @@ autopilot/
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import {
-  findNearestCalCell,
-  applyAngleCorrectionToCell,
-  type CellIndex,
-} from './find-cell.js';
-import {
-  DEFAULT_AWS_AWA_CAL,
-  type AwsAwaCalTable,
-} from '@h6000/db';
+import { findNearestCalCell, applyAngleCorrectionToCell, type CellIndex } from './find-cell.js';
+import { DEFAULT_AWS_AWA_CAL, type AwsAwaCalTable } from '@h6000/db';
 
 describe('findNearestCalCell', () => {
   const cal = DEFAULT_AWS_AWA_CAL; // 8 AWS bins [2,4,...,20], 13 AWA bins [0,15°,…,180°]
@@ -143,12 +138,8 @@ describe('applyAngleCorrectionToCell', () => {
 
   it('throws on an out-of-range cell index', () => {
     const cal = DEFAULT_AWS_AWA_CAL;
-    expect(() =>
-      applyAngleCorrectionToCell(cal, { awsIdx: 999, awaIdx: 0 }, 0.1),
-    ).toThrow();
-    expect(() =>
-      applyAngleCorrectionToCell(cal, { awsIdx: 0, awaIdx: -1 }, 0.1),
-    ).toThrow();
+    expect(() => applyAngleCorrectionToCell(cal, { awsIdx: 999, awaIdx: 0 }, 0.1)).toThrow();
+    expect(() => applyAngleCorrectionToCell(cal, { awsIdx: 0, awaIdx: -1 }, 0.1)).toThrow();
   });
 });
 ```
@@ -178,11 +169,7 @@ export interface CellIndex {
  * `awaAbs` is expected to already be non-negative (callers should pass
  * Math.abs(awa)). The cal grid is symmetric across the boat centerline.
  */
-export function findNearestCalCell(
-  cal: AwsAwaCalTable,
-  aws: number,
-  awaAbs: number,
-): CellIndex {
+export function findNearestCalCell(cal: AwsAwaCalTable, aws: number, awaAbs: number): CellIndex {
   return {
     awsIdx: nearestIndex(cal.awsBins, aws),
     awaIdx: nearestIndex(cal.awaBins, awaAbs),
@@ -254,6 +241,7 @@ git commit -m "feat(compute): cal-tools — findNearestCalCell and applyAngleCor
 ## Task 2: Cal-tools — `computeTackCorrection` (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/cal-tools/tack-correction.ts`
 - Test: `packages/compute/src/cal-tools/tack-correction.test.ts`
 - Modify: `packages/compute/src/index.ts` — re-export cal-tools
@@ -273,13 +261,15 @@ And the cal cell needs `angleCorrection` increased by error_port to make port
 ```
 
 The wizard takes two captures (port-tack and starboard-tack averages) and returns:
+
 - The target cell (AWS/|AWA| based on the captured port tack — both tacks should agree on these).
 - The suggested `delta` to add to that cell's `angleCorrection`.
 
 Sign convention: `delta = -(TWD_port - TWD_starboard) / 2`. The negative sign is because:
+
 - If port reads HIGHER TWD than starboard, port's AWA is too positive ("rotated outward more than it should").
-- The cal correction `angleCorrection` is *added* to AWA in the math (after multiplying by sign(awa)).
-- On port (positive AWA), we want awa to come *down* — so the cal correction is negative.
+- The cal correction `angleCorrection` is _added_ to AWA in the math (after multiplying by sign(awa)).
+- On port (positive AWA), we want awa to come _down_ — so the cal correction is negative.
 - We're computing the delta to ADD to whatever the cell already holds.
 
 We'll write tests with synthetic capture data that asserts both magnitude and sign.
@@ -347,10 +337,7 @@ describe('computeTackCorrection', () => {
       awa: -0.785,
     });
     const r = computeTackCorrection(DEFAULT_AWS_AWA_CAL, port, starboard);
-    expect(r.previewed.angleCorrection[r.cell.awsIdx]![r.cell.awaIdx]).toBeCloseTo(
-      r.delta,
-      6,
-    );
+    expect(r.previewed.angleCorrection[r.cell.awsIdx]![r.cell.awaIdx]).toBeCloseTo(r.delta, 6);
     // Untouched cells preserved.
     expect(r.previewed.angleCorrection[0]![0]).toBe(0);
   });
@@ -363,11 +350,7 @@ describe('computeTackCorrection', () => {
 
 ```ts
 import type { AwsAwaCalTable } from '@h6000/db';
-import {
-  findNearestCalCell,
-  applyAngleCorrectionToCell,
-  type CellIndex,
-} from './find-cell.js';
+import { findNearestCalCell, applyAngleCorrectionToCell, type CellIndex } from './find-cell.js';
 
 /**
  * One steady-state capture during the tack-test wizard. Each field is the
@@ -464,6 +447,7 @@ git commit -m "feat(compute): cal-tools — computeTackCorrection with wraparoun
 ## Task 3: Rebuild compute to dist (so Next.js can consume it)
 
 **Files:**
+
 - Modify: `packages/compute/package.json` — point `main` at `dist/`
 - Modify: `apps/autopilot-server/package.json` — extend `predev`/`prebuild` to build compute
 
@@ -533,6 +517,7 @@ git commit -m "chore: compute ships from dist, web depends on compute"
 ## Task 4: `useSse` React hook
 
 **Files:**
+
 - Create: `packages/web/src/hooks/use-sse.ts`
 
 A reusable hook that subscribes to `/api/stream`, maintains a `Map<channel, JsonSafeSample>` of latest values per channel, and returns it. Behavior matches the existing `/inspect` page's effect but factored into a hook so the wizard and editor can share it.
@@ -558,9 +543,7 @@ export interface UseSseResult {
  * on every new event (small payloads, batched server-side).
  */
 export function useSse(): UseSseResult {
-  const [channels, setChannels] = useState<Map<string, JsonSafeSample>>(
-    new Map(),
-  );
+  const [channels, setChannels] = useState<Map<string, JsonSafeSample>>(new Map());
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -613,6 +596,7 @@ git commit -m "feat(web): useSse hook for live channel subscription"
 ## Task 5: `useChannelHistory` React hook
 
 **Files:**
+
 - Create: `packages/web/src/hooks/use-channel-history.ts`
 
 A hook that maintains a rolling buffer of the last N seconds of samples on a specific channel, with averaging helpers. The wizard uses this during capture: subscribe to TWD, TWA, etc., let the user say "now", then compute averages over the past few seconds.
@@ -675,8 +659,7 @@ export function useChannelHistory(
   }, [sample, windowMs]);
 
   const history = historyRef.current;
-  const latest =
-    history.length > 0 ? history[history.length - 1]!.value : null;
+  const latest = history.length > 0 ? history[history.length - 1]!.value : null;
 
   return {
     latest,
@@ -689,10 +672,7 @@ export function useChannelHistory(
     stdDev() {
       if (history.length < 2) return null;
       const mean = this.average()!;
-      const sumSq = history.reduce(
-        (s, p) => s + (p.value - mean) ** 2,
-        0,
-      );
+      const sumSq = history.reduce((s, p) => s + (p.value - mean) ** 2, 0);
       return Math.sqrt(sumSq / (history.length - 1));
     },
   };
@@ -717,6 +697,7 @@ git commit -m "feat(web): useChannelHistory hook with rolling window and stats"
 ## Task 6: `CalHeatmap` component
 
 **Files:**
+
 - Create: `packages/web/src/app/calibration/wind/CalHeatmap.tsx`
 
 A visual grid of the AWS/AWA cal table. Rows = AWS bins, columns = |AWA| bins. Each cell colored by its `angleCorrection` value (red for negative, blue for positive, gray for zero). Click a cell to select it; selected cell highlighted with a ring.
@@ -737,10 +718,7 @@ export interface CalHeatmapProps {
 const RAD_TO_DEG = 180 / Math.PI;
 
 export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
-  const maxAbs = Math.max(
-    1e-6,
-    ...cal.angleCorrection.flat().map(Math.abs),
-  );
+  const maxAbs = Math.max(1e-6, ...cal.angleCorrection.flat().map(Math.abs));
 
   const cellColor = (v: number): string => {
     if (Math.abs(v) < 1e-9) return 'bg-slate-800';
@@ -767,13 +745,10 @@ export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
         <tbody>
           {cal.awsBins.map((aws, awsIdx) => (
             <tr key={awsIdx}>
-              <th className="p-1 text-slate-500 text-right pr-2">
-                {aws.toFixed(0)} m/s
-              </th>
+              <th className="p-1 text-slate-500 text-right pr-2">{aws.toFixed(0)} m/s</th>
               {cal.awaBins.map((_, awaIdx) => {
                 const v = cal.angleCorrection[awsIdx]![awaIdx]!;
-                const isSelected =
-                  selected?.awsIdx === awsIdx && selected.awaIdx === awaIdx;
+                const isSelected = selected?.awsIdx === awsIdx && selected.awaIdx === awaIdx;
                 return (
                   <td
                     key={awaIdx}
@@ -819,6 +794,7 @@ git commit -m "feat(web): CalHeatmap component visualizing AWS/AWA grid"
 ## Task 7: `CellEditor` component
 
 **Files:**
+
 - Create: `packages/web/src/app/calibration/wind/CellEditor.tsx`
 
 When a cell is selected, show a form with the current value, an input for a new value (in degrees), and an "Apply" button that PUTs the new full cal table.
@@ -862,9 +838,7 @@ export function CellEditor({ cal, cell, onApply }: CellEditorProps) {
     const updated: AwsAwaCalTable = {
       ...cal,
       angleCorrection: cal.angleCorrection.map((row, i) =>
-        i === cell.awsIdx
-          ? row.map((v, j) => (j === cell.awaIdx ? newRad : v))
-          : row.slice(),
+        i === cell.awsIdx ? row.map((v, j) => (j === cell.awaIdx ? newRad : v)) : row.slice(),
       ),
     };
     setBusy(true);
@@ -884,8 +858,8 @@ export function CellEditor({ cal, cell, onApply }: CellEditorProps) {
   return (
     <div className="border border-slate-700 rounded p-4 space-y-3">
       <div className="text-sm text-slate-300">
-        Editing cell at <span className="font-mono">AWS {awsAt.toFixed(1)} m/s</span>{' '}
-        × <span className="font-mono">|AWA| {awaAt.toFixed(0)}°</span>
+        Editing cell at <span className="font-mono">AWS {awsAt.toFixed(1)} m/s</span> ×{' '}
+        <span className="font-mono">|AWA| {awaAt.toFixed(0)}°</span>
       </div>
       <label className="block text-sm">
         <span className="text-slate-400">Angle correction (degrees):</span>
@@ -924,6 +898,7 @@ git commit -m "feat(web): CellEditor for manual cell value entry"
 ## Task 8: `TackTestWizard` component
 
 **Files:**
+
 - Create: `packages/web/src/app/calibration/wind/TackTestWizard.tsx`
 
 State machine:
@@ -949,10 +924,7 @@ The wizard listens to live `wind.true.calibrated.{angle,speed,direction}` channe
 
 import { useMemo, useState } from 'react';
 import type { AwsAwaCalTable } from '@h6000/db';
-import {
-  computeTackCorrection,
-  type TackCapture,
-} from '@h6000/compute';
+import { computeTackCorrection, type TackCapture } from '@h6000/compute';
 import { useSse } from '../../../hooks/use-sse.js';
 import { useChannelHistory } from '../../../hooks/use-channel-history.js';
 
@@ -995,12 +967,7 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
     const twsAvg = tws.average();
     const awaAvg = awa.average();
     const awsAvg = aws.average();
-    if (
-      twdAvg === null ||
-      twsAvg === null ||
-      awaAvg === null ||
-      awsAvg === null
-    ) {
+    if (twdAvg === null || twsAvg === null || awaAvg === null || awsAvg === null) {
       return null;
     }
     return { twd: twdAvg, tws: twsAvg, awa: awaAvg, aws: awsAvg };
@@ -1122,12 +1089,12 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
             Starboard TWD:{' '}
             <span className="font-mono">{(state.starboard.twd * RAD_TO_DEG).toFixed(1)}°</span>
             <br />
-            Difference: <span className="font-mono">{(result.twdDiff * RAD_TO_DEG).toFixed(2)}°</span>
+            Difference:{' '}
+            <span className="font-mono">{(result.twdDiff * RAD_TO_DEG).toFixed(2)}°</span>
           </div>
           <div className="text-slate-200">
             Suggested correction at cell (AWS{' '}
-            <span className="font-mono">{cal.awsBins[result.cell.awsIdx]!.toFixed(0)}</span>,{' '}
-            |AWA|{' '}
+            <span className="font-mono">{cal.awsBins[result.cell.awsIdx]!.toFixed(0)}</span>, |AWA|{' '}
             <span className="font-mono">
               {(cal.awaBins[result.cell.awaIdx]! * RAD_TO_DEG).toFixed(0)}°
             </span>
@@ -1140,10 +1107,7 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
             >
               Apply
             </button>
-            <button
-              onClick={reset}
-              className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
-            >
+            <button onClick={reset} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
               Discard
             </button>
           </div>
@@ -1153,10 +1117,7 @@ export function TackTestWizard({ cal, onApply }: TackTestWizardProps) {
       {state.kind === 'applied' && (
         <div className="space-y-2">
           <p className="text-sm text-green-400">Correction applied.</p>
-          <button
-            onClick={reset}
-            className="px-3 py-1 bg-slate-700 text-slate-200 rounded"
-          >
+          <button onClick={reset} className="px-3 py-1 bg-slate-700 text-slate-200 rounded">
             Run another tack test
           </button>
         </div>
@@ -1186,6 +1147,7 @@ git commit -m "feat(web): TackTestWizard with capture/review/apply state machine
 ## Task 9: `/calibration/wind` page
 
 **Files:**
+
 - Create: `packages/web/src/app/calibration/wind/page.tsx`
 
 The page combines `CalHeatmap`, `CellEditor` (when a cell is selected), and `TackTestWizard`. It loads the current cal table from the API and provides a callback for both editor and wizard to PUT updates back.
@@ -1203,9 +1165,7 @@ import { TackTestWizard } from './TackTestWizard.js';
 
 export default function CalibrationWindPage() {
   const [cal, setCal] = useState<AwsAwaCalTable | null>(null);
-  const [selected, setSelected] = useState<{ awsIdx: number; awaIdx: number } | null>(
-    null,
-  );
+  const [selected, setSelected] = useState<{ awsIdx: number; awaIdx: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const reload = useCallback(async (): Promise<void> => {
@@ -1254,9 +1214,7 @@ export default function CalibrationWindPage() {
               selected={selected ?? undefined}
               onSelect={(c) => setSelected(c)}
             />
-            {selected && (
-              <CellEditor cal={cal} cell={selected} onApply={handleApply} />
-            )}
+            {selected && <CellEditor cal={cal} cell={selected} onApply={handleApply} />}
           </section>
 
           <section className="space-y-3">
@@ -1360,6 +1318,7 @@ git commit -m "chore: final polish after Plan 4 manual verification"
 ## Closing notes
 
 After this plan:
+
 - Manual cell editing: visit `/calibration/wind`, click cell, enter degrees, apply.
 - Tack-test wizard: sail upwind on port, tap Capture, tack, sail steady on starboard, tap Capture, review correction, Apply. The cell is updated and the compute pipeline hot-reloads.
 - Plan 3's REST PUT endpoint is now exercised by real UI.
@@ -1367,6 +1326,7 @@ After this plan:
 The math has been independently TDD-tested; the UI is manually verified. The first real-boat test of the wizard will be the moment the H6000 starts beating the H5000 in calibration quality (assuming you actually save corrections).
 
 Plan 5 candidates:
+
 - BSP cal page + dockside swing for compass deviation + boat config form (the easy cal rounds — same pattern as this, just 1D tables).
 - Polars editor with Expedition CSV import.
 - Autopilot decode → shadow mode (the highest-stakes work — needs the existing tooling to capture H5000 → course computer traffic and diff against our shadow).
