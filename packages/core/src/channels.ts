@@ -28,4 +28,16 @@ export const Channels = {
     Yaw: 'motion.yaw',
     RateOfTurn: 'motion.rateOfTurn',
   },
+  Autopilot: {
+    /** Steering mode (enum from PGN 127237: "Heading Control", "Track Control", etc.). */
+    Mode: 'autopilot.mode',
+    /** Heading-To-Steer in radians [0, 2π). */
+    TargetHeading: 'autopilot.target.heading',
+    /** Commanded rudder angle in radians (signed; +stbd, -port). */
+    CommandedRudder: 'autopilot.commandedRudder',
+    /** Vessel heading per autopilot's own reference, radians. */
+    ActualHeading: 'autopilot.actual.heading',
+    /** Track-to-steer in radians when in Track Control mode. */
+    TargetTrack: 'autopilot.target.track',
+  },
 } as const;

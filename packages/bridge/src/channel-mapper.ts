@@ -85,6 +85,60 @@ const mappers: Record<number, MapperFn> = {
     ];
   },
 
+  // PGN 127237 — Heading/Track Control (standard autopilot).
+  // We surface a useful subset; canboatjs's decoded field names match the
+  // canboat database conventions: "Steering Mode", "Heading-To-Steer (Course)",
+  // "Commanded Rudder Angle", "Vessel Heading", "Track".
+  127237: (pgn) => {
+    const out: Sample[] = [];
+    const mode = pgn.fields['Steering Mode'];
+    if (typeof mode === 'string') {
+      out.push({
+        channel: Channels.Autopilot.Mode,
+        t_ns: pgn.rxTimestamp,
+        value: { kind: 'enum', value: mode },
+        source: sourceTag(pgn),
+      });
+    }
+    const targetHdg = pgn.fields['Heading-To-Steer (Course)'];
+    if (typeof targetHdg === 'number') {
+      out.push({
+        channel: Channels.Autopilot.TargetHeading,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(targetHdg, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    const rudder = pgn.fields['Commanded Rudder Angle'];
+    if (typeof rudder === 'number') {
+      out.push({
+        channel: Channels.Autopilot.CommandedRudder,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(rudder, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    const actualHdg = pgn.fields['Vessel Heading'];
+    if (typeof actualHdg === 'number') {
+      out.push({
+        channel: Channels.Autopilot.ActualHeading,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(actualHdg, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    const track = pgn.fields['Track'];
+    if (typeof track === 'number') {
+      out.push({
+        channel: Channels.Autopilot.TargetTrack,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(track, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    return out;
+  },
+
   // PGN 127257 — attitude (yaw/pitch/roll, all in radians).
   // Sailing convention: roll = heel.
   127257: (pgn) => {
