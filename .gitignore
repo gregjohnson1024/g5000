@@ -41,3 +41,10 @@ coverage/
 # Next.js (top-level .next/ covers all workspace .next/ as well)
 packages/*/out/
 apps/*/out/
+
+# Next.js auto-generated — rewritten on every build, varies between dev/prod runs
+packages/*/next-env.d.ts
+
+# Dev-session artifacts (Playwright snapshots and ad-hoc screenshots)
+.playwright-mcp/
+*.png
