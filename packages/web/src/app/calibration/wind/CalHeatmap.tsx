@@ -17,13 +17,15 @@ export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
   // Inline style for the cell color since Tailwind v4's JIT may not pick up
   // dynamic arbitrary classnames at every value.
   const cellStyle = (v: number): React.CSSProperties => {
-    if (Math.abs(v) < 1e-9) return { backgroundColor: '#1e293b' };
+    if (Math.abs(v) < 1e-9) return { backgroundColor: '#1e293b', color: '#e2e8f0' };
     const intensity = Math.min(1, Math.abs(v) / maxAbs);
     const channel = Math.floor(intensity * 200 + 30);
-    if (v < 0) {
-      return { backgroundColor: `rgb(${channel},24,24)` };
-    }
-    return { backgroundColor: `rgb(24,24,${channel})` };
+    const r = v < 0 ? channel : 24;
+    const g = 24;
+    const b = v < 0 ? 24 : channel;
+    const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    const color = luma > 0.55 ? '#0f172a' : '#e2e8f0';
+    return { backgroundColor: `rgb(${r},${g},${b})`, color };
   };
 
   return (

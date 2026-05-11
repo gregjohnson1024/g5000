@@ -16,13 +16,16 @@ export function PolarHeatmap({ polar, selected, onSelect }: PolarHeatmapProps) {
   const maxBsp = Math.max(1e-6, ...polar.boatSpeed.flat());
 
   const cellStyle = (v: number): React.CSSProperties => {
-    if (v <= 0) return { backgroundColor: '#1e293b' };
+    if (v <= 0) return { backgroundColor: '#1e293b', color: '#e2e8f0' };
     const intensity = Math.min(1, v / maxBsp);
     // Cool teal → bright cyan as speed rises.
     const r = Math.floor(24 + intensity * 80);
     const g = Math.floor(80 + intensity * 150);
     const b = Math.floor(160 + intensity * 60);
-    return { backgroundColor: `rgb(${r},${g},${b})` };
+    // Switch text colour by perceived luminance so cells stay legible at the bright end.
+    const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    const color = luma > 0.55 ? '#0f172a' : '#e2e8f0';
+    return { backgroundColor: `rgb(${r},${g},${b})`, color };
   };
 
   return (
