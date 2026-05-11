@@ -58,6 +58,12 @@ async function readHeaderStartedAt(filePath: string): Promise<string | undefined
       }
       return undefined;
     }
+  } catch {
+    // Tolerate truncated or still-open gzip streams (e.g., the live session
+    // log file held open by an autopilot-server in record mode). Returning
+    // undefined here lets listSessions still surface the file in the listing
+    // with mtime/size only.
+    return undefined;
   } finally {
     lines.close();
   }
@@ -101,6 +107,10 @@ export async function summarizeSession(filePath: string): Promise<SessionSummary
         lastNs = ns;
       }
     }
+  } catch {
+    // Tolerate truncated or still-open gzip streams. Partial counts are
+    // returned with whatever was successfully read so the UI can still show
+    // a meaningful summary for a live or interrupted session log.
   } finally {
     lines.close();
   }
