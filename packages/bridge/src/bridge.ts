@@ -5,6 +5,7 @@ import { decode } from './decoder.js';
 import { mapPgnToSamples } from './channel-mapper.js';
 import { mapSentenceToSamples } from './nmea0183/channel-mapper.js';
 import { getSharedDeviceRegistry } from './index.js';
+import { handleAisPgn, isAisPgn } from './ais/ais-handler.js';
 
 export interface BridgeOptions {
   bus: Bus;
@@ -47,6 +48,20 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
         error: (err) => {
           // eslint-disable-next-line no-console
           console.error('[bridge] device-registry pipeline error', err);
+        },
+      }),
+    );
+
+    // AIS path: AIS PGNs feed the per-MMSI targets registry rather than the
+    // bus, so we don't get per-vessel channel proliferation.
+    subs.push(
+      decoded$.subscribe({
+        next: (pgn) => {
+          if (isAisPgn(pgn.pgn)) handleAisPgn(pgn.pgn, pgn.fields);
+        },
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] AIS pipeline error', err);
         },
       }),
     );

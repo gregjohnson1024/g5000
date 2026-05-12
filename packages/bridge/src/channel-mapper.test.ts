@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { mapPgnToSamples } from './channel-mapper.js';
 import type { DecodedPgn } from './decoder.js';
-import { Channels } from '@g5000/core';
+import { Channels, _resetAisTargetsForTests, getSharedAisTargets } from '@g5000/core';
+import { handleAisPgn, isAisPgn } from './ais/ais-handler.js';
+import { createAisTargetsRegistry } from './ais/targets-registry.js';
 
 const make = (pgn: number, fields: Record<string, unknown>): DecodedPgn => ({
   pgn,
@@ -153,5 +155,137 @@ describe('mapPgnToSamples', () => {
     const channels = new Set(samples.map((s) => s.channel));
     expect(channels.has(Channels.Autopilot.Mode)).toBe(true);
     expect(channels.has(Channels.Autopilot.TargetHeading)).toBe(false);
+  });
+
+  it('does NOT publish samples for AIS PGNs (they feed the registry instead)', () => {
+    // AIS PGNs deliberately have no mapper entry — they go through the
+    // separate ais-handler pipeline so we don't proliferate per-MMSI channels
+    // on the bus.
+    const decoded = make(129038, { 'User ID': 12345, Latitude: 40, Longitude: -74 });
+    expect(mapPgnToSamples(decoded)).toEqual([]);
+  });
+});
+
+describe('AIS PGN handler', () => {
+  beforeEach(() => _resetAisTargetsForTests());
+
+  it('isAisPgn() recognises the v1 AIS PGN set', () => {
+    expect(isAisPgn(129038)).toBe(true);
+    expect(isAisPgn(129039)).toBe(true);
+    expect(isAisPgn(129040)).toBe(true);
+    expect(isAisPgn(129794)).toBe(true);
+    expect(isAisPgn(129809)).toBe(true);
+    expect(isAisPgn(129810)).toBe(true);
+    expect(isAisPgn(127250)).toBe(false);
+    expect(isAisPgn(130306)).toBe(false);
+  });
+
+  it('decodes a 129038 Class A position into the registry', () => {
+    createAisTargetsRegistry();
+    handleAisPgn(129038, {
+      'User ID': 538003154,
+      Longitude: -74.123,
+      Latitude: 40.456,
+      COG: 1.23,
+      SOG: 5.5,
+      Heading: 1.22,
+      'Rate of Turn': 0.001,
+    });
+    const r = getSharedAisTargets()!;
+    const t = r.get(538003154)!;
+    expect(t.vesselClass).toBe('A');
+    expect(t.lat).toBeCloseTo(40.456);
+    expect(t.lon).toBeCloseTo(-74.123);
+    expect(t.sog).toBe(5.5);
+    expect(t.cog).toBe(1.23);
+    expect(t.heading).toBe(1.22);
+    expect(t.rateOfTurn).toBe(0.001);
+  });
+
+  it('handles 129040 Class B extended (True Heading + Type of ship)', () => {
+    createAisTargetsRegistry();
+    handleAisPgn(129040, {
+      'User ID': 367123456,
+      Latitude: 40,
+      Longitude: -74,
+      COG: 0.5,
+      SOG: 3,
+      'True Heading': 0.6,
+      'Type of ship': 36,
+      Length: 80,
+      Beam: 15,
+      Name: 'PASSENGER VESSEL',
+    });
+    const t = getSharedAisTargets()!.get(367123456)!;
+    expect(t.vesselClass).toBe('B');
+    expect(t.heading).toBe(0.6);
+    expect(t.vesselType).toBe(36);
+    expect(t.length).toBe(80);
+    expect(t.beam).toBe(15);
+    expect(t.name).toBe('PASSENGER VESSEL');
+  });
+
+  it('ignores PGNs without a valid MMSI', () => {
+    createAisTargetsRegistry();
+    expect(handleAisPgn(129038, { 'User ID': 0, Latitude: 1, Longitude: 2 })).toBe(false);
+    expect(handleAisPgn(129038, { Latitude: 1, Longitude: 2 })).toBe(false);
+    expect(handleAisPgn(129038, { 'User ID': 'not-a-number', Latitude: 1 })).toBe(false);
+    expect(getSharedAisTargets()!.all()).toEqual([]);
+  });
+
+  it('ignores non-AIS PGNs', () => {
+    createAisTargetsRegistry();
+    expect(handleAisPgn(127250, { 'User ID': 123, Heading: 1.5 })).toBe(false);
+    expect(getSharedAisTargets()!.all()).toEqual([]);
+  });
+
+  it('merges static-data PGN (129809) into existing target', () => {
+    const r = createAisTargetsRegistry();
+    handleAisPgn(129039, { 'User ID': 99, Latitude: 10, Longitude: 20, SOG: 4 });
+    handleAisPgn(129809, { 'User ID': 99, Name: 'TEST VESSEL' });
+    const t = r.get(99)!;
+    expect(t.name).toBe('TEST VESSEL');
+    expect(t.lat).toBe(10);
+    expect(t.lon).toBe(20);
+    expect(t.sog).toBe(4);
+  });
+
+  it('merges 129810 Part B static data (vesselType/length/beam)', () => {
+    const r = createAisTargetsRegistry();
+    handleAisPgn(129809, { 'User ID': 200, Name: 'SAILBOAT' });
+    handleAisPgn(129810, {
+      'User ID': 200,
+      'Type of ship': 36,
+      Length: 12,
+      Beam: 4,
+    });
+    const t = r.get(200)!;
+    expect(t.name).toBe('SAILBOAT');
+    expect(t.vesselType).toBe(36);
+    expect(t.length).toBe(12);
+    expect(t.beam).toBe(4);
+  });
+
+  it('lazily creates the registry if no one called createAisTargetsRegistry() first', () => {
+    expect(getSharedAisTargets()).toBeUndefined();
+    handleAisPgn(129038, { 'User ID': 555, Latitude: 1, Longitude: 1 });
+    expect(getSharedAisTargets()).toBeDefined();
+    expect(getSharedAisTargets()!.get(555)).toBeDefined();
+  });
+
+  it('accepts camelCase field names as fallback (canboatjs version drift safety)', () => {
+    createAisTargetsRegistry();
+    handleAisPgn(129038, {
+      userId: 1001,
+      latitude: 40,
+      longitude: -74,
+      cog: 1,
+      sog: 2,
+    });
+    const t = getSharedAisTargets()!.get(1001)!;
+    expect(t.lat).toBe(40);
+    expect(t.lon).toBe(-74);
+    expect(t.cog).toBe(1);
+    expect(t.sog).toBe(2);
   });
 });
