@@ -5,6 +5,7 @@
     { "path": "./packages/db" },
     { "path": "./packages/compute" },
     { "path": "./packages/bridge" },
+    { "path": "./packages/grib" },
     { "path": "./apps/autopilot-server" }
   ]
 }
