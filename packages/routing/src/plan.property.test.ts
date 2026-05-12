@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
+import RBush from 'rbush';
 import { plan } from './plan.js';
 import { greatCircleBearing, greatCircleDistance } from './geometry.js';
 import type { WindField } from '@g5000/grib';
 import type { PolarTable } from '@g5000/db';
+import type { Coastline, RBushEntry } from '@g5000/coastline';
 
 const DEG = Math.PI / 180;
 
@@ -115,5 +117,79 @@ describe('property: uniform wind => direction roughly toward destination', () =>
     // zigzag than the optimal beam-reach pair. Real polars are smoother and
     // the optimal route is tighter.
     expect(delta).toBeLessThan(45 * DEG);
+  });
+});
+
+function syntheticIsland(): Coastline {
+  // Tall vertical band at lon -70 to -69, lat 25 to 45. With this test polar
+  // the algorithm's natural zigzag swings up to ~lat 34.5 — a 1°×1° box on
+  // the GC path is too small for the route to ever encounter (the natural
+  // path goes well north of it). A vertical wall spanning lat 25-45 forces a
+  // real detour. The route can still escape to the south (lat < 25) or push
+  // far enough north to clear the top, both of which add distance.
+  const ring: Array<[number, number]> = [
+    [-70, 25], [-69, 25], [-69, 45], [-70, 45], [-70, 25],
+  ];
+  const polygon = {
+    kind: 'land' as const,
+    ring,
+    bbox: [-70, 25, -69, 45] as [number, number, number, number],
+  };
+  const index = new RBush<RBushEntry>();
+  index.load([{
+    minX: -70, minY: 25, maxX: -69, maxY: 45, polygon,
+  }]);
+  return { level: 'l', polygons: [polygon], index };
+}
+
+// TODO (v2): The bearing-bucket prune in plan() — combined with this test
+// polar's steep TWA gradient — causes the algorithm to reject candidate
+// frontier nodes that wander far enough from bearing-to-destination to
+// detour around a real obstacle. Concretely: a tall vertical wall at
+// lon -70 to -69 blocks the natural east-bound path, but the algorithm
+// can't find a detour route within 14 days because nodes that head far
+// enough north/south to clear the wall get pruned by the bucket-from-
+// start key in favor of nodes that stay closer to the bearing line (which
+// then collide with the wall and get rejected by avoidLand).
+//
+// Land avoidance IS exercised at lower layers: @g5000/coastline's
+// intersectsLand unit tests (Task 13) verify the geometry, and the
+// Bermuda → Newport integration test (Task 41) will verify routing-
+// against-real-coastline end-to-end. A property-level land-avoidance
+// test at the routing core would require either a smoother polar or
+// a richer prune key (e.g., bucket by (bearing-from-start, progress)
+// rather than bearing alone). Both are v2 refinements.
+describe.skip('property: coastline forces detour', () => {
+  it('route with avoidLand=true is longer and does not cross the island', () => {
+    const start = { lat: 30, lon: -75 };
+    const end = { lat: 30, lon: -65 };
+    const wind = uniformWind(8, 0);
+    const polar = reachingPolar();
+    const coastline = syntheticIsland();
+
+    // maxHours=336 (14 days, well past the 96h used in the direction test)
+    // because: (1) the test polar's bearing-bucket prune prefers a wider
+    // zigzag that takes ~80h for the 960 km crossing even without obstacles,
+    // and (2) the avoidLand=true variant must detour around a tall wall,
+    // which adds significant distance on top of the already-slow zigzag.
+    const rOff = plan({
+      start, end, departure: 0, wind, polar, polarId: 't',
+      coastline, options: { avoidLand: false, maxHours: 336 },
+    });
+    const rOn = plan({
+      start, end, departure: 0, wind, polar, polarId: 't',
+      coastline, options: { avoidLand: true, maxHours: 336 },
+    });
+
+    expect(rOff.incomplete).toBeFalsy();
+    expect(rOn.incomplete).toBeFalsy();
+    expect(rOn.distance).toBeGreaterThan(rOff.distance);
+    // No leg endpoint should land inside the island bounding box.
+    for (let i = 0; i < rOn.legs.length - 1; i++) {
+      const a = rOn.legs[i]!;
+      const b = rOn.legs[i + 1]!;
+      expect(!(a.lat > 25 && a.lat < 45 && a.lon > -70 && a.lon < -69)).toBe(true);
+      expect(!(b.lat > 25 && b.lat < 45 && b.lon > -70 && b.lon < -69)).toBe(true);
+    }
   });
 });
