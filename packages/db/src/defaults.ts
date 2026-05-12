@@ -142,6 +142,8 @@ export interface SailConfig {
   mainState?: string;
   headsail?: string;
   downwindSail?: string;
+  /** Daggerboard state: 'down' (upwind/reaching), 'half', 'up' (running). Optional. */
+  daggerboard?: 'down' | 'half' | 'up';
   notes?: string;
   /** This config's polar table. */
   polar: PolarTable;

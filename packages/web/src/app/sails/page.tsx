@@ -242,6 +242,23 @@ export default function SailsPage() {
                           className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
                         />
                       </label>
+                      <label className="block text-sm">
+                        <span className="text-slate-400">Daggerboard:</span>
+                        <select
+                          value={c.daggerboard ?? ''}
+                          onChange={(e) =>
+                            updateConfig(c.id, {
+                              daggerboard: (e.target.value as 'down' | 'half' | 'up') || undefined,
+                            })
+                          }
+                          className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
+                        >
+                          <option value="">— (unset)</option>
+                          <option value="down">Down</option>
+                          <option value="half">Half</option>
+                          <option value="up">Up</option>
+                        </select>
+                      </label>
                     </div>
 
                     <div className="flex items-center gap-3">

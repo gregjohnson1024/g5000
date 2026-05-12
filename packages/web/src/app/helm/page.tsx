@@ -110,6 +110,12 @@ export default function HelmPage() {
               </option>
             ))}
           </select>
+          {wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)?.daggerboard && (
+            <span className="px-2 py-0.5 rounded bg-amber-700 text-amber-100 text-xs font-mono uppercase">
+              boards{' '}
+              {wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)?.daggerboard}
+            </span>
+          )}
           <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
             manage
           </a>
