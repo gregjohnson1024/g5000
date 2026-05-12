@@ -81,67 +81,67 @@ Inferable from the release notes + marketing copy:
   — operator-level wisdom, see `autopilot-design-notes.md` for the
   distilled lessons.
 
-## 4. The overlay-vs-replace question (the load-bearing decision)
+## 4. Topology note: Exocet overlays, we're replacing
 
-Pixel sur Mer's Exocet Essential implementation is an **overlay** on the
-H5000 system, not a replacement. From the Yachting World article:
+Worth flagging because the topologies are visibly different and a future
+maintainer might wonder: **Exocet Essential is an overlay on the H5000,
+not a replacement.** From Yachting World:
 
 > "The Exocet's overlays take the form of an expert system – a type of
 > AI – that sits between the user and the H5000 controller, with the
 > system changing the requested pilot heading depending on inputs from
 > sensor data, including speed, heel and wind data."
 
-So Exocet:
+So Exocet modifies the *target* the H5000 course computer receives but
+lets the H5000 own the actual rudder-drive PID.
 
-- Receives the user's intent (target heading or wind-angle)
-- Reads sensor data from the bus
-- Computes a *modified* target heading (e.g. bear away in a gust before
-  heel builds)
-- **Sends the modified target to the H5000 course computer via the
-  normal PGN 127237 or H-LINK channel**
-- Lets the H5000 do the actual rudder-drive PID — the validated
-  rudder-load, hard-over-time, etc., logic stays B&G's
+**Our master spec §7 deliberately picks the other path: replace the
+H5000 CPU outright** with our own primary/standby/shadow model
+(§7.3, §7.5, §10 step 21). We take ownership of the full pilot stack —
+target generation, PID, safety bounds, hardware fault handling — and
+the H5000 course computer becomes just the rudder-drive amplifier we
+talk to via PGN 127237 + the B&G proprietary 1857 PGNs.
 
-Our master spec §7 was written assuming we'd replace the H5000 CPU with
-our own primary/standby/shadow model. Compare topologies:
+The replace path is more work but is what the spec says we're doing.
+The Exocet feature inventory below is therefore strictly a survey of
+*what features we might want to copy* — not a topology argument.
 
-| Approach | Pros | Cons |
+## 4a. Feature-gap inventory (Exocet has it, we don't yet)
+
+Cross-referenced against the master-spec §10 build sequence and the
+current commit. Sorted by my judgement of value-for-our-boat.
+
+### High value — should add
+
+| Exocet feature | Our state | Notes |
 |---|---|---|
-| **Replace (current spec)** | Full ownership of pilot algorithm; can use any course computer; not gated by H5000 firmware | We become responsible for rudder safety, sanity bounds, hardware-level fault handling. Big surface area. |
-| **Overlay (Exocet's approach)** | Keep H5000's validated rudder-drive logic. Only need to ship "expert systems" that bias the target. Much smaller surface area for Phase 0c. User can disable our overlay and fall back to vanilla H5000 mid-sail. | Tied to whatever target-heading-bias the H5000 will accept; bounded by H5000's PID response (so we can't fix bad H5000 behaviour). |
+| **Man Over Board** (button + DR bearing/range channels — H-LINK fns 185, 186) | Not in master spec | Safety. Big red button on the page; stamps GPS pos; surfaces `mob.dr.bearing` + `mob.dr.range` channels; helm tile group. |
+| **Alerts engine + `/alerts` page** (history, mute, per-channel sector/low/high rules; H-LINK message types 32/33/34) | We have `alarm.autopilot.watchdog` channel name and that's it — no engine, no UI | Define an alarm-rule type per channel; central engine subscribes the bus and publishes `alarm.*` events; UI lists active + history. |
+| **Tidal Set + Drift as first-class channels** (Exocet exposes; H5000 H-LINK fns 131, 132) | Spec §6.4 Kalman model produces this vector internally but doesn't expose it | One small follow-on once §6.4 lands: publish `tidal.set` (rad) and `tidal.drift` (m/s) channels; helm tile pair. |
+| **Operating-variable channels — daggerboard up/down at minimum** | Polar is keyed only by TWS/TWA; no provision for boards-up vs boards-down | Real catamaran impact: boards-up vs boards-down can shift target speeds by 10–20%. Today the sail wardrobe handles sail config but not appendage config. Two options: (a) add a boards-position channel + a boards-axis to the polar table, (b) use the wardrobe to encode "Default — boards down" + "Default — boards up" as separate sail configs. (b) is cheaper, (a) is more flexible. |
+| **PHSPD / PASHR 0183 frames** | We parse MWV; not these | PHSPD = high-precision speed-and-heading (B&G/Garmin), PASHR = Applanix/Hemisphere proprietary attitude. Worth knowing they exist — add only if a sensor on the boat emits them. |
+| **Layered diagnose view on `/autopilot`** | Not in master spec | Per the H5000 design notes (`autopilot-design-notes.md`). The Exocet UI surfaces sensor freshness + algorithm state separately. We already publish all the underlying observables; just need the assembly page. |
 
-**For our build**, the overlay topology is probably the right place to
-start, even if the spec eventually evolves to "replace". Reasons:
+### Medium value — worth a follow-up
 
-1. The H5000 course computer is already on the boat. Its rudder-drive
-   PID is tuned and works. Re-validating that ourselves is a multi-day
-   on-water exercise we don't need to take on first.
-2. Phase 0b shadow mode → Phase 0c overlay is a *much smaller step*
-   than Phase 0b shadow → Phase 0c replace. The shadow log already
-   compares our intended target heading against the H5000's. To go live
-   in overlay mode, we just emit the same target to the H5000 instead
-   of writing it to the file sink. The H5000 keeps doing all the
-   actual steering work.
-3. If we later decide we want to fully replace, the spec already covers
-   that path — we don't lose any architectural flexibility, we just
-   defer the replace work.
-4. The "expert systems" (Gust Response, TWS Response, Heel Compensation
-   from the H5000 design notes) are exactly the things we'd build in an
-   overlay. The blur.se autopilot post says these are also where the
-   real value is — the underlying PID is already commodity.
+| Exocet feature | Our state | Notes |
+|---|---|---|
+| **Race timer + start-line tools** (start-line bearing, port/stbd-end distance, line bias; H-LINK fns 152, 272-275, 281) | Master spec §2.1 explicitly excluded | Spec exclusion was about scope, not about value. Race timer is small; start-line tools are bigger. Worth re-opening if a regatta is on the calendar. |
+| **Bidirectional Expedition integration** (`Expedition_in` + `Expedition_out` boxes) | We import polar CSV; no live data exchange | Most race tactical software wants live data IN and waypoint/route OUT. We could expose a `/expedition` integration that speaks their UDP/serial format. H-LINK is already most of the path (Expedition supports H-LINK reads). |
+| **GoFree integration** (B&G's WiFi nav protocol) | Not in spec | The Zeus SR plotter on the boat speaks GoFree. We could read waypoint/route info over WiFi without going through the N2K bus. Useful for /autopilot Navigation mode. |
+| **Heel correction on BSP** (H5000 has 2D BSP[heel_bin][speed_bin]) | Our BSP cal is 1D | H5000 default; meaningful on a heeling monohull, much less on a cat. Worth knowing the table shape if we ever decide to add it; YAGNI for now. |
+| **Optimum Wind Angle channel** distinct from Target TWA (H-LINK fns 53 + 83) | We have `performance.target.twaUpwind` only | H5000 exposes both — function 53 (absolute optimum TWA, polar-derived) and function 83 (signed target TWA accounting for tack). Worth surfacing as separate channels for clarity. |
+| **Damping config exposed via H-LINK** (H5000 H-LINK message type 206) | We have damping config exposed via REST + `/damping` UI; not via H-LINK | Add H-LINK message type 206 support if tactical software wants it; small extension to the H-LINK server. |
 
-**Recommended revision to master spec §7:** Add an Overlay mode between
-shadow (§7.5) and primary (§7.3). The "Phase 0c live engagement" step
-in §10 then becomes "Phase 0c overlay" (we modify the H5000 target via
-PGN 127237 / H-LINK fn 83 `TARGET TWA`), with full primary mode
-remaining a future option for after-the-boat-is-known-good.
+### Out of scope (explicit) — for reference
 
-This is also consistent with what we already built today:
-- H-LINK fn 83 already in our function-number table (writes are not yet
-  implemented but the protocol slot is there).
-- Source priority would let an operator pick "Exocet target" over
-  "raw user target" for `autopilot.target.heading` channel arbitration.
-- The "TX gated when not live" pattern is what an overlay needs.
+- **Manta graphical box editor** — master spec §4.4 rejected this approach (TypeScript channel-mapping wins).
+- **Cloud connectivity / Telegram / Python box / AI prompt** — master spec §2.1 out-of-scope.
+- **AIS / anti-collision / TargetManager** — master spec §2.1 out-of-scope.
+- **Nortek AD2CP** (direct current-profiler hardware) — would obsolete §6.4 Kalman if added, but hardware-dependent; not on this boat.
+- **Cellular telemetry / fleet tracking** — master spec §2.1 out-of-scope.
+- **NMEA 2000 certification + IP67 enclosure** — master spec §2 out-of-scope; we're a personal build.
+- **Many heavily-instrumented operating-variable load cells** (mainsheet load, runner port/stbd, J1/J2/J3 halyard loads, foil port/stbd loads, etc., H-LINK fns 341-349, 350-359) — hardware-dependent; not on this boat.
 
 ## 5. What we can NOT get publicly
 
