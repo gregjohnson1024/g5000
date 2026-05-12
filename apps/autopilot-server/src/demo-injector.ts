@@ -119,7 +119,13 @@ function advance(target: SyntheticTarget, dtSeconds: number, originLat: number):
 export function startDemoInjector(bus: Bus): () => void {
   const startedAt = Date.now();
   const aisRegistry = createAisTargetsRegistry();
-  const targets = buildSyntheticTargets(OWN_LAT, OWN_LON);
+  // Mutable own-boat position so it advances each tick consistently with the
+  // published sog+cog. If we leave own.position fixed while publishing nonzero
+  // sog, the CPA math sees a phantom own-velocity against a stationary position
+  // and computes nonsense TCPAs.
+  let ownLat = OWN_LAT;
+  let ownLon = OWN_LON;
+  const targets = buildSyntheticTargets(ownLat, ownLon);
   let lastTickMs = startedAt;
 
   const id = setInterval(() => {
@@ -159,8 +165,19 @@ export function startDemoInjector(bus: Bus): () => void {
     pub('wind.true.direction', (hdg + twa + 2 * Math.PI) % (2 * Math.PI), 'rad');
     pub('boat.speed.water', bsp, 'm/s');
     pub('boat.heading.magnetic', hdg, 'rad');
-    pub('nav.gps.cog', hdg + 0.03, 'rad');
-    pub('nav.gps.sog', bsp + 0.08, 'm/s');
+    const ownCog = hdg + 0.03;
+    const ownSog = bsp + 0.08;
+    pub('nav.gps.cog', ownCog, 'rad');
+    pub('nav.gps.sog', ownSog, 'm/s');
+
+    // Advance own position consistently with the published velocity so that
+    // own.position and own.cog/sog tell the same story — otherwise CPA math
+    // computes against a phantom velocity.
+    const ownDEast = ownSog * Math.sin(ownCog) * dt;
+    const ownDNorth = ownSog * Math.cos(ownCog) * dt;
+    const mPerDegLonAtOwn = M_PER_DEG_LAT * Math.cos((ownLat * Math.PI) / 180);
+    ownLat += ownDNorth / M_PER_DEG_LAT;
+    ownLon += ownDEast / mPerDegLonAtOwn;
     pub('motion.heel', 0.08 * Math.sin(t / 7), 'rad');
     pub('motion.pitch', 0.03 * Math.cos(t / 5), 'rad');
     pub('motion.yaw', hdg, 'rad');
@@ -170,7 +187,7 @@ export function startDemoInjector(bus: Bus): () => void {
     bus.publish({
       channel: 'nav.gps.position',
       t_ns: now_ns,
-      value: { kind: 'geo', value: { lat: OWN_LAT, lon: OWN_LON } },
+      value: { kind: 'geo', value: { lat: ownLat, lon: ownLon } },
       source: 'demo',
     });
 
@@ -178,7 +195,7 @@ export function startDemoInjector(bus: Bus): () => void {
     // SAILBOAT NEAR target stays in CPA-alarm range for the first few minutes
     // of the demo so the /chart alarm UI shows a threat right away.
     for (const target of targets) {
-      advance(target, dt, OWN_LAT);
+      advance(target, dt, ownLat);
       aisRegistry.upsert({
         mmsi: target.mmsi,
         vesselClass: target.vesselClass,

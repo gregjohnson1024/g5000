@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { computeCpa, type CpaResult } from '@g5000/compute';
 import type { AisTarget, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
@@ -37,10 +37,84 @@ function scalarValue(s: JsonSafeSample | undefined): number | null {
 }
 
 function fmtTcpa(seconds: number): string {
-  if (seconds <= 0) return '—';
+  // Negative TCPA = closest approach already happened (boats are diverging).
+  // Surface that case explicitly rather than collapsing it to "—" which is
+  // indistinguishable from "no data".
+  if (!Number.isFinite(seconds)) return '—';
+  if (seconds < 0) return 'past';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+/**
+ * Lazy-initialised AudioContext + threat-onset detector. Plays a 600 ms 660 Hz
+ * tone whenever a target's threat state flips false→true, and re-pulses every
+ * 5 s while at least one threat persists. Respects browser autoplay policies
+ * by deferring AudioContext creation until first user interaction.
+ */
+function useThreatAudio(threatMmsis: Set<number>, enabled: boolean): { armed: boolean; arm: () => void } {
+  const ctxRef = useRef<AudioContext | null>(null);
+  const prevThreatsRef = useRef<Set<number>>(new Set());
+  const lastPulseRef = useRef(0);
+  const [armed, setArmed] = useState(false);
+
+  const arm = () => {
+    if (ctxRef.current) return;
+    try {
+      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      ctxRef.current = new Ctor();
+      setArmed(true);
+    } catch {
+      /* AudioContext not available; alarm stays visual-only */
+    }
+  };
+
+  const beep = (durationMs: number, frequency: number) => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + durationMs / 1000 + 0.05);
+  };
+
+  useEffect(() => {
+    if (!enabled || !ctxRef.current) {
+      prevThreatsRef.current = new Set(threatMmsis);
+      return;
+    }
+    // Edge: any MMSI in the current set that wasn't in the previous → new threat
+    let newThreatFired = false;
+    for (const m of threatMmsis) {
+      if (!prevThreatsRef.current.has(m)) {
+        beep(600, 660);
+        beep(600, 880); // second harmonic for a more "alarm-y" sound — staggered by 0.05s of stop overhead
+        newThreatFired = true;
+        break;
+      }
+    }
+    // Sustained alarm: re-pulse every 5 s while threats persist (only if we
+    // didn't just fire an onset beep above).
+    if (!newThreatFired && threatMmsis.size > 0) {
+      const now = performance.now();
+      if (now - lastPulseRef.current > 5000) {
+        beep(250, 660);
+        lastPulseRef.current = now;
+      }
+    } else if (newThreatFired) {
+      lastPulseRef.current = performance.now();
+    }
+    prevThreatsRef.current = new Set(threatMmsis);
+  }, [threatMmsis, enabled]);
+
+  return { armed, arm };
 }
 
 export default function ChartPage() {
@@ -124,6 +198,18 @@ export default function ChartPage() {
     cpa.tcpaSeconds > 0 &&
     cpa.tcpaSeconds < alarmConfig.tcpaSeconds;
 
+  // Set of currently-threatening MMSIs — used to drive the audio alarm.
+  const threatMmsis = useMemo(() => {
+    const s = new Set<number>();
+    for (const r of targetsWithCpa) {
+      if (isThreat(r.cpa)) s.add(r.target.mmsi);
+    }
+    return s;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetsWithCpa, alarmConfig.enabled, alarmConfig.cpaMeters, alarmConfig.tcpaSeconds]);
+
+  const { armed: audioArmed, arm: armAudio } = useThreatAudio(threatMmsis, alarmConfig.enabled);
+
   // Course-up rotation: in course-up mode, the canvas rotates clockwise by
   // own's heading so own's heading points up. North-up means no rotation.
   const canvasRotationDeg = northUp ? 0 : -ownHeading * RAD_TO_DEG;
@@ -191,6 +277,19 @@ export default function ChartPage() {
             }`}
           >
             Alarm {alarmConfig.enabled ? 'ON' : 'OFF'}
+          </button>
+          <button
+            type="button"
+            onClick={() => armAudio()}
+            disabled={audioArmed}
+            title={audioArmed ? 'Audio alarm armed — beeps on new threats' : 'Click to enable beep on new threats (browser requires this user gesture)'}
+            className={`px-2 py-1 rounded text-xs ${
+              audioArmed
+                ? 'bg-emerald-700 cursor-default'
+                : 'bg-slate-700 hover:bg-slate-600'
+            }`}
+          >
+            {audioArmed ? 'Audio armed' : 'Arm audio'}
           </button>
           <button
             type="button"
@@ -282,6 +381,73 @@ export default function ChartPage() {
                 y2={center}
                 stroke="#1e293b"
               />
+
+              {/* Predicted CPA markers + connector lines (rendered behind
+                  the target triangles so the triangle stays the dominant
+                  visual). Only drawn for threats with a positive TCPA — past
+                  CPAs aren't relevant to a tactical decision. */}
+              {targetsWithCpa.map(({ target, cpa }) => {
+                if (!cpa || !isThreat(cpa)) return null;
+                if (cpa.tcpaSeconds <= 0) return null;
+                // Target's current relative pos in canvas pixels.
+                const dist = cpa.rangeMeters * metersToPx;
+                const targetX = center + dist * Math.sin(cpa.bearingRadians);
+                const targetY = center - dist * Math.cos(cpa.bearingRadians);
+                // Target's predicted relative pos at TCPA, in canvas pixels.
+                // The compute helper returns this in own-centred east/north
+                // meters; convert to canvas (east → +x, north → -y).
+                const cpaX = center + cpa.cpaRelativeEast * metersToPx;
+                const cpaY = center - cpa.cpaRelativeNorth * metersToPx;
+                // Clamp drawing to the visible chart area — if the CPA point
+                // is off-canvas the dashed connector still terminates at the
+                // edge, but we skip the marker.
+                const cpaInBounds =
+                  Math.hypot(cpaX - center, cpaY - center) < svgRadius + 12;
+                return (
+                  <g key={`cpa-${target.mmsi}`} pointerEvents="none">
+                    <line
+                      x1={targetX}
+                      y1={targetY}
+                      x2={cpaX}
+                      y2={cpaY}
+                      stroke="#fbbf24"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    {cpaInBounds && (
+                      <>
+                        {/* CPA cross-hair */}
+                        <line
+                          x1={cpaX - 6}
+                          y1={cpaY}
+                          x2={cpaX + 6}
+                          y2={cpaY}
+                          stroke="#fbbf24"
+                          strokeWidth="1.5"
+                        />
+                        <line
+                          x1={cpaX}
+                          y1={cpaY - 6}
+                          x2={cpaX}
+                          y2={cpaY + 6}
+                          stroke="#fbbf24"
+                          strokeWidth="1.5"
+                        />
+                        <circle
+                          cx={cpaX}
+                          cy={cpaY}
+                          r={Math.max(3, (cpa.cpaMeters * metersToPx) / 2)}
+                          fill="none"
+                          stroke="#fbbf24"
+                          strokeWidth="0.5"
+                          strokeDasharray="2 2"
+                          opacity="0.5"
+                        />
+                      </>
+                    )}
+                  </g>
+                );
+              })}
 
               {/* AIS targets */}
               {targetsWithCpa.map(({ target, cpa }) => {

@@ -36,6 +36,14 @@ export interface CpaResult {
   rangeMeters: number;
   /** Current bearing from own to target, radians (compass: 0 = N, +ve = E). */
   bearingRadians: number;
+  /**
+   * Predicted position of the target at TCPA, in own-centred east/north meters.
+   * Use this to render the predicted-CPA marker on a chart that's centered on
+   * own. (Own's own predicted position at TCPA is the origin by construction —
+   * the chart frame moves with own.)
+   */
+  cpaRelativeEast: number;
+  cpaRelativeNorth: number;
 }
 
 /**
@@ -94,5 +102,7 @@ export function computeCpa(own: CpaInput, target: CpaInput): CpaResult {
     tcpaSeconds: tcpa,
     rangeMeters: range,
     bearingRadians: bearingWrapped,
+    cpaRelativeEast: cpaX,
+    cpaRelativeNorth: cpaY,
   };
 }

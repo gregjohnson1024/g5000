@@ -86,4 +86,37 @@ describe('computeCpa', () => {
     expect(r.cpaMeters).toBeLessThan(r.rangeMeters);
     expect(r.cpaMeters).toBeGreaterThanOrEqual(0);
   });
+
+  it('exposes cpaRelativeEast/North for chart-marker rendering', () => {
+    // Target 1 NM north, heading SW at 5 kn. Own stationary.
+    const target = {
+      lat: 1 / 60,
+      lon: 0,
+      cog: (5 * Math.PI) / 4, // SW
+      sog: 5 * KN,
+    };
+    const own = { lat: 0, lon: 0, cog: 0, sog: 0 };
+    const r = computeCpa(own, target);
+    // cpaRelativeEast/North should sit on the target's projected line — i.e.
+    // sqrt(east² + north²) must equal cpaMeters by construction.
+    const recomputed = Math.hypot(r.cpaRelativeEast, r.cpaRelativeNorth);
+    expect(recomputed).toBeCloseTo(r.cpaMeters, 5);
+    // For this geometry (target starts 1 NM N of own, heads SW), the CPA
+    // point ends up to the NORTHWEST: target moves SW just long enough to
+    // cancel half its northward offset, leaving NW.
+    expect(r.cpaRelativeEast).toBeLessThan(0);
+    expect(r.cpaRelativeNorth).toBeGreaterThan(0);
+  });
+
+  it('cpaRelativeEast/North = current relative position when tcpa = 0', () => {
+    // Identical velocities → zero relative motion → tcpa = 0, CPA marker at
+    // the target's current position.
+    const own = { lat: 0, lon: 0, cog: Math.PI / 2, sog: 5 * KN };
+    const target = { lat: 0, lon: 1 / 60, cog: Math.PI / 2, sog: 5 * KN };
+    const r = computeCpa(own, target);
+    expect(Math.abs(r.tcpaSeconds)).toBeLessThan(1);
+    // Target is east of own; cpaRelativeEast > 0, cpaRelativeNorth ≈ 0.
+    expect(r.cpaRelativeEast).toBeGreaterThan(0);
+    expect(Math.abs(r.cpaRelativeNorth)).toBeLessThan(10);
+  });
 });
