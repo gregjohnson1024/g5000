@@ -1,6 +1,7 @@
 import { plan } from '@g5000/routing';
 import type { PolarTable } from '@g5000/db';
-import { loadWindFor } from '../../../../lib/grib-context';
+import type { CurrentField } from '@g5000/grib';
+import { loadWindFor, loadCurrentFor } from '../../../../lib/grib-context';
 import { loadDefaultCoastline } from '../../../../lib/coastline';
 
 export const dynamic = 'force-dynamic';
@@ -56,6 +57,10 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const bbox = bboxAround(b.start, b.end);
     const wind = await loadWindFor(b.model, bbox, 120);
+    let currents: CurrentField | undefined;
+    if (b.useCurrents) {
+      currents = await loadCurrentFor(bbox, 120);
+    }
     const coastline = await loadDefaultCoastline();
     const route = plan({
       start: b.start,
@@ -65,7 +70,8 @@ export async function POST(req: Request): Promise<Response> {
       polar: b.polar,
       polarId: b.polarId,
       coastline,
-      options: b.options,
+      currents,
+      options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents },
     });
     return Response.json({ ok: true, route });
   } catch (err) {

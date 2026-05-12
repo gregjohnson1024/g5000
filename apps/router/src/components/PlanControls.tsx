@@ -8,6 +8,7 @@ export interface PlanRequest {
   model: 'GFS' | 'ECMWF';
   polarId: string;
   polar: unknown;
+  useCurrents?: boolean;
 }
 
 export function PlanControls(props: {
@@ -20,6 +21,7 @@ export function PlanControls(props: {
   const [departure, setDeparture] = useState<string>(
     new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
   );
+  const [useCurrents, setUseCurrents] = useState<boolean>(false);
   const onSubmit = async () => {
     const polarRes = await fetch('/api/live/polar');
     if (!polarRes.ok) return alert('No polar available (live or cached).');
@@ -33,6 +35,7 @@ export function PlanControls(props: {
       model,
       polarId: polar.id ?? 'default',
       polar: polar.polar ?? polar,
+      useCurrents,
     });
   };
   return (
@@ -54,6 +57,15 @@ export function PlanControls(props: {
           <option value="GFS">GFS (NOAA)</option>
           <option value="ECMWF">ECMWF</option>
         </select>
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={useCurrents}
+          onChange={(e) => setUseCurrents(e.target.checked)}
+          className="bg-slate-900 border border-slate-700 rounded"
+        />
+        Use surface currents (RTOFS)
       </label>
       <button
         disabled={props.loading || !props.start || !props.end}
