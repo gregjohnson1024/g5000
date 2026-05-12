@@ -8,3 +8,4 @@ export * from './log-stream.js';
 export * from './damping.js';
 export * from './selector.js';
 export * from './observed-sources.js';
+export * from './ais-targets.js';

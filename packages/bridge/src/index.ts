@@ -16,6 +16,7 @@ export {
 } from './persistence/session-summary.js';
 export * from './tx/true-wind-tx.js';
 export * from './devices/device-registry.js';
+export * from './ais/targets-registry.js';
 
 import { DeviceRegistry } from './devices/device-registry.js';
 
