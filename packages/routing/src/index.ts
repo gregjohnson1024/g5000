@@ -8,3 +8,4 @@ export {
   normalizeAngle,
   normalizeBearing,
 } from './geometry.js';
+export { decomposeWind, twaFromWindAndHeading } from './wind.js';
