@@ -12,3 +12,11 @@ export {
   type CacheModel,
   type CacheVariable,
 } from './cache.js';
+export {
+  buildGfsUrl,
+  pickGfsRunForDeparture,
+  gfsForecastHoursForRange,
+  fetchGfsBlobs,
+  type BuildGfsUrlOpts,
+  type FetchGfsOpts,
+} from './fetch-gfs.js';
