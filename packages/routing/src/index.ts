@@ -9,3 +9,4 @@ export {
   normalizeBearing,
 } from './geometry.js';
 export { decomposeWind, twaFromWindAndHeading } from './wind.js';
+export { generateHeadingFan } from './fan.js';
