@@ -7,3 +7,4 @@ export {
   type Point,
 } from './geometry.js';
 export { loadCoastlineFromGeojson } from './load.js';
+export { isOnLand, intersectsLand } from './queries.js';
