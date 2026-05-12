@@ -1,0 +1,23 @@
+{
+  "name": "@g5000/coastline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "fetch": "tsx scripts/fetch-coastline.ts"
+  },
+  "dependencies": {
+    "rbush": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/rbush": "^4",
+    "tsx": "^4",
+    "typescript": "^5.7",
+    "vitest": "^2"
+  }
+}

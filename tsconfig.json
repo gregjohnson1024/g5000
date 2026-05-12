@@ -6,6 +6,7 @@
     { "path": "./packages/compute" },
     { "path": "./packages/bridge" },
     { "path": "./packages/grib" },
+    { "path": "./packages/coastline" },
     { "path": "./apps/autopilot-server" }
   ]
 }
