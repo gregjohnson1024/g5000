@@ -210,6 +210,30 @@ export type SourcePriorityConfig = SourcePriorityRule[];
  */
 export const DEFAULT_SOURCE_PRIORITY: SourcePriorityConfig = [];
 
+/**
+ * AIS CPA alarm configuration. The /chart page (and any future compute-side
+ * alerter) reads this to decide whether to raise a collision-avoidance alarm
+ * for a given AIS target.
+ *
+ * An alarm fires for a target iff `enabled` AND its CPA is < `cpaMeters`
+ * AND its TCPA is positive (closing) AND < `tcpaSeconds`.
+ */
+export interface AisAlarmConfig {
+  /** Master enable switch. When false, no targets are highlighted as threats. */
+  enabled: boolean;
+  /** CPA threshold in meters. Default 1852 m = 1 NM. */
+  cpaMeters: number;
+  /** TCPA threshold in seconds. Default 600 s = 10 min. Only positive (closing) TCPAs trip the alarm. */
+  tcpaSeconds: number;
+}
+
+/** Default AIS alarm: ON, 1 NM, 10 min — sensible recreational defaults. */
+export const DEFAULT_AIS_ALARM_CONFIG: AisAlarmConfig = {
+  enabled: true,
+  cpaMeters: 1852,
+  tcpaSeconds: 600,
+};
+
 /** Default wardrobe: one config wrapping the existing DEFAULT_POLARS. */
 export const DEFAULT_WARDROBE: SailWardrobe = {
   configs: [

@@ -3,6 +3,7 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm';
 import { BehaviorSubject, type Observable, map } from 'rxjs';
 import {
+  DEFAULT_AIS_ALARM_CONFIG,
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_BOAT_CONFIG,
   DEFAULT_BSP_CAL,
@@ -11,6 +12,7 @@ import {
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
+  type AisAlarmConfig,
   type AwsAwaCalTable,
   type BoatConfig,
   type BspCal,
@@ -21,6 +23,7 @@ import {
   type SourcePriorityConfig,
 } from './defaults.js';
 import {
+  aisAlarmConfig as aisAlarmConfigTable,
   awsAwaCal,
   bspCal,
   boatConfig as boatConfigTable,
@@ -54,6 +57,7 @@ export class ConfigStore {
     sails: BehaviorSubject<SailWardrobe>;
     dampingConfig: BehaviorSubject<DampingConfig>;
     sourcePriority: BehaviorSubject<SourcePriorityConfig>;
+    aisAlarm: BehaviorSubject<AisAlarmConfig>;
   };
 
   private constructor(
@@ -67,6 +71,7 @@ export class ConfigStore {
       sails: SailWardrobe;
       dampingConfig: DampingConfig;
       sourcePriority: SourcePriorityConfig;
+      aisAlarm: AisAlarmConfig;
     },
   ) {
     this.subjects = {
@@ -77,6 +82,7 @@ export class ConfigStore {
       sails: new BehaviorSubject(initial.sails),
       dampingConfig: new BehaviorSubject(initial.dampingConfig),
       sourcePriority: new BehaviorSubject(initial.sourcePriority),
+      aisAlarm: new BehaviorSubject(initial.aisAlarm),
     };
   }
 
@@ -95,6 +101,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS damping_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS source_priority_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS ais_alarm_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -151,6 +158,7 @@ export class ConfigStore {
         sourcePriorityConfigTable,
         DEFAULT_SOURCE_PRIORITY,
       ),
+      aisAlarm: loadOrInsert<AisAlarmConfig>(aisAlarmConfigTable, DEFAULT_AIS_ALARM_CONFIG),
     };
 
     return new ConfigStore(raw, db, initial);
@@ -193,6 +201,13 @@ export class ConfigStore {
    */
   getSourcePriority(): SourcePriorityConfig {
     return this.subjects.sourcePriority.value;
+  }
+  get aisAlarmConfig$(): Observable<AisAlarmConfig> {
+    return this.subjects.aisAlarm.asObservable();
+  }
+  /** Synchronous read of the current AIS alarm config (BehaviorSubject.value). */
+  getAisAlarmConfig(): AisAlarmConfig {
+    return this.subjects.aisAlarm.value;
   }
   /** Derived from sails$ — returns the active config's polar. */
   get activePolar$(): Observable<PolarTable> {
@@ -249,6 +264,25 @@ export class ConfigStore {
     this.upsert(sourcePriorityConfigTable, cleaned);
     this.subjects.sourcePriority.next(cleaned);
   }
+  async setAisAlarmConfig(value: AisAlarmConfig): Promise<void> {
+    // Validate: enabled boolean, thresholds finite & positive.
+    if (typeof value.enabled !== 'boolean') {
+      throw new Error('aisAlarmConfig.enabled must be boolean');
+    }
+    if (!Number.isFinite(value.cpaMeters) || value.cpaMeters <= 0) {
+      throw new Error('aisAlarmConfig.cpaMeters must be a positive finite number');
+    }
+    if (!Number.isFinite(value.tcpaSeconds) || value.tcpaSeconds <= 0) {
+      throw new Error('aisAlarmConfig.tcpaSeconds must be a positive finite number');
+    }
+    const cleaned: AisAlarmConfig = {
+      enabled: value.enabled,
+      cpaMeters: value.cpaMeters,
+      tcpaSeconds: value.tcpaSeconds,
+    };
+    this.upsert(aisAlarmConfigTable, cleaned);
+    this.subjects.aisAlarm.next(cleaned);
+  }
   async setDampingConfig(value: DampingConfig): Promise<void> {
     // Drop entries with zero / negative / non-finite τ — they are passthrough
     // anyway and stripping keeps the persisted form minimal.
@@ -281,6 +315,7 @@ export class ConfigStore {
     this.subjects.sails.complete();
     this.subjects.dampingConfig.complete();
     this.subjects.sourcePriority.complete();
+    this.subjects.aisAlarm.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

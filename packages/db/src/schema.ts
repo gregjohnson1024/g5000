@@ -47,3 +47,8 @@ export const sourcePriorityConfig = sqliteTable('source_priority_config', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded SourcePriorityConfig (SourcePriorityRule[])
 });
+
+export const aisAlarmConfig = sqliteTable('ais_alarm_config', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded AisAlarmConfig
+});

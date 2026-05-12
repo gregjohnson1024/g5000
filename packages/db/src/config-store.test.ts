@@ -5,12 +5,14 @@ import path from 'node:path';
 import { firstValueFrom, take, skip } from 'rxjs';
 import { ConfigStore } from './config-store.js';
 import {
+  DEFAULT_AIS_ALARM_CONFIG,
   DEFAULT_BOAT_CONFIG,
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
+  type AisAlarmConfig,
   type BoatConfig,
   type DampingConfig,
   type PolarTable,
@@ -221,5 +223,38 @@ describe('ConfigStore', () => {
     const a = await firstValueFrom(store.polars$);
     const b = await firstValueFrom(store.activePolar$);
     expect(a).toEqual(b);
+  });
+
+  it('returns DEFAULT_AIS_ALARM_CONFIG on a fresh database', async () => {
+    const c = await firstValueFrom(store.aisAlarmConfig$);
+    expect(c).toEqual(DEFAULT_AIS_ALARM_CONFIG);
+  });
+
+  it('persists AIS alarm config writes and emits on the observable', async () => {
+    const next: Promise<AisAlarmConfig> = firstValueFrom(
+      store.aisAlarmConfig$.pipe(skip(1), take(1)),
+    );
+    await store.setAisAlarmConfig({ enabled: false, cpaMeters: 500, tcpaSeconds: 120 });
+    const v = await next;
+    expect(v).toEqual({ enabled: false, cpaMeters: 500, tcpaSeconds: 120 });
+    // Synchronous read also returns the new value.
+    expect(store.getAisAlarmConfig()).toEqual({
+      enabled: false,
+      cpaMeters: 500,
+      tcpaSeconds: 120,
+    });
+  });
+
+  it('rejects invalid AIS alarm config', async () => {
+    await expect(
+      store.setAisAlarmConfig({ enabled: true, cpaMeters: -1, tcpaSeconds: 60 }),
+    ).rejects.toThrow(/cpaMeters/);
+    await expect(
+      store.setAisAlarmConfig({ enabled: true, cpaMeters: 100, tcpaSeconds: 0 }),
+    ).rejects.toThrow(/tcpaSeconds/);
+    await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.setAisAlarmConfig({ enabled: 'no' as any, cpaMeters: 100, tcpaSeconds: 60 }),
+    ).rejects.toThrow(/enabled/);
   });
 });
