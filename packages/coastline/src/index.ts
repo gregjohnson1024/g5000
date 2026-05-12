@@ -6,3 +6,4 @@ export {
   ringAabb,
   type Point,
 } from './geometry.js';
+export { loadCoastlineFromGeojson } from './load.js';
