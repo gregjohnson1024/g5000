@@ -7,9 +7,10 @@ export interface MapProps {
   center: { lat: number; lon: number };
   zoom: number;
   onClick?: (latLon: { lat: number; lon: number }) => void;
+  onLoad?: (m: maplibregl.Map) => void;
 }
 
-export function Map({ center, zoom, onClick }: MapProps) {
+export function Map({ center, zoom, onClick, onLoad }: MapProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   useEffect(() => {
@@ -33,6 +34,9 @@ export function Map({ center, zoom, onClick }: MapProps) {
     });
     if (onClick) {
       map.on('click', (e) => onClick({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
+    }
+    if (onLoad) {
+      map.on('load', () => onLoad(map));
     }
     mapRef.current = map;
     return () => { map.remove(); };
