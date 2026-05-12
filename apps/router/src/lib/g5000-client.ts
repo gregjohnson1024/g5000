@@ -1,5 +1,5 @@
-import { CACHED_POLAR } from './paths.js';
-import { writeJson, readJson } from './persistence.js';
+import { CACHED_POLAR } from './paths';
+import { writeJson, readJson } from './persistence';
 
 const HOST = process.env.G5000_HOST ?? 'http://g5000.local:3000';
 

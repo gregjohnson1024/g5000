@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeJson, readJson, listJson } from './persistence.js';
+import { writeJson, readJson, listJson } from './persistence';
 
 let dir: string;
 beforeEach(() => {

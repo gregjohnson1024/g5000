@@ -21,7 +21,7 @@ vi.mock('../../../../lib/coastline.js', () => ({
   loadDefaultCoastline: vi.fn(async () => ({})),
 }));
 
-import { POST } from './route.js';
+import { POST } from './route';
 
 describe('POST /api/route/plan', () => {
   it('returns a Route for a well-formed body', async () => {

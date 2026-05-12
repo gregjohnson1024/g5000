@@ -1,4 +1,4 @@
-import { positionStreamUrl } from '../../../../lib/g5000-client.js';
+import { positionStreamUrl } from '../../../../lib/g5000-client';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

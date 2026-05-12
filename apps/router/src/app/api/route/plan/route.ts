@@ -1,7 +1,7 @@
 import { plan } from '@g5000/routing';
 import type { PolarTable } from '@g5000/db';
-import { loadWindFor } from '../../../../lib/grib-context.js';
-import { loadDefaultCoastline } from '../../../../lib/coastline.js';
+import { loadWindFor } from '../../../../lib/grib-context';
+import { loadDefaultCoastline } from '../../../../lib/coastline';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

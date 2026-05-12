@@ -1,6 +1,6 @@
 import type { WindField, Bbox } from '@g5000/grib';
 import { fetchGfsBlobs, runWgrib2, parseGrib2Json } from '@g5000/grib';
-import { GRIB_CACHE } from './paths.js';
+import { GRIB_CACHE } from './paths';
 
 export async function loadWindFor(
   model: 'GFS' | 'ECMWF',
