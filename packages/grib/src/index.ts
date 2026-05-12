@@ -20,3 +20,11 @@ export {
   type BuildGfsUrlOpts,
   type FetchGfsOpts,
 } from './fetch-gfs.js';
+export {
+  buildEcmwfUrls,
+  pickEcmwfRun,
+  fetchEcmwfMessages,
+  fetchEcmwfBlobs,
+  type BuildEcmwfUrlsOpts,
+  type FetchEcmwfOpts,
+} from './fetch-ecmwf.js';
