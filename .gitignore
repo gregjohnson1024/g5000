@@ -45,3 +45,6 @@ packages/*/next-env.d.ts
 # Dev-session artifacts (Playwright snapshots and ad-hoc screenshots)
 .playwright-mcp/
 *.png
+
+# Coastline data — downloaded by `npm run fetch --workspace @g5000/coastline`
+packages/coastline/data/
