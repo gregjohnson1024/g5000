@@ -17,6 +17,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [route, setRoute] = useState<Route | undefined>();
   const [error, setError] = useState<string | undefined>();
+  const [savedMsg, setSavedMsg] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
 
   const onMapClick = (p: Pos) => {
     if (!start) setStart(p);
@@ -46,6 +48,28 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+  const onSave = async () => {
+    if (!route) return;
+    const name = window.prompt('Plan name?');
+    if (!name || !name.trim()) return;
+    setSaving(true);
+    setSavedMsg(undefined);
+    try {
+      const res = await fetch('/api/plans', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim(), route }),
+        headers: { 'content-type': 'application/json' },
+      });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error?.message ?? 'save failed');
+      setSavedMsg(`Saved as ${name.trim()}`);
+      setTimeout(() => setSavedMsg(undefined), 3000);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <main className="grid grid-cols-[1fr_360px] h-screen">
       <Map
@@ -69,6 +93,17 @@ export default function HomePage() {
             Model: {route.model}{route.incomplete ? ` (incomplete: ${route.reason})` : ''}
           </div>
         )}
+        {route && (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="w-full text-sm bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-400 text-white py-2 rounded"
+          >
+            {saving ? 'Saving…' : 'Save plan'}
+          </button>
+        )}
+        {savedMsg && <div className="text-xs text-emerald-400">{savedMsg}</div>}
         {route && <RouteTimeline route={route} />}
       </aside>
     </main>
