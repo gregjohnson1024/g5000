@@ -5,6 +5,7 @@ import { Map } from '../components/Map';
 import { StatusBadge } from '../components/StatusBadge';
 import { PlanControls, type PlanRequest } from '../components/PlanControls';
 import { attachRoute } from '../components/RoutePolyline';
+import { RouteTimeline } from '../components/RouteTimeline';
 import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
@@ -68,6 +69,7 @@ export default function HomePage() {
             Model: {route.model}{route.incomplete ? ` (incomplete: ${route.reason})` : ''}
           </div>
         )}
+        {route && <RouteTimeline route={route} />}
       </aside>
     </main>
   );
