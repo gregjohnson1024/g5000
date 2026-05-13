@@ -107,6 +107,17 @@ export function DriftArrow({ map, p, scaleNmPerKt = 5 }: DriftArrowProps) {
     if (map.isStyleLoaded()) ensureLayers();
     else map.once('load', ensureLayers);
 
+    // Keep instrument layers on top of any wind overlay layers added later.
+    for (const id of [LAYER_LINE, LAYER_HEAD, LAYER_LABEL]) {
+      if (map.getLayer(id)) {
+        try {
+          map.moveLayer(id);
+        } catch {
+          /* style not ready */
+        }
+      }
+    }
+
     const drift = computeDrift(p.hdg, p.cog, p.sog);
     const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
     if (!src) return;

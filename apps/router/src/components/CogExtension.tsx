@@ -93,6 +93,18 @@ export function CogExtension({
     if (map.isStyleLoaded()) ensure();
     else map.once('load', ensure);
 
+    // Keep the COG-extension layers on top — wind overlay layers added by
+    // /forecast fetches arrive later and would otherwise cover them.
+    for (const id of [LAYER_LINE, LAYER_TICKS, LAYER_LABELS]) {
+      if (map.getLayer(id)) {
+        try {
+          map.moveLayer(id);
+        } catch {
+          /* style not ready */
+        }
+      }
+    }
+
     const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
 

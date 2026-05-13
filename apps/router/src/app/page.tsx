@@ -224,10 +224,10 @@ export default function HomePage() {
                 onChange={(e) => setWindModel(e.target.value as WindModel)}
                 className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200"
               >
-                <option value="gfs" disabled={availableHours.gfs.length === 0}>
+                <option value="gfs">
                   GFS{availableHours.gfs.length ? '' : ' (no cache)'}
                 </option>
-                <option value="ecmwf" disabled={availableHours.ecmwf.length === 0}>
+                <option value="ecmwf">
                   ECMWF{availableHours.ecmwf.length ? '' : ' (no cache)'}
                 </option>
               </select>
@@ -246,17 +246,52 @@ export default function HomePage() {
                 </div>
               );
             }
+            const idx = list.indexOf(windHours);
+            // If the current slider hour isn't in this model's cache, snap
+            // to the nearest one as we render.
+            const effectiveIdx = idx >= 0 ? idx : 0;
+            const effectiveHours = list[effectiveIdx]!;
+            if (effectiveHours !== windHours) {
+              setTimeout(() => setWindHours(effectiveHours), 0);
+            }
+            const goPrev = (): void => {
+              if (effectiveIdx > 0) setWindHours(list[effectiveIdx - 1]!);
+            };
+            const goNext = (): void => {
+              if (effectiveIdx < list.length - 1) setWindHours(list[effectiveIdx + 1]!);
+            };
             return (
-              <label className="block text-xs text-slate-400">
-                +{windHours} h forecast
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={effectiveIdx <= 0}
+                    className="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-30"
+                    title="Previous cached hour"
+                  >
+                    ←
+                  </button>
+                  <span className="text-xs text-slate-400 font-mono flex-1 text-center">
+                    +{effectiveHours} h forecast
+                  </span>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={effectiveIdx >= list.length - 1}
+                    className="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-30"
+                    title="Next cached hour"
+                  >
+                    →
+                  </button>
+                </div>
                 <input
                   type="range"
                   min={list[0]}
                   max={list[list.length - 1]}
                   step={1}
-                  value={windHours}
+                  value={effectiveHours}
                   onChange={(e) => {
-                    // Snap the slider to the nearest cached hour.
                     const v = Number(e.target.value);
                     const nearest = list.reduce(
                       (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
@@ -266,10 +301,10 @@ export default function HomePage() {
                   }}
                   className="block w-full"
                 />
-                <span className="font-mono text-slate-500">
+                <span className="text-xs font-mono text-slate-500">
                   cached: {list.map((h) => `+${h}h`).join(', ')}
                 </span>
-              </label>
+              </div>
             );
           })()}
           <label className="block text-xs text-slate-400">
