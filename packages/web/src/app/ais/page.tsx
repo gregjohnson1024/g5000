@@ -224,15 +224,53 @@ export default function ChartPage() {
     cpa.tcpaSeconds > 0 &&
     cpa.tcpaSeconds < alarmConfig.tcpaSeconds;
 
-  // Set of currently-threatening MMSIs — used to drive the audio alarm.
+  // Per-vessel klaxon mute. Key: MMSI. Value: the CPA in meters at the time
+  // the mute was applied. The vessel re-arms (mute auto-clears) once the
+  // current CPA drops below 90% of that value — i.e. the situation has
+  // closed by 10% since the helmsman decided to silence it.
+  const [mutes, setMutes] = useState<Record<number, number>>({});
+
+  // Auto-unmute when CPA tightens 10% past the mute snapshot.
+  useEffect(() => {
+    setMutes((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const r of targetsWithCpa) {
+        const mutedAt = next[r.target.mmsi];
+        if (mutedAt !== undefined && r.cpa && r.cpa.cpaMeters < mutedAt * 0.9) {
+          delete next[r.target.mmsi];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [targetsWithCpa]);
+
+  const muteVessel = (mmsi: number): void => {
+    const row = targetsWithCpa.find((r) => r.target.mmsi === mmsi);
+    if (!row?.cpa) return;
+    setMutes((prev) => ({ ...prev, [mmsi]: row.cpa!.cpaMeters }));
+  };
+  const unmuteVessel = (mmsi: number): void => {
+    setMutes((prev) => {
+      const { [mmsi]: _drop, ...rest } = prev;
+      void _drop;
+      return rest;
+    });
+  };
+
+  // Set of currently-threatening MMSIs that drive the klaxon. Muted vessels
+  // are excluded unless they've auto-unmuted on the close-by-10% rule above.
   const threatMmsis = useMemo(() => {
     const s = new Set<number>();
     for (const r of targetsWithCpa) {
-      if (isThreat(r.cpa)) s.add(r.target.mmsi);
+      if (!isThreat(r.cpa)) continue;
+      if (mutes[r.target.mmsi] !== undefined) continue;
+      s.add(r.target.mmsi);
     }
     return s;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetsWithCpa, alarmConfig.enabled, alarmConfig.cpaMeters, alarmConfig.tcpaSeconds]);
+  }, [targetsWithCpa, alarmConfig.enabled, alarmConfig.cpaMeters, alarmConfig.tcpaSeconds, mutes]);
 
   const { armed: audioArmed, arm: armAudio } = useThreatAudio(threatMmsis, alarmConfig.enabled);
 
@@ -500,19 +538,19 @@ export default function ChartPage() {
                     <g transform={`translate(${x}, ${y})`}>
                       <g transform={`rotate(${cogDeg})`}>
                         <polygon
-                          points="0,-7 -4,5 4,5"
+                          points="0,-14 -8,10 8,10"
                           fill={threat ? '#ef4444' : '#94a3b8'}
                           stroke="#0f172a"
-                          strokeWidth="0.5"
+                          strokeWidth="1"
                         />
                         {leaderLen > 1 && (
                           <line
                             x1="0"
-                            y1="-7"
+                            y1="-14"
                             x2="0"
-                            y2={-7 - leaderLen}
+                            y2={-14 - leaderLen}
                             stroke={threat ? '#ef4444' : '#475569'}
-                            strokeWidth="1"
+                            strokeWidth="1.5"
                           />
                         )}
                       </g>
@@ -540,13 +578,11 @@ export default function ChartPage() {
                 );
               })}
 
-              {/* Own boat — at center, pointing along own's heading (compass).
-                  In north-up mode that's `ownHeading` degrees clockwise from
-                  up; in course-up mode the canvas itself is rotated so the
-                  boat triangle always points up.
-                  Plus a fixed 10 NM COG extension line, drawn separately so
-                  the boat-triangle rotates by HDG while the extension
-                  rotates by COG (they can differ by leeway / current). */}
+              {/* Own boat — at center, triangle and 10 NM extension both
+                  rotated by COG so the apparent direction matches every other
+                  vessel on the screen. (HDG is published separately and shown
+                  in the helm view; on the radar we want a consistent COG-
+                  based picture.) */}
               {(() => {
                 const ownCogDeg = (ownCog * RAD_TO_DEG) % 360;
                 const ownLeaderLen = Math.min(
@@ -554,33 +590,25 @@ export default function ChartPage() {
                   svgRadius - 14,
                 );
                 return (
-                  <>
-                    <g
-                      transform={`translate(${center}, ${center}) rotate(${ownCogDeg})`}
-                    >
-                      {ownLeaderLen > 1 && (
-                        <line
-                          x1="0"
-                          y1="-14"
-                          x2="0"
-                          y2={-14 - ownLeaderLen}
-                          stroke="#fbbf24"
-                          strokeWidth="1.5"
-                          strokeOpacity="0.85"
-                        />
-                      )}
-                    </g>
-                    <g
-                      transform={`translate(${center}, ${center}) rotate(${ownHeading * RAD_TO_DEG})`}
-                    >
-                      <polygon
-                        points="0,-14 -8,10 8,10"
-                        fill="#fbbf24"
-                        stroke="#0f172a"
-                        strokeWidth="1"
+                  <g transform={`translate(${center}, ${center}) rotate(${ownCogDeg})`}>
+                    {ownLeaderLen > 1 && (
+                      <line
+                        x1="0"
+                        y1="-14"
+                        x2="0"
+                        y2={-14 - ownLeaderLen}
+                        stroke="#fbbf24"
+                        strokeWidth="1.5"
+                        strokeOpacity="0.85"
                       />
-                    </g>
-                  </>
+                    )}
+                    <polygon
+                      points="0,-14 -8,10 8,10"
+                      fill="#fbbf24"
+                      stroke="#0f172a"
+                      strokeWidth="1"
+                    />
+                  </g>
                 );
               })()}
             </g>
@@ -695,6 +723,7 @@ export default function ChartPage() {
                 <th className="text-right py-1">Range</th>
                 <th className="text-right py-1">CPA</th>
                 <th className="text-right py-1">TCPA</th>
+                <th className="text-right py-1">Mute</th>
               </tr>
             </thead>
             <tbody>
@@ -710,12 +739,15 @@ export default function ChartPage() {
                 .map(({ target, cpa }) => {
                   const threat = isThreat(cpa);
                   const selected = selectedMmsi === target.mmsi;
+                  const mutedAt = mutes[target.mmsi];
+                  const muted = mutedAt !== undefined;
+                  const remutedTriggerNm = muted ? (mutedAt * 0.9) / NM : null;
                   return (
                     <tr
                       key={target.mmsi}
                       className={`border-b border-slate-900 cursor-pointer hover:bg-slate-900 ${
                         selected ? 'bg-slate-800' : ''
-                      } ${threat ? 'text-red-300' : ''}`}
+                      } ${muted ? 'text-slate-500' : threat ? 'text-red-300' : ''}`}
                       onClick={() => setSelectedMmsi(target.mmsi)}
                     >
                       <td className="py-1">{target.mmsi}</td>
@@ -727,6 +759,30 @@ export default function ChartPage() {
                         {cpa ? `${(cpa.cpaMeters / NM).toFixed(2)}` : '—'}
                       </td>
                       <td className="py-1 text-right">{cpa ? fmtTcpa(cpa.tcpaSeconds) : '—'}</td>
+                      <td
+                        className="py-1 text-right whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {muted ? (
+                          <button
+                            type="button"
+                            onClick={() => unmuteVessel(target.mmsi)}
+                            title={`Re-arm now (would auto-arm at CPA < ${remutedTriggerNm!.toFixed(2)} NM)`}
+                            className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-emerald-700 hover:text-slate-100 rounded"
+                          >
+                            muted ≥{remutedTriggerNm!.toFixed(2)}
+                          </button>
+                        ) : threat ? (
+                          <button
+                            type="button"
+                            onClick={() => muteVessel(target.mmsi)}
+                            title="Silence the klaxon for this vessel until CPA closes by 10%"
+                            className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-red-700 hover:text-red-100 rounded"
+                          >
+                            Mute
+                          </button>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
