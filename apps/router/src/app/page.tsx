@@ -7,7 +7,9 @@ import { PlanControls, type PlanRequest } from '../components/PlanControls';
 import { attachRoute } from '../components/RoutePolyline';
 import { RouteTimeline } from '../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../components/LiveBoatMarker';
-import { DriftArrow, computeDrift } from '../components/DriftArrow';
+// DriftArrow removed at user's request; computation kept on /helm via the
+// shared @g5000/compute helper. If the chart needs set+drift back, prefer
+// pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid, type WindModel } from '../components/WindOverlay';
 import { CogExtension } from '../components/CogExtension';
 import type { Route } from '@g5000/routing';
@@ -158,7 +160,6 @@ export default function HomePage() {
           }}
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
-        <DriftArrow map={mapInstance} p={livePos} />
         <CogExtension map={mapInstance} p={livePos} hidden={!cogExtOn} />
         <WindOverlay
           map={mapInstance}
@@ -416,9 +417,6 @@ function LiveValues({ p }: { p: LivePos | null }) {
   const cogDeg = typeof p.cog === 'number' ? wrap360(p.cog * RAD_TO_DEG) : null;
   const hdgDeg = typeof p.hdg === 'number' ? wrap360(p.hdg * RAD_TO_DEG) : null;
   const sogKn = typeof p.sog === 'number' ? p.sog * MS_TO_KN : null;
-  const drift = computeDrift(p.hdg, p.cog, p.sog);
-  const driftKn = drift ? drift.magnitudeMps / 0.514444 : null;
-  const driftBrgDeg = drift ? wrap360((drift.bearingRad * 180) / Math.PI) : null;
   return (
     <div className="text-xs space-y-0.5 bg-slate-900/60 border border-slate-800 rounded p-2">
       <div className="font-mono text-slate-200">{fmtCoord(p.lat, 'lat')}</div>
@@ -431,11 +429,6 @@ function LiveValues({ p }: { p: LivePos | null }) {
       </div>
       <div className="text-slate-400">
         HDG: <span className="text-slate-200 font-mono">{hdgDeg !== null ? `${hdgDeg.toFixed(0)}° T` : '—'}</span>
-      </div>
-      <div className="text-cyan-300">
-        Drift: <span className="font-mono">
-          {driftKn !== null && driftBrgDeg !== null ? `${driftKn.toFixed(1)} kn @ ${driftBrgDeg.toFixed(0)}° T` : '—'}
-        </span>
       </div>
     </div>
   );

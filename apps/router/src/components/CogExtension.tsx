@@ -146,23 +146,10 @@ export function CogExtension({
     }
     src.setData({ type: 'FeatureCollection', features });
   }, [map, p, totalMinutes, tickMinutes, hidden]);
-
-  useEffect(() => {
-    if (!map) return;
-    return () => {
-      const safe = (op: () => void): void => {
-        try {
-          op();
-        } catch {
-          /* map / style already torn down */
-        }
-      };
-      safe(() => map.getLayer(LAYER_LABELS) && map.removeLayer(LAYER_LABELS));
-      safe(() => map.getLayer(LAYER_TICKS) && map.removeLayer(LAYER_TICKS));
-      safe(() => map.getLayer(LAYER_LINE) && map.removeLayer(LAYER_LINE));
-      safe(() => map.getSource(SOURCE_ID) && map.removeSource(SOURCE_ID));
-    };
-  }, [map]);
+  // Layer cleanup intentionally not registered — the parent Map component
+  // calls `map.remove()` on unmount which discards every layer. A separate
+  // cleanup effect would race against StrictMode's double-mount and leave
+  // the COG extension stripped while p hadn't yet propagated.
 
   return null;
 }

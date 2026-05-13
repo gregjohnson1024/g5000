@@ -156,27 +156,9 @@ export function DriftArrow({ map, p, scaleNmPerKt = 5 }: DriftArrowProps) {
     });
     ensuredRef.current = true;
 
-    return () => {
-      // No-op per render. Layer cleanup happens on unmount below.
-    };
   }, [map, p, scaleNmPerKt]);
-
-  useEffect(() => {
-    if (!map) return;
-    return () => {
-      const safe = (op: () => void): void => {
-        try {
-          op();
-        } catch {
-          /* map / style already torn down */
-        }
-      };
-      safe(() => map.getLayer(LAYER_LABEL) && map.removeLayer(LAYER_LABEL));
-      safe(() => map.getLayer(LAYER_HEAD) && map.removeLayer(LAYER_HEAD));
-      safe(() => map.getLayer(LAYER_LINE) && map.removeLayer(LAYER_LINE));
-      safe(() => map.getSource(SOURCE_ID) && map.removeSource(SOURCE_ID));
-    };
-  }, [map]);
+  // Layer cleanup intentionally not registered — same reasoning as
+  // CogExtension. The parent Map calls map.remove() on unmount.
 
   return null;
 }

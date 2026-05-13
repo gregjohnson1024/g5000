@@ -487,25 +487,8 @@ export function WindOverlay({
     if (map.getLayer(LAYER_FILL)) map.setPaintProperty(LAYER_FILL, 'fill-opacity', opacity);
   }, [map, opacity]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    if (!map) return;
-    return () => {
-      const safe = (op: () => void): void => {
-        try {
-          op();
-        } catch {
-          /* map / style already torn down */
-        }
-      };
-      for (const id of [LAYER_FILL, LAYER_BARB_LINE, LAYER_BARB_PENNANT, LAYER_ISOBAR_LINE]) {
-        safe(() => map.getLayer(id) && map.removeLayer(id));
-      }
-      for (const id of [SRC_FILL, SRC_BARBS, SRC_ISOBARS]) {
-        safe(() => map.getSource(id) && map.removeSource(id));
-      }
-    };
-  }, [map]);
+  // Layer cleanup intentionally not registered — parent Map.remove()
+  // discards all layers on unmount.
 
   return null;
 }

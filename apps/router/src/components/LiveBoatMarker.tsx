@@ -135,19 +135,7 @@ export function LiveBoatMarker({
         /* map already torn down */
       }
       markerRef.current = null;
-      // Map may already be destroyed (parent's cleanup ran first). Guard
-      // every style access — same pattern used in DriftArrow / CogExtension /
-      // WindOverlay.
-      try {
-        if (map.getLayer(TRAIL_LAYER_ID)) map.removeLayer(TRAIL_LAYER_ID);
-      } catch {
-        /* style destroyed */
-      }
-      try {
-        if (map.getSource(TRAIL_SOURCE_ID)) map.removeSource(TRAIL_SOURCE_ID);
-      } catch {
-        /* style destroyed */
-      }
+      // Layers not removed — parent Map.remove() handles full teardown.
       trailRef.current = [];
     };
   }, [map, flyToOnFirstFix, trailLength]);

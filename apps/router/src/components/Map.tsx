@@ -36,6 +36,9 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
       new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }),
       'bottom-left',
     );
+    // Expose for in-page debugging — set on a global so we can inspect
+    // layer order from the dev console / playwright.
+    (window as unknown as { __g5kMap?: maplibregl.Map }).__g5kMap = map;
     if (onClick) {
       map.on('click', (e) => onClick({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
     }
