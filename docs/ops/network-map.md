@@ -16,6 +16,7 @@ Subnet `192.168.1.0/24` · Gateway `192.168.1.1` · DHCP from gateway.
 |---|---|---|
 | `192.168.1.1` | Starlink router | 80/http (web UI, title `Starlink`) |
 | `192.168.1.64` | PredictWind DataHub (mfr Remote Data Sensing LLC) — bridges to boat LAN as `…bd:a0`. Default LAN IP is `10.10.10.1`; this unit has been re-IP'd. | 22/ssh (Dropbear; **no documented user access** per official manual), 53/dns, 80/http → `cgi-bin/luci/` (OpenWrt LuCI, admin/admin), 443/https (cert `O=Remote Data Sensing, LLC`). **Wi-Fi-side has severe packet loss (~90% on SulaStarlink path)**; reliable admin path is IPv6 link-local via eth0. NMEA0183 broadcast on UDP 11101 + TCP 11102 is documented but bound to the AP-side (SulaLocal) interface, not reachable from SulaStarlink or boat-LAN paths. |
+| `192.168.1.100` | Yacht Devices YDWG (NMEA 2000 ↔ Wi-Fi gateway, ESP32-based) | 80/http (web UI, redirects to `/login.html`), **1456/tcp NMEA-0183 transmit-only**, **1457/tcp YD-RAW bidirectional**. Both feeds carry the full N2K bus content (GPS, AIS, wind, heading, pitch/roll, water temp, log). |
 | `192.168.1.129` | Victron Venus OS GX (Wi-Fi side; same MAC as `.14.187` on boat LAN) | 80/http (`GX device login`), 443/https (cert `O=Victron Energy, OU=Venus OS, CN=venus.local`) |
 | `192.168.1.114` | Mac (`en0`) | — |
 | `192.168.1.157` | Greg's iPhone | — |
