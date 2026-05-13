@@ -182,6 +182,22 @@ const mappers: Record<number, MapperFn> = {
     return out;
   },
 
+  // PGN 127258 — Magnetic Variation. East-positive (NMEA 2000 convention).
+  // True = Magnetic + Variation. The helm uses this to display HDG in True
+  // when no device publishes true heading directly.
+  127258: (pgn) => {
+    const v = pgn.fields['Variation'];
+    if (typeof v !== 'number') return [];
+    return [
+      {
+        channel: Channels.Nav.MagVar,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(v, 'rad'),
+        source: sourceTag(pgn),
+      },
+    ];
+  },
+
   // PGN 127257 — attitude (yaw/pitch/roll, all in radians).
   // Sailing convention: roll = heel.
   127257: (pgn) => {

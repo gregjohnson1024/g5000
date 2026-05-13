@@ -29,6 +29,10 @@ function fmtAngleSigned(s: JsonSafeSample | undefined): string {
 
 function fmtHeading(s: JsonSafeSample | undefined): string {
   const v = scalar(s);
+  return fmtHeadingRad(v);
+}
+
+function fmtHeadingRad(v: number | null): string {
   if (v === null) return '—';
   let deg = v * RAD_TO_DEG;
   while (deg < 0) deg += 360;
@@ -65,16 +69,34 @@ export default function HelmPage() {
 
   // Wind + polar/VMG channels intentionally not subscribed — no wind sensor attached.
   const sog = channels.get('nav.gps.sog');
-  // COG and HDG: each can arrive in either True or Magnetic reference.
-  // Pick whichever has fresh data, and remember which one to label the tile.
+  // COG can arrive in either True or Magnetic reference; prefer True.
   const cogTrue = channels.get('nav.gps.cog');
   const cogMag = channels.get('nav.gps.cog.magnetic');
   const cog = cogTrue ?? cogMag;
   const cogRef = cogTrue ? 'T' : cogMag ? 'M' : null;
-  const hdgMag = channels.get('boat.heading.magnetic');
-  const hdgTrue = channels.get('boat.heading.true');
-  const hdg = hdgMag ?? hdgTrue;
-  const hdgRef = hdgMag ? 'M' : hdgTrue ? 'T' : null;
+
+  // HDG: prefer a direct True publisher. If only Magnetic is available, add
+  // live magnetic variation (PGN 127258) to compute True. Fall back to raw
+  // Magnetic only if variation is also missing.
+  const hdgTrueSample = channels.get('boat.heading.true');
+  const hdgMagSample = channels.get('boat.heading.magnetic');
+  const magVarSample = channels.get('nav.magvar');
+  const hdgTrueRad = scalar(hdgTrueSample);
+  const hdgMagRad = scalar(hdgMagSample);
+  const magVarRad = scalar(magVarSample);
+  let hdgValueRad: number | null = null;
+  let hdgRef: 'T' | 'M' | null = null;
+  if (hdgTrueRad !== null) {
+    hdgValueRad = hdgTrueRad;
+    hdgRef = 'T';
+  } else if (hdgMagRad !== null && magVarRad !== null) {
+    hdgValueRad = hdgMagRad + magVarRad; // True = Magnetic + Variation (East-positive).
+    hdgRef = 'T';
+  } else if (hdgMagRad !== null) {
+    hdgValueRad = hdgMagRad;
+    hdgRef = 'M';
+  }
+
   const heel = channels.get('motion.heel');
   const pitch = channels.get('motion.pitch');
 
@@ -123,7 +145,7 @@ export default function HelmPage() {
         />
         <HelmTile
           label="HDG"
-          value={fmtHeading(hdg)}
+          value={fmtHeadingRad(hdgValueRad)}
           unit="°"
           sub={hdgRef ?? undefined}
         />

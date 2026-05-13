@@ -134,6 +134,49 @@ export default function BoatConfigPage() {
         Mast height is used by the true-wind pipeline to correct for masthead motion. If it&apos;s
         wrong, true wind will appear noisy in turning maneuvers.
       </p>
+
+      <div className="pt-6 border-t border-red-900/40 space-y-2">
+        <h2 className="text-sm font-semibold text-red-300">Danger zone</h2>
+        <ResetCalibrationsButton />
+      </div>
     </main>
+  );
+}
+
+function ResetCalibrationsButton() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const handle = async (): Promise<void> => {
+    if (!window.confirm('Reset all sensor calibrations (wind, BSP, compass) to defaults? This cannot be undone.')) {
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/config/reset-calibrations', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMsg('All calibrations reset to defaults.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      setTimeout(() => setMsg(null), 3000);
+    }
+  };
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={handle}
+        disabled={busy}
+        className="px-3 py-1 bg-red-900 hover:bg-red-800 text-red-100 rounded text-sm disabled:opacity-50"
+      >
+        {busy ? 'Resetting…' : 'Reset all calibrations'}
+      </button>
+      <p className="text-xs text-slate-500">
+        Restores wind, BSP, and compass calibration tables to identity defaults. Does not touch boat
+        config, polars, or sail wardrobe.
+      </p>
+      {msg && <p className="text-xs text-emerald-300">{msg}</p>}
+    </div>
   );
 }

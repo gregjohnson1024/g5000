@@ -352,7 +352,7 @@ export default function SourcesPage() {
   const [newRulePattern, setNewRulePattern] = useState('');
 
   return (
-    <main className="p-6 space-y-6 max-w-5xl">
+    <main className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Sources & priority</h1>
 
       <div className="text-sm text-slate-400 space-y-1">
@@ -377,7 +377,7 @@ export default function SourcesPage() {
         {channelsToShow.length === 0 && (
           <p className="text-sm text-slate-500">No samples seen yet…</p>
         )}
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse table-auto">
           <thead>
             <tr className="text-left text-slate-400 border-b border-slate-800">
               <th className="p-2">Channel</th>
@@ -405,16 +405,16 @@ export default function SourcesPage() {
                           return (
                             <div
                               key={p.source}
-                              className="grid grid-cols-[minmax(0,1fr)_5rem_4rem_8rem] gap-x-3 items-baseline text-xs"
+                              className="grid grid-cols-[minmax(0,1fr)_5rem_4rem_9.5rem] gap-x-3 items-baseline text-xs"
                             >
                               <span
-                                className={
+                                className={`whitespace-nowrap ${
                                   isBlocked
-                                    ? 'text-slate-600 line-through'
+                                    ? 'text-slate-500'
                                     : isPrimary
                                       ? 'text-amber-300'
                                       : 'text-slate-300'
-                                }
+                                }`}
                                 title={p.source}
                               >
                                 {friendlySourceLabel(p.source)}
@@ -438,18 +438,32 @@ export default function SourcesPage() {
                               <span className="text-right text-slate-500 font-mono">
                                 {p.ageMs} ms
                               </span>
-                              <span className="text-right space-x-1">
-                                {!isPrimary && !isBlocked && pubs.length > 1 && (
+                              <span className="grid grid-cols-[4rem_4.5rem] gap-1 justify-end">
+                                {!isPrimary ? (
                                   <button
                                     onClick={() => void promoteSource(ch, p.source)}
                                     disabled={busy}
                                     className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-amber-700 hover:text-slate-900 rounded disabled:opacity-50"
-                                    title={`Make ${p.source} the primary source for ${ch}`}
+                                    title={`Make ${p.source} the primary source for ${ch}${isBlocked ? ' (also unblocks it)' : ''}`}
                                   >
                                     Primary
                                   </button>
+                                ) : (
+                                  <span />
                                 )}
-                                {!isBlocked && (
+                                {isBlocked ? (
+                                  <button
+                                    onClick={() => {
+                                      const m = findRuleForChannel(ch);
+                                      if (m) void unblockSource(m.index, p.source);
+                                    }}
+                                    disabled={busy}
+                                    className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-emerald-700 hover:text-slate-900 rounded disabled:opacity-50"
+                                    title={`Stop ignoring ${p.source}`}
+                                  >
+                                    Unblock
+                                  </button>
+                                ) : (
                                   <button
                                     onClick={() => void blockSource(ch, p.source)}
                                     disabled={busy}
@@ -594,7 +608,7 @@ export default function SourcesPage() {
                       key={s}
                       className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline text-xs"
                     >
-                      <span className="text-slate-400 line-through" title={s}>
+                      <span className="text-slate-500" title={s}>
                         {friendlySourceLabel(s)}
                         {(() => {
                           const d = deviceLabel(s);

@@ -126,6 +126,13 @@ describe('mapPgnToSamples', () => {
     expect(channels).toEqual([Channels.Nav.CogMagnetic, Channels.Nav.Sog].sort());
   });
 
+  it('maps PGN 127258 to nav.magvar', () => {
+    const decoded = make(127258, { SID: 1, Variation: -0.2443 }); // ~ -14°
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Nav.MagVar]);
+    expect(samples[0]?.value).toEqual({ kind: 'scalar', value: -0.2443, unit: 'rad' });
+  });
+
   it('maps PGN 127257 attitude to heel, pitch, yaw', () => {
     const decoded = make(127257, {
       Yaw: 1.23,

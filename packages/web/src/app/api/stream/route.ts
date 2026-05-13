@@ -1,4 +1,13 @@
-import { getSharedBus, toJsonSafe, createDamper, type Sample } from '@g5000/core';
+import {
+  getSharedBus,
+  toJsonSafe,
+  createDamper,
+  findRuleForChannel,
+  pickWinner,
+  type Sample,
+  type SourceSnapshot,
+  type SourcePriorityConfig,
+} from '@g5000/core';
 import { getSharedConfigStore } from '@g5000/db';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +16,11 @@ export const runtime = 'nodejs';
 /**
  * GET /api/stream — Server-Sent Events feed of every Sample published to
  * the shared bus.
+ *
+ * Source priority: for channels with a matching priority rule, only samples
+ * from the current winner reach the client. Blocked sources are never
+ * forwarded. This makes Block / Set primary on /sources actually affect
+ * /helm, /inspect, and any other UI consumer.
  *
  * Damping: per-channel EMA low-pass filter is applied to outgoing scalar
  * samples here, at the boundary. Internal compute pipelines see raw samples.
@@ -32,6 +46,14 @@ export async function GET(req: Request): Promise<Response> {
       const latest = new Map<string, Sample>();
       let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
+      // Per-channel per-source last-seen timestamps so we can run pickWinner
+      // inline and drop samples from non-winning / blocked sources.
+      const sourceTimes = new Map<string, Map<string, bigint>>();
+      let currentRules: SourcePriorityConfig = [];
+      const ruleSub = configStore.sourcePriority$.subscribe((r) => {
+        currentRules = r;
+      });
+
       const flush = (): void => {
         flushTimer = null;
         if (latest.size === 0) return;
@@ -43,6 +65,23 @@ export async function GET(req: Request): Promise<Response> {
       };
 
       const unsub = bus.subscribe('**', (sample) => {
+        // Always update per-source state so pickWinner's freshness fallback
+        // works correctly even when this particular sample gets dropped.
+        let perSource = sourceTimes.get(sample.channel);
+        if (!perSource) {
+          perSource = new Map();
+          sourceTimes.set(sample.channel, perSource);
+        }
+        perSource.set(sample.source, sample.t_ns);
+
+        const rule = findRuleForChannel(currentRules, sample.channel);
+        if (rule) {
+          const snapshots = new Map<string, SourceSnapshot>();
+          for (const [src, t_ns] of perSource) snapshots.set(src, { t_ns });
+          const winner = pickWinner(rule, snapshots, sample.t_ns);
+          if (winner === null || winner !== sample.source) return;
+        }
+
         // Damp on EVERY raw sample so the EMA sees real Δt between samples,
         // not the (longer) flush interval. The result is stored in the batch
         // map and the most-recent damped value wins per channel per flush.
@@ -61,6 +100,7 @@ export async function GET(req: Request): Promise<Response> {
 
       req.signal.addEventListener('abort', () => {
         unsub();
+        ruleSub.unsubscribe();
         clearInterval(heartbeat);
         if (flushTimer) clearTimeout(flushTimer);
         try {

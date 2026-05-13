@@ -24,6 +24,9 @@ export const Channels = {
     CogMagnetic: 'nav.gps.cog.magnetic',
     Sog: 'nav.gps.sog',
     Depth: 'nav.depth',
+    /** Magnetic variation in radians; East-positive (NMEA 2000 convention).
+     *  True = Magnetic + Variation. */
+    MagVar: 'nav.magvar',
   },
   Motion: {
     Heel: 'motion.heel',

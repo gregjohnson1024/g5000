@@ -2,6 +2,9 @@
 
 :root {
   color-scheme: dark;
+  /* Bump root font size so every Tailwind size class (text-xs/sm/base/lg)
+   * is ~2pt larger than its default. Browser default 16px → 18px. */
+  font-size: 18px;
 }
 
 body {
