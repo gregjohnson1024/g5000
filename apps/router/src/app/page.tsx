@@ -39,6 +39,7 @@ export default function HomePage() {
   const [cogExtOn, setCogExtOn] = useState(true);
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
+  const [waypoints, setWaypoints] = useState<Array<{ id: string; name: string; lat: number; lon: number }>>([]);
   const [loading, setLoading] = useState(false);
   const [route, setRoute] = useState<Route | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -96,6 +97,18 @@ export default function HomePage() {
     if (livePos === null) return;
     setWindRefreshKey((k) => k + 1);
   }, [windModel, windHours, livePos?.lat, livePos?.lon, availableHours]);
+
+  // Load saved waypoints once so they're selectable as Start / End.
+  useEffect(() => {
+    void fetch('/api/waypoints')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setWaypoints(j.waypoints);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+  }, []);
 
   const onMapClick = (p: Pos) => {
     if (!start) setStart(p);
@@ -370,9 +383,90 @@ export default function HomePage() {
             Dashed violet line ahead of the boat with 30/60/90/120 min ticks at the current SOG.
           </p>
         </div>
-        <div className="text-xs text-slate-400 space-y-1">
-          <div>Start: {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}</div>
-          <div>End:   {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}</div>
+        <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400 w-10">Start:</span>
+              <span className="font-mono text-slate-200 flex-1">
+                {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}
+              </span>
+              {start && (
+                <button
+                  type="button"
+                  onClick={() => setStart(undefined)}
+                  className="text-[10px] px-1 py-0.5 bg-slate-800 hover:bg-slate-700 rounded"
+                  title="Clear start"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="flex gap-1 items-center text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  if (livePos)
+                    setStart({ lat: livePos.lat, lon: livePos.lon });
+                }}
+                disabled={!livePos}
+                className="px-2 py-1 bg-slate-700 hover:bg-amber-600 hover:text-slate-900 rounded disabled:opacity-40"
+              >
+                Use boat position
+              </button>
+              <select
+                value=""
+                onChange={(e) => {
+                  const w = waypoints.find((x) => x.id === e.target.value);
+                  if (w) setStart({ lat: w.lat, lon: w.lon });
+                  e.currentTarget.value = '';
+                }}
+                className="bg-slate-900 border border-slate-700 rounded px-1 py-1 text-slate-200 flex-1"
+              >
+                <option value="">Waypoint…</option>
+                {waypoints.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1 pt-1 border-t border-slate-800">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400 w-10">End:</span>
+              <span className="font-mono text-slate-200 flex-1">
+                {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}
+              </span>
+              {end && (
+                <button
+                  type="button"
+                  onClick={() => setEnd(undefined)}
+                  className="text-[10px] px-1 py-0.5 bg-slate-800 hover:bg-slate-700 rounded"
+                  title="Clear end"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div className="flex gap-1 items-center text-xs">
+              <select
+                value=""
+                onChange={(e) => {
+                  const w = waypoints.find((x) => x.id === e.target.value);
+                  if (w) setEnd({ lat: w.lat, lon: w.lon });
+                  e.currentTarget.value = '';
+                }}
+                className="bg-slate-900 border border-slate-700 rounded px-1 py-1 text-slate-200 flex-1"
+              >
+                <option value="">Waypoint…</option>
+                {waypoints.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
         <PlanControls start={start} end={end} onPlan={onPlan} loading={loading} />
         {error && <div className="text-rose-400 text-xs">{error}</div>}
