@@ -1,4 +1,10 @@
-import { fetchWindGrid, type Bbox, type WindGrid } from '../../../lib/wind-fetch';
+import {
+  fetchWindGrid,
+  fetchWindGridEcmwf,
+  type Bbox,
+  type WindGrid,
+  type WindModel,
+} from '../../../lib/wind-fetch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -8,8 +14,8 @@ export const runtime = 'nodejs';
 const cache = new Map<string, { at: number; grid: WindGrid }>();
 const TTL_MS = 30 * 60 * 1000; // 30 min
 
-function bboxKey(b: Bbox, fh: number): string {
-  return `${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;
+function bboxKey(model: WindModel, b: Bbox, fh: number): string {
+  return `${model}|${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;
 }
 
 /**
@@ -28,6 +34,8 @@ export async function GET(req: Request): Promise<Response> {
   const lon = Number(url.searchParams.get('lon'));
   const hours = Number(url.searchParams.get('hours') ?? '0');
   const radius = Number(url.searchParams.get('radius') ?? '6');
+  const modelParam = (url.searchParams.get('model') ?? 'gfs').toLowerCase();
+  const model: WindModel = modelParam === 'ecmwf' ? 'ecmwf' : 'gfs';
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return Response.json({ ok: false, error: { message: 'lat & lon required' } }, { status: 400 });
   }
@@ -46,14 +54,15 @@ export async function GET(req: Request): Promise<Response> {
     lonMin: lon - radius,
     lonMax: lon + radius,
   };
-  const key = bboxKey(bbox, fh);
+  const key = bboxKey(model, bbox, fh);
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && now - cached.at < TTL_MS) {
     return Response.json({ ok: true, grid: cached.grid, cached: true });
   }
   try {
-    const grid = await fetchWindGrid(bbox, fh);
+    const grid =
+      model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, fh) : await fetchWindGrid(bbox, fh);
     cache.set(key, { at: now, grid });
     return Response.json({ ok: true, grid, cached: false });
   } catch (e) {

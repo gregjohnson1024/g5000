@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fetchEcmwfMessages, pickEcmwfRun } from '@g5000/grib';
+
+export type WindModel = 'gfs' | 'ecmwf';
 
 const NOMADS = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl';
 
@@ -20,6 +23,8 @@ export interface WindGrid {
   runAt: number;
   /** Hours after run that this forecast is valid (0, 3, 6, …). */
   forecastHour: number;
+  /** Which model produced this grid. */
+  model: WindModel;
 }
 
 export interface Bbox {
@@ -177,8 +182,119 @@ export async function fetchWindGrid(
       if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
     }
     const validAt = run.runUnix + forecastHour * 3600;
-    return { lats, lons, u, v, validAt, runAt: run.runUnix, forecastHour };
+    return { lats, lons, u, v, validAt, runAt: run.runUnix, forecastHour, model: 'gfs' };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Decode a (possibly multi-message) GRIB2 buffer into U + V grids by
+ * splitting and running grib_get_data on each. The buffer should contain
+ * either one or both of {10u, 10v} as separate messages; messages are
+ * paired by shortName, not order, so the ordering of input messages
+ * doesn't matter.
+ */
+async function decodeUVGrib(rawGrib: Buffer, model: WindModel, runAt: number, fh: number): Promise<WindGrid> {
+  const dir = await mkdtemp(join(tmpdir(), 'g5000-grib-'));
+  try {
+    const gribPath = join(dir, 'in.grib2');
+    await writeFile(gribPath, rawGrib);
+    const uOnly = join(dir, 'u.grib2');
+    const vOnly = join(dir, 'v.grib2');
+    await spawnText('grib_copy', ['-w', 'shortName=10u', gribPath, uOnly]);
+    await spawnText('grib_copy', ['-w', 'shortName=10v', gribPath, vOnly]);
+    const uTxt = await spawnText('grib_get_data', [uOnly]);
+    const vTxt = await spawnText('grib_get_data', [vOnly]);
+    const uRecs = parseGridData(uTxt);
+    const vRecs = parseGridData(vTxt);
+    if (uRecs.length === 0 || vRecs.length === 0) throw new Error('eccodes returned no grid points');
+    const latsSet = new Set<number>();
+    const lonsSet = new Set<number>();
+    for (const r of uRecs) {
+      latsSet.add(r.lat);
+      lonsSet.add(r.lon);
+    }
+    const lats = [...latsSet].sort((a, b) => a - b);
+    const lons = [...lonsSet].sort((a, b) => a - b);
+    const u: number[][] = lats.map(() => lons.map(() => NaN));
+    const v: number[][] = lats.map(() => lons.map(() => NaN));
+    const latIx = new Map(lats.map((l, i) => [l, i]));
+    const lonIx = new Map(lons.map((l, i) => [l, i]));
+    for (const r of uRecs) {
+      const yi = latIx.get(r.lat);
+      const xi = lonIx.get(r.lon);
+      if (yi !== undefined && xi !== undefined) u[yi]![xi] = r.v;
+    }
+    for (const r of vRecs) {
+      const yi = latIx.get(r.lat);
+      const xi = lonIx.get(r.lon);
+      if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
+    }
+    return { lats, lons, u, v, validAt: runAt + fh * 3600, runAt, forecastHour: fh, model };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Crop a `WindGrid` to an inclusive bbox. ECMWF Open Data is global only
+ * so we fetch globally and crop locally.
+ */
+function cropGrid(grid: WindGrid, bbox: Bbox): WindGrid {
+  const latKeep: number[] = [];
+  const latIdx: number[] = [];
+  for (let i = 0; i < grid.lats.length; i++) {
+    const lat = grid.lats[i]!;
+    if (lat >= bbox.latMin && lat <= bbox.latMax) {
+      latKeep.push(lat);
+      latIdx.push(i);
+    }
+  }
+  const lonKeep: number[] = [];
+  const lonIdx: number[] = [];
+  for (let i = 0; i < grid.lons.length; i++) {
+    const lon = grid.lons[i]!;
+    if (lon >= bbox.lonMin && lon <= bbox.lonMax) {
+      lonKeep.push(lon);
+      lonIdx.push(i);
+    }
+  }
+  const u: number[][] = latIdx.map((yi) => lonIdx.map((xi) => grid.u[yi]![xi]!));
+  const v: number[][] = latIdx.map((yi) => lonIdx.map((xi) => grid.v[yi]![xi]!));
+  return { ...grid, lats: latKeep, lons: lonKeep, u, v };
+}
+
+/**
+ * Fetch ECMWF IFS Open Data 0p25 wind at the given forecast hour, decode,
+ * and crop to bbox. ECMWF Open Data IFS publishes only every 6 hours
+ * (0/6/12/18 z) with forecast hours at 0/3/6/.../240; this function rounds
+ * the request to the nearest 3 h step.
+ */
+export async function fetchWindGridEcmwf(
+  bbox: Bbox,
+  forecastHour: number,
+  now: Date = new Date(),
+): Promise<WindGrid> {
+  const run = pickEcmwfRun(now.getTime() / 1000);
+  const runUnix = Date.UTC(
+    Number(run.runDateUtc.slice(0, 4)),
+    Number(run.runDateUtc.slice(5, 7)) - 1,
+    Number(run.runDateUtc.slice(8, 10)),
+    run.runHourUtc,
+  ) / 1000;
+  // Round to nearest 3 h step (Open Data IFS step cadence).
+  const fh = Math.max(0, Math.round(forecastHour / 3) * 3);
+  const messages = await fetchEcmwfMessages({
+    runDateUtc: run.runDateUtc,
+    runHourUtc: run.runHourUtc,
+    forecastHour: fh,
+    variables: ['10u', '10v'],
+  });
+  if (messages.length === 0) {
+    throw new Error('ECMWF: no GRIB messages returned (run may not be posted yet)');
+  }
+  const combined = Buffer.concat(messages);
+  const globalGrid = await decodeUVGrib(combined, 'ecmwf', runUnix, fh);
+  return cropGrid(globalGrid, bbox);
 }

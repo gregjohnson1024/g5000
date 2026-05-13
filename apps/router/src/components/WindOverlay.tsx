@@ -1,8 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 
-interface WindGrid {
+export type WindModel = 'gfs' | 'ecmwf';
+
+export interface WindGrid {
   lats: number[];
   lons: number[];
   u: number[][];
@@ -10,6 +12,7 @@ interface WindGrid {
   validAt: number;
   runAt: number;
   forecastHour: number;
+  model: WindModel;
 }
 
 const SOURCE_ID = 'wind-overlay';
@@ -48,62 +51,82 @@ export interface WindOverlayProps {
   map: maplibregl.Map | null;
   centerLat: number | null;
   centerLon: number | null;
-  /** Forecast hours ahead. Default 0 (closest to now). */
-  hours?: number;
-  /** Half-width of bbox in degrees. Default 6 (12° × 12° area). */
+  /** Model: GFS or ECMWF. */
+  model: WindModel;
+  /** Forecast hours ahead. */
+  hours: number;
+  /** Half-width of bbox in degrees. */
   radius?: number;
   /** When true, no overlay rendered. */
   hidden?: boolean;
   /** Subsample factor — render every Nth grid cell to keep the map readable. */
   stride?: number;
-  /** Arrow length per knot, in NM. Default 0.18 so a 20 kn wind = 3.6 NM. */
+  /** Arrow length per knot, in NM. */
   nmPerKn?: number;
-  /** Called whenever the grid is (re)fetched. */
-  onLoaded?: (g: WindGrid) => void;
+  /** Opacity for the overlay layer, 0..1. */
+  opacity?: number;
+  /** Bumping this triggers a fetch. Center/hours/model changes alone do NOT. */
+  refreshKey: number;
+  /** Called when fetch completes — `grid` is null if response had no change. */
+  onLoaded?: (info: { grid: WindGrid | null; identical: boolean; error: string | null }) => void;
 }
 
 export function WindOverlay({
   map,
   centerLat,
   centerLon,
-  hours = 0,
+  model,
+  hours,
   radius = 6,
   hidden = false,
   stride = 2,
   nmPerKn = 0.18,
+  opacity = 0.85,
+  refreshKey,
   onLoaded,
 }: WindOverlayProps) {
   const [grid, setGrid] = useState<WindGrid | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const onLoadedRef = useRef(onLoaded);
+  onLoadedRef.current = onLoaded;
 
-  // Fetch the grid whenever center or hours change.
+  // Fetch ONLY when refreshKey changes. Center/hours/model are read at
+  // fetch time but don't auto-trigger — the user decides when to refresh.
   useEffect(() => {
     if (centerLat === null || centerLon === null) return;
+    if (refreshKey === 0) return; // initial mount, wait for first user-triggered refresh
     let cancelled = false;
-    const url = `/api/wind?lat=${centerLat.toFixed(2)}&lon=${centerLon.toFixed(2)}&hours=${hours}&radius=${radius}`;
+    const url = `/api/wind?model=${model}&lat=${centerLat.toFixed(2)}&lon=${centerLon.toFixed(2)}&hours=${hours}&radius=${radius}`;
     fetch(url)
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
         if (!j.ok) {
           setErr(j.error?.message ?? 'wind fetch failed');
-          setGrid(null);
+          onLoadedRef.current?.({ grid: null, identical: false, error: j.error?.message ?? 'fetch failed' });
         } else {
           setErr(null);
-          setGrid(j.grid as WindGrid);
-          onLoaded?.(j.grid as WindGrid);
+          const newGrid = j.grid as WindGrid;
+          let identical = false;
+          if (grid && grid.runAt === newGrid.runAt && grid.forecastHour === newGrid.forecastHour && grid.model === newGrid.model) {
+            identical = true;
+          }
+          setGrid(newGrid);
+          onLoadedRef.current?.({ grid: newGrid, identical, error: null });
         }
       })
       .catch((e) => {
         if (cancelled) return;
-        setErr(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        setErr(msg);
+        onLoadedRef.current?.({ grid: null, identical: false, error: msg });
       });
     return () => {
       cancelled = true;
     };
-  // intentionally omit onLoaded from deps to avoid loop
+  // intentionally driven by refreshKey only
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centerLat, centerLon, hours, radius]);
+  }, [refreshKey]);
 
   // Render whenever the grid changes (or hidden flips).
   useEffect(() => {
@@ -119,14 +142,14 @@ export function WindOverlay({
         type: 'line',
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'shaft'],
-        paint: { 'line-color': ['get', 'color'], 'line-width': 1.5, 'line-opacity': 0.85 },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 1.5, 'line-opacity': opacity },
       });
       map.addLayer({
         id: LAYER_HEAD,
         type: 'fill',
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'head'],
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.85 },
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': opacity },
       });
     };
     if (map.isStyleLoaded()) ensureLayers();
@@ -139,8 +162,7 @@ export function WindOverlay({
       src.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
-    type Feature = { type: 'Feature'; properties: Record<string, unknown>; geometry: { type: 'LineString' | 'Polygon'; coordinates: unknown } };
-    const features: Feature[] = [];
+    const features: GeoJSON.Feature[] = [];
     for (let yi = 0; yi < grid.lats.length; yi += stride) {
       for (let xi = 0; xi < grid.lons.length; xi += stride) {
         const lat = grid.lats[yi]!;
@@ -179,6 +201,13 @@ export function WindOverlay({
     }
     src.setData({ type: 'FeatureCollection', features });
   }, [map, grid, hidden, stride, nmPerKn]);
+
+  // Update layer opacity when the prop changes (avoid full re-render).
+  useEffect(() => {
+    if (!map) return;
+    if (map.getLayer(LAYER_LINE)) map.setPaintProperty(LAYER_LINE, 'line-opacity', opacity);
+    if (map.getLayer(LAYER_HEAD)) map.setPaintProperty(LAYER_HEAD, 'fill-opacity', opacity);
+  }, [map, opacity]);
 
   useEffect(() => {
     if (!map) return;
