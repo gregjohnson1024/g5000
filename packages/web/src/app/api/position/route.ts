@@ -1,4 +1,12 @@
-import { getSharedBus, type Sample } from '@g5000/core';
+import {
+  getSharedBus,
+  findRuleForChannel,
+  pickWinner,
+  type Sample,
+  type SourceSnapshot,
+  type SourcePriorityConfig,
+} from '@g5000/core';
+import { getSharedConfigStore } from '@g5000/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,7 +25,32 @@ export const runtime = 'nodejs';
  */
 export async function GET(): Promise<Response> {
   const bus = getSharedBus();
+  const configStore = getSharedConfigStore();
   const encoder = new TextEncoder();
+
+  // Apply source-priority rules so a blocked source (or non-winning source)
+  // never sneaks into our derived position/HDG. The /api/stream feed has
+  // the same logic — keeping them in lockstep means /helm and /chart see
+  // the same selected sources.
+  let currentRules: SourcePriorityConfig = [];
+  const ruleSub = configStore.sourcePriority$.subscribe((r) => {
+    currentRules = r;
+  });
+  const sourceTimes = new Map<string, Map<string, bigint>>();
+  const acceptSample = (s: Sample): boolean => {
+    let perSource = sourceTimes.get(s.channel);
+    if (!perSource) {
+      perSource = new Map();
+      sourceTimes.set(s.channel, perSource);
+    }
+    perSource.set(s.source, s.t_ns);
+    const rule = findRuleForChannel(currentRules, s.channel);
+    if (!rule) return true;
+    const snapshots = new Map<string, SourceSnapshot>();
+    for (const [src, t_ns] of perSource) snapshots.set(src, { t_ns });
+    const winner = pickWinner(rule, snapshots, s.t_ns);
+    return winner !== null && winner === s.source;
+  };
 
   // Captured by both start() and cancel() so the consumer aborting the
   // stream tears down subscriptions and the 1 Hz timer.
@@ -42,6 +75,7 @@ export async function GET(): Promise<Response> {
     timer = null;
     for (const u of unsubs) u();
     unsubs.length = 0;
+    ruleSub.unsubscribe();
   };
 
   const stream = new ReadableStream({
@@ -52,20 +86,20 @@ export async function GET(): Promise<Response> {
       // the channel-mapper landed.)
       unsubs.push(
         bus.subscribe('nav.gps.position', (s: Sample) => {
-          if (s.value.kind !== 'geo') return;
+          if (s.value.kind !== 'geo' || !acceptSample(s)) return;
           latest.lat = s.value.value.lat;
           latest.lon = s.value.value.lon;
         }),
       );
       unsubs.push(
         bus.subscribe('nav.gps.cog', (s: Sample) => {
-          if (s.value.kind !== 'scalar') return;
+          if (s.value.kind !== 'scalar' || !acceptSample(s)) return;
           latest.cog = s.value.value;
         }),
       );
       unsubs.push(
         bus.subscribe('nav.gps.sog', (s: Sample) => {
-          if (s.value.kind !== 'scalar') return;
+          if (s.value.kind !== 'scalar' || !acceptSample(s)) return;
           latest.sog = s.value.value;
         }),
       );
@@ -84,21 +118,21 @@ export async function GET(): Promise<Response> {
       };
       unsubs.push(
         bus.subscribe('boat.heading.true', (s: Sample) => {
-          if (s.value.kind !== 'scalar') return;
+          if (s.value.kind !== 'scalar' || !acceptSample(s)) return;
           lastHdgTrue = s.value.value;
           recomputeHdg();
         }),
       );
       unsubs.push(
         bus.subscribe('boat.heading.magnetic', (s: Sample) => {
-          if (s.value.kind !== 'scalar') return;
+          if (s.value.kind !== 'scalar' || !acceptSample(s)) return;
           lastHdgMag = s.value.value;
           recomputeHdg();
         }),
       );
       unsubs.push(
         bus.subscribe('nav.magvar', (s: Sample) => {
-          if (s.value.kind !== 'scalar') return;
+          if (s.value.kind !== 'scalar' || !acceptSample(s)) return;
           magVar = s.value.value;
           recomputeHdg();
         }),
