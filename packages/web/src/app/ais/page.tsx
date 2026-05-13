@@ -715,7 +715,7 @@ export default function ChartPage() {
               </div>
             </div>
           )}
-          <table className="w-full text-xs font-mono">
+          <table className="w-full text-sm font-mono">
             <thead>
               <tr className="text-slate-400 border-b border-slate-800">
                 <th className="text-left py-1">MMSI</th>
@@ -768,7 +768,7 @@ export default function ChartPage() {
                             type="button"
                             onClick={() => unmuteVessel(target.mmsi)}
                             title={`Re-arm now (would auto-arm at CPA < ${remutedTriggerNm!.toFixed(2)} NM)`}
-                            className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-emerald-700 hover:text-slate-100 rounded"
+                            className="px-1.5 py-0.5 text-xs bg-slate-700 hover:bg-emerald-700 hover:text-slate-100 rounded"
                           >
                             muted ≥{remutedTriggerNm!.toFixed(2)}
                           </button>
@@ -777,7 +777,7 @@ export default function ChartPage() {
                             type="button"
                             onClick={() => muteVessel(target.mmsi)}
                             title="Silence the klaxon for this vessel until CPA closes by 10%"
-                            className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-red-700 hover:text-red-100 rounded"
+                            className="px-1.5 py-0.5 text-xs bg-slate-700 hover:bg-red-700 hover:text-red-100 rounded"
                           >
                             Mute
                           </button>

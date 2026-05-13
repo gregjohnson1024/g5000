@@ -83,7 +83,7 @@ export function PolarPlot({
             x={cx + 4}
             y={cy - v * scale + 4}
             fill="rgb(100,110,130)"
-            fontSize="10"
+            fontSize="15"
             fontFamily="monospace"
           >
             {(v * MS_TO_KNOTS).toFixed(0)}kn
@@ -109,7 +109,7 @@ export function PolarPlot({
               x={cx + (r + 12) * Math.sin(rad)}
               y={cy - (r + 12) * Math.cos(rad)}
               fill="rgb(100,110,130)"
-              fontSize="10"
+              fontSize="15"
               fontFamily="monospace"
               textAnchor="middle"
               dominantBaseline="central"
@@ -180,10 +180,10 @@ export function PolarPlot({
 
       {/* Current numbers (bottom-left) */}
       <g transform={`translate(${margin / 2},${size - margin / 2})`}>
-        <text fill="rgb(200,210,230)" fontSize="11" fontFamily="monospace">
+        <text fill="rgb(200,210,230)" fontSize="16" fontFamily="monospace">
           {currentTws !== undefined ? `TWS ${(currentTws * MS_TO_KNOTS).toFixed(1)}kn` : 'TWS —'}
         </text>
-        <text fill="rgb(200,210,230)" fontSize="11" fontFamily="monospace" dy="14">
+        <text fill="rgb(200,210,230)" fontSize="16" fontFamily="monospace" dy="20">
           {currentTwa !== undefined ? `TWA ${(currentTwa * RAD_TO_DEG).toFixed(0)}°` : 'TWA —'}
           {currentBsp !== undefined ? `  BSP ${(currentBsp * MS_TO_KNOTS).toFixed(2)}kn` : ''}
         </text>
@@ -191,25 +191,25 @@ export function PolarPlot({
 
       {/* Legend (top-right). Always rendered so the meaning of the dots and
           the curve colour ramp is visible even before any live data flows. */}
-      <g transform={`translate(${size - margin / 2 - 110},${margin / 2 + 4})`}>
+      <g transform={`translate(${size - margin / 2 - 150},${margin / 2 + 4})`}>
         <rect
-          x="-8"
-          y="-12"
-          width="118"
-          height="74"
+          x="-10"
+          y="-16"
+          width="160"
+          height="110"
           rx="4"
           fill="rgb(15,20,32)"
           fillOpacity="0.75"
           stroke="rgb(50,55,70)"
         />
         {/* Current operating-point dot */}
-        <circle cx="0" cy="0" r="6" fill="rgb(120,255,180)" stroke="rgb(20,40,30)" strokeWidth="1.5" />
-        <text x="14" y="3" fill="rgb(200,210,230)" fontSize="10" fontFamily="monospace">
+        <circle cx="0" cy="0" r="7" fill="rgb(120,255,180)" stroke="rgb(20,40,30)" strokeWidth="1.5" />
+        <text x="16" y="5" fill="rgb(200,210,230)" fontSize="15" fontFamily="monospace">
           Current
         </text>
         {/* Target operating-point dot */}
-        <circle cx="0" cy="16" r="4" fill="rgb(255,180,80)" stroke="rgb(40,30,10)" strokeWidth="1" />
-        <text x="14" y="19" fill="rgb(200,210,230)" fontSize="10" fontFamily="monospace">
+        <circle cx="0" cy="24" r="5" fill="rgb(255,180,80)" stroke="rgb(40,30,10)" strokeWidth="1" />
+        <text x="16" y="29" fill="rgb(200,210,230)" fontSize="15" fontFamily="monospace">
           Target
         </text>
         {/* TWS curve colour ramp */}
@@ -219,14 +219,14 @@ export function PolarPlot({
             <stop offset="100%" stopColor="rgb(240,100,100)" />
           </linearGradient>
         </defs>
-        <rect x="-4" y="30" width="100" height="6" fill="url(#twsLegendGrad)" rx="1" />
-        <text x="-4" y="48" fill="rgb(150,160,180)" fontSize="9" fontFamily="monospace">
+        <rect x="-4" y="48" width="140" height="8" fill="url(#twsLegendGrad)" rx="1" />
+        <text x="-4" y="76" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
           light
         </text>
-        <text x="96" y="48" textAnchor="end" fill="rgb(150,160,180)" fontSize="9" fontFamily="monospace">
+        <text x="136" y="76" textAnchor="end" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
           heavy
         </text>
-        <text x="46" y="48" textAnchor="middle" fill="rgb(150,160,180)" fontSize="9" fontFamily="monospace">
+        <text x="66" y="76" textAnchor="middle" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
           TWS
         </text>
       </g>
