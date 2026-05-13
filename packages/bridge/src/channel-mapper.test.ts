@@ -102,7 +102,7 @@ describe('mapPgnToSamples', () => {
     expect(mapPgnToSamples(make(129025, { Latitude: 32.7 }))).toEqual([]);
   });
 
-  it('maps PGN 129026 to nav.gps.cog and nav.gps.sog', () => {
+  it('maps PGN 129026 True reference to nav.gps.cog and nav.gps.sog', () => {
     const decoded = make(129026, { 'COG Reference': 'True', COG: 5.27, SOG: 3.6 });
     const samples = mapPgnToSamples(decoded);
     const channels = samples.map((s) => s.channel).sort();
@@ -117,6 +117,13 @@ describe('mapPgnToSamples', () => {
       value: 3.6,
       unit: 'm/s',
     });
+  });
+
+  it('maps PGN 129026 Magnetic reference to nav.gps.cog.magnetic', () => {
+    const decoded = make(129026, { 'COG Reference': 'Magnetic', COG: 1.2, SOG: 4.0 });
+    const samples = mapPgnToSamples(decoded);
+    const channels = samples.map((s) => s.channel).sort();
+    expect(channels).toEqual([Channels.Nav.CogMagnetic, Channels.Nav.Sog].sort());
   });
 
   it('maps PGN 127257 attitude to heel, pitch, yaw', () => {

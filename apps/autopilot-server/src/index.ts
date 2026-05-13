@@ -26,6 +26,7 @@ import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { startHlinkServer } from './hlink/server.js';
 import { installObservedSourcesTracker } from './observed-sources.js';
+import { installDeviceDiscovery } from './device-discovery.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -237,6 +238,16 @@ async function main(): Promise<void> {
       console.log('[autopilot] device-registry refresh target = YDWG (single-frame PGNs only)');
     }
 
+    // Auto-discovery — for each newly-seen src that we don't yet have
+    // Product Info for, send a per-target ISO Request. Only useful when a
+    // txer is registered.
+    let stopDiscoveryFn: (() => void) | null = null;
+    if (registeredTxer) {
+      stopDiscoveryFn = installDeviceDiscovery(bus);
+      // eslint-disable-next-line no-console
+      console.log('[autopilot] device-discovery online (per-target ISO Request on new sources)');
+    }
+
     const teardownFn = async (): Promise<void> => {
       // Reverse order. Best-effort: log + swallow each step's error so
       // we still unwind the rest.
@@ -250,6 +261,7 @@ async function main(): Promise<void> {
           );
         }
       };
+      if (stopDiscoveryFn) stopDiscoveryFn();
       if (registeredTxer) {
         getSharedDeviceRegistry().unregisterTxer(registeredTxer);
       }

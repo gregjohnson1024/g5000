@@ -24,6 +24,7 @@ interface SourcePriorityRule {
   channelPattern: string;
   sources: string[];
   freshnessSeconds: number;
+  blocked?: string[];
 }
 
 type SourcePriorityConfig = SourcePriorityRule[];
@@ -239,27 +240,10 @@ export default function SourcesPage() {
   );
 
   /**
-   * Promote a publisher to primary for a channel. Creates a rule on the
-   * specific channel if none matches (or only a wildcard matches — we don't
-   * mutate wildcard rules to avoid surprising the user). Saves immediately.
+   * Persist an updated rule config to the server and update local state.
+   * Shared by promoteSource / blockSource / unblockSource.
    */
-  const promoteSource = async (channel: string, source: string): Promise<void> => {
-    const match = findRuleForChannel(channel);
-    let next: SourcePriorityConfig;
-    if (match && match.rule.channelPattern === channel) {
-      // Exact-channel rule exists: move/add source to the top.
-      next = draft.map((r, i) => {
-        if (i !== match.index) return r;
-        const others = r.sources.filter((s) => s !== source);
-        return { ...r, sources: [source, ...others] };
-      });
-    } else {
-      // No exact rule (or only a wildcard matches): append a fresh exact-rule
-      // for this channel with the chosen source on top. We don't strip the
-      // existing wildcard — exact rules win because they appear later? No,
-      // earlier-in-the-list wins. Insert at the front so it beats wildcards.
-      next = [{ channelPattern: channel, sources: [source], freshnessSeconds: 2 }, ...draft];
-    }
+  const saveConfig = async (next: SourcePriorityConfig): Promise<void> => {
     setBusy(true);
     setErr(null);
     try {
@@ -270,10 +254,10 @@ export default function SourcesPage() {
       });
       if (!res.ok) {
         const t = await res.text();
-        throw new Error(`promote failed: ${res.status} ${t}`);
+        throw new Error(`save failed: ${res.status} ${t}`);
       }
       setDraft(next);
-      setRules(next.map((r) => ({ ...r, sources: [...r.sources] })));
+      setRules(next.map((r) => ({ ...r, sources: [...r.sources], blocked: r.blocked ? [...r.blocked] : undefined })));
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
     } catch (e) {
@@ -281,6 +265,70 @@ export default function SourcesPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * Promote a publisher to primary for a channel. Creates a rule on the
+   * specific channel if none matches (or only a wildcard matches — we don't
+   * mutate wildcard rules to avoid surprising the user). Saves immediately.
+   */
+  const promoteSource = async (channel: string, source: string): Promise<void> => {
+    const match = findRuleForChannel(channel);
+    let next: SourcePriorityConfig;
+    if (match && match.rule.channelPattern === channel) {
+      next = draft.map((r, i) => {
+        if (i !== match.index) return r;
+        const others = r.sources.filter((s) => s !== source);
+        // Promoting unblocks too — can't be primary and blocked.
+        const blocked = (r.blocked ?? []).filter((s) => s !== source);
+        return { ...r, sources: [source, ...others], ...(blocked.length ? { blocked } : { blocked: undefined }) };
+      });
+    } else {
+      next = [{ channelPattern: channel, sources: [source], freshnessSeconds: 2 }, ...draft];
+    }
+    await saveConfig(next);
+  };
+
+  /**
+   * Block a source for a channel. Adds it to the rule's `blocked` list (and
+   * removes it from `sources` if present). Creates a fresh exact-channel rule
+   * if no rule matches.
+   */
+  const blockSource = async (channel: string, source: string): Promise<void> => {
+    const match = findRuleForChannel(channel);
+    let next: SourcePriorityConfig;
+    if (match && match.rule.channelPattern === channel) {
+      next = draft.map((r, i) => {
+        if (i !== match.index) return r;
+        const sources = r.sources.filter((s) => s !== source);
+        const blocked = Array.from(new Set([...(r.blocked ?? []), source]));
+        return { ...r, sources, blocked };
+      });
+    } else {
+      // No exact rule: create one that allows everything-not-blocked via a
+      // wildcard, with the specified source blocked. `n2k:*` matches every
+      // N2K source so the selector still picks fresh values from others.
+      next = [
+        {
+          channelPattern: channel,
+          sources: ['n2k:*'],
+          freshnessSeconds: 2,
+          blocked: [source],
+        },
+        ...draft,
+      ];
+    }
+    await saveConfig(next);
+  };
+
+  /** Remove a source from a rule's blocked list. */
+  const unblockSource = async (ruleIdx: number, source: string): Promise<void> => {
+    const next = draft.map((r, i) => {
+      if (i !== ruleIdx) return r;
+      const blocked = (r.blocked ?? []).filter((s) => s !== source);
+      return { ...r, blocked: blocked.length > 0 ? blocked : undefined };
+    });
+    await saveConfig(next);
   };
 
   // Channel list to render in the observed section:
@@ -349,14 +397,24 @@ export default function SourcesPage() {
                     {pubs.length === 0 ? (
                       <span className="text-slate-500">—</span>
                     ) : (
-                      <ul className="space-y-0.5">
+                      <div className="space-y-0.5">
                         {pubs.map((p) => {
                           const isPrimary = ruleMatch?.rule.sources[0] === p.source;
+                          const isBlocked = ruleMatch?.rule.blocked?.includes(p.source) ?? false;
                           const devName = deviceLabel(p.source);
                           return (
-                            <li key={p.source} className="text-xs flex items-center gap-2">
+                            <div
+                              key={p.source}
+                              className="grid grid-cols-[minmax(0,1fr)_5rem_4rem_8rem] gap-x-3 items-baseline text-xs"
+                            >
                               <span
-                                className={isPrimary ? 'text-amber-300' : 'text-slate-300'}
+                                className={
+                                  isBlocked
+                                    ? 'text-slate-600 line-through'
+                                    : isPrimary
+                                      ? 'text-amber-300'
+                                      : 'text-slate-300'
+                                }
                                 title={p.source}
                               >
                                 {friendlySourceLabel(p.source)}
@@ -368,27 +426,44 @@ export default function SourcesPage() {
                                     primary
                                   </span>
                                 )}
+                                {isBlocked && (
+                                  <span className="ml-1 text-[10px] uppercase text-red-500">
+                                    blocked
+                                  </span>
+                                )}
                               </span>
-                              <span className="text-slate-200 font-mono ml-2">
+                              <span className="text-right text-slate-200 font-mono">
                                 {formatChannelValue(p.lastValue)}
                               </span>
-                              <span className="text-slate-500 font-mono">
-                                ({p.ageMs} ms)
+                              <span className="text-right text-slate-500 font-mono">
+                                {p.ageMs} ms
                               </span>
-                              {!isPrimary && pubs.length > 1 && (
-                                <button
-                                  onClick={() => void promoteSource(ch, p.source)}
-                                  disabled={busy}
-                                  className="ml-auto px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-amber-700 hover:text-slate-900 rounded disabled:opacity-50"
-                                  title={`Make ${p.source} the primary source for ${ch}`}
-                                >
-                                  Set primary
-                                </button>
-                              )}
-                            </li>
+                              <span className="text-right space-x-1">
+                                {!isPrimary && !isBlocked && pubs.length > 1 && (
+                                  <button
+                                    onClick={() => void promoteSource(ch, p.source)}
+                                    disabled={busy}
+                                    className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-amber-700 hover:text-slate-900 rounded disabled:opacity-50"
+                                    title={`Make ${p.source} the primary source for ${ch}`}
+                                  >
+                                    Primary
+                                  </button>
+                                )}
+                                {!isBlocked && (
+                                  <button
+                                    onClick={() => void blockSource(ch, p.source)}
+                                    disabled={busy}
+                                    className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-red-800 hover:text-red-100 rounded disabled:opacity-50"
+                                    title={`Ignore ${p.source} for ${ch}, even when fresh`}
+                                  >
+                                    Block
+                                  </button>
+                                )}
+                              </span>
+                            </div>
                           );
                         })}
-                      </ul>
+                      </div>
                     )}
                   </td>
                   <td className="p-2">
@@ -498,7 +573,45 @@ export default function SourcesPage() {
                 onAdd={(s) => addSource(idx, s)}
                 onRemove={(j) => removeSource(idx, j)}
                 onMove={(j, d) => moveSource(idx, j, d)}
+                lookupValue={(s) => {
+                  // Find a publisher whose source matches the pattern.
+                  // For exact patterns it's a single lookup; for trailing-`*`
+                  // patterns we pick the first match.
+                  for (const e of observed) {
+                    if (s === e.source || (s.endsWith('*') && e.source.startsWith(s.slice(0, -1)))) {
+                      return { value: e.lastValue, ageMs: e.ageMs };
+                    }
+                  }
+                  return null;
+                }}
+                lookupDevice={deviceLabel}
               />
+              {rule.blocked && rule.blocked.length > 0 && (
+                <div className="space-y-1 pt-2 border-t border-red-900/40">
+                  <p className="text-xs text-red-400 uppercase">Blocked</p>
+                  {rule.blocked.map((s) => (
+                    <div
+                      key={s}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline text-xs"
+                    >
+                      <span className="text-slate-400 line-through" title={s}>
+                        {friendlySourceLabel(s)}
+                        {(() => {
+                          const d = deviceLabel(s);
+                          return d ? <span className="text-slate-500"> · {d}</span> : null;
+                        })()}
+                      </span>
+                      <button
+                        onClick={() => void unblockSource(idx, s)}
+                        disabled={busy}
+                        className="px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50"
+                      >
+                        Unblock
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -541,20 +654,34 @@ interface SourceListProps {
   onAdd: (source: string) => void;
   onRemove: (idx: number) => void;
   onMove: (idx: number, delta: -1 | 1) => void;
+  /** Optional: returns the current value + age for a source pattern. */
+  lookupValue?: (source: string) => { value: unknown; ageMs: number } | null;
+  /** Optional: returns a human-readable device label for a source. */
+  lookupDevice?: (source: string) => string | null;
 }
 
-function SourceList({ sources, onAdd, onRemove, onMove }: SourceListProps) {
+function SourceList({ sources, onAdd, onRemove, onMove, lookupValue, lookupDevice }: SourceListProps) {
   const [newSource, setNewSource] = useState('');
   return (
     <div className="space-y-1">
       {sources.length === 0 && (
         <p className="text-xs text-slate-500 italic">No sources — rule will not match anything.</p>
       )}
-      {sources.map((s, j) => (
-        <div key={s + j} className="flex items-center gap-2 text-sm">
-          <span className="text-slate-500 w-5 text-right">{j + 1}.</span>
-          <span className="flex-1" title={s}>
+      {sources.map((s, j) => {
+        const live = lookupValue?.(s) ?? null;
+        const dev = lookupDevice?.(s) ?? null;
+        return (
+        <div key={s + j} className="grid grid-cols-[1.25rem_minmax(0,1fr)_5rem_4rem_auto_auto_auto] gap-x-2 items-baseline text-sm">
+          <span className="text-slate-500 text-right">{j + 1}.</span>
+          <span className="text-slate-300" title={s}>
             {friendlySourceLabel(s)}
+            {dev && <span className="text-slate-500"> · {dev}</span>}
+          </span>
+          <span className="text-right text-slate-200 font-mono text-xs">
+            {live ? formatChannelValue(live.value) : <span className="text-slate-600">—</span>}
+          </span>
+          <span className="text-right text-slate-500 font-mono text-xs">
+            {live ? `${live.ageMs} ms` : ''}
           </span>
           <button
             onClick={() => onMove(j, -1)}
@@ -580,7 +707,8 @@ function SourceList({ sources, onAdd, onRemove, onMove }: SourceListProps) {
             ×
           </button>
         </div>
-      ))}
+        );
+      })}
       <div className="flex items-center gap-2 pt-1">
         <input
           type="text"

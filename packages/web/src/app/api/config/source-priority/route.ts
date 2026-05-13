@@ -62,6 +62,12 @@ export async function PUT(req: Request): Promise<Response> {
         { status: 422 },
       );
     }
+    if (r.blocked !== undefined && !Array.isArray(r.blocked)) {
+      return Response.json(
+        { error: `rule[${i}].blocked must be an array of strings if provided` },
+        { status: 422 },
+      );
+    }
   }
   await store.setSourcePriority(body as SourcePriorityConfig);
   return Response.json({ ok: true });

@@ -203,6 +203,11 @@ export interface SourcePriorityRule {
    * in the list.
    */
   freshnessSeconds: number;
+  /**
+   * Sources to never select for this channel, even if all `sources` entries
+   * are stale. Same pattern syntax as `sources`.
+   */
+  blocked?: string[];
 }
 
 export type SourcePriorityConfig = SourcePriorityRule[];

@@ -65,8 +65,16 @@ export default function HelmPage() {
 
   // Wind + polar/VMG channels intentionally not subscribed — no wind sensor attached.
   const sog = channels.get('nav.gps.sog');
-  const cog = channels.get('nav.gps.cog');
-  const hdg = channels.get('boat.heading.magnetic');
+  // COG and HDG: each can arrive in either True or Magnetic reference.
+  // Pick whichever has fresh data, and remember which one to label the tile.
+  const cogTrue = channels.get('nav.gps.cog');
+  const cogMag = channels.get('nav.gps.cog.magnetic');
+  const cog = cogTrue ?? cogMag;
+  const cogRef = cogTrue ? 'T' : cogMag ? 'M' : null;
+  const hdgMag = channels.get('boat.heading.magnetic');
+  const hdgTrue = channels.get('boat.heading.true');
+  const hdg = hdgMag ?? hdgTrue;
+  const hdgRef = hdgMag ? 'M' : hdgTrue ? 'T' : null;
   const heel = channels.get('motion.heel');
   const pitch = channels.get('motion.pitch');
 
@@ -107,8 +115,18 @@ export default function HelmPage() {
           hidden — no wind sensor attached. Re-add when masthead is wired. */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <HelmTile label="SOG" value={fmtSpeed(sog)} unit="kn" />
-        <HelmTile label="COG" value={fmtHeading(cog)} unit="°" />
-        <HelmTile label="Heading" value={fmtHeading(hdg)} unit="°" />
+        <HelmTile
+          label="COG"
+          value={fmtHeading(cog)}
+          unit="°"
+          sub={cogRef ?? undefined}
+        />
+        <HelmTile
+          label="HDG"
+          value={fmtHeading(hdg)}
+          unit="°"
+          sub={hdgRef ?? undefined}
+        />
 
         <HelmTile label="Heel" value={fmtAngleSigned(heel)} unit="°" small />
         <HelmTile label="Pitch" value={fmtAngleSigned(pitch)} unit="°" small />

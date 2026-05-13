@@ -50,6 +50,12 @@ export interface SourcePriorityRule {
    * sample within this window, the selector falls through to the next source.
    */
   freshnessSeconds: number;
+  /**
+   * Sources to never select for this channel, even when all `sources` entries
+   * are stale. Same pattern syntax as `sources`. Used to block a device that
+   * publishes valid-looking-but-wrong values (e.g. a stale repeater).
+   */
+  blocked?: string[];
 }
 
 export type SourcePriorityConfig = SourcePriorityRule[];
@@ -152,6 +158,7 @@ export function pickWinner(
   nowNs: bigint,
 ): string | null {
   const freshNs = BigInt(Math.round(rule.freshnessSeconds * 1e9));
+  const blocked = rule.blocked ?? [];
   // For each pattern in priority order, find the freshest source-tag that
   // matches the pattern. If that freshest tag is within the freshness
   // window, it wins. Otherwise advance to the next pattern.
@@ -159,6 +166,7 @@ export function pickWinner(
     let bestTag: string | null = null;
     let bestT: bigint = -1n;
     for (const [tag, snap] of latestSamplesBySource.entries()) {
+      if (blocked.length > 0 && matchSourceIndex(tag, blocked) >= 0) continue;
       if (matchSourceIndex(tag, [pattern]) < 0) continue;
       if (snap.t_ns > bestT) {
         bestT = snap.t_ns;

@@ -255,10 +255,14 @@ export class ConfigStore {
       if (sources.length === 0) continue;
       if (typeof rule.freshnessSeconds !== 'number' || !Number.isFinite(rule.freshnessSeconds)) continue;
       if (rule.freshnessSeconds <= 0) continue;
+      const blocked = Array.isArray(rule.blocked)
+        ? rule.blocked.filter((s): s is string => typeof s === 'string' && s.length > 0)
+        : undefined;
       cleaned.push({
         channelPattern: rule.channelPattern,
         sources,
         freshnessSeconds: rule.freshnessSeconds,
+        ...(blocked && blocked.length > 0 ? { blocked } : {}),
       });
     }
     this.upsert(sourcePriorityConfigTable, cleaned);

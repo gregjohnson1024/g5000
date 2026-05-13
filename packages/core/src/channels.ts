@@ -18,7 +18,10 @@ export const Channels = {
   },
   Nav: {
     Position: 'nav.gps.position',
+    /** Course over ground, True reference. */
     Cog: 'nav.gps.cog',
+    /** Course over ground, Magnetic reference. Some devices publish this instead of true. */
+    CogMagnetic: 'nav.gps.cog.magnetic',
     Sog: 'nav.gps.sog',
     Depth: 'nav.depth',
   },

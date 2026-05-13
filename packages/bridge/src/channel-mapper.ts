@@ -154,14 +154,18 @@ const mappers: Record<number, MapperFn> = {
     ];
   },
 
-  // PGN 129026 — COG & SOG, Rapid Update.
+  // PGN 129026 — COG & SOG, Rapid Update. COG can be reported in either True
+  // or Magnetic reference; route to separate channels so the helm UI can
+  // label the value with (T) / (M) without guessing.
   129026: (pgn) => {
     const cog = pgn.fields['COG'];
     const sog = pgn.fields['SOG'];
+    const ref = String(pgn.fields['COG Reference'] ?? '');
     const out: Sample[] = [];
     if (typeof cog === 'number') {
+      const cogChan = ref === 'Magnetic' ? Channels.Nav.CogMagnetic : Channels.Nav.Cog;
       out.push({
-        channel: Channels.Nav.Cog,
+        channel: cogChan,
         t_ns: pgn.rxTimestamp,
         value: scalar(cog, 'rad'),
         source: sourceTag(pgn),
