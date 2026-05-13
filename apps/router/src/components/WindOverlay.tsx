@@ -10,6 +10,8 @@ export interface WindGrid {
   lons: number[];
   u: number[][];
   v: number[][];
+  /** Mean sea level pressure in Pa (optional — may be absent for some models). */
+  prmsl?: number[][];
   validAt: number;
   runAt: number;
   forecastHour: number;
@@ -18,9 +20,11 @@ export interface WindGrid {
 
 const SRC_FILL = 'wind-fill';
 const SRC_BARBS = 'wind-barbs';
+const SRC_ISOBARS = 'wind-isobars';
 const LAYER_FILL = 'wind-fill-layer';
 const LAYER_BARB_LINE = 'wind-barb-line';
 const LAYER_BARB_PENNANT = 'wind-barb-pennant';
+const LAYER_ISOBAR_LINE = 'wind-isobar-line';
 
 const M_PER_DEG_LAT = 111_320;
 const MS_TO_KN = 1 / 0.514444;
@@ -146,6 +150,69 @@ function makeBarb(
 }
 
 /**
+ * Helper: convert a flat field's grid coords back to lat/lon and emit a
+ * FeatureCollection of LineString (`type='line'`) or Polygon features at
+ * the chosen thresholds. `closed` decides between lines (false) and fills
+ * (true).
+ */
+function contourField(
+  field: Float64Array,
+  W: number,
+  H: number,
+  lats: number[],
+  lons: number[],
+  thresholds: number[],
+  closed: boolean,
+): GeoJSON.FeatureCollection {
+  const gen = contours().size([W, H]).thresholds(thresholds)(Array.from(field));
+  const features: GeoJSON.Feature[] = [];
+  const toLatLon = (pt: number[]): number[] => {
+    const gx = pt[0] ?? 0;
+    const gy = pt[1] ?? 0;
+    const xi = Math.max(0, Math.min(W - 1, gx));
+    const yi = Math.max(0, Math.min(H - 1, gy));
+    const xLow = Math.floor(xi);
+    const xFrac = xi - xLow;
+    const lon = lons[xLow]! * (1 - xFrac) + (lons[xLow + 1] ?? lons[xLow]!) * xFrac;
+    const yLow = Math.floor(yi);
+    const yFrac = yi - yLow;
+    const latIdxLow = H - 1 - yLow;
+    const latIdxHigh = H - 1 - Math.min(H - 1, yLow + 1);
+    const lat = lats[latIdxLow]! * (1 - yFrac) + lats[latIdxHigh]! * yFrac;
+    return [lon, lat];
+  };
+  for (const c of gen) {
+    const value = c.value;
+    if (closed) {
+      const polys: number[][][][] = [];
+      for (const poly of c.coordinates as number[][][][]) {
+        const ringsOut: number[][][] = poly.map((ring) => ring.map(toLatLon));
+        polys.push(ringsOut);
+      }
+      features.push({
+        type: 'Feature',
+        properties: { value },
+        geometry: { type: 'MultiPolygon', coordinates: polys },
+      });
+    } else {
+      // For lines, take the outer rings as LineStrings.
+      const lines: number[][][] = [];
+      for (const poly of c.coordinates as number[][][][]) {
+        for (const ring of poly) {
+          lines.push(ring.map(toLatLon));
+        }
+      }
+      features.push({
+        type: 'Feature',
+        properties: { value },
+        geometry: { type: 'MultiLineString', coordinates: lines },
+      });
+    }
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+/**
  * Build a d3-contour speed field from a wind grid and return a FeatureCollection
  * with one Polygon per threshold band. Each feature has a `speed` property = the
  * lower threshold of the band, used to drive the fill-color step expression.
@@ -166,45 +233,45 @@ function buildSpeedContours(grid: WindGrid): GeoJSON.FeatureCollection {
     }
   }
   const thresholds = FILL_STOPS.map((s) => s[0]);
-  const gen = contours().size([W, H]).thresholds(thresholds)(Array.from(speed));
-  // Convert each MultiPolygon's grid coords back to lat/lon.
-  const features: GeoJSON.Feature[] = [];
-  for (const c of gen) {
-    const value = c.value;
-    const polys: number[][][][] = [];
-    for (const poly of c.coordinates as number[][][][]) {
-      const ringsOut: number[][][] = [];
-      for (const ring of poly) {
-        const out: number[][] = ring.map((pt) => {
-          // d3-contour returns floats in [0, W] × [0, H]. Map to lat/lon by
-          // linear interpolation against our lats/lons arrays.
-          const gx = pt[0] ?? 0;
-          const gy = pt[1] ?? 0;
-          const xi = Math.max(0, Math.min(W - 1, gx));
-          const yi = Math.max(0, Math.min(H - 1, gy));
-          const xLow = Math.floor(xi);
-          const xFrac = xi - xLow;
-          const lon =
-            lons[xLow]! * (1 - xFrac) + (lons[xLow + 1] ?? lons[xLow]!) * xFrac;
-          const yLow = Math.floor(yi);
-          const yFrac = yi - yLow;
-          // y is flipped; row y=0 corresponds to lats[H-1]
-          const latIdxLow = H - 1 - yLow;
-          const latIdxHigh = H - 1 - Math.min(H - 1, yLow + 1);
-          const lat = lats[latIdxLow]! * (1 - yFrac) + lats[latIdxHigh]! * yFrac;
-          return [lon, lat];
-        });
-        ringsOut.push(out);
-      }
-      polys.push(ringsOut);
-    }
-    features.push({
-      type: 'Feature',
-      properties: { speed: value },
-      geometry: { type: 'MultiPolygon', coordinates: polys },
-    });
+  const fc = contourField(speed, W, H, lats, lons, thresholds, true);
+  // Rename `value` → `speed` so the fill layer's step expression matches.
+  for (const f of fc.features) {
+    f.properties = { speed: (f.properties as { value: number }).value };
   }
-  return { type: 'FeatureCollection', features };
+  return fc;
+}
+
+/**
+ * Build isobar lines (LineStrings) at every 2 hPa.
+ */
+function buildIsobars(grid: WindGrid): GeoJSON.FeatureCollection {
+  if (!grid.prmsl) return { type: 'FeatureCollection', features: [] };
+  const { lats, lons, prmsl } = grid;
+  const W = lons.length;
+  const H = lats.length;
+  const pField = new Float64Array(W * H);
+  let minHpa = Infinity;
+  let maxHpa = -Infinity;
+  for (let y = 0; y < H; y++) {
+    const yi = H - 1 - y;
+    for (let x = 0; x < W; x++) {
+      const v = prmsl[yi]?.[x] ?? NaN;
+      const hpa = Number.isFinite(v) ? v / 100 : NaN; // Pa → hPa
+      pField[y * W + x] = hpa;
+      if (Number.isFinite(hpa)) {
+        if (hpa < minHpa) minHpa = hpa;
+        if (hpa > maxHpa) maxHpa = hpa;
+      }
+    }
+  }
+  if (!Number.isFinite(minHpa) || !Number.isFinite(maxHpa)) {
+    return { type: 'FeatureCollection', features: [] };
+  }
+  const lo = Math.floor(minHpa / 2) * 2;
+  const hi = Math.ceil(maxHpa / 2) * 2;
+  const thresholds: number[] = [];
+  for (let t = lo; t <= hi; t += 2) thresholds.push(t);
+  return contourField(pField, W, H, lats, lons, thresholds, false);
 }
 
 export interface WindOverlayProps {
@@ -223,6 +290,8 @@ export interface WindOverlayProps {
   showFill?: boolean;
   /** When true, draw black wind barbs. */
   showBarbs?: boolean;
+  /** When true, draw black isobar contours at 2 hPa intervals. */
+  showIsobars?: boolean;
   /** Bumping this triggers a fetch from cache. */
   refreshKey: number;
   onLoaded?: (info: { grid: WindGrid | null; identical: boolean; error: string | null }) => void;
@@ -240,6 +309,7 @@ export function WindOverlay({
   opacity = 0.5,
   showFill = true,
   showBarbs = true,
+  showIsobars = false,
   refreshKey,
   onLoaded,
 }: WindOverlayProps) {
@@ -336,17 +406,45 @@ export function WindOverlay({
           paint: { 'fill-color': '#000000' },
         });
       }
+      if (!map.getSource(SRC_ISOBARS)) {
+        map.addSource(SRC_ISOBARS, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: LAYER_ISOBAR_LINE,
+          type: 'line',
+          source: SRC_ISOBARS,
+          paint: {
+            'line-color': '#1f2937', // slate-800
+            'line-width': [
+              'case',
+              // Bold every 10 hPa
+              ['==', ['%', ['get', 'value'], 10], 0], 1.8,
+              0.8,
+            ],
+            'line-opacity': 0.85,
+          },
+        });
+      }
     };
     if (map.isStyleLoaded()) ensure();
     else map.once('load', ensure);
 
     const fillSrc = map.getSource(SRC_FILL) as maplibregl.GeoJSONSource | undefined;
     const barbSrc = map.getSource(SRC_BARBS) as maplibregl.GeoJSONSource | undefined;
+    const isoSrc = map.getSource(SRC_ISOBARS) as maplibregl.GeoJSONSource | undefined;
 
     if (hidden || !grid) {
       fillSrc?.setData({ type: 'FeatureCollection', features: [] });
       barbSrc?.setData({ type: 'FeatureCollection', features: [] });
+      isoSrc?.setData({ type: 'FeatureCollection', features: [] });
       return;
+    }
+    if (showIsobars && isoSrc) {
+      isoSrc.setData(buildIsobars(grid));
+    } else if (isoSrc) {
+      isoSrc.setData({ type: 'FeatureCollection', features: [] });
     }
     if (showFill && fillSrc) {
       fillSrc.setData(buildSpeedContours(grid));
@@ -379,7 +477,7 @@ export function WindOverlay({
     } else if (barbSrc) {
       barbSrc.setData({ type: 'FeatureCollection', features: [] });
     }
-  }, [map, grid, hidden, stride, showFill, showBarbs]);
+  }, [map, grid, hidden, stride, showFill, showBarbs, showIsobars]);
 
   // Live opacity update
   useEffect(() => {
@@ -391,10 +489,10 @@ export function WindOverlay({
   useEffect(() => {
     if (!map) return;
     return () => {
-      for (const id of [LAYER_FILL, LAYER_BARB_LINE, LAYER_BARB_PENNANT]) {
+      for (const id of [LAYER_FILL, LAYER_BARB_LINE, LAYER_BARB_PENNANT, LAYER_ISOBAR_LINE]) {
         if (map.getLayer(id)) map.removeLayer(id);
       }
-      for (const id of [SRC_FILL, SRC_BARBS]) {
+      for (const id of [SRC_FILL, SRC_BARBS, SRC_ISOBARS]) {
         if (map.getSource(id)) map.removeSource(id);
       }
     };

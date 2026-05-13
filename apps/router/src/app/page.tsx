@@ -24,6 +24,7 @@ export default function HomePage() {
   const [windOpacity, setWindOpacity] = useState(0.5);
   const [showFill, setShowFill] = useState(true);
   const [showBarbs, setShowBarbs] = useState(true);
+  const [showIsobars, setShowIsobars] = useState(true);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -169,6 +170,7 @@ export default function HomePage() {
           opacity={windOpacity}
           showFill={showFill}
           showBarbs={showBarbs}
+          showIsobars={showIsobars}
           refreshKey={windRefreshKey}
           onLoaded={({ grid, identical, error }) => {
             if (error) {
@@ -282,7 +284,7 @@ export default function HomePage() {
               className="block w-full"
             />
           </label>
-          <div className="flex gap-3 text-xs">
+          <div className="flex gap-3 text-xs flex-wrap">
             <label className="flex items-center gap-1">
               <input
                 type="checkbox"
@@ -298,6 +300,14 @@ export default function HomePage() {
                 onChange={(e) => setShowBarbs(e.target.checked)}
               />
               <span className="text-slate-300">barbs</span>
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={showIsobars}
+                onChange={(e) => setShowIsobars(e.target.checked)}
+              />
+              <span className="text-slate-300">isobars</span>
             </label>
           </div>
           {windGrid && (

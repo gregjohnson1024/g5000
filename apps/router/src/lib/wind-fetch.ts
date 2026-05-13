@@ -17,6 +17,8 @@ export interface WindGrid {
   u: number[][];
   /** Northward component, m/s. Indexed [latIdx][lonIdx]. */
   v: number[][];
+  /** Mean sea-level pressure, Pa. Indexed [latIdx][lonIdx]. Null if unavailable. */
+  prmsl?: number[][];
   /** UTC seconds for the valid time of this forecast. */
   validAt: number;
   /** UTC seconds for the model run time. */
@@ -103,7 +105,9 @@ export function buildGfsUrl(o: {
   params.set('file', `gfs.t${hh}z.pgrb2.0p25.f${fff}`);
   params.set('var_UGRD', 'on');
   params.set('var_VGRD', 'on');
+  params.set('var_PRMSL', 'on');
   params.set('lev_10_m_above_ground', 'on');
+  params.set('lev_mean_sea_level', 'on');
   params.set('subregion', '');
   params.set('toplat', String(o.bbox.latMax));
   params.set('leftlon', String(o.bbox.lonMin));
@@ -182,12 +186,23 @@ export async function fetchWindGrid(
     await writeFile(gribPath, buf);
     const uOnly = join(dir, 'u.grib2');
     const vOnly = join(dir, 'v.grib2');
+    const pOnly = join(dir, 'p.grib2');
     await spawnText('grib_copy', ['-w', 'shortName=10u', gribPath, uOnly]);
     await spawnText('grib_copy', ['-w', 'shortName=10v', gribPath, vOnly]);
+    // PRMSL is optional — older NOMADS files may not have it. Don't fail
+    // wind decoding if pressure extraction fails.
+    let pTxt: string | null = null;
+    try {
+      await spawnText('grib_copy', ['-w', 'shortName=prmsl', gribPath, pOnly]);
+      pTxt = await spawnText('grib_get_data', [pOnly]);
+    } catch {
+      pTxt = null;
+    }
     const uTxt = await spawnText('grib_get_data', [uOnly]);
     const vTxt = await spawnText('grib_get_data', [vOnly]);
     const uRecs = parseGridData(uTxt);
     const vRecs = parseGridData(vTxt);
+    const pRecs = pTxt ? parseGridData(pTxt) : [];
     if (uRecs.length === 0 || vRecs.length === 0) {
       throw new Error('eccodes returned no grid points');
     }
@@ -201,6 +216,8 @@ export async function fetchWindGrid(
     const lons = [...lonsSet].sort((a, b) => a - b);
     const u: number[][] = lats.map(() => lons.map(() => NaN));
     const v: number[][] = lats.map(() => lons.map(() => NaN));
+    const prmsl: number[][] | undefined =
+      pRecs.length > 0 ? lats.map(() => lons.map(() => NaN)) : undefined;
     const latIx = new Map(lats.map((l, i) => [l, i]));
     const lonIx = new Map(lons.map((l, i) => [l, i]));
     for (const r of uRecs) {
@@ -213,8 +230,15 @@ export async function fetchWindGrid(
       const xi = lonIx.get(r.lon);
       if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
     }
+    if (prmsl) {
+      for (const r of pRecs) {
+        const yi = latIx.get(r.lat);
+        const xi = lonIx.get(r.lon);
+        if (yi !== undefined && xi !== undefined) prmsl[yi]![xi] = r.v;
+      }
+    }
     const validAt = run.runUnix + forecastHour * 3600;
-    return { lats, lons, u, v, validAt, runAt: run.runUnix, forecastHour, model: 'gfs' };
+    return { lats, lons, u, v, prmsl, validAt, runAt: run.runUnix, forecastHour, model: 'gfs' };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -234,12 +258,21 @@ async function decodeUVGrib(rawGrib: Buffer, model: WindModel, runAt: number, fh
     await writeFile(gribPath, rawGrib);
     const uOnly = join(dir, 'u.grib2');
     const vOnly = join(dir, 'v.grib2');
+    const pOnly = join(dir, 'p.grib2');
     await spawnText('grib_copy', ['-w', 'shortName=10u', gribPath, uOnly]);
     await spawnText('grib_copy', ['-w', 'shortName=10v', gribPath, vOnly]);
+    let pTxt: string | null = null;
+    try {
+      await spawnText('grib_copy', ['-w', 'shortName=msl', gribPath, pOnly]);
+      pTxt = await spawnText('grib_get_data', [pOnly]);
+    } catch {
+      pTxt = null;
+    }
     const uTxt = await spawnText('grib_get_data', [uOnly]);
     const vTxt = await spawnText('grib_get_data', [vOnly]);
     const uRecs = parseGridData(uTxt);
     const vRecs = parseGridData(vTxt);
+    const pRecs = pTxt ? parseGridData(pTxt) : [];
     if (uRecs.length === 0 || vRecs.length === 0) throw new Error('eccodes returned no grid points');
     const latsSet = new Set<number>();
     const lonsSet = new Set<number>();
@@ -251,6 +284,8 @@ async function decodeUVGrib(rawGrib: Buffer, model: WindModel, runAt: number, fh
     const lons = [...lonsSet].sort((a, b) => a - b);
     const u: number[][] = lats.map(() => lons.map(() => NaN));
     const v: number[][] = lats.map(() => lons.map(() => NaN));
+    const prmsl: number[][] | undefined =
+      pRecs.length > 0 ? lats.map(() => lons.map(() => NaN)) : undefined;
     const latIx = new Map(lats.map((l, i) => [l, i]));
     const lonIx = new Map(lons.map((l, i) => [l, i]));
     for (const r of uRecs) {
@@ -263,7 +298,14 @@ async function decodeUVGrib(rawGrib: Buffer, model: WindModel, runAt: number, fh
       const xi = lonIx.get(r.lon);
       if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
     }
-    return { lats, lons, u, v, validAt: runAt + fh * 3600, runAt, forecastHour: fh, model };
+    if (prmsl) {
+      for (const r of pRecs) {
+        const yi = latIx.get(r.lat);
+        const xi = lonIx.get(r.lon);
+        if (yi !== undefined && xi !== undefined) prmsl[yi]![xi] = r.v;
+      }
+    }
+    return { lats, lons, u, v, prmsl, validAt: runAt + fh * 3600, runAt, forecastHour: fh, model };
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -294,7 +336,10 @@ function cropGrid(grid: WindGrid, bbox: Bbox): WindGrid {
   }
   const u: number[][] = latIdx.map((yi) => lonIdx.map((xi) => grid.u[yi]![xi]!));
   const v: number[][] = latIdx.map((yi) => lonIdx.map((xi) => grid.v[yi]![xi]!));
-  return { ...grid, lats: latKeep, lons: lonKeep, u, v };
+  const prmsl: number[][] | undefined = grid.prmsl
+    ? latIdx.map((yi) => lonIdx.map((xi) => grid.prmsl![yi]![xi]!))
+    : undefined;
+  return { ...grid, lats: latKeep, lons: lonKeep, u, v, prmsl };
 }
 
 /**
@@ -321,7 +366,7 @@ export async function fetchWindGridEcmwf(
     runDateUtc: run.runDateUtc,
     runHourUtc: run.runHourUtc,
     forecastHour: fh,
-    variables: ['10u', '10v'],
+    variables: ['10u', '10v', 'msl'],
   });
   if (messages.length === 0) {
     throw new Error('ECMWF: no GRIB messages returned (run may not be posted yet)');
