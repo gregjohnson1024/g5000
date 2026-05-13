@@ -9,8 +9,8 @@ const NM = 1852;
 const MS_TO_KN = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
 const RANGE_OPTIONS_NM = [1, 2, 4, 8, 15];
-const LEADER_MINUTES = 6;
-const LEADER_SECONDS = LEADER_MINUTES * 60;
+/** Fixed-length COG extension drawn for own ship and every AIS target. */
+const COG_EXTENSION_NM = 10;
 
 interface AisAlarmConfig {
   enabled: boolean;
@@ -485,7 +485,12 @@ export default function ChartPage() {
                 const y = center - dist * Math.cos(cpa.bearingRadians);
                 const threat = isThreat(cpa);
                 const cogDeg = ((target.cog ?? 0) * RAD_TO_DEG) % 360;
-                const leaderLen = (target.sog ?? 0) * LEADER_SECONDS * metersToPx;
+                // Fixed 10 NM COG extension for every target (not SOG-scaled).
+                // Clipped to the current radar range so it doesn't run off-screen.
+                const leaderLen = Math.min(
+                  COG_EXTENSION_NM * NM * metersToPx,
+                  svgRadius - dist + 7,
+                );
                 return (
                   <g
                     key={target.mmsi}
@@ -538,15 +543,46 @@ export default function ChartPage() {
               {/* Own boat — at center, pointing along own's heading (compass).
                   In north-up mode that's `ownHeading` degrees clockwise from
                   up; in course-up mode the canvas itself is rotated so the
-                  boat triangle always points up. */}
-              <g transform={`translate(${center}, ${center}) rotate(${ownHeading * RAD_TO_DEG})`}>
-                <polygon
-                  points="0,-14 -8,10 8,10"
-                  fill="#fbbf24"
-                  stroke="#0f172a"
-                  strokeWidth="1"
-                />
-              </g>
+                  boat triangle always points up.
+                  Plus a fixed 10 NM COG extension line, drawn separately so
+                  the boat-triangle rotates by HDG while the extension
+                  rotates by COG (they can differ by leeway / current). */}
+              {(() => {
+                const ownCogDeg = (ownCog * RAD_TO_DEG) % 360;
+                const ownLeaderLen = Math.min(
+                  COG_EXTENSION_NM * NM * metersToPx,
+                  svgRadius - 14,
+                );
+                return (
+                  <>
+                    <g
+                      transform={`translate(${center}, ${center}) rotate(${ownCogDeg})`}
+                    >
+                      {ownLeaderLen > 1 && (
+                        <line
+                          x1="0"
+                          y1="-14"
+                          x2="0"
+                          y2={-14 - ownLeaderLen}
+                          stroke="#fbbf24"
+                          strokeWidth="1.5"
+                          strokeOpacity="0.85"
+                        />
+                      )}
+                    </g>
+                    <g
+                      transform={`translate(${center}, ${center}) rotate(${ownHeading * RAD_TO_DEG})`}
+                    >
+                      <polygon
+                        points="0,-14 -8,10 8,10"
+                        fill="#fbbf24"
+                        stroke="#0f172a"
+                        strokeWidth="1"
+                      />
+                    </g>
+                  </>
+                );
+              })()}
             </g>
 
             {/* North indicator — UNrotated; arrow points to where north is on
