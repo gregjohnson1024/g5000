@@ -21,6 +21,14 @@ export interface RouteLeg {
   sogGround: number;
 }
 
+export interface Isochrone {
+  /** Unix seconds at which this frontier is valid. */
+  t: number;
+  /** Points on the frontier, sorted by bearing from the start so polyline
+   *  rendering joins them in a sensible order. */
+  points: LatLon[];
+}
+
 export interface Route {
   legs: RouteLeg[];
   start: number;
@@ -32,6 +40,9 @@ export interface Route {
   polarId: string;
   incomplete?: boolean;
   reason?: 'exceeded_max_hours' | 'no_wind' | 'land_blocked';
+  /** Captured frontier at each planner step. Present only when
+   *  `options.captureIsochrones` is true. */
+  isochrones?: Isochrone[];
 }
 
 export interface PlanOptions {
@@ -42,6 +53,9 @@ export interface PlanOptions {
   avoidLand?: boolean;             // default true
   useCurrents?: boolean;           // default false
   pruneBucketDeg?: number;         // default 2
+  /** When true, plan() attaches `isochrones` to the returned Route — one
+   *  entry per step, holding the pruned frontier at that step's time. */
+  captureIsochrones?: boolean;     // default false
 }
 
 export interface PlanInput {

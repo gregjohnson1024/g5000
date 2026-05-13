@@ -1,4 +1,4 @@
-import type { PlanInput, Route, RouteLeg, PlanOptions, LatLon } from './types.js';
+import type { PlanInput, Route, RouteLeg, PlanOptions, LatLon, Isochrone } from './types.js';
 import { interpolateWind, interpolateCurrent } from '@g5000/grib';
 import { interpolatePolarSpeed } from '@g5000/compute';
 import { intersectsLand } from '@g5000/coastline';
@@ -23,6 +23,7 @@ const DEFAULTS: Required<PlanOptions> = {
   avoidLand: true,
   useCurrents: false,
   pruneBucketDeg: 2,
+  captureIsochrones: false,
 };
 
 export function plan(input: PlanInput): Route {
@@ -48,6 +49,7 @@ export function plan(input: PlanInput): Route {
   let bestForReason: FrontierNode = startNode;
   let stepCount = 0;
   const maxSteps = Math.ceil(maxSec / stepSec);
+  const isochrones: Isochrone[] = o.captureIsochrones ? [] : [];
 
   while (stepCount < maxSteps) {
     stepCount++;
@@ -76,9 +78,23 @@ export function plan(input: PlanInput): Route {
     }
 
     if (next.length === 0) {
-      return assembleRoute(bestForReason, input, true, 'no_wind');
+      return assembleRoute(bestForReason, input, isochrones, true, 'no_wind');
     }
     frontier = pruneByBearingBucket(next, input.start, o.pruneBucketDeg);
+
+    if (o.captureIsochrones && frontier.length > 0) {
+      // Sort by bearing from start so the resulting polyline traces the
+      // frontier in angular order rather than insertion order.
+      const sorted = [...frontier].sort((a, b) => {
+        const ba = Math.atan2(a.pos.lon - input.start.lon, a.pos.lat - input.start.lat);
+        const bb = Math.atan2(b.pos.lon - input.start.lon, b.pos.lat - input.start.lat);
+        return ba - bb;
+      });
+      isochrones.push({
+        t: frontier[0]!.t,
+        points: sorted.map((n) => ({ lat: n.pos.lat, lon: n.pos.lon })),
+      });
+    }
 
     // Track the best (most progress toward destination) for incomplete return.
     for (const n of frontier) {
@@ -108,12 +124,12 @@ export function plan(input: PlanInput): Route {
           sogGround: n.sogGround,
           distFromStart: n.distFromStart + dGround,
         };
-        return assembleRoute(finalLeg, input, false);
+        return assembleRoute(finalLeg, input, isochrones, false);
       }
     }
   }
 
-  return assembleRoute(bestForReason, input, true, 'exceeded_max_hours');
+  return assembleRoute(bestForReason, input, isochrones, true, 'exceeded_max_hours');
 }
 
 function propagate(
@@ -191,6 +207,7 @@ function expandFanIfStuck(
 function assembleRoute(
   end: FrontierNode,
   input: PlanInput,
+  isochrones: Isochrone[],
   incomplete: boolean,
   reason?: Route['reason'],
 ): Route {
@@ -220,5 +237,6 @@ function assembleRoute(
     polarId: input.polarId,
     ...(incomplete ? { incomplete: true } : {}),
     ...(reason ? { reason } : {}),
+    ...(isochrones.length > 0 ? { isochrones } : {}),
   };
 }

@@ -1,35 +1,27 @@
 import {
   fetchWindGrid,
   fetchWindGridEcmwf,
+  windCache,
+  bboxKey,
   type Bbox,
-  type WindGrid,
   type WindModel,
 } from '../../../lib/wind-fetch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Process-level cache: model + bbox + forecast hour → grid.
-// Caches per server-lifetime; restart to refresh. Exported so the
-// /api/forecast/* routes can read + write the same cache.
-export const cache = new Map<string, { at: number; grid: WindGrid }>();
+// Re-export the shared cache + key fn so /api/forecast/* routes that
+// already import from this path keep working unchanged.
+export { windCache as cache, bboxKey };
+
 const TTL_MS = 30 * 60 * 1000; // 30 min
-
-export { bboxKey };
-
-function bboxKey(model: WindModel, b: Bbox, fh: number): string {
-  return `${model}|${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;
-}
 
 /**
  * GET /api/wind?lat=...&lon=...&hours=H&radius=R
  *
  * Returns a wind-component grid covering a box `±R` degrees around (lat,lon)
- * at forecast hour `H` of the most recent GFS run. The grid resolution is
- * GFS-native (0.25° = ~15 NM).
- *
- * Response shape: `WindGrid` JSON (`lats`, `lons`, `u`, `v`, `validAt`,
- * `runAt`, `forecastHour`).
+ * at forecast hour `H` of the most recent run. With `cached=1`, returns 404
+ * on miss instead of fetching (so /chart never triggers a fresh download).
  */
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
@@ -48,8 +40,6 @@ export async function GET(req: Request): Promise<Response> {
   if (!Number.isFinite(radius) || radius <= 0 || radius > 20) {
     return Response.json({ ok: false, error: { message: 'radius must be 0–20°' } }, { status: 400 });
   }
-  // Round hour to the nearest available step. GFS 0.25° has 1-h steps to
-  // f120 and 3-h steps to f384; here we serve only 1-h steps.
   const fh = Math.max(0, Math.round(hours));
   const bbox: Bbox = {
     latMin: lat - radius,
@@ -60,7 +50,7 @@ export async function GET(req: Request): Promise<Response> {
   const cachedOnly = url.searchParams.get('cached') === '1';
   const key = bboxKey(model, bbox, fh);
   const now = Date.now();
-  const cached = cache.get(key);
+  const cached = windCache.get(key);
   if (cached && now - cached.at < TTL_MS) {
     return Response.json({ ok: true, grid: cached.grid, cached: true });
   }
@@ -73,7 +63,7 @@ export async function GET(req: Request): Promise<Response> {
   try {
     const grid =
       model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, fh) : await fetchWindGrid(bbox, fh);
-    cache.set(key, { at: now, grid });
+    windCache.set(key, { at: now, grid });
     return Response.json({ ok: true, grid, cached: false });
   } catch (e) {
     return Response.json(

@@ -71,7 +71,7 @@ export async function POST(req: Request): Promise<Response> {
       polarId: b.polarId,
       coastline,
       currents,
-      options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents },
+      options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents, captureIsochrones: true },
     });
     return Response.json({ ok: true, route });
   } catch (err) {

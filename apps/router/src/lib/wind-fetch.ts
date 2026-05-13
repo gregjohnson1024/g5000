@@ -52,6 +52,81 @@ async function fetchEcmwfMessagesS3(opts: {
 
 export type WindModel = 'gfs' | 'ecmwf';
 
+// Shared in-memory wind cache. Owned here so both /api/wind and
+// /api/forecast/* + the routing planner can read/write the same map.
+export const windCache = new Map<string, { at: number; grid: WindGrid }>();
+
+export function bboxKey(model: WindModel, b: Bbox, fh: number): string {
+  return `${model}|${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;
+}
+
+/**
+ * Build a 3-D `WindField` (the format `@g5000/routing#plan` expects) from
+ * the cached forecast hours of a given model. Selects entries whose bbox
+ * contains the requested `requireBbox` (so a cache fetched for a wider ROI
+ * is reusable), sorts by valid time, and stacks the u/v grids along a new
+ * time axis. Throws if fewer than 2 forecast hours are cached — the
+ * planner needs at least a start + step interpolation.
+ */
+export function windFieldFromCache(
+  model: WindModel,
+  requireBbox: Bbox,
+): {
+  lats: number[];
+  lons: number[];
+  times: number[];
+  u: number[][][];
+  v: number[][][];
+  source: 'GFS' | 'ECMWF';
+  runTime: number;
+} {
+  const grids: WindGrid[] = [];
+  for (const [, v] of windCache) {
+    if (v.grid.model !== model) continue;
+    // Require the cached bbox to fully contain the requested ROI. Lats/lons
+    // ascending in our grids, so check endpoints.
+    const lats = v.grid.lats;
+    const lons = v.grid.lons;
+    if (lats.length === 0 || lons.length === 0) continue;
+    if (lats[0]! > requireBbox.latMin || lats[lats.length - 1]! < requireBbox.latMax) continue;
+    if (lons[0]! > requireBbox.lonMin || lons[lons.length - 1]! < requireBbox.lonMax) continue;
+    grids.push(v.grid);
+  }
+  if (grids.length < 2) {
+    throw new Error(
+      `windFieldFromCache: need ≥ 2 cached ${model.toUpperCase()} forecast hours covering bbox ` +
+        `[${requireBbox.latMin.toFixed(1)}..${requireBbox.latMax.toFixed(1)}, ${requireBbox.lonMin.toFixed(1)}..${requireBbox.lonMax.toFixed(1)}], ` +
+        `have ${grids.length}. Fetch more on the /forecast tab.`,
+    );
+  }
+  // All grids must share the same lats/lons. With our eccodes pipeline this
+  // is true when they came from the same bbox fetch — but if a previous
+  // refresh used a different ROI we'd see size drift. Reject mismatches up
+  // front rather than silently producing a bad field.
+  grids.sort((a, b) => a.validAt - b.validAt);
+  const ref = grids[0]!;
+  for (let i = 1; i < grids.length; i++) {
+    const g = grids[i]!;
+    if (g.lats.length !== ref.lats.length || g.lons.length !== ref.lons.length) {
+      throw new Error(
+        `windFieldFromCache: grid size mismatch between forecast hours ` +
+          `(t=${ref.forecastHour}h: ${ref.lats.length}×${ref.lons.length}, ` +
+          `t=${g.forecastHour}h: ${g.lats.length}×${g.lons.length}). ` +
+          `Re-fetch ${model.toUpperCase()} for a single ROI on /forecast.`,
+      );
+    }
+  }
+  return {
+    lats: ref.lats,
+    lons: ref.lons,
+    times: grids.map((g) => g.validAt),
+    u: grids.map((g) => g.u),
+    v: grids.map((g) => g.v),
+    source: model === 'gfs' ? 'GFS' : 'ECMWF',
+    runTime: ref.runAt,
+  };
+}
+
 const NOMADS = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl';
 
 export interface WindGrid {
