@@ -18,6 +18,7 @@ const FIELDS: Array<{
 export default function BoatConfigPage() {
   const [cfg, setCfg] = useState<BoatConfig | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [mmsiEdit, setMmsiEdit] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -31,6 +32,7 @@ export default function BoatConfigPage() {
       const e: Record<string, string> = {};
       for (const f of FIELDS) e[f.key] = String(body[f.key]);
       setEdits(e);
+      setMmsiEdit(body.selfMmsi !== undefined ? String(body.selfMmsi) : '');
       setErr(null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -51,6 +53,17 @@ export default function BoatConfigPage() {
         return;
       }
       (next as unknown as Record<string, number>)[f.key] = n;
+    }
+    const mmsiTrim = mmsiEdit.trim();
+    if (mmsiTrim === '') {
+      delete next.selfMmsi;
+    } else {
+      const mmsi = Number(mmsiTrim);
+      if (!Number.isInteger(mmsi) || mmsi <= 0) {
+        setErr('MMSI must be a positive integer');
+        return;
+      }
+      next.selfMmsi = mmsi;
     }
     setBusy(true);
     setErr(null);
@@ -97,6 +110,17 @@ export default function BoatConfigPage() {
               />
             </label>
           ))}
+          <label className="block text-sm">
+            <span className="text-slate-400">Own MMSI (filters self from AIS chart)</span>
+            <input
+              type="number"
+              step={1}
+              value={mmsiEdit}
+              onChange={(e) => setMmsiEdit(e.target.value)}
+              placeholder="leave blank if unknown"
+              className="block w-40 mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200 font-mono"
+            />
+          </label>
           <button
             onClick={handleApply}
             disabled={busy}

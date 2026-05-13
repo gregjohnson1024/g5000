@@ -87,6 +87,38 @@ describe('mapPgnToSamples', () => {
     });
   });
 
+  it('maps PGN 129025 lat/lon to nav.gps.position as a geo value', () => {
+    const decoded = make(129025, { Latitude: 32.7833, Longitude: -64.8333 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Nav.Position]);
+    expect(samples[0]?.value).toEqual({
+      kind: 'geo',
+      value: { lat: 32.7833, lon: -64.8333 },
+    });
+  });
+
+  it('skips PGN 129025 when lat or lon is missing/non-numeric', () => {
+    expect(mapPgnToSamples(make(129025, { Latitude: 'n/a', Longitude: -64.8 }))).toEqual([]);
+    expect(mapPgnToSamples(make(129025, { Latitude: 32.7 }))).toEqual([]);
+  });
+
+  it('maps PGN 129026 to nav.gps.cog and nav.gps.sog', () => {
+    const decoded = make(129026, { 'COG Reference': 'True', COG: 5.27, SOG: 3.6 });
+    const samples = mapPgnToSamples(decoded);
+    const channels = samples.map((s) => s.channel).sort();
+    expect(channels).toEqual([Channels.Nav.Cog, Channels.Nav.Sog].sort());
+    expect(samples.find((s) => s.channel === Channels.Nav.Cog)?.value).toEqual({
+      kind: 'scalar',
+      value: 5.27,
+      unit: 'rad',
+    });
+    expect(samples.find((s) => s.channel === Channels.Nav.Sog)?.value).toEqual({
+      kind: 'scalar',
+      value: 3.6,
+      unit: 'm/s',
+    });
+  });
+
   it('maps PGN 127257 attitude to heel, pitch, yaw', () => {
     const decoded = make(127257, {
       Yaw: 1.23,

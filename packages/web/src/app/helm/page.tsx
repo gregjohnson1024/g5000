@@ -36,19 +36,6 @@ function fmtHeading(s: JsonSafeSample | undefined): string {
   return `${deg.toFixed(0)}`;
 }
 
-function fmtPercent(s: JsonSafeSample | undefined): string {
-  const v = scalar(s);
-  return v === null ? '—' : `${v.toFixed(0)}`;
-}
-
-function percentSeverity(s: JsonSafeSample | undefined): 'good' | 'ok' | 'bad' | 'neutral' {
-  const v = scalar(s);
-  if (v === null) return 'neutral';
-  if (v >= 95) return 'good';
-  if (v >= 80) return 'ok';
-  return 'bad';
-}
-
 export default function HelmPage() {
   const { channels, connected } = useSse();
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
@@ -76,18 +63,12 @@ export default function HelmPage() {
     await reloadWardrobe();
   };
 
-  const tws = channels.get('wind.true.speed');
-  const twa = channels.get('wind.true.angle');
-  const awa = channels.get('wind.apparent.angle');
-  const bsp = channels.get('boat.speed.water');
-  const targetSpeed = channels.get('performance.target.boatSpeed');
-  const percentPolar = channels.get('performance.percentPolar');
-  const vmg = channels.get('performance.vmg');
-  const targetVmg = channels.get('performance.target.vmg');
+  // Wind + polar/VMG channels intentionally not subscribed — no wind sensor attached.
+  const sog = channels.get('nav.gps.sog');
+  const cog = channels.get('nav.gps.cog');
   const hdg = channels.get('boat.heading.magnetic');
   const heel = channels.get('motion.heel');
   const pitch = channels.get('motion.pitch');
-  const rot = channels.get('motion.rateOfTurn');
 
   return (
     <main className="p-4 min-h-screen bg-black">
@@ -122,27 +103,15 @@ export default function HelmPage() {
         </div>
       )}
 
+      {/* Wind-derived tiles (TWS/TWA/AWA, Target speed, % polar, VMG, Target VMG)
+          hidden — no wind sensor attached. Re-add when masthead is wired. */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" />
-        <HelmTile label="TWA" value={fmtAngleSigned(twa)} unit="°" />
-        <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />
-
-        <HelmTile label="BSP" value={fmtSpeed(bsp)} unit="kn" />
-        <HelmTile label="Target speed" value={fmtSpeed(targetSpeed)} unit="kn" sub="polar" />
-        <HelmTile
-          label="% polar"
-          value={fmtPercent(percentPolar)}
-          unit="%"
-          severity={percentSeverity(percentPolar)}
-        />
-
-        <HelmTile label="VMG" value={fmtSpeed(vmg)} unit="kn" />
-        <HelmTile label="Target VMG" value={fmtSpeed(targetVmg)} unit="kn" sub="polar" />
+        <HelmTile label="SOG" value={fmtSpeed(sog)} unit="kn" />
+        <HelmTile label="COG" value={fmtHeading(cog)} unit="°" />
         <HelmTile label="Heading" value={fmtHeading(hdg)} unit="°" />
 
         <HelmTile label="Heel" value={fmtAngleSigned(heel)} unit="°" small />
         <HelmTile label="Pitch" value={fmtAngleSigned(pitch)} unit="°" small />
-        <HelmTile label="Rate of turn" value={fmtAngleSigned(rot)} unit="°/s" small />
       </div>
     </main>
   );

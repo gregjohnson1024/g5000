@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { friendlySourceLabel, formatChannelValue, parseN2kSource } from '../../lib/friendly-source';
 
 /**
  * /sources — source-priority arbitration UI.
@@ -32,11 +33,19 @@ interface ObservedEntry {
   source: string;
   lastSeenMs: number;
   ageMs: number;
+  lastValue: unknown;
 }
 
 interface ObservedResponse {
   entries: ObservedEntry[];
   windowMs: number;
+}
+
+interface DeviceInfo {
+  src: number;
+  manufacturerName?: string;
+  modelId?: string;
+  deviceFunctionName?: string;
 }
 
 const POLL_MS = 1000;
@@ -46,6 +55,7 @@ const MAX_FRESHNESS = 30;
 export default function SourcesPage() {
   const [observed, setObserved] = useState<ObservedEntry[]>([]);
   const [observedErr, setObservedErr] = useState<string | null>(null);
+  const [devices, setDevices] = useState<Map<number, DeviceInfo>>(new Map());
 
   const [rules, setRules] = useState<SourcePriorityConfig | null>(null);
   const [draft, setDraft] = useState<SourcePriorityConfig>([]);
@@ -53,16 +63,25 @@ export default function SourcesPage() {
   const [err, setErr] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
 
-  // Poll the observed-sources endpoint.
+  // Poll the observed-sources + devices endpoints.
   useEffect(() => {
     let alive = true;
     const tick = async (): Promise<void> => {
       try {
-        const res = await fetch('/api/sources/observed', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`GET observed: ${res.status}`);
-        const body = (await res.json()) as ObservedResponse;
+        const [obsRes, devRes] = await Promise.all([
+          fetch('/api/sources/observed', { cache: 'no-store' }),
+          fetch('/api/devices', { cache: 'no-store' }).catch(() => null),
+        ]);
+        if (!obsRes.ok) throw new Error(`GET observed: ${obsRes.status}`);
+        const body = (await obsRes.json()) as ObservedResponse;
         if (!alive) return;
         setObserved(body.entries);
+        if (devRes && devRes.ok) {
+          const dev = (await devRes.json()) as { devices: DeviceInfo[] };
+          const m = new Map<number, DeviceInfo>();
+          for (const d of dev.devices) m.set(d.src, d);
+          setDevices(m);
+        }
         setObservedErr(null);
       } catch (e) {
         if (alive) setObservedErr(e instanceof Error ? e.message : String(e));
@@ -75,6 +94,23 @@ export default function SourcesPage() {
       clearInterval(id);
     };
   }, []);
+
+  /** Resolve a source tag to a device-name suffix, e.g. "H5000 _Pilot controller"
+   *  or the function-class name. Returns null if no info known. */
+  const deviceLabel = useCallback(
+    (sourceTag: string): string | null => {
+      const parsed = parseN2kSource(sourceTag);
+      if (!parsed) return null;
+      const d = devices.get(parsed.src);
+      if (!d) return null;
+      if (d.modelId) return d.modelId;
+      if (d.manufacturerName && d.deviceFunctionName) {
+        return `${d.manufacturerName} ${d.deviceFunctionName}`;
+      }
+      return d.deviceFunctionName ?? d.manufacturerName ?? null;
+    },
+    [devices],
+  );
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -202,6 +238,51 @@ export default function SourcesPage() {
     [draft],
   );
 
+  /**
+   * Promote a publisher to primary for a channel. Creates a rule on the
+   * specific channel if none matches (or only a wildcard matches — we don't
+   * mutate wildcard rules to avoid surprising the user). Saves immediately.
+   */
+  const promoteSource = async (channel: string, source: string): Promise<void> => {
+    const match = findRuleForChannel(channel);
+    let next: SourcePriorityConfig;
+    if (match && match.rule.channelPattern === channel) {
+      // Exact-channel rule exists: move/add source to the top.
+      next = draft.map((r, i) => {
+        if (i !== match.index) return r;
+        const others = r.sources.filter((s) => s !== source);
+        return { ...r, sources: [source, ...others] };
+      });
+    } else {
+      // No exact rule (or only a wildcard matches): append a fresh exact-rule
+      // for this channel with the chosen source on top. We don't strip the
+      // existing wildcard — exact rules win because they appear later? No,
+      // earlier-in-the-list wins. Insert at the front so it beats wildcards.
+      next = [{ channelPattern: channel, sources: [source], freshnessSeconds: 2 }, ...draft];
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch('/api/config/source-priority', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`promote failed: ${res.status} ${t}`);
+      }
+      setDraft(next);
+      setRules(next.map((r) => ({ ...r, sources: [...r.sources] })));
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1500);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // Channel list to render in the observed section:
   //   - any channel currently publishing
   //   - any channel that has a configured rule
@@ -269,12 +350,44 @@ export default function SourcesPage() {
                       <span className="text-slate-500">—</span>
                     ) : (
                       <ul className="space-y-0.5">
-                        {pubs.map((p) => (
-                          <li key={p.source} className="font-mono text-xs">
-                            <span className="text-slate-300">{p.source}</span>{' '}
-                            <span className="text-slate-500">({p.ageMs} ms ago)</span>
-                          </li>
-                        ))}
+                        {pubs.map((p) => {
+                          const isPrimary = ruleMatch?.rule.sources[0] === p.source;
+                          const devName = deviceLabel(p.source);
+                          return (
+                            <li key={p.source} className="text-xs flex items-center gap-2">
+                              <span
+                                className={isPrimary ? 'text-amber-300' : 'text-slate-300'}
+                                title={p.source}
+                              >
+                                {friendlySourceLabel(p.source)}
+                                {devName && (
+                                  <span className="text-slate-500"> · {devName}</span>
+                                )}
+                                {isPrimary && (
+                                  <span className="ml-1 text-[10px] uppercase text-amber-500">
+                                    primary
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-slate-200 font-mono ml-2">
+                                {formatChannelValue(p.lastValue)}
+                              </span>
+                              <span className="text-slate-500 font-mono">
+                                ({p.ageMs} ms)
+                              </span>
+                              {!isPrimary && pubs.length > 1 && (
+                                <button
+                                  onClick={() => void promoteSource(ch, p.source)}
+                                  disabled={busy}
+                                  className="ml-auto px-1.5 py-0.5 text-[10px] bg-slate-700 hover:bg-amber-700 hover:text-slate-900 rounded disabled:opacity-50"
+                                  title={`Make ${p.source} the primary source for ${ch}`}
+                                >
+                                  Set primary
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </td>
@@ -286,9 +399,11 @@ export default function SourcesPage() {
                           <span className="font-mono">{ruleMatch.rule.channelPattern}</span> ·
                           freshness {ruleMatch.rule.freshnessSeconds.toFixed(1)} s
                         </div>
-                        <ol className="list-decimal ml-5 text-slate-300 font-mono">
+                        <ol className="list-decimal ml-5 text-slate-300">
                           {ruleMatch.rule.sources.map((s, i) => (
-                            <li key={s + i}>{s}</li>
+                            <li key={s + i} title={s}>
+                              {friendlySourceLabel(s)}
+                            </li>
                           ))}
                         </ol>
                       </div>
@@ -438,7 +553,9 @@ function SourceList({ sources, onAdd, onRemove, onMove }: SourceListProps) {
       {sources.map((s, j) => (
         <div key={s + j} className="flex items-center gap-2 text-sm">
           <span className="text-slate-500 w-5 text-right">{j + 1}.</span>
-          <span className="font-mono flex-1">{s}</span>
+          <span className="flex-1" title={s}>
+            {friendlySourceLabel(s)}
+          </span>
           <button
             onClick={() => onMove(j, -1)}
             disabled={j === 0}

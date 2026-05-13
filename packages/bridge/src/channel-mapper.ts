@@ -139,6 +139,45 @@ const mappers: Record<number, MapperFn> = {
     return out;
   },
 
+  // PGN 129025 — Position, Rapid Update (lat/lon only, ~10 Hz).
+  129025: (pgn) => {
+    const lat = pgn.fields['Latitude'];
+    const lon = pgn.fields['Longitude'];
+    if (typeof lat !== 'number' || typeof lon !== 'number') return [];
+    return [
+      {
+        channel: Channels.Nav.Position,
+        t_ns: pgn.rxTimestamp,
+        value: { kind: 'geo', value: { lat, lon } },
+        source: sourceTag(pgn),
+      },
+    ];
+  },
+
+  // PGN 129026 — COG & SOG, Rapid Update.
+  129026: (pgn) => {
+    const cog = pgn.fields['COG'];
+    const sog = pgn.fields['SOG'];
+    const out: Sample[] = [];
+    if (typeof cog === 'number') {
+      out.push({
+        channel: Channels.Nav.Cog,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(cog, 'rad'),
+        source: sourceTag(pgn),
+      });
+    }
+    if (typeof sog === 'number') {
+      out.push({
+        channel: Channels.Nav.Sog,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(sog, 'm/s'),
+        source: sourceTag(pgn),
+      });
+    }
+    return out;
+  },
+
   // PGN 127257 — attitude (yaw/pitch/roll, all in radians).
   // Sailing convention: roll = heel.
   127257: (pgn) => {

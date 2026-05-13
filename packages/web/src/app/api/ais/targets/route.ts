@@ -1,4 +1,6 @@
+import { firstValueFrom } from 'rxjs';
 import { getSharedAisTargets } from '@g5000/core';
+import { getSharedConfigStore } from '@g5000/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,10 +12,14 @@ export const runtime = 'nodejs';
  * CPA/TCPA — that's a client-side concern because it needs own-boat live
  * data that the client already has via SSE.
  *
- * Response: `{ targets: AisTarget[] }`. Empty when no AIS data has been
- * received yet (typical on a fresh boot before the first AIS PGN arrives).
+ * Targets matching `BoatConfig.selfMmsi` are dropped — we don't want to see
+ * ourselves on the chart.
  */
 export async function GET(): Promise<Response> {
   const registry = getSharedAisTargets();
-  return Response.json({ targets: registry?.all() ?? [] });
+  const targets = registry?.all() ?? [];
+  const cfg = await firstValueFrom(getSharedConfigStore().boatConfig$);
+  const self = cfg.selfMmsi;
+  const filtered = typeof self === 'number' ? targets.filter((t) => t.mmsi !== self) : targets;
+  return Response.json({ targets: filtered });
 }

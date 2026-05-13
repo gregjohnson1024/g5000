@@ -8,6 +8,8 @@
  * package.
  */
 
+import type { ChannelValue } from './types.js';
+
 export interface ObservedSourceEntry {
   channel: string;
   source: string;
@@ -17,6 +19,8 @@ export interface ObservedSourceEntry {
   lastSeenMs: number;
   /** Convenience: age (ms) at the time of the read. */
   ageMs: number;
+  /** Most recent sample value for (channel, source). */
+  lastValue: ChannelValue;
 }
 
 export interface ObservedSources {

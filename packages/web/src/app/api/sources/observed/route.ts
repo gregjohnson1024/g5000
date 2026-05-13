@@ -27,6 +27,7 @@ export async function GET(req: Request): Promise<Response> {
     source: e.source,
     lastSeenMs: e.lastSeenMs,
     ageMs: e.ageMs,
+    lastValue: e.lastValue,
   }));
   return Response.json({ entries, windowMs });
 }

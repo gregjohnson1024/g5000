@@ -17,9 +17,14 @@ import {
  * ring buffer without paying the bookkeeping.
  */
 
+interface SourceState {
+  t_ns: bigint;
+  value: import('@g5000/core').ChannelValue;
+}
+
 interface InternalState {
-  // channel -> source -> last-seen ns
-  by: Map<string, Map<string, bigint>>;
+  // channel -> source -> { last-seen ns, last value }
+  by: Map<string, Map<string, SourceState>>;
   unsubscribe: () => void;
 }
 
@@ -44,7 +49,7 @@ export function installObservedSourcesTracker(bus: Bus): {
       perSource = new Map();
       state.by.set(s.channel, perSource);
     }
-    perSource.set(s.source, s.t_ns);
+    perSource.set(s.source, { t_ns: s.t_ns, value: s.value });
   });
 
   const tracker: ObservedSources = {
@@ -54,7 +59,7 @@ export function installObservedSourcesTracker(bus: Bus): {
       const windowNs = BigInt(windowMs) * 1_000_000n;
       const out: ObservedSourceEntry[] = [];
       for (const [channel, perSource] of state.by.entries()) {
-        for (const [source, t_ns] of perSource.entries()) {
+        for (const [source, { t_ns, value }] of perSource.entries()) {
           const age = nowNs - t_ns;
           if (age < 0n) continue; // future timestamps — ignore (replay edge case)
           if (age > windowNs) continue;
@@ -64,6 +69,7 @@ export function installObservedSourcesTracker(bus: Bus): {
             lastSeenT_ns: t_ns,
             lastSeenMs: Number(t_ns / 1_000_000n),
             ageMs: Number(age / 1_000_000n),
+            lastValue: value,
           });
         }
       }

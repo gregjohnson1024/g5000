@@ -12,6 +12,8 @@ import {
   Ngt1Driver,
   SerialPort0183Driver,
   ReplayDriver,
+  YdwgRawTcpDriver,
+  createYdwgTcpSocketFactory,
   runBridge,
   startSessionLogger,
   startTrueWindTx,
@@ -34,6 +36,8 @@ const NMEA0183_PATHS = (process.env.NMEA0183_PATHS ?? '')
   .map((s) => s.trim())
   .filter((s) => s.length > 0);
 const NMEA0183_BAUD = Number(process.env.NMEA0183_BAUD ?? 4800);
+const YDWG_HOST = process.env.YDWG_HOST ?? null;
+const YDWG_PORT = Number(process.env.YDWG_PORT ?? 1457);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
 const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
@@ -127,6 +131,24 @@ async function main(): Promise<void> {
         );
       }
 
+      if (YDWG_HOST) {
+        try {
+          const ydwg = new YdwgRawTcpDriver({
+            socketFactory: createYdwgTcpSocketFactory(YDWG_HOST, YDWG_PORT),
+          });
+          await ydwg.start();
+          drivers.push(ydwg);
+          stops.push(() => ydwg.stop());
+          // eslint-disable-next-line no-console
+          console.log(`[autopilot] YDWG online via tcp://${YDWG_HOST}:${YDWG_PORT}`);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[autopilot] YDWG offline (${err instanceof Error ? err.message : String(err)})`,
+          );
+        }
+      }
+
       for (const [i, p183] of NMEA0183_PATHS.entries()) {
         try {
           const port = new SerialPort({
@@ -185,8 +207,12 @@ async function main(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log('[autopilot] true-wind compute pipeline online');
 
-    // True-wind TX wiring + device-registry refresh target (NGT-1 only).
+    // True-wind TX wiring + device-registry refresh target.
+    //   - True-wind TX is NGT-1-only (requires Fast Packet split).
+    //   - Device refresh uses ISO Request (PGN 59904, single-frame), which
+    //     YDWG can also handle — so we fall back to YDWG when NGT-1 absent.
     const ngt = drivers.find((d) => d instanceof Ngt1Driver);
+    const ydwg = drivers.find((d) => d instanceof YdwgRawTcpDriver);
     let stopTxFn: (() => Promise<void>) | null = null;
     let registeredTxer: ((pgn: OutgoingPgn) => Promise<void>) | null = null;
     if (ngt) {
@@ -203,6 +229,12 @@ async function main(): Promise<void> {
       registry.registerTxer(registeredTxer);
       // eslint-disable-next-line no-console
       console.log('[autopilot] device-registry refresh target = NGT-1');
+    } else if (ydwg) {
+      const registry = getSharedDeviceRegistry();
+      registeredTxer = (pgn) => ydwg.txPgn(pgn);
+      registry.registerTxer(registeredTxer);
+      // eslint-disable-next-line no-console
+      console.log('[autopilot] device-registry refresh target = YDWG (single-frame PGNs only)');
     }
 
     const teardownFn = async (): Promise<void> => {

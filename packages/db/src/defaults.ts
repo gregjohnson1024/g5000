@@ -13,6 +13,9 @@ export interface BoatConfig {
   mastheadOffsetY: number;
   /** Magnetic variation for the sailing area, degrees (positive = east). */
   magVarDeg: number;
+  /** This vessel's MMSI. When set, AIS targets matching it are filtered out
+   *  of the chart view so we don't see ourselves on the radar. */
+  selfMmsi?: number;
 }
 
 /**

@@ -28,10 +28,18 @@ export async function PUT(req: Request): Promise<Response> {
 function validate(v: unknown): v is BoatConfig {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
-  return (
-    typeof o.mastHeight === 'number' &&
-    typeof o.mastheadOffsetX === 'number' &&
-    typeof o.mastheadOffsetY === 'number' &&
-    typeof o.magVarDeg === 'number'
-  );
+  if (
+    typeof o.mastHeight !== 'number' ||
+    typeof o.mastheadOffsetX !== 'number' ||
+    typeof o.mastheadOffsetY !== 'number' ||
+    typeof o.magVarDeg !== 'number'
+  ) {
+    return false;
+  }
+  if (o.selfMmsi !== undefined) {
+    if (typeof o.selfMmsi !== 'number' || !Number.isInteger(o.selfMmsi) || o.selfMmsi <= 0) {
+      return false;
+    }
+  }
+  return true;
 }
