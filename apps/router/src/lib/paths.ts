@@ -6,3 +6,4 @@ export const GRIB_CACHE = join(ROOT, 'grib-cache');
 export const PLANS_DIR = join(ROOT, 'plans');
 export const CACHED_POLAR = join(ROOT, 'cached-polar.json');
 export const SETTINGS = join(ROOT, 'settings.json');
+export const WAYPOINTS = join(ROOT, 'waypoints.json');

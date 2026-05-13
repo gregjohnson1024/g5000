@@ -32,6 +32,10 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
       center: [center.lon, center.lat],
       zoom,
     });
+    map.addControl(
+      new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }),
+      'bottom-left',
+    );
     if (onClick) {
       map.on('click', (e) => onClick({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
     }

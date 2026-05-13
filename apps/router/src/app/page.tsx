@@ -74,17 +74,37 @@ export default function HomePage() {
     }
   };
   return (
-    <main className="grid grid-cols-[1fr_360px] h-screen">
-      <Map
-        center={{ lat: 35, lon: -70 }}
-        zoom={4}
-        onClick={onMapClick}
-        onLoad={(m) => {
-          mapRef.current = m;
-          setMapInstance(m);
-        }}
-      />
-      <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
+    <main className="grid grid-cols-[1fr_360px] h-full [&>div:first-child]:relative">
+      <div className="relative">
+        <Map
+          center={{ lat: 35, lon: -70 }}
+          zoom={4}
+          onClick={onMapClick}
+          onLoad={(m) => {
+            mapRef.current = m;
+            setMapInstance(m);
+          }}
+        />
+        <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
+        {livePos && (
+          <button
+            type="button"
+            onClick={() => {
+              if (mapRef.current) {
+                mapRef.current.flyTo({
+                  center: [livePos.lon, livePos.lat],
+                  zoom: Math.max(mapRef.current.getZoom(), 9),
+                  speed: 1.4,
+                });
+              }
+            }}
+            className="absolute top-3 left-3 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
+            title="Pan map to boat's current position"
+          >
+            ⊕ Center on boat
+          </button>
+        )}
+      </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <StatusBadge />
         <LiveValues p={livePos} />
