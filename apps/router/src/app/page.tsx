@@ -8,6 +8,7 @@ import { attachRoute } from '../components/RoutePolyline';
 import { RouteTimeline } from '../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../components/LiveBoatMarker';
 import { DriftArrow, computeDrift } from '../components/DriftArrow';
+import { WindOverlay } from '../components/WindOverlay';
 import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
@@ -16,6 +17,8 @@ export default function HomePage() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [livePos, setLivePos] = useState<LivePos | null>(null);
+  const [windHours, setWindHours] = useState(0);
+  const [windOn, setWindOn] = useState(true);
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
   const [loading, setLoading] = useState(false);
@@ -88,6 +91,13 @@ export default function HomePage() {
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
         <DriftArrow map={mapInstance} p={livePos} />
+        <WindOverlay
+          map={mapInstance}
+          centerLat={livePos?.lat ?? null}
+          centerLon={livePos?.lon ?? null}
+          hours={windHours}
+          hidden={!windOn}
+        />
         {livePos && (
           <button
             type="button"
@@ -110,6 +120,31 @@ export default function HomePage() {
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <StatusBadge />
         <LiveValues p={livePos} />
+        <div className="space-y-1 bg-slate-900/60 border border-slate-800 rounded p-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-400">GFS wind</span>
+            <label className="flex items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                checked={windOn}
+                onChange={(e) => setWindOn(e.target.checked)}
+              />
+              <span className="text-slate-300">visible</span>
+            </label>
+          </div>
+          <label className="block text-xs text-slate-400">
+            +{windHours} h forecast
+            <input
+              type="range"
+              min={0}
+              max={72}
+              step={3}
+              value={windHours}
+              onChange={(e) => setWindHours(Number(e.target.value))}
+              className="block w-full"
+            />
+          </label>
+        </div>
         <div className="text-xs text-slate-400 space-y-1">
           <div>Start: {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}</div>
           <div>End:   {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}</div>
