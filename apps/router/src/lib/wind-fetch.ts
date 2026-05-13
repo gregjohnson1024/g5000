@@ -2,7 +2,53 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fetchEcmwfMessages, pickEcmwfRun } from '@g5000/grib';
+import { pickEcmwfRun } from '@g5000/grib';
+
+// ECMWF Open Data IFS is mirrored on AWS S3 (public bucket, no auth, no rate
+// limit). Prefer it over data.ecmwf.int which 429s aggressively after a
+// handful of requests.
+const ECMWF_S3 = 'https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com';
+
+interface EcmwfIndexLine {
+  param: string;
+  _offset: number;
+  _length: number;
+}
+
+async function fetchEcmwfMessagesS3(opts: {
+  runDateUtc: string;
+  runHourUtc: 0 | 6 | 12 | 18;
+  forecastHour: number;
+  variables: Array<'10u' | '10v' | 'msl'>;
+}): Promise<Buffer[]> {
+  const date = opts.runDateUtc.replace(/-/g, '');
+  const hh = String(opts.runHourUtc).padStart(2, '0');
+  const base = `${ECMWF_S3}/${date}/${hh}z/ifs/0p25/oper`;
+  const stem = `${date}${hh}0000-${opts.forecastHour}h-oper-fc`;
+  const idxUrl = `${base}/${stem}.index`;
+  const gribUrl = `${base}/${stem}.grib2`;
+  const idxRes = await fetch(idxUrl);
+  if (!idxRes.ok) {
+    throw new Error(`ECMWF S3 index ${idxUrl} → ${idxRes.status}`);
+  }
+  const text = await idxRes.text();
+  const lines = text
+    .split(/\n/)
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as EcmwfIndexLine);
+  const wanted = lines.filter((l) => opts.variables.includes(l.param as '10u' | '10v' | 'msl'));
+  const buffers: Buffer[] = [];
+  for (const w of wanted) {
+    const res = await fetch(gribUrl, {
+      headers: { Range: `bytes=${w._offset}-${w._offset + w._length - 1}` },
+    });
+    if (!(res.status === 200 || res.status === 206)) {
+      throw new Error(`ECMWF S3 range fetch failed: ${res.status} for param=${w.param}`);
+    }
+    buffers.push(Buffer.from(await res.arrayBuffer()));
+  }
+  return buffers;
+}
 
 export type WindModel = 'gfs' | 'ecmwf';
 
@@ -347,6 +393,10 @@ function cropGrid(grid: WindGrid, bbox: Bbox): WindGrid {
  * and crop to bbox. ECMWF Open Data IFS publishes only every 6 hours
  * (0/6/12/18 z) with forecast hours at 0/3/6/.../240; this function rounds
  * the request to the nearest 3 h step.
+ *
+ * ECMWF's CDN is aggressively rate-limited. We retry up to two times on
+ * a 429, with exponential backoff (4 s, 12 s). The underlying
+ * fetchEcmwfMessages does not retry itself.
  */
 export async function fetchWindGridEcmwf(
   bbox: Bbox,
@@ -360,9 +410,9 @@ export async function fetchWindGridEcmwf(
     Number(run.runDateUtc.slice(8, 10)),
     run.runHourUtc,
   ) / 1000;
-  // Round to nearest 3 h step (Open Data IFS step cadence).
   const fh = Math.max(0, Math.round(forecastHour / 3) * 3);
-  const messages = await fetchEcmwfMessages({
+
+  const messages = await fetchEcmwfMessagesS3({
     runDateUtc: run.runDateUtc,
     runHourUtc: run.runHourUtc,
     forecastHour: fh,

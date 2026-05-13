@@ -67,15 +67,10 @@ export async function POST(req: Request): Promise<Response> {
     error?: string;
   }
   const results: Result[] = [];
-  // Fetch sequentially. ECMWF Open Data rate-limits aggressive callers
-  // (we hit two URLs per hour: .index then a byte-range into .grib2),
-  // so pace ECMWF requests with a small delay.
-  const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+  // Sequential. ECMWF uses the public S3 mirror (no rate limit) so no
+  // additional pacing needed.
   for (const model of models) {
-    let first = true;
     for (const hour of hours) {
-      if (model === 'ecmwf' && !first) await sleep(500);
-      first = false;
       try {
         const grid: WindGrid =
           model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, hour) : await fetchWindGrid(bbox, hour);
@@ -91,7 +86,7 @@ export async function POST(req: Request): Promise<Response> {
       } catch (e) {
         const raw = e instanceof Error ? e.message : String(e);
         const msg = /\b429\b/.test(raw)
-          ? 'rate-limited by upstream (429) — try again in 30 s, or fetch fewer hours per click'
+          ? 'ECMWF rate-limited after retries — wait 1 min, fetch fewer hours, or use GFS'
           : raw;
         results.push({ model, hour, ok: false, error: msg });
       }
