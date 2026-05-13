@@ -7,6 +7,8 @@ export interface LivePos {
   lon: number;
   cog: number | null;
   sog: number | null;
+  /** Heading (true), radians. Null if no source publishes it. */
+  hdg: number | null;
   t: number;
 }
 

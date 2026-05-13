@@ -21,12 +21,16 @@ export async function GET(): Promise<Response> {
 
   // Captured by both start() and cancel() so the consumer aborting the
   // stream tears down subscriptions and the 1 Hz timer.
-  const latest: Record<'lat' | 'lon' | 'sog' | 'cog', number | undefined> = {
+  const latest: Record<'lat' | 'lon' | 'sog' | 'cog' | 'hdg', number | undefined> = {
     lat: undefined,
     lon: undefined,
     sog: undefined,
     cog: undefined,
+    hdg: undefined,
   };
+  // Magnetic variation, used to derive true heading when only magnetic is
+  // published. East-positive (NMEA 2000 convention); True = Mag + Var.
+  let magVar: number | undefined = undefined;
   const unsubs: Array<() => void> = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
@@ -65,6 +69,40 @@ export async function GET(): Promise<Response> {
           latest.sog = s.value.value;
         }),
       );
+      // Heading: prefer the device-published true heading; otherwise
+      // derive true from magnetic + live magnetic variation.
+      let lastHdgTrue: number | undefined;
+      let lastHdgMag: number | undefined;
+      const recomputeHdg = (): void => {
+        if (lastHdgTrue !== undefined) {
+          latest.hdg = lastHdgTrue;
+        } else if (lastHdgMag !== undefined && magVar !== undefined) {
+          latest.hdg = lastHdgMag + magVar;
+        } else if (lastHdgMag !== undefined) {
+          latest.hdg = lastHdgMag;
+        }
+      };
+      unsubs.push(
+        bus.subscribe('boat.heading.true', (s: Sample) => {
+          if (s.value.kind !== 'scalar') return;
+          lastHdgTrue = s.value.value;
+          recomputeHdg();
+        }),
+      );
+      unsubs.push(
+        bus.subscribe('boat.heading.magnetic', (s: Sample) => {
+          if (s.value.kind !== 'scalar') return;
+          lastHdgMag = s.value.value;
+          recomputeHdg();
+        }),
+      );
+      unsubs.push(
+        bus.subscribe('nav.magvar', (s: Sample) => {
+          if (s.value.kind !== 'scalar') return;
+          magVar = s.value.value;
+          recomputeHdg();
+        }),
+      );
 
       const emit = (): void => {
         if (closed) return;
@@ -74,6 +112,7 @@ export async function GET(): Promise<Response> {
             lon: latest.lon,
             sog: latest.sog ?? null,
             cog: latest.cog ?? null,
+            hdg: latest.hdg ?? null,
             t: Date.now() / 1000,
           });
           try {
