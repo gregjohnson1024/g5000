@@ -155,6 +155,13 @@ export default function ForecastPage() {
         setErr(j.error?.message ?? 'fetch failed');
       } else {
         setResults(j.results);
+        // Tell other tabs (e.g. /chart) to re-poll the manifest immediately
+        // so they don't sit on stale "no cache" state for up to 30 s.
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('forecast-cache');
+          bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
+          bc.close();
+        }
       }
       await reloadManifest();
     } catch (e) {

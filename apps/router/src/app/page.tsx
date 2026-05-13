@@ -40,8 +40,12 @@ export default function HomePage() {
   const [savedMsg, setSavedMsg] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
 
-  // Poll the manifest so the chart's model picker + timeline reflect what's
-  // currently cached on the server. Refresh every 30 s.
+  // Manifest sync — three triggers, in priority order:
+  //   1. BroadcastChannel('forecast-cache') message from the /forecast tab
+  //      when it completes a fetch. Same-origin, near-instant.
+  //   2. tab focus (`visibilitychange` → visible) — covers the case where
+  //      the /forecast tab is in a different browser/window.
+  //   3. background poll every 30 s as a safety net.
   useEffect(() => {
     let alive = true;
     const tick = async (): Promise<void> => {
@@ -63,10 +67,21 @@ export default function HomePage() {
       }
     };
     void tick();
+
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('forecast-cache') : null;
+    bc?.addEventListener('message', () => void tick());
+
+    const onVisible = (): void => {
+      if (document.visibilityState === 'visible') void tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
     const id = setInterval(() => void tick(), 30_000);
     return () => {
       alive = false;
       clearInterval(id);
+      bc?.close();
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
 
