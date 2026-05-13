@@ -21,7 +21,9 @@ export default function HomePage() {
   const [windHours, setWindHours] = useState(0);
   const [windModel, setWindModel] = useState<WindModel>('gfs');
   const [windOn, setWindOn] = useState(true);
-  const [windOpacity, setWindOpacity] = useState(0.85);
+  const [windOpacity, setWindOpacity] = useState(0.5);
+  const [showFill, setShowFill] = useState(true);
+  const [showBarbs, setShowBarbs] = useState(true);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -165,6 +167,8 @@ export default function HomePage() {
           hours={windHours}
           hidden={!windOn}
           opacity={windOpacity}
+          showFill={showFill}
+          showBarbs={showBarbs}
           refreshKey={windRefreshKey}
           onLoaded={({ grid, identical, error }) => {
             if (error) {
@@ -267,7 +271,7 @@ export default function HomePage() {
             );
           })()}
           <label className="block text-xs text-slate-400">
-            Opacity {Math.round(windOpacity * 100)}%
+            Fill opacity {Math.round(windOpacity * 100)}%
             <input
               type="range"
               min={0}
@@ -278,6 +282,24 @@ export default function HomePage() {
               className="block w-full"
             />
           </label>
+          <div className="flex gap-3 text-xs">
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={showFill}
+                onChange={(e) => setShowFill(e.target.checked)}
+              />
+              <span className="text-slate-300">speed fill</span>
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={showBarbs}
+                onChange={(e) => setShowBarbs(e.target.checked)}
+              />
+              <span className="text-slate-300">barbs</span>
+            </label>
+          </div>
           {windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
               <div>Showing: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>

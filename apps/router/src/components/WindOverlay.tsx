@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import { contours } from 'd3-contour';
 
 export type WindModel = 'gfs' | 'ecmwf';
 
@@ -15,24 +16,28 @@ export interface WindGrid {
   model: WindModel;
 }
 
-const SOURCE_ID = 'wind-overlay';
-const LAYER_LINE = 'wind-overlay-shaft';
-const LAYER_HEAD = 'wind-overlay-head';
+const SRC_FILL = 'wind-fill';
+const SRC_BARBS = 'wind-barbs';
+const LAYER_FILL = 'wind-fill-layer';
+const LAYER_BARB_LINE = 'wind-barb-line';
+const LAYER_BARB_PENNANT = 'wind-barb-pennant';
 
 const M_PER_DEG_LAT = 111_320;
-const M_PER_NM = 1852;
 const MS_TO_KN = 1 / 0.514444;
 
-/** Color ramp from light cyan (calm) to magenta (storm) in knots. */
-function colorForSpeedKn(kn: number): string {
-  if (kn < 5) return '#7dd3fc'; // sky-300
-  if (kn < 10) return '#67e8f9'; // cyan-300
-  if (kn < 15) return '#86efac'; // green-300
-  if (kn < 20) return '#fde047'; // yellow-300
-  if (kn < 25) return '#fdba74'; // orange-300
-  if (kn < 30) return '#fca5a5'; // red-300
-  return '#f0abfc'; // fuchsia-300
-}
+// Speed bin → fill color. Steps match common nautical-wind palettes.
+const FILL_STOPS: Array<[number, string]> = [
+  [0, '#1e3a8a'], // navy
+  [5, '#3b82f6'], // blue-500
+  [10, '#22d3ee'], // cyan-400
+  [15, '#10b981'], // emerald-500
+  [20, '#a3e635'], // lime-400
+  [25, '#facc15'], // yellow-400
+  [30, '#fb923c'], // orange-400
+  [35, '#f87171'], // red-400
+  [45, '#c084fc'], // purple-400
+  [60, '#fb7185'], // rose-400
+];
 
 function project(
   fromLat: number,
@@ -47,27 +52,179 @@ function project(
   return [fromLon + dLon, fromLat + dLat];
 }
 
+/**
+ * Build wind-barb GeoJSON features at a grid point. Standard meteorological
+ * convention: shaft points INTO the wind (open end toward where wind is
+ * coming from), barbs at the grid-point end angled back. Northern-hemisphere
+ * barbs on the left side of the shaft.
+ */
+function makeBarb(
+  lat: number,
+  lon: number,
+  speedKn: number,
+  windFromBearingRad: number,
+  shaftLenM: number,
+): GeoJSON.Feature[] {
+  if (speedKn < 2.5) {
+    // Calm: just a small circle around the grid point. Render as a tiny
+    // degenerate line so the same paint layer covers it.
+    const tinyTip = project(lat, lon, 50, 0);
+    return [
+      {
+        type: 'Feature',
+        properties: { kind: 'shaft' },
+        geometry: { type: 'LineString', coordinates: [[lon, lat], tinyTip] },
+      },
+    ];
+  }
+  const shaftEnd = project(lat, lon, shaftLenM, windFromBearingRad);
+  const features: GeoJSON.Feature[] = [
+    {
+      type: 'Feature',
+      properties: { kind: 'shaft' },
+      geometry: { type: 'LineString', coordinates: [[lon, lat], shaftEnd] },
+    },
+  ];
+
+  // Decompose speed in 5-kn rounding
+  const rounded = Math.round(speedKn / 5) * 5;
+  const pennants = Math.floor(rounded / 50);
+  const fulls = Math.floor((rounded - pennants * 50) / 10);
+  const halfs = Math.floor((rounded - pennants * 50 - fulls * 10) / 5);
+
+  // Barbs are drawn on the LEFT side of the shaft when looking along the
+  // shaft direction (toward wind source). Perpendicular bearing = shaft - 90°.
+  const perpBearing = windFromBearingRad - Math.PI / 2;
+  // Tick lengths
+  const fullLen = shaftLenM * 0.45;
+  const halfLen = shaftLenM * 0.25;
+  const pennantLen = shaftLenM * 0.45;
+  // Step size between adjacent ticks along the shaft (from open end inward).
+  const stepM = shaftLenM * 0.18;
+  // Position of the first tick — at the OPEN end of shaft (where wind comes
+  // from), then walk back toward the grid point.
+  let distFromGrid = shaftLenM;
+
+  // Pennants first (closest to open end)
+  for (let i = 0; i < pennants; i++) {
+    const base = project(lat, lon, distFromGrid, windFromBearingRad);
+    const inner = project(lat, lon, distFromGrid - stepM, windFromBearingRad);
+    const tip = project(base[1], base[0], pennantLen, perpBearing);
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'pennant' },
+      geometry: { type: 'Polygon', coordinates: [[base, tip, inner, base]] },
+    });
+    distFromGrid -= stepM;
+  }
+  // Full barbs
+  for (let i = 0; i < fulls; i++) {
+    const base = project(lat, lon, distFromGrid, windFromBearingRad);
+    const tip = project(base[1], base[0], fullLen, perpBearing);
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'barb' },
+      geometry: { type: 'LineString', coordinates: [base, tip] },
+    });
+    distFromGrid -= stepM;
+  }
+  // Half barbs (one max per the decomposition above)
+  if (halfs > 0) {
+    // If there are no fulls and no pennants, the half barb shouldn't sit
+    // right at the shaft's open end (looks like a stray spike) — pull it
+    // one step inward.
+    if (fulls === 0 && pennants === 0) distFromGrid -= stepM;
+    const base = project(lat, lon, distFromGrid, windFromBearingRad);
+    const tip = project(base[1], base[0], halfLen, perpBearing);
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'barb' },
+      geometry: { type: 'LineString', coordinates: [base, tip] },
+    });
+  }
+  return features;
+}
+
+/**
+ * Build a d3-contour speed field from a wind grid and return a FeatureCollection
+ * with one Polygon per threshold band. Each feature has a `speed` property = the
+ * lower threshold of the band, used to drive the fill-color step expression.
+ */
+function buildSpeedContours(grid: WindGrid): GeoJSON.FeatureCollection {
+  const { lats, lons, u, v } = grid;
+  const W = lons.length;
+  const H = lats.length;
+  // d3-contour expects a flat row-major array. d3-contour treats row 0 as
+  // the TOP — we'll flip Y so highest lat is at y=0 to match.
+  const speed = new Float64Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const yi = H - 1 - y; // flip so y=0 is highest lat
+    for (let x = 0; x < W; x++) {
+      const uu = u[yi]![x] ?? 0;
+      const vv = v[yi]![x] ?? 0;
+      speed[y * W + x] = Math.hypot(uu, vv) * MS_TO_KN;
+    }
+  }
+  const thresholds = FILL_STOPS.map((s) => s[0]);
+  const gen = contours().size([W, H]).thresholds(thresholds)(Array.from(speed));
+  // Convert each MultiPolygon's grid coords back to lat/lon.
+  const features: GeoJSON.Feature[] = [];
+  for (const c of gen) {
+    const value = c.value;
+    const polys: number[][][][] = [];
+    for (const poly of c.coordinates as number[][][][]) {
+      const ringsOut: number[][][] = [];
+      for (const ring of poly) {
+        const out: number[][] = ring.map((pt) => {
+          // d3-contour returns floats in [0, W] × [0, H]. Map to lat/lon by
+          // linear interpolation against our lats/lons arrays.
+          const gx = pt[0] ?? 0;
+          const gy = pt[1] ?? 0;
+          const xi = Math.max(0, Math.min(W - 1, gx));
+          const yi = Math.max(0, Math.min(H - 1, gy));
+          const xLow = Math.floor(xi);
+          const xFrac = xi - xLow;
+          const lon =
+            lons[xLow]! * (1 - xFrac) + (lons[xLow + 1] ?? lons[xLow]!) * xFrac;
+          const yLow = Math.floor(yi);
+          const yFrac = yi - yLow;
+          // y is flipped; row y=0 corresponds to lats[H-1]
+          const latIdxLow = H - 1 - yLow;
+          const latIdxHigh = H - 1 - Math.min(H - 1, yLow + 1);
+          const lat = lats[latIdxLow]! * (1 - yFrac) + lats[latIdxHigh]! * yFrac;
+          return [lon, lat];
+        });
+        ringsOut.push(out);
+      }
+      polys.push(ringsOut);
+    }
+    features.push({
+      type: 'Feature',
+      properties: { speed: value },
+      geometry: { type: 'MultiPolygon', coordinates: polys },
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
+
 export interface WindOverlayProps {
   map: maplibregl.Map | null;
   centerLat: number | null;
   centerLon: number | null;
-  /** Model: GFS or ECMWF. */
   model: WindModel;
-  /** Forecast hours ahead. */
   hours: number;
-  /** Half-width of bbox in degrees. */
   radius?: number;
-  /** When true, no overlay rendered. */
   hidden?: boolean;
-  /** Subsample factor — render every Nth grid cell to keep the map readable. */
+  /** Grid stride for barbs — 1 = every cell, 2 = every other. Default 2. */
   stride?: number;
-  /** Arrow length per knot, in NM. */
-  nmPerKn?: number;
-  /** Opacity for the overlay layer, 0..1. */
+  /** Opacity for the speed-fill layer. Barbs are always full strength. */
   opacity?: number;
-  /** Bumping this triggers a fetch. Center/hours/model changes alone do NOT. */
+  /** When true, draw the colored speed-fill. */
+  showFill?: boolean;
+  /** When true, draw black wind barbs. */
+  showBarbs?: boolean;
+  /** Bumping this triggers a fetch from cache. */
   refreshKey: number;
-  /** Called when fetch completes — `grid` is null if response had no change. */
   onLoaded?: (info: { grid: WindGrid | null; identical: boolean; error: string | null }) => void;
 }
 
@@ -80,32 +237,34 @@ export function WindOverlay({
   radius = 6,
   hidden = false,
   stride = 2,
-  nmPerKn = 0.18,
-  opacity = 0.85,
+  opacity = 0.5,
+  showFill = true,
+  showBarbs = true,
   refreshKey,
   onLoaded,
 }: WindOverlayProps) {
   const [grid, setGrid] = useState<WindGrid | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
-  // Fetch ONLY when refreshKey changes; cached-only by default so /chart
-  // never triggers a fresh download itself. Use the /forecast tab for that.
   useEffect(() => {
-    if (centerLat === null || centerLon === null) return;
     if (refreshKey === 0) return;
     let cancelled = false;
-    const url = `/api/wind?model=${model}&lat=${centerLat.toFixed(2)}&lon=${centerLon.toFixed(2)}&hours=${hours}&radius=${radius}&cached=1`;
+    // Look up the cached grid by (model, hour). /forecast fetches with a
+    // specific bbox; this endpoint returns whatever's cached for that
+    // (model, hour) regardless of bbox, so /chart doesn't have to mirror
+    // /forecast's ROI.
+    void centerLat;
+    void centerLon;
+    void radius;
+    const url = `/api/forecast/grid?model=${model}&hour=${hours}`;
     fetch(url)
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
         if (!j.ok) {
-          setErr(j.error?.message ?? 'wind fetch failed');
           onLoadedRef.current?.({ grid: null, identical: false, error: j.error?.message ?? 'fetch failed' });
         } else {
-          setErr(null);
           const newGrid = j.grid as WindGrid;
           let identical = false;
           if (grid && grid.runAt === newGrid.runAt && grid.forecastHour === newGrid.forecastHour && grid.model === newGrid.model) {
@@ -117,113 +276,129 @@ export function WindOverlay({
       })
       .catch((e) => {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        setErr(msg);
-        onLoadedRef.current?.({ grid: null, identical: false, error: msg });
+        onLoadedRef.current?.({ grid: null, identical: false, error: e instanceof Error ? e.message : String(e) });
       });
     return () => {
       cancelled = true;
     };
-  // intentionally driven by refreshKey only
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  // Render whenever the grid changes (or hidden flips).
+  // Render
   useEffect(() => {
     if (!map) return;
-    const ensureLayers = (): void => {
-      if (map.getSource(SOURCE_ID)) return;
-      map.addSource(SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-      map.addLayer({
-        id: LAYER_LINE,
-        type: 'line',
-        source: SOURCE_ID,
-        filter: ['==', ['get', 'kind'], 'shaft'],
-        paint: { 'line-color': ['get', 'color'], 'line-width': 1.5, 'line-opacity': opacity },
-      });
-      map.addLayer({
-        id: LAYER_HEAD,
-        type: 'fill',
-        source: SOURCE_ID,
-        filter: ['==', ['get', 'kind'], 'head'],
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': opacity },
-      });
-    };
-    if (map.isStyleLoaded()) ensureLayers();
-    else map.once('load', ensureLayers);
-
-    const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
-    if (!src) return;
-
-    if (hidden || !grid) {
-      src.setData({ type: 'FeatureCollection', features: [] });
-      return;
-    }
-    const features: GeoJSON.Feature[] = [];
-    for (let yi = 0; yi < grid.lats.length; yi += stride) {
-      for (let xi = 0; xi < grid.lons.length; xi += stride) {
-        const lat = grid.lats[yi]!;
-        const lon = grid.lons[xi]!;
-        const u = grid.u[yi]?.[xi];
-        const v = grid.v[yi]?.[xi];
-        if (typeof u !== 'number' || typeof v !== 'number') continue;
-        // U is eastward, V is northward. Wind FROM bearing = atan2(-u, -v).
-        // For visualization we draw the vector along the direction the wind
-        // is going TO (i.e., the velocity vector) so arrows point downwind.
-        const speedMps = Math.hypot(u, v);
-        if (speedMps < 0.2) continue;
-        const speedKn = speedMps * MS_TO_KN;
-        const dirRad = Math.atan2(u, v); // direction wind is going TO
-        const lengthM = speedKn * nmPerKn * M_PER_NM;
-        const tip = project(lat, lon, lengthM, dirRad);
-        const color = colorForSpeedKn(speedKn);
-        features.push({
-          type: 'Feature',
-          properties: { kind: 'shaft', color },
-          geometry: { type: 'LineString', coordinates: [[lon, lat], tip] },
+    const ensure = (): void => {
+      if (!map.getSource(SRC_FILL)) {
+        map.addSource(SRC_FILL, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
         });
-        // Arrowhead
-        const headLen = Math.max(lengthM * 0.3, 600);
-        const headHalfAngle = (22 * Math.PI) / 180;
-        const leftBearing = dirRad + Math.PI - headHalfAngle;
-        const rightBearing = dirRad + Math.PI + headHalfAngle;
-        const left = project(tip[1], tip[0], headLen, leftBearing);
-        const right = project(tip[1], tip[0], headLen, rightBearing);
-        features.push({
-          type: 'Feature',
-          properties: { kind: 'head', color },
-          geometry: { type: 'Polygon', coordinates: [[tip, left, right, tip]] },
+        const stepArgs: (string | number)[] = [];
+        for (const [thr, col] of FILL_STOPS) {
+          stepArgs.push(col, thr);
+        }
+        // step expression: step(input, base, stop1, color1, stop2, color2, …)
+        // We provide base = first color; pairs of (threshold, color) follow.
+        const stepExpr: maplibregl.DataDrivenPropertyValueSpecification<string> = [
+          'step',
+          ['get', 'speed'],
+          FILL_STOPS[0]![1],
+          ...stepArgs.slice(2),
+        ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>;
+        map.addLayer({
+          id: LAYER_FILL,
+          type: 'fill',
+          source: SRC_FILL,
+          paint: {
+            'fill-color': stepExpr,
+            'fill-opacity': opacity,
+            'fill-antialias': true,
+          },
         });
       }
-    }
-    src.setData({ type: 'FeatureCollection', features });
-  }, [map, grid, hidden, stride, nmPerKn]);
+      if (!map.getSource(SRC_BARBS)) {
+        map.addSource(SRC_BARBS, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        map.addLayer({
+          id: LAYER_BARB_LINE,
+          type: 'line',
+          source: SRC_BARBS,
+          filter: ['in', ['get', 'kind'], ['literal', ['shaft', 'barb']]],
+          paint: { 'line-color': '#000000', 'line-width': 1.4 },
+        });
+        map.addLayer({
+          id: LAYER_BARB_PENNANT,
+          type: 'fill',
+          source: SRC_BARBS,
+          filter: ['==', ['get', 'kind'], 'pennant'],
+          paint: { 'fill-color': '#000000' },
+        });
+      }
+    };
+    if (map.isStyleLoaded()) ensure();
+    else map.once('load', ensure);
 
-  // Update layer opacity when the prop changes (avoid full re-render).
+    const fillSrc = map.getSource(SRC_FILL) as maplibregl.GeoJSONSource | undefined;
+    const barbSrc = map.getSource(SRC_BARBS) as maplibregl.GeoJSONSource | undefined;
+
+    if (hidden || !grid) {
+      fillSrc?.setData({ type: 'FeatureCollection', features: [] });
+      barbSrc?.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+    if (showFill && fillSrc) {
+      fillSrc.setData(buildSpeedContours(grid));
+    } else if (fillSrc) {
+      fillSrc.setData({ type: 'FeatureCollection', features: [] });
+    }
+    if (showBarbs && barbSrc) {
+      const features: GeoJSON.Feature[] = [];
+      // Shaft length scales with grid spacing so barbs fit one cell.
+      const dLat =
+        grid.lats.length > 1 ? Math.abs(grid.lats[1]! - grid.lats[0]!) : 0.25;
+      const shaftLenM = dLat * M_PER_DEG_LAT * 0.75 * stride;
+      for (let yi = 0; yi < grid.lats.length; yi += stride) {
+        for (let xi = 0; xi < grid.lons.length; xi += stride) {
+          const lat = grid.lats[yi]!;
+          const lon = grid.lons[xi]!;
+          const uu = grid.u[yi]?.[xi];
+          const vv = grid.v[yi]?.[xi];
+          if (typeof uu !== 'number' || typeof vv !== 'number') continue;
+          const speedMps = Math.hypot(uu, vv);
+          const speedKn = speedMps * MS_TO_KN;
+          // Wind FROM bearing (compass) is direction from which wind blows:
+          // = bearing of -V vector (since V is northward).
+          let windFrom = Math.atan2(-uu, -vv);
+          if (windFrom < 0) windFrom += 2 * Math.PI;
+          features.push(...makeBarb(lat, lon, speedKn, windFrom, shaftLenM));
+        }
+      }
+      barbSrc.setData({ type: 'FeatureCollection', features });
+    } else if (barbSrc) {
+      barbSrc.setData({ type: 'FeatureCollection', features: [] });
+    }
+  }, [map, grid, hidden, stride, showFill, showBarbs]);
+
+  // Live opacity update
   useEffect(() => {
     if (!map) return;
-    if (map.getLayer(LAYER_LINE)) map.setPaintProperty(LAYER_LINE, 'line-opacity', opacity);
-    if (map.getLayer(LAYER_HEAD)) map.setPaintProperty(LAYER_HEAD, 'fill-opacity', opacity);
+    if (map.getLayer(LAYER_FILL)) map.setPaintProperty(LAYER_FILL, 'fill-opacity', opacity);
   }, [map, opacity]);
 
+  // Cleanup on unmount
   useEffect(() => {
     if (!map) return;
     return () => {
-      if (map.getLayer(LAYER_HEAD)) map.removeLayer(LAYER_HEAD);
-      if (map.getLayer(LAYER_LINE)) map.removeLayer(LAYER_LINE);
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      for (const id of [LAYER_FILL, LAYER_BARB_LINE, LAYER_BARB_PENNANT]) {
+        if (map.getLayer(id)) map.removeLayer(id);
+      }
+      for (const id of [SRC_FILL, SRC_BARBS]) {
+        if (map.getSource(id)) map.removeSource(id);
+      }
     };
   }, [map]);
 
-  if (err) {
-    return (
-      <div className="absolute bottom-3 left-3 text-xs bg-rose-900/80 text-rose-100 px-2 py-1 rounded">
-        Wind: {err}
-      </div>
-    );
-  }
   return null;
 }
