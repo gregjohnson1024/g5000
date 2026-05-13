@@ -19,30 +19,28 @@ export interface LiveBoatMarkerProps {
   flyToOnFirstFix?: boolean;
   /** Notified on every position event so the page can render live values. */
   onUpdate?: (p: LivePos) => void;
-  /** Max points retained in the trail. Default 600 — at 1 Hz that's 10 min. */
-  trailLength?: number;
 }
 
 const TRAIL_SOURCE_ID = 'live-trail';
 const TRAIL_LAYER_ID = 'live-trail-layer';
 
 /**
- * Subscribes to `/api/live/position` (SSE proxied from the autopilot-server)
- * and renders a triangle marker on the map at the boat's latest position.
- * The marker rotates to match COG when COG is available.
- *
- * Re-renders cheaply — no React state for the marker itself, the maplibre
- * marker is mutated directly on each fix to avoid re-creating DOM nodes.
+ * Trail strategy: hydrate from `/api/tracks/active` on mount (so a page
+ * reload preserves the breadcrumb across all of the active recording),
+ * then append live `/api/live/position` fixes on top. A
+ * `BroadcastChannel('tracks')` listener triggers a re-fetch when the
+ * /tracks page interrupts the active recording, so the chart drops the
+ * previous breadcrumb and starts a fresh line for the new track.
  */
 export function LiveBoatMarker({
   map,
   flyToOnFirstFix = true,
   onUpdate,
-  trailLength = 600,
 }: LiveBoatMarkerProps) {
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const flownRef = useRef<boolean>(false);
   const trailRef = useRef<Array<[number, number]>>([]);
+  const activeTrackIdRef = useRef<string | null>(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
@@ -61,9 +59,6 @@ export function LiveBoatMarker({
     const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
     markerRef.current = marker;
 
-    // Ensure the trail source/layer exists. The map's `load` event may have
-    // already fired by the time this effect runs (HMR / late attach), so
-    // check synchronously and only register a listener if not yet loaded.
     const ensureTrailLayer = (): void => {
       if (map.getSource(TRAIL_SOURCE_ID)) return;
       map.addSource(TRAIL_SOURCE_ID, {
@@ -95,6 +90,37 @@ export function LiveBoatMarker({
       });
     };
 
+    // Hydrate from the active track on disk. Replaces the prior in-memory
+    // ring-buffer behavior so reloading the chart doesn't lose history.
+    const hydrate = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/tracks/active', { cache: 'no-store' });
+        const j = await r.json();
+        if (!j.ok || !j.track) return;
+        activeTrackIdRef.current = j.track.id;
+        trailRef.current = (j.track.points as Array<{ lat: number; lon: number }>).map(
+          (p) => [p.lon, p.lat] as [number, number],
+        );
+        updateTrail();
+      } catch {
+        /* server may not be ready — fall back to live-only appending */
+      }
+    };
+    void hydrate();
+
+    // Re-hydrate when /tracks page interrupts the active recording.
+    const bc =
+      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('tracks') : null;
+    bc?.addEventListener('message', (e) => {
+      const m = e.data as { kind?: string } | null;
+      if (m?.kind === 'interrupted') {
+        // Drop the old breadcrumb, start a fresh line, then hydrate.
+        trailRef.current = [];
+        updateTrail();
+        void hydrate();
+      }
+    });
+
     const es = new EventSource('/api/live/position');
     es.onmessage = (e) => {
       try {
@@ -105,16 +131,14 @@ export function LiveBoatMarker({
         if (typeof p.cog === 'number') {
           marker.setRotation((p.cog * 180) / Math.PI);
         }
-        // Trail: only push if moved noticeably to avoid duplicate points
-        // when the boat is anchored / drifting under 1 m between fixes.
+        // Append to in-memory trail. The server-side recorder writes its
+        // own down-sampled copy to disk; we don't reach back to /api/tracks
+        // on every fix. On reload, hydrate() picks up the persisted copy.
         const last = trailRef.current[trailRef.current.length - 1];
         const moved =
           !last || Math.abs(last[0] - p.lon) > 1e-5 || Math.abs(last[1] - p.lat) > 1e-5;
         if (moved) {
           trailRef.current.push([p.lon, p.lat]);
-          if (trailRef.current.length > trailLength) {
-            trailRef.current.splice(0, trailRef.current.length - trailLength);
-          }
           updateTrail();
         }
         if (!flownRef.current && flyToOnFirstFix) {
@@ -129,16 +153,16 @@ export function LiveBoatMarker({
 
     return () => {
       es.close();
+      bc?.close();
       try {
         marker.remove();
       } catch {
         /* map already torn down */
       }
       markerRef.current = null;
-      // Layers not removed — parent Map.remove() handles full teardown.
       trailRef.current = [];
     };
-  }, [map, flyToOnFirstFix, trailLength]);
+  }, [map, flyToOnFirstFix]);
 
   return null;
 }

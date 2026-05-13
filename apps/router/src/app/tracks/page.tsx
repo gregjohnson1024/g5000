@@ -82,6 +82,12 @@ export default function TracksPage() {
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error?.message ?? 'interrupt failed');
+      // Tell /chart's trail to drop the old breadcrumb and reload.
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('tracks');
+        bc.postMessage({ kind: 'interrupted', at: Date.now() });
+        bc.close();
+      }
       await reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
