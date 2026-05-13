@@ -33,6 +33,7 @@ const NMEA0183_PATHS = (process.env.NMEA0183_PATHS ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter((s) => s.length > 0);
+const NMEA0183_BAUD = Number(process.env.NMEA0183_BAUD ?? 4800);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
 const REPLAY_MODE: 'asap' | 'realtime' = process.env.REPLAY_MODE === 'asap' ? 'asap' : 'realtime';
@@ -130,7 +131,7 @@ async function main(): Promise<void> {
         try {
           const port = new SerialPort({
             path: p183,
-            baudRate: 4800,
+            baudRate: NMEA0183_BAUD,
             autoOpen: false,
           });
           await new Promise<void>((resolve, reject) => {

@@ -90,7 +90,12 @@ export async function runWgrib2(gribPath: string): Promise<Grib2JsonMessage[]> {
   // We use this rather than -V because the verbose format embeds the variable
   // name in a free-text description (e.g. "UGRD U-Component of Wind [m/s]")
   // that's awkward to parse.
-  const inv = await spawnText('wgrib2', [gribPath]);
+  //
+  // Binary location: defaults to `wgrib2` on PATH. Set the WGRIB2_PATH env var
+  // to override (useful when wgrib2 is installed in a micromamba env or other
+  // non-PATH location).
+  const wgrib2 = process.env.WGRIB2_PATH ?? 'wgrib2';
+  const inv = await spawnText(wgrib2, [gribPath]);
   const messages: Grib2JsonMessage[] = [];
 
   for (const rawLine of inv.split(/\r?\n/)) {
@@ -124,7 +129,7 @@ export async function runWgrib2(gribPath: string): Promise<Grib2JsonMessage[]> {
 
     // Dump this message's grid + values via -csv. Pass `-inv /dev/null` so
     // wgrib2 doesn't prepend its inventory text to the CSV stream.
-    const csv = await spawnText('wgrib2', [
+    const csv = await spawnText(wgrib2, [
       gribPath,
       '-inv',
       '/dev/null',
