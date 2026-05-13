@@ -6,12 +6,14 @@ import { StatusBadge } from '../components/StatusBadge';
 import { PlanControls, type PlanRequest } from '../components/PlanControls';
 import { attachRoute } from '../components/RoutePolyline';
 import { RouteTimeline } from '../components/RouteTimeline';
+import { LiveBoatMarker } from '../components/LiveBoatMarker';
 import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
 
 export default function HomePage() {
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
   const [loading, setLoading] = useState(false);
@@ -76,8 +78,12 @@ export default function HomePage() {
         center={{ lat: 35, lon: -70 }}
         zoom={4}
         onClick={onMapClick}
-        onLoad={(m) => { mapRef.current = m; }}
+        onLoad={(m) => {
+          mapRef.current = m;
+          setMapInstance(m);
+        }}
       />
+      <LiveBoatMarker map={mapInstance} />
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <StatusBadge />
         <div className="text-xs text-slate-400 space-y-1">

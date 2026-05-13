@@ -42,21 +42,29 @@ export async function GET(): Promise<Response> {
 
   const stream = new ReadableStream({
     start(controller) {
-      const channelMap: Record<string, keyof typeof latest> = {
-        'gps.position.lat': 'lat',
-        'gps.position.lon': 'lon',
-        'gps.position.sog': 'sog',
-        'gps.position.cog': 'cog',
-      };
-
-      for (const [channel, key] of Object.entries(channelMap)) {
-        unsubs.push(
-          bus.subscribe(channel, (s: Sample) => {
-            if (s.value.kind !== 'scalar') return;
-            latest[key] = s.value.value;
-          }),
-        );
-      }
+      // Position is `nav.gps.position` (kind: 'geo' with { lat, lon }).
+      // COG / SOG are scalars on `nav.gps.cog` / `nav.gps.sog`. (The earlier
+      // `gps.position.{lat,lon,...}` flat-scalar layout was replaced when
+      // the channel-mapper landed.)
+      unsubs.push(
+        bus.subscribe('nav.gps.position', (s: Sample) => {
+          if (s.value.kind !== 'geo') return;
+          latest.lat = s.value.value.lat;
+          latest.lon = s.value.value.lon;
+        }),
+      );
+      unsubs.push(
+        bus.subscribe('nav.gps.cog', (s: Sample) => {
+          if (s.value.kind !== 'scalar') return;
+          latest.cog = s.value.value;
+        }),
+      );
+      unsubs.push(
+        bus.subscribe('nav.gps.sog', (s: Sample) => {
+          if (s.value.kind !== 'scalar') return;
+          latest.sog = s.value.value;
+        }),
+      );
 
       const emit = (): void => {
         if (closed) return;
