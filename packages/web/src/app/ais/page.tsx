@@ -48,21 +48,31 @@ function fmtTcpa(seconds: number): string {
 }
 
 /**
- * Lazy-initialised AudioContext + threat-onset detector. Plays a 600 ms 660 Hz
- * tone whenever a target's threat state flips false→true, and re-pulses every
- * 5 s while at least one threat persists. Respects browser autoplay policies
- * by deferring AudioContext creation until first user interaction.
+ * Lazy-initialised AudioContext + continuous klaxon. While any threat is
+ * present (and alarm is enabled), plays a two-tone square-wave klaxon —
+ * 800 Hz / 600 Hz alternating at 4 Hz — through a soft-knee compressor at
+ * near-clipping gain. Stops the moment the threat set goes empty. Respects
+ * browser autoplay policies by deferring AudioContext creation until first
+ * user interaction (the "Arm audio" button).
  */
-function useThreatAudio(threatMmsis: Set<number>, enabled: boolean): { armed: boolean; arm: () => void } {
+function useThreatAudio(
+  threatMmsis: Set<number>,
+  enabled: boolean,
+): { armed: boolean; arm: () => void } {
   const ctxRef = useRef<AudioContext | null>(null);
-  const prevThreatsRef = useRef<Set<number>>(new Set());
-  const lastPulseRef = useRef(0);
+  const klaxonRef = useRef<{
+    osc: OscillatorNode;
+    gain: GainNode;
+    toneTimer: ReturnType<typeof setInterval>;
+  } | null>(null);
   const [armed, setArmed] = useState(false);
 
   const arm = () => {
     if (ctxRef.current) return;
     try {
-      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       ctxRef.current = new Ctor();
       setArmed(true);
     } catch {
@@ -70,49 +80,65 @@ function useThreatAudio(threatMmsis: Set<number>, enabled: boolean): { armed: bo
     }
   };
 
-  const beep = (durationMs: number, frequency: number) => {
+  const startKlaxon = (): void => {
     const ctx = ctxRef.current;
-    if (!ctx) return;
+    if (!ctx || klaxonRef.current) return;
+    // Soft-knee compressor pre-stage so peaks don't clip and average loudness
+    // is pushed up. After compression a master gain at 0.95 is just shy of
+    // clipping; the OS / browser volume control is the final ceiling.
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -10;
+    compressor.knee.value = 6;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.1;
+    const master = ctx.createGain();
+    master.gain.value = 0.95;
     const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = frequency;
-    gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
-    osc.connect(gain).connect(ctx.destination);
+    osc.type = 'square'; // harsher than sine → louder perceived volume
+    osc.frequency.value = 800;
+    osc.connect(compressor).connect(master).connect(ctx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + durationMs / 1000 + 0.05);
+    // Two-tone alternation: 800 / 600 Hz at 4 Hz (125 ms per tone). Browser
+    // setInterval has 4–10 ms jitter — fine for a klaxon.
+    let toggle = false;
+    const toneTimer = setInterval(() => {
+      toggle = !toggle;
+      osc.frequency.setValueAtTime(toggle ? 600 : 800, ctx.currentTime);
+    }, 125);
+    klaxonRef.current = { osc, gain: master, toneTimer };
+  };
+
+  const stopKlaxon = (): void => {
+    const k = klaxonRef.current;
+    if (!k) return;
+    clearInterval(k.toneTimer);
+    try {
+      k.osc.stop();
+      k.osc.disconnect();
+      k.gain.disconnect();
+    } catch {
+      /* already stopped */
+    }
+    klaxonRef.current = null;
   };
 
   useEffect(() => {
     if (!enabled || !ctxRef.current) {
-      prevThreatsRef.current = new Set(threatMmsis);
+      stopKlaxon();
       return;
     }
-    // Edge: any MMSI in the current set that wasn't in the previous → new threat
-    let newThreatFired = false;
-    for (const m of threatMmsis) {
-      if (!prevThreatsRef.current.has(m)) {
-        beep(600, 660);
-        beep(600, 880); // second harmonic for a more "alarm-y" sound — staggered by 0.05s of stop overhead
-        newThreatFired = true;
-        break;
-      }
+    if (threatMmsis.size > 0) {
+      startKlaxon();
+    } else {
+      stopKlaxon();
     }
-    // Sustained alarm: re-pulse every 5 s while threats persist (only if we
-    // didn't just fire an onset beep above).
-    if (!newThreatFired && threatMmsis.size > 0) {
-      const now = performance.now();
-      if (now - lastPulseRef.current > 5000) {
-        beep(250, 660);
-        lastPulseRef.current = now;
-      }
-    } else if (newThreatFired) {
-      lastPulseRef.current = performance.now();
-    }
-    prevThreatsRef.current = new Set(threatMmsis);
   }, [threatMmsis, enabled]);
+
+  // Cleanup on unmount — otherwise the klaxon survives a hot reload.
+  useEffect(() => {
+    return () => stopKlaxon();
+  }, []);
 
   return { armed, arm };
 }
