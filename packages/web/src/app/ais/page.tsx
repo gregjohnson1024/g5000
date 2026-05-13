@@ -8,7 +8,7 @@ import { useSse } from '../../hooks/use-sse';
 const NM = 1852;
 const MS_TO_KN = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
-const RANGE_OPTIONS_NM = [1, 2, 4, 8, 16];
+const RANGE_OPTIONS_NM = [1, 2, 4, 8, 15];
 const LEADER_MINUTES = 6;
 const LEADER_SECONDS = LEADER_MINUTES * 60;
 
@@ -121,8 +121,8 @@ export default function ChartPage() {
   const { channels } = useSse();
   const [targets, setTargets] = useState<AisTarget[]>([]);
   const [alarmConfig, setAlarmConfig] = useState<AisAlarmConfig>(DEFAULT_ALARM);
-  const [rangeNm, setRangeNm] = useState(4);
-  const [northUp, setNorthUp] = useState(false);
+  const [rangeNm, setRangeNm] = useState(15);
+  const [northUp, setNorthUp] = useState(true);
   const [selectedMmsi, setSelectedMmsi] = useState<number | null>(null);
   const [showAlarmEdit, setShowAlarmEdit] = useState(false);
   const [draftCpaNm, setDraftCpaNm] = useState(1);
@@ -243,7 +243,7 @@ export default function ChartPage() {
   return (
     <main className="p-4 max-w-7xl mx-auto text-slate-100">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h1 className="text-2xl font-semibold">Chart</h1>
+        <h1 className="text-2xl font-semibold">AIS</h1>
         <div className="flex gap-3 items-center text-sm font-mono flex-wrap">
           <label className="text-slate-300">
             Range:&nbsp;

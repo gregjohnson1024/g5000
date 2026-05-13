@@ -30,7 +30,7 @@ export async function GET(): Promise<Response> {
 
   // Apply source-priority rules so a blocked source (or non-winning source)
   // never sneaks into our derived position/HDG. The /api/stream feed has
-  // the same logic — keeping them in lockstep means /helm and /chart see
+  // the same logic — keeping them in lockstep means /helm and /ais see
   // the same selected sources.
   let currentRules: SourcePriorityConfig = [];
   const ruleSub = configStore.sourcePriority$.subscribe((r) => {

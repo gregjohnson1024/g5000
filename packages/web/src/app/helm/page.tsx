@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JsonSafeSample } from '@g5000/core';
 import type { SailWardrobe } from '@g5000/db';
 import { useSse } from '../../hooks/use-sse';
@@ -8,6 +8,7 @@ import { HelmTile } from './HelmTile';
 
 const MS_TO_KNOTS = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
+const AVG_WINDOW_MS = 30 * 60 * 1000;
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
@@ -100,6 +101,34 @@ export default function HelmPage() {
   const heel = channels.get('motion.heel');
   const pitch = channels.get('motion.pitch');
 
+  // Rolling 30-min average SOG. Buffer holds raw m/s samples keyed by
+  // server-stamped t_ms; we prune-then-append on every new SOG event. Resets
+  // when the page reloads (no server persistence) — sub-label shows the
+  // actual window covered so a fresh page doesn't claim a 30-min average it
+  // hasn't earned yet.
+  const sogBufferRef = useRef<Array<{ t: number; v: number }>>([]);
+  const [avgSog, setAvgSog] = useState<{ ms: number; coveredMs: number } | null>(null);
+  const sogTms = sog?.t_ms;
+  const sogScalar = scalar(sog);
+  useEffect(() => {
+    if (sogTms === undefined || sogScalar === null) return;
+    const buf = sogBufferRef.current;
+    buf.push({ t: sogTms, v: sogScalar });
+    const cutoff = sogTms - AVG_WINDOW_MS;
+    let drop = 0;
+    while (drop < buf.length) {
+      const head = buf[drop];
+      if (head === undefined || head.t >= cutoff) break;
+      drop++;
+    }
+    if (drop > 0) buf.splice(0, drop);
+    const head = buf[0];
+    if (!head) return;
+    let sum = 0;
+    for (const s of buf) sum += s.v;
+    setAvgSog({ ms: sum / buf.length, coveredMs: sogTms - head.t });
+  }, [sogTms, sogScalar]);
+
   return (
     <main className="p-4 min-h-screen bg-black">
       <div className="flex items-center justify-between mb-4">
@@ -148,6 +177,20 @@ export default function HelmPage() {
           value={fmtHeadingRad(hdgValueRad)}
           unit="°"
           sub={hdgRef ?? undefined}
+        />
+
+        <HelmTile
+          label="Avg SOG"
+          value={avgSog ? (avgSog.ms * MS_TO_KNOTS).toFixed(1) : '—'}
+          unit="kn"
+          sub={
+            avgSog
+              ? avgSog.coveredMs >= AVG_WINDOW_MS - 1000
+                ? '30 min'
+                : `${Math.max(1, Math.round(avgSog.coveredMs / 60000))} min so far`
+              : '30 min'
+          }
+          small
         />
 
         <HelmTile label="Heel" value={fmtAngleSigned(heel)} unit="°" small />

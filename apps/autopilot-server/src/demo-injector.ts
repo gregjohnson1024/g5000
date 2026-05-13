@@ -8,7 +8,7 @@ const M_PER_DEG_LAT = 111_320;
 
 // Own-boat home position — Ottawa-ish so the synthetic AIS targets have
 // realistic lat/lon values. Anything plausible would work; this is purely
-// cosmetic for the /chart page.
+// cosmetic for the /ais page.
 const OWN_LAT = 45.0;
 const OWN_LON = -75.0;
 
@@ -108,13 +108,13 @@ function advance(target: SyntheticTarget, dtSeconds: number, originLat: number):
 
 /**
  * Periodically publish synthetic wind/boat/motion samples to the shared bus.
- * Used for bench-side visual validation of /helm, /polars, /chart, capture
+ * Used for bench-side visual validation of /helm, /polars, /ais, capture
  * wizards, etc. when no real boat hardware is available. The values aren't
  * physically consistent — TWS/TWA/BSP just oscillate independently — but
  * they're plausible enough to demo the UI.
  *
  * Also populates the shared AIS targets registry with 3 synthetic vessels
- * that dead-reckon forward each tick, so /chart shows meaningful traffic.
+ * that dead-reckon forward each tick, so /ais shows meaningful traffic.
  */
 export function startDemoInjector(bus: Bus): () => void {
   const startedAt = Date.now();
@@ -183,7 +183,7 @@ export function startDemoInjector(bus: Bus): () => void {
     pub('motion.yaw', hdg, 'rad');
     pub('motion.rateOfTurn', 0.01, 'rad/s');
 
-    // Own-boat position as a geo sample. /chart needs this for CPA math.
+    // Own-boat position as a geo sample. /ais needs this for CPA math.
     bus.publish({
       channel: 'nav.gps.position',
       t_ns: now_ns,
@@ -193,7 +193,7 @@ export function startDemoInjector(bus: Bus): () => void {
 
     // Advance the synthetic AIS targets and upsert into the registry. The
     // SAILBOAT NEAR target stays in CPA-alarm range for the first few minutes
-    // of the demo so the /chart alarm UI shows a threat right away.
+    // of the demo so the /ais alarm UI shows a threat right away.
     for (const target of targets) {
       advance(target, dt, ownLat);
       aisRegistry.upsert({
