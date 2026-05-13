@@ -363,17 +363,19 @@ export function WindOverlay({
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
+        // step expression: step(input, base, threshold1, output1, threshold2, output2, …)
+        // The thresholds MUST be literal numbers (not computed expressions),
+        // and they come BEFORE their corresponding outputs.
         const stepArgs: (string | number)[] = [];
-        for (const [thr, col] of FILL_STOPS) {
-          stepArgs.push(col, thr);
+        for (let i = 1; i < FILL_STOPS.length; i++) {
+          const stop = FILL_STOPS[i]!;
+          stepArgs.push(stop[0], stop[1]);
         }
-        // step expression: step(input, base, stop1, color1, stop2, color2, …)
-        // We provide base = first color; pairs of (threshold, color) follow.
         const stepExpr: maplibregl.DataDrivenPropertyValueSpecification<string> = [
           'step',
           ['get', 'speed'],
           FILL_STOPS[0]![1],
-          ...stepArgs.slice(2),
+          ...stepArgs,
         ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>;
         map.addLayer({
           id: LAYER_FILL,
@@ -489,11 +491,18 @@ export function WindOverlay({
   useEffect(() => {
     if (!map) return;
     return () => {
+      const safe = (op: () => void): void => {
+        try {
+          op();
+        } catch {
+          /* map / style already torn down */
+        }
+      };
       for (const id of [LAYER_FILL, LAYER_BARB_LINE, LAYER_BARB_PENNANT, LAYER_ISOBAR_LINE]) {
-        if (map.getLayer(id)) map.removeLayer(id);
+        safe(() => map.getLayer(id) && map.removeLayer(id));
       }
       for (const id of [SRC_FILL, SRC_BARBS, SRC_ISOBARS]) {
-        if (map.getSource(id)) map.removeSource(id);
+        safe(() => map.getSource(id) && map.removeSource(id));
       }
     };
   }, [map]);

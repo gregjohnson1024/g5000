@@ -138,10 +138,17 @@ export function CogExtension({
   useEffect(() => {
     if (!map) return;
     return () => {
-      if (map.getLayer(LAYER_LABELS)) map.removeLayer(LAYER_LABELS);
-      if (map.getLayer(LAYER_TICKS)) map.removeLayer(LAYER_TICKS);
-      if (map.getLayer(LAYER_LINE)) map.removeLayer(LAYER_LINE);
-      if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      const safe = (op: () => void): void => {
+        try {
+          op();
+        } catch {
+          /* map / style already torn down */
+        }
+      };
+      safe(() => map.getLayer(LAYER_LABELS) && map.removeLayer(LAYER_LABELS));
+      safe(() => map.getLayer(LAYER_TICKS) && map.removeLayer(LAYER_TICKS));
+      safe(() => map.getLayer(LAYER_LINE) && map.removeLayer(LAYER_LINE));
+      safe(() => map.getSource(SOURCE_ID) && map.removeSource(SOURCE_ID));
     };
   }, [map]);
 
