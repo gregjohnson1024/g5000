@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 
-interface LivePos {
+export interface LivePos {
   lat: number;
   lon: number;
   cog: number | null;
@@ -15,7 +15,14 @@ export interface LiveBoatMarkerProps {
   map: maplibregl.Map | null;
   /** When true, flies the map to the boat on first fix. Default true. */
   flyToOnFirstFix?: boolean;
+  /** Notified on every position event so the page can render live values. */
+  onUpdate?: (p: LivePos) => void;
+  /** Max points retained in the trail. Default 600 — at 1 Hz that's 10 min. */
+  trailLength?: number;
 }
+
+const TRAIL_SOURCE_ID = 'live-trail';
+const TRAIL_LAYER_ID = 'live-trail-layer';
 
 /**
  * Subscribes to `/api/live/position` (SSE proxied from the autopilot-server)
@@ -25,15 +32,21 @@ export interface LiveBoatMarkerProps {
  * Re-renders cheaply — no React state for the marker itself, the maplibre
  * marker is mutated directly on each fix to avoid re-creating DOM nodes.
  */
-export function LiveBoatMarker({ map, flyToOnFirstFix = true }: LiveBoatMarkerProps) {
+export function LiveBoatMarker({
+  map,
+  flyToOnFirstFix = true,
+  onUpdate,
+  trailLength = 600,
+}: LiveBoatMarkerProps) {
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const flownRef = useRef<boolean>(false);
+  const trailRef = useRef<Array<[number, number]>>([]);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
   useEffect(() => {
     if (!map) return;
 
-    // Build a small svg triangle pointing up (north). We rotate the marker
-    // to match COG when fixes carry it.
     const el = document.createElement('div');
     el.style.width = '20px';
     el.style.height = '20px';
@@ -46,6 +59,40 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true }: LiveBoatMarkerPr
     const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
     markerRef.current = marker;
 
+    // Ensure the trail source/layer exists. The map's `load` event may have
+    // already fired by the time this effect runs (HMR / late attach), so
+    // check synchronously and only register a listener if not yet loaded.
+    const ensureTrailLayer = (): void => {
+      if (map.getSource(TRAIL_SOURCE_ID)) return;
+      map.addSource(TRAIL_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} },
+      });
+      map.addLayer({
+        id: TRAIL_LAYER_ID,
+        type: 'line',
+        source: TRAIL_SOURCE_ID,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#fbbf24',
+          'line-width': 2,
+          'line-opacity': 0.7,
+        },
+      });
+    };
+    if (map.isStyleLoaded()) ensureTrailLayer();
+    else map.once('load', ensureTrailLayer);
+
+    const updateTrail = (): void => {
+      const src = map.getSource(TRAIL_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+      if (!src) return;
+      src.setData({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: trailRef.current },
+        properties: {},
+      });
+    };
+
     const es = new EventSource('/api/live/position');
     es.onmessage = (e) => {
       try {
@@ -56,10 +103,23 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true }: LiveBoatMarkerPr
         if (typeof p.cog === 'number') {
           marker.setRotation((p.cog * 180) / Math.PI);
         }
+        // Trail: only push if moved noticeably to avoid duplicate points
+        // when the boat is anchored / drifting under 1 m between fixes.
+        const last = trailRef.current[trailRef.current.length - 1];
+        const moved =
+          !last || Math.abs(last[0] - p.lon) > 1e-5 || Math.abs(last[1] - p.lat) > 1e-5;
+        if (moved) {
+          trailRef.current.push([p.lon, p.lat]);
+          if (trailRef.current.length > trailLength) {
+            trailRef.current.splice(0, trailRef.current.length - trailLength);
+          }
+          updateTrail();
+        }
         if (!flownRef.current && flyToOnFirstFix) {
           flownRef.current = true;
           map.flyTo({ center: [p.lon, p.lat], zoom: 9, speed: 1.2 });
         }
+        onUpdateRef.current?.(p);
       } catch {
         /* ignore parse errors */
       }
@@ -69,8 +129,11 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true }: LiveBoatMarkerPr
       es.close();
       marker.remove();
       markerRef.current = null;
+      if (map.getLayer(TRAIL_LAYER_ID)) map.removeLayer(TRAIL_LAYER_ID);
+      if (map.getSource(TRAIL_SOURCE_ID)) map.removeSource(TRAIL_SOURCE_ID);
+      trailRef.current = [];
     };
-  }, [map, flyToOnFirstFix]);
+  }, [map, flyToOnFirstFix, trailLength]);
 
   return null;
 }

@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { PlanControls, type PlanRequest } from '../components/PlanControls';
 import { attachRoute } from '../components/RoutePolyline';
 import { RouteTimeline } from '../components/RouteTimeline';
-import { LiveBoatMarker } from '../components/LiveBoatMarker';
+import { LiveBoatMarker, type LivePos } from '../components/LiveBoatMarker';
 import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
@@ -14,6 +14,7 @@ type Pos = { lat: number; lon: number };
 export default function HomePage() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
+  const [livePos, setLivePos] = useState<LivePos | null>(null);
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
   const [loading, setLoading] = useState(false);
@@ -83,9 +84,10 @@ export default function HomePage() {
           setMapInstance(m);
         }}
       />
-      <LiveBoatMarker map={mapInstance} />
+      <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <StatusBadge />
+        <LiveValues p={livePos} />
         <div className="text-xs text-slate-400 space-y-1">
           <div>Start: {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}</div>
           <div>End:   {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}</div>
@@ -113,5 +115,34 @@ export default function HomePage() {
         {route && <RouteTimeline route={route} />}
       </aside>
     </main>
+  );
+}
+
+function LiveValues({ p }: { p: LivePos | null }) {
+  if (!p) {
+    return <div className="text-xs text-slate-500">Waiting for live fix…</div>;
+  }
+  const MS_TO_KN = 1 / 0.514444;
+  const RAD_TO_DEG = 180 / Math.PI;
+  const fmtCoord = (deg: number, axis: 'lat' | 'lon'): string => {
+    const hemi = deg >= 0 ? (axis === 'lat' ? 'N' : 'E') : axis === 'lat' ? 'S' : 'W';
+    const abs = Math.abs(deg);
+    const d = Math.floor(abs);
+    const m = (abs - d) * 60;
+    return `${d}° ${m.toFixed(3)}' ${hemi}`;
+  };
+  const cogDeg = typeof p.cog === 'number' ? ((p.cog * RAD_TO_DEG) % 360 + 360) % 360 : null;
+  const sogKn = typeof p.sog === 'number' ? p.sog * MS_TO_KN : null;
+  return (
+    <div className="text-xs space-y-0.5 bg-slate-900/60 border border-slate-800 rounded p-2">
+      <div className="font-mono text-slate-200">{fmtCoord(p.lat, 'lat')}</div>
+      <div className="font-mono text-slate-200">{fmtCoord(p.lon, 'lon')}</div>
+      <div className="text-slate-400">
+        SOG: <span className="text-slate-200 font-mono">{sogKn !== null ? `${sogKn.toFixed(1)} kn` : '—'}</span>
+      </div>
+      <div className="text-slate-400">
+        COG: <span className="text-slate-200 font-mono">{cogDeg !== null ? `${cogDeg.toFixed(0)}° T` : '—'}</span>
+      </div>
+    </div>
   );
 }
