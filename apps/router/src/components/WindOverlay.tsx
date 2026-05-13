@@ -90,13 +90,13 @@ export function WindOverlay({
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
-  // Fetch ONLY when refreshKey changes. Center/hours/model are read at
-  // fetch time but don't auto-trigger — the user decides when to refresh.
+  // Fetch ONLY when refreshKey changes; cached-only by default so /chart
+  // never triggers a fresh download itself. Use the /forecast tab for that.
   useEffect(() => {
     if (centerLat === null || centerLon === null) return;
-    if (refreshKey === 0) return; // initial mount, wait for first user-triggered refresh
+    if (refreshKey === 0) return;
     let cancelled = false;
-    const url = `/api/wind?model=${model}&lat=${centerLat.toFixed(2)}&lon=${centerLon.toFixed(2)}&hours=${hours}&radius=${radius}`;
+    const url = `/api/wind?model=${model}&lat=${centerLat.toFixed(2)}&lon=${centerLon.toFixed(2)}&hours=${hours}&radius=${radius}&cached=1`;
     fetch(url)
       .then((r) => r.json())
       .then((j) => {

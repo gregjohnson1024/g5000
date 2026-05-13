@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../components/Map';
 import { StatusBadge } from '../components/StatusBadge';
@@ -22,10 +22,15 @@ export default function HomePage() {
   const [windModel, setWindModel] = useState<WindModel>('gfs');
   const [windOn, setWindOn] = useState(true);
   const [windOpacity, setWindOpacity] = useState(0.85);
-  const [windRefreshKey, setWindRefreshKey] = useState(0);
+  // Bumped automatically whenever the user moves the timeline / model so the
+  // chart re-reads from the cache. Fetching itself happens on /forecast.
+  const [windRefreshKey, setWindRefreshKey] = useState(1);
   const [windGrid, setWindGrid] = useState<WindGrid | null>(null);
   const [windStatus, setWindStatus] = useState<string | null>(null);
-  const [windBusy, setWindBusy] = useState(false);
+  const [availableHours, setAvailableHours] = useState<{ gfs: number[]; ecmwf: number[] }>({
+    gfs: [],
+    ecmwf: [],
+  });
   const [cogExtOn, setCogExtOn] = useState(true);
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
@@ -34,6 +39,43 @@ export default function HomePage() {
   const [error, setError] = useState<string | undefined>();
   const [savedMsg, setSavedMsg] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+
+  // Poll the manifest so the chart's model picker + timeline reflect what's
+  // currently cached on the server. Refresh every 30 s.
+  useEffect(() => {
+    let alive = true;
+    const tick = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/forecast/manifest', { cache: 'no-store' });
+        const j = await r.json();
+        if (!alive || !j.ok) return;
+        const gfs = new Set<number>();
+        const ecmwf = new Set<number>();
+        for (const e of j.entries as Array<{ model: 'gfs' | 'ecmwf'; forecastHour: number }>) {
+          (e.model === 'gfs' ? gfs : ecmwf).add(e.forecastHour);
+        }
+        setAvailableHours({
+          gfs: [...gfs].sort((a, b) => a - b),
+          ecmwf: [...ecmwf].sort((a, b) => a - b),
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), 30_000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  // When the manifest changes or timeline moves, bump refreshKey so the
+  // overlay re-reads from the cache.
+  useEffect(() => {
+    if (livePos === null) return;
+    setWindRefreshKey((k) => k + 1);
+  }, [windModel, windHours, livePos?.lat, livePos?.lon, availableHours]);
 
   const onMapClick = (p: Pos) => {
     if (!start) setStart(p);
@@ -110,16 +152,13 @@ export default function HomePage() {
           opacity={windOpacity}
           refreshKey={windRefreshKey}
           onLoaded={({ grid, identical, error }) => {
-            setWindBusy(false);
             if (error) {
-              setWindStatus(`Error: ${error}`);
-            } else if (identical) {
-              setWindStatus('No change — already showing this run');
+              setWindStatus(`Not cached: ${error}`);
             } else if (grid) {
               setWindGrid(grid);
-              setWindStatus('Updated');
+              if (identical) setWindStatus(null);
             }
-            setTimeout(() => setWindStatus(null), 4000);
+            if (windStatus) setTimeout(() => setWindStatus(null), 4000);
           }}
         />
         {livePos && (
@@ -164,23 +203,54 @@ export default function HomePage() {
                 onChange={(e) => setWindModel(e.target.value as WindModel)}
                 className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200"
               >
-                <option value="gfs">GFS (NOAA)</option>
-                <option value="ecmwf">ECMWF</option>
+                <option value="gfs" disabled={availableHours.gfs.length === 0}>
+                  GFS{availableHours.gfs.length ? '' : ' (no cache)'}
+                </option>
+                <option value="ecmwf" disabled={availableHours.ecmwf.length === 0}>
+                  ECMWF{availableHours.ecmwf.length ? '' : ' (no cache)'}
+                </option>
               </select>
             </label>
           </div>
-          <label className="block text-xs text-slate-400">
-            +{windHours} h forecast
-            <input
-              type="range"
-              min={0}
-              max={120}
-              step={3}
-              value={windHours}
-              onChange={(e) => setWindHours(Number(e.target.value))}
-              className="block w-full"
-            />
-          </label>
+          {(() => {
+            const list = availableHours[windModel];
+            if (list.length === 0) {
+              return (
+                <div className="text-xs text-amber-300">
+                  No {windModel.toUpperCase()} forecast cached. Visit{' '}
+                  <a href="/forecast" className="underline">
+                    Forecast
+                  </a>
+                  .
+                </div>
+              );
+            }
+            return (
+              <label className="block text-xs text-slate-400">
+                +{windHours} h forecast
+                <input
+                  type="range"
+                  min={list[0]}
+                  max={list[list.length - 1]}
+                  step={1}
+                  value={windHours}
+                  onChange={(e) => {
+                    // Snap the slider to the nearest cached hour.
+                    const v = Number(e.target.value);
+                    const nearest = list.reduce(
+                      (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
+                      list[0]!,
+                    );
+                    setWindHours(nearest);
+                  }}
+                  className="block w-full"
+                />
+                <span className="font-mono text-slate-500">
+                  cached: {list.map((h) => `+${h}h`).join(', ')}
+                </span>
+              </label>
+            );
+          })()}
           <label className="block text-xs text-slate-400">
             Opacity {Math.round(windOpacity * 100)}%
             <input
@@ -193,21 +263,9 @@ export default function HomePage() {
               className="block w-full"
             />
           </label>
-          <button
-            type="button"
-            onClick={() => {
-              setWindBusy(true);
-              setWindStatus('Fetching…');
-              setWindRefreshKey((k) => k + 1);
-            }}
-            disabled={windBusy || livePos === null}
-            className="w-full px-2 py-1 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-slate-900 disabled:text-slate-400 text-sm rounded"
-          >
-            {windBusy ? 'Fetching…' : 'Get forecast'}
-          </button>
           {windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
-              <div>Model: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>
+              <div>Showing: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>
               <div>Run: <span className="text-slate-200 font-mono">{new Date(windGrid.runAt * 1000).toISOString().slice(0, 16).replace('T', ' ')}Z</span></div>
               <div>Valid: <span className="text-slate-200 font-mono">{new Date(windGrid.validAt * 1000).toISOString().slice(0, 16).replace('T', ' ')}Z</span> (+{windGrid.forecastHour}h)</div>
             </div>

@@ -18,6 +18,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Link href="/" className="text-slate-300 hover:text-amber-200">
             Chart
           </Link>
+          <Link href="/forecast" className="text-slate-300 hover:text-amber-200">
+            Forecast
+          </Link>
           <Link href="/waypoints" className="text-slate-300 hover:text-amber-200">
             Waypoints
           </Link>

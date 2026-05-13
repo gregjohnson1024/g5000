@@ -9,10 +9,13 @@ import {
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Process-level cache: model run + bbox + forecast hour → grid.
-// Caches per server-lifetime; restart to refresh.
-const cache = new Map<string, { at: number; grid: WindGrid }>();
+// Process-level cache: model + bbox + forecast hour → grid.
+// Caches per server-lifetime; restart to refresh. Exported so the
+// /api/forecast/* routes can read + write the same cache.
+export const cache = new Map<string, { at: number; grid: WindGrid }>();
 const TTL_MS = 30 * 60 * 1000; // 30 min
+
+export { bboxKey };
 
 function bboxKey(model: WindModel, b: Bbox, fh: number): string {
   return `${model}|${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;
@@ -54,11 +57,18 @@ export async function GET(req: Request): Promise<Response> {
     lonMin: lon - radius,
     lonMax: lon + radius,
   };
+  const cachedOnly = url.searchParams.get('cached') === '1';
   const key = bboxKey(model, bbox, fh);
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && now - cached.at < TTL_MS) {
     return Response.json({ ok: true, grid: cached.grid, cached: true });
+  }
+  if (cachedOnly) {
+    return Response.json(
+      { ok: false, error: { message: 'not in cache; fetch via /forecast tab' } },
+      { status: 404 },
+    );
   }
   try {
     const grid =
