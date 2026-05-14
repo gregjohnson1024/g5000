@@ -35,6 +35,10 @@ export default function HomePage() {
     gfs: [],
     ecmwf: [],
   });
+  const [latestRunAt, setLatestRunAt] = useState<{ gfs: number | null; ecmwf: number | null }>({
+    gfs: null,
+    ecmwf: null,
+  });
   const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
   const [showIsochrones, setShowIsochrones] = useState(true);
   const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'RTOFS'>('GFS');
@@ -102,13 +106,18 @@ export default function HomePage() {
         if (!alive || !j.ok) return;
         const gfs = new Set<number>();
         const ecmwf = new Set<number>();
-        for (const e of j.entries as Array<{ model: 'gfs' | 'ecmwf'; forecastHour: number }>) {
+        let gfsRun: number | null = null;
+        let ecmwfRun: number | null = null;
+        for (const e of j.entries as Array<{ model: 'gfs' | 'ecmwf'; forecastHour: number; runAt: number }>) {
           (e.model === 'gfs' ? gfs : ecmwf).add(e.forecastHour);
+          if (e.model === 'gfs') gfsRun = Math.max(gfsRun ?? 0, e.runAt);
+          else ecmwfRun = Math.max(ecmwfRun ?? 0, e.runAt);
         }
         setAvailableHours({
           gfs: [...gfs].sort((a, b) => a - b),
           ecmwf: [...ecmwf].sort((a, b) => a - b),
         });
+        setLatestRunAt({ gfs: gfsRun, ecmwf: ecmwfRun });
       } catch {
         /* ignore */
       }
@@ -355,8 +364,8 @@ export default function HomePage() {
             </div>
           )}
           {(() => {
-            const list = availableHours[windModel];
-            if (list.length === 0) {
+            const fullList = availableHours[windModel];
+            if (fullList.length === 0) {
               return (
                 <div className="text-xs text-amber-300">
                   No {windModel.toUpperCase()} forecast cached. Visit{' '}
@@ -367,9 +376,25 @@ export default function HomePage() {
                 </div>
               );
             }
+            // Filter out forecast hours whose valid time is in the past.
+            // Slider always starts at "now" (or the first cached hour
+            // that's still useful). Falls back to the full list if we
+            // don't yet know the run time.
+            const runAt = latestRunAt[windModel];
+            const nowS = Date.now() / 1000;
+            const list = runAt
+              ? fullList.filter((h) => runAt + h * 3600 >= nowS - 1800) // 30 min grace
+              : fullList;
+            if (list.length === 0) {
+              return (
+                <div className="text-xs text-amber-300">
+                  {windModel.toUpperCase()} forecast cache is stale (all
+                  valid times in the past). Refresh on{' '}
+                  <a href="/forecast" className="underline">Forecast</a>.
+                </div>
+              );
+            }
             const idx = list.indexOf(windHours);
-            // If the current slider hour isn't in this model's cache, snap
-            // to the nearest one as we render.
             const effectiveIdx = idx >= 0 ? idx : 0;
             const effectiveHours = list[effectiveIdx]!;
             if (effectiveHours !== windHours) {
@@ -381,6 +406,22 @@ export default function HomePage() {
             const goNext = (): void => {
               if (effectiveIdx < list.length - 1) setWindHours(list[effectiveIdx + 1]!);
             };
+            // Label: single UTC convention — "Valid HH:MMZ DD MMM" with
+            // a relative "(in N h)" so it's clear where we are on the
+            // timeline. Replaces the old "+X h forecast" which mixed
+            // run-relative with neither timezone.
+            let label = `+${effectiveHours}h`;
+            if (runAt) {
+              const validAt = new Date((runAt + effectiveHours * 3600) * 1000);
+              const utcLabel = `${String(validAt.getUTCHours()).padStart(2, '0')}:${String(validAt.getUTCMinutes()).padStart(2, '0')}Z ${String(validAt.getUTCDate()).padStart(2, '0')} ${validAt.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`;
+              const hoursFromNow = (runAt + effectiveHours * 3600 - nowS) / 3600;
+              const rel = Math.abs(hoursFromNow) < 0.5
+                ? 'now'
+                : hoursFromNow < 0
+                ? `${Math.round(-hoursFromNow)}h ago`
+                : `in ${Math.round(hoursFromNow)}h`;
+              label = `${utcLabel} (${rel})`;
+            }
             return (
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -394,7 +435,7 @@ export default function HomePage() {
                     ←
                   </button>
                   <span className="text-xs text-slate-400 font-mono flex-1 text-center">
-                    +{effectiveHours} h forecast
+                    {label}
                   </span>
                   <button
                     type="button"
