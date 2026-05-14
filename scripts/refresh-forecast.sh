@@ -15,8 +15,16 @@
 set -euo pipefail
 
 HOST=${HOST:-http://localhost:3000}
-HOURS=${HOURS:-"[0,6,12,24,48]"}
 MODELS=${MODELS:-'["gfs","ecmwf"]'}
+
+# Hard-coded 3-h cadence out to 168 h (7 days). Native resolutions:
+#   - GFS 0.25°: 1 h to +120 h, then 3 h to +384 h.
+#   - ECMWF IFS 0p25: 3 h to +144 h, then 6 h to +240 h.
+# Sampling at 3 h keeps both happy and matches the timer cadence so each
+# wall-clock tick is the same density. 57 snapshots × ~50 KB Range fetch ≈
+# 3 MB per model per tick.
+HOURS=$(seq 0 3 168 | tr '\n' ',' | sed 's/,$//')
+HOURS="[$HOURS]"
 
 # Default bbox: covers a generous North-Atlantic operating area. Used only
 # if Settings has no forecastBbox yet.

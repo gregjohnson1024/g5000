@@ -9,6 +9,11 @@ After=g5000-autopilot.service network-online.target
 [Service]
 Type=oneshot
 User=greg
-ExecStart=/home/greg/autopilot/scripts/refresh-forecast.sh
+# Invoke via `bash` rather than directly, so the script doesn't need
+# the executable bit. rsync over Tailscale strips +x bits from synced
+# files, which used to cause this service to fail with EXEC=203 after
+# every deploy. `bash` reads the file as plain text — permission bits
+# on the script itself don't matter.
+ExecStart=/usr/bin/bash /home/greg/autopilot/scripts/refresh-forecast.sh
 StandardOutput=journal
 StandardError=journal

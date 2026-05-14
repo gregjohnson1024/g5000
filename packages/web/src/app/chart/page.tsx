@@ -24,10 +24,6 @@ export default function HomePage() {
   const [windHours, setWindHours] = useState(0);
   const [windModel, setWindModel] = useState<WindModel>('gfs');
   const [windOn, setWindOn] = useState(true);
-  const [windOpacity, setWindOpacity] = useState(0.5);
-  const [showFill, setShowFill] = useState(true);
-  const [showBarbs, setShowBarbs] = useState(true);
-  const [showIsobars, setShowIsobars] = useState(true);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -37,7 +33,37 @@ export default function HomePage() {
     gfs: [],
     ecmwf: [],
   });
-  const [cogExtOn, setCogExtOn] = useState(true);
+  const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
+
+  const saveRoiFromView = async (): Promise<void> => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = map.getBounds();
+    const bbox = {
+      latMin: b.getSouth(),
+      latMax: b.getNorth(),
+      lonMin: b.getWest(),
+      lonMax: b.getEast(),
+    };
+    try {
+      const r = await fetch('/api/settings');
+      const prev = (await r.json())?.settings ?? {};
+      const next = { ...prev, forecastBbox: bbox };
+      const put = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      if (!put.ok) throw new Error(`HTTP ${put.status}`);
+      setRoiSaveStatus(
+        `ROI saved: ${bbox.latMin.toFixed(1)}–${bbox.latMax.toFixed(1)}°N, ` +
+          `${Math.abs(bbox.lonMax).toFixed(1)}–${Math.abs(bbox.lonMin).toFixed(1)}°W`,
+      );
+    } catch (e) {
+      setRoiSaveStatus(`save failed: ${String(e)}`);
+    }
+    setTimeout(() => setRoiSaveStatus(null), 4000);
+  };
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
   const [waypoints, setWaypoints] = useState<Array<{ id: string; name: string; lat: number; lon: number }>>([]);
@@ -174,7 +200,7 @@ export default function HomePage() {
           }}
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
-        <CogExtension map={mapInstance} p={livePos} hidden={!cogExtOn} />
+        <CogExtension map={mapInstance} p={livePos} hidden={false} />
         <AisTargets map={mapInstance} />
         <WindOverlay
           map={mapInstance}
@@ -183,10 +209,10 @@ export default function HomePage() {
           model={windModel}
           hours={windHours}
           hidden={!windOn}
-          opacity={windOpacity}
-          showFill={showFill}
-          showBarbs={showBarbs}
-          showIsobars={showIsobars}
+          opacity={0.5}
+          showFill={true}
+          showBarbs={true}
+          showIsobars={true}
           refreshKey={windRefreshKey}
           onLoaded={({ grid, identical, error }) => {
             if (error) {
@@ -198,24 +224,39 @@ export default function HomePage() {
             if (windStatus) setTimeout(() => setWindStatus(null), 4000);
           }}
         />
-        {livePos && (
+        <div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
+          {livePos && (
+            <button
+              type="button"
+              onClick={() => {
+                if (mapRef.current) {
+                  mapRef.current.flyTo({
+                    center: [livePos.lon, livePos.lat],
+                    zoom: Math.max(mapRef.current.getZoom(), 9),
+                    speed: 1.4,
+                  });
+                }
+              }}
+              className="px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
+              title="Pan map to boat's current position"
+            >
+              ⊕ Center on boat
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => {
-              if (mapRef.current) {
-                mapRef.current.flyTo({
-                  center: [livePos.lon, livePos.lat],
-                  zoom: Math.max(mapRef.current.getZoom(), 9),
-                  speed: 1.4,
-                });
-              }
-            }}
-            className="absolute top-3 left-3 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
-            title="Pan map to boat's current position"
+            onClick={() => void saveRoiFromView()}
+            className="px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
+            title="Save current map view as the forecast refresh ROI (picked up by the 3 h timer on the Pi)"
           >
-            ⊕ Center on boat
+            ▣ Save view as ROI
           </button>
-        )}
+          {roiSaveStatus && (
+            <div className="px-2 py-1 bg-slate-900/85 border border-slate-700 text-slate-300 text-xs rounded shadow font-mono">
+              {roiSaveStatus}
+            </div>
+          )}
+        </div>
       </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <StatusBadge />
@@ -317,50 +358,9 @@ export default function HomePage() {
                   }}
                   className="block w-full"
                 />
-                <span className="text-xs font-mono text-slate-500">
-                  cached: {list.map((h) => `+${h}h`).join(', ')}
-                </span>
               </div>
             );
           })()}
-          <label className="block text-xs text-slate-400">
-            Fill opacity {Math.round(windOpacity * 100)}%
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={windOpacity}
-              onChange={(e) => setWindOpacity(Number(e.target.value))}
-              className="block w-full"
-            />
-          </label>
-          <div className="flex gap-3 text-xs flex-wrap">
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={showFill}
-                onChange={(e) => setShowFill(e.target.checked)}
-              />
-              <span className="text-slate-300">speed fill</span>
-            </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={showBarbs}
-                onChange={(e) => setShowBarbs(e.target.checked)}
-              />
-              <span className="text-slate-300">barbs</span>
-            </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={showIsobars}
-                onChange={(e) => setShowIsobars(e.target.checked)}
-              />
-              <span className="text-slate-300">isobars</span>
-            </label>
-          </div>
           {windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
               <div>Showing: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>
@@ -371,19 +371,6 @@ export default function HomePage() {
           {windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
           )}
-        </div>
-        <div className="space-y-1 bg-slate-900/60 border border-slate-800 rounded p-2">
-          <label className="flex items-center justify-between text-sm">
-            <span className="text-slate-400">COG extension (120 min)</span>
-            <input
-              type="checkbox"
-              checked={cogExtOn}
-              onChange={(e) => setCogExtOn(e.target.checked)}
-            />
-          </label>
-          <p className="text-xs text-slate-500">
-            Dashed violet line ahead of the boat with 30/60/90/120 min ticks at the current SOG.
-          </p>
         </div>
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
           <div className="space-y-1">

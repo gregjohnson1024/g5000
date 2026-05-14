@@ -35,7 +35,10 @@ interface FetchResult {
   error?: string;
 }
 
-const DEFAULT_HOURS = [0, 6, 12, 24, 36, 48, 72];
+// Fixed forecast hours: every 3 h out to 168 h (7 days). Matches the
+// systemd timer's refresh-forecast.sh, so the manual "Refresh now" button
+// fetches the same set as the periodic background refresh.
+const FORECAST_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
 
 function fmtUtc(unix: number): string {
   return new Date(unix * 1000).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
@@ -72,9 +75,6 @@ export default function ForecastPage() {
   const [roi, setRoi] = useState<{ latMin: number; latMax: number; lonMin: number; lonMax: number }>(
     { latMin: 30, latMax: 40, lonMin: -75, lonMax: -65 },
   );
-  const [gfsOn, setGfsOn] = useState(true);
-  const [ecmwfOn, setEcmwfOn] = useState(true);
-  const [hours, setHours] = useState<number[]>(DEFAULT_HOURS);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<FetchResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -125,22 +125,7 @@ export default function ForecastPage() {
     });
   };
 
-  const toggleHour = (h: number): void => {
-    setHours((prev) => (prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h].sort((a, b) => a - b)));
-  };
-
   const runFetch = async (): Promise<void> => {
-    const models: WindModel[] = [];
-    if (gfsOn) models.push('gfs');
-    if (ecmwfOn) models.push('ecmwf');
-    if (models.length === 0) {
-      setErr('Select at least one model');
-      return;
-    }
-    if (hours.length === 0) {
-      setErr('Select at least one forecast hour');
-      return;
-    }
     setErr(null);
     setBusy(true);
     setResults(null);
@@ -148,7 +133,11 @@ export default function ForecastPage() {
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bbox: roi, models, hours }),
+        body: JSON.stringify({
+          bbox: roi,
+          models: ['gfs', 'ecmwf'] as WindModel[],
+          hours: FORECAST_HOURS,
+        }),
       });
       const j = (await r.json()) as { ok: boolean; results: FetchResult[]; error?: { message: string } };
       if (!j.ok) {
@@ -259,46 +248,22 @@ export default function ForecastPage() {
       </section>
 
       <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
-        <h2 className="text-base font-semibold">Models &amp; forecast hours</h2>
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={gfsOn} onChange={(e) => setGfsOn(e.target.checked)} />
-            <span>GFS (NOAA, 0.25°, 1 h cadence)</span>
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={ecmwfOn} onChange={(e) => setEcmwfOn(e.target.checked)} />
-            <span>ECMWF (IFS Open Data, 0.25°, 3 h cadence)</span>
-          </label>
-        </div>
-        <div className="flex gap-2 flex-wrap text-sm">
-          <span className="text-slate-400">Hours:</span>
-          {[0, 3, 6, 12, 18, 24, 36, 48, 60, 72, 96, 120].map((h) => (
-            <label
-              key={h}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                hours.includes(h)
-                  ? 'bg-amber-600 text-slate-900'
-                  : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={hours.includes(h)}
-                onChange={() => toggleHour(h)}
-                className="hidden"
-              />
-              +{h}h
-            </label>
-          ))}
-        </div>
+        <h2 className="text-base font-semibold">Refresh forecast cache</h2>
+        <p className="text-xs text-slate-500">
+          Fetches GFS + ECMWF for the ROI above, every 3 h out to +168 h
+          (57 snapshots/model). The Pi runs the same refresh on a 3 h timer
+          in the background; this button just lets you trigger one out of
+          band. Partial 404s (ECMWF when its run hasn&apos;t published yet)
+          are normal.
+        </p>
         <button
           onClick={() => void runFetch()}
           disabled={busy}
           className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded text-sm font-medium disabled:opacity-50"
         >
           {busy
-            ? `Fetching ${(gfsOn ? 1 : 0) + (ecmwfOn ? 1 : 0)} model × ${hours.length} hours…`
-            : 'Fetch all'}
+            ? `Fetching 2 models × ${FORECAST_HOURS.length} hours…`
+            : 'Refresh now'}
         </button>
       </section>
 
