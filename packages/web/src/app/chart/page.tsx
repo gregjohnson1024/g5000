@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
@@ -20,13 +20,26 @@ import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
 
-export default function HomePage() {
+export default function ChartPage() {
+  // Next.js requires useSearchParams() to be wrapped in a Suspense boundary
+  // because the search params can suspend during static prerender. This
+  // wrapper satisfies that requirement; ChartPageInner does the real work.
+  return (
+    <Suspense fallback={null}>
+      <ChartPageInner />
+    </Suspense>
+  );
+}
+
+function ChartPageInner() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [livePos, setLivePos] = useState<LivePos | null>(null);
   const [windHours, setWindHours] = useState(0);
   const [windModel, setWindModel] = useState<WindModel>('gfs');
-  const [windOn, setWindOn] = useState(true);
+  // Default off — at the user's request. Wind overlay is heavy and most
+  // helm-time looks don't need it; toggle on when checking conditions.
+  const [windOn, setWindOn] = useState(false);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -41,7 +54,9 @@ export default function HomePage() {
     ecmwf: null,
   });
   const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
-  const [showIsochrones, setShowIsochrones] = useState(true);
+  // Default off — at the user's request. Isochrones add chart clutter and
+  // are mostly useful when actively investigating a planned route's fan-out.
+  const [showIsochrones, setShowIsochrones] = useState(false);
   const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'RTOFS'>('GFS');
 
   const saveRoiFromView = async (): Promise<void> => {
