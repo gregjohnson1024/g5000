@@ -291,12 +291,18 @@ function AlertsPanel(): ReactElement | null {
     };
   }, []);
 
-  // Surface only alerts that aren't already in a resolved state. The
-  // bridge keeps the snapshot around briefly after Acknowledge so the
-  // helmsman can see the transition; once the issuer's re-emission
-  // settles state to 'Normal' or the entry ages out, it disappears.
+  // Surface only alerts that aren't already in a resolved state AND
+  // are still actively transmitting. Navico proprietary alerts have no
+  // ack/cleared PGN we can rely on — the issuer just stops sending the
+  // 130850 frames when the helmsman silences the alarm at the MFD. So
+  // if we haven't seen a refresh in the last 5 seconds, consider it
+  // cleared by the operator and hide the panel.
+  const now = Date.now();
   const visible = alerts.filter(
-    (a) => a.state !== 'Normal' && a.state !== 'Disabled',
+    (a) =>
+      a.state !== 'Normal' &&
+      a.state !== 'Disabled' &&
+      now - a.lastSeenMs < 5000,
   );
   if (visible.length === 0) return null;
 

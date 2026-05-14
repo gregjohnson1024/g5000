@@ -67,14 +67,20 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
       }),
     );
 
-    // Alerts path: PGN 126983 (Alert) and 126985 (Alert Text) feed a
-    // shared registry keyed by (src, system, sub-system, id, occurrence).
-    // /api/alerts reads from there; the helm UI's Acknowledge button
-    // round-trips through to send PGN 126984 back to the issuer.
+    // Alerts path: standard 126983/126985 plus Navico's proprietary
+    // 130850 (Simnet Event Command: AP command) — B&G/Lowrance gear
+    // doesn't follow the N2K alert protocol, so we treat
+    // non-standard Event IDs on 130850 as synthetic alarms. /api/alerts
+    // reads from the shared registry; the helm UI's Clear button
+    // either sends 126984 for standard alerts or just removes the
+    // local snapshot for synthetic ones (Navico doesn't speak
+    // Alert Response).
     subs.push(
       decoded$.subscribe({
         next: (pgn) => {
-          if (pgn.pgn === 126983 || pgn.pgn === 126985) handleAlertPgn(pgn);
+          if (pgn.pgn === 126983 || pgn.pgn === 126985 || pgn.pgn === 130850) {
+            handleAlertPgn(pgn);
+          }
         },
         error: (err) => {
           // eslint-disable-next-line no-console

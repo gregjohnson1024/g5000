@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdtemp, writeFile, rm, readdir, readFile, mkdir } from 'node:fs/promises';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { pickEcmwfRun } from '@g5000/grib';
 
@@ -57,9 +57,88 @@ async function fetchEcmwfMessagesS3(opts: {
 
 export type WindModel = 'gfs' | 'ecmwf';
 
-// Shared in-memory wind cache. Owned here so both /api/wind and
-// /api/forecast/* + the routing planner can read/write the same map.
-export const windCache = new Map<string, { at: number; grid: WindGrid }>();
+// Persistent on-disk wind cache. Survives autopilot restarts so a planner
+// can use yesterday's forecast immediately without re-fetching from
+// NOMADS / S3. Entries hydrate on module load (eager) and write through
+// on every `set`. The original Map is wrapped so existing callers like
+// `cache.set(key, {at, grid})` and `cache.get(key)` keep working with no
+// changes — disk persistence is a side-effect.
+const WIND_CACHE_DIR = join(
+  process.env.G5000_ROUTER_ROOT ?? join(homedir(), '.g5000-router'),
+  'wind-cache',
+);
+
+interface CacheEntry { at: number; grid: WindGrid }
+
+class PersistentWindCache {
+  private mem = new Map<string, CacheEntry>();
+
+  get(key: string): CacheEntry | undefined { return this.mem.get(key); }
+  has(key: string): boolean { return this.mem.has(key); }
+  get size(): number { return this.mem.size; }
+  delete(key: string): boolean { return this.mem.delete(key); }
+  clear(): void { this.mem.clear(); }
+  entries(): IterableIterator<[string, CacheEntry]> { return this.mem.entries(); }
+  values(): IterableIterator<CacheEntry> { return this.mem.values(); }
+  keys(): IterableIterator<string> { return this.mem.keys(); }
+  [Symbol.iterator](): IterableIterator<[string, CacheEntry]> { return this.mem[Symbol.iterator](); }
+
+  set(key: string, entry: CacheEntry): this {
+    this.mem.set(key, entry);
+    void this.persist(key, entry);
+    return this;
+  }
+
+  private async persist(key: string, entry: CacheEntry): Promise<void> {
+    try {
+      await mkdir(WIND_CACHE_DIR, { recursive: true });
+      // Sanitise the key for the filesystem: pipes → underscores.
+      const file = join(WIND_CACHE_DIR, key.replace(/\|/g, '_').replace(/[^\w.\-_]/g, '_') + '.json');
+      await writeFile(file, JSON.stringify(entry));
+    } catch {
+      /* disk full or perm denied — in-memory still works */
+    }
+  }
+
+  async hydrate(): Promise<number> {
+    try {
+      const files = await readdir(WIND_CACHE_DIR);
+      let loaded = 0;
+      for (const f of files) {
+        if (!f.endsWith('.json')) continue;
+        try {
+          const raw = await readFile(join(WIND_CACHE_DIR, f), 'utf8');
+          const entry = JSON.parse(raw) as CacheEntry;
+          if (!entry?.grid?.model) continue;
+          // Reverse the filename sanitisation. The pipes were the only
+          // multi-char escape we did; everything else was already
+          // filename-safe.
+          const g = entry.grid;
+          const k = `${g.model}|${g.forecastHour}|${g.lats[0]!.toFixed(2)}|${g.lats[g.lats.length-1]!.toFixed(2)}|${g.lons[0]!.toFixed(2)}|${g.lons[g.lons.length-1]!.toFixed(2)}`;
+          this.mem.set(k, entry);
+          loaded++;
+        } catch {
+          /* one bad file shouldn't sink the rest */
+        }
+      }
+      return loaded;
+    } catch {
+      return 0;
+    }
+  }
+}
+
+export const windCache = new PersistentWindCache();
+// Fire-and-forget hydrate on module load. Routes that touch the cache
+// in the first few seconds after boot might miss disk entries; the
+// hydrate finishes long before the boat's helmsman opens a tab.
+void (async () => {
+  const n = await windCache.hydrate();
+  if (n > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[wind-cache] hydrated ${n} grid(s) from ${WIND_CACHE_DIR}`);
+  }
+})();
 
 export function bboxKey(model: WindModel, b: Bbox, fh: number): string {
   return `${model}|${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;

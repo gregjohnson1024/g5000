@@ -31,7 +31,11 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
         sources: {
           osm: {
             type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            // Same-origin tile proxy backed by an on-disk cache under
+            // ${G5000_ROUTER_ROOT}/tile-cache. First view of a tile fetches
+            // from openstreetmap.org and writes to disk; subsequent views
+            // never hit the network. Survives autopilot restarts.
+            tiles: ['/api/tiles/{z}/{x}/{y}.png'],
             tileSize: 256,
             attribution: '© OpenStreetMap contributors',
           },
