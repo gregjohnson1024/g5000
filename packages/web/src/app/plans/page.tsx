@@ -28,7 +28,7 @@ export default async function PlansPage() {
       <ul className="divide-y divide-slate-800">
         {items.map((p) => (
           <li key={p.id} className="py-2 flex justify-between">
-            <Link href={`/?plan=${p.id}`} className="text-emerald-400">
+            <Link href={`/chart?plan=${p.id}`} className="text-emerald-400">
               {p.name}
             </Link>
             <span className="text-xs text-slate-500">

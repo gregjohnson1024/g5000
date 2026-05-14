@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -192,13 +193,56 @@ export default function HomePage() {
     }
   }, [route, restored]);
 
+  // Refs declared up here because they're shared between the load-from-URL
+  // effect (just below) and the auto-preselect effects (further down).
+  const didAutoSetStartRef = useRef(false);
+  const didAutoSetEndRef = useRef(false);
+
+  // Load a saved plan via the ?plan=<id> URL param so /plans → click name
+  // takes you to the chart with that route already overlaid. Runs once
+  // when the param is present.
+  const searchParams = useSearchParams();
+  const planIdFromUrl = searchParams.get('plan');
+  const loadedPlanRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!planIdFromUrl || loadedPlanRef.current === planIdFromUrl) return;
+    loadedPlanRef.current = planIdFromUrl;
+    void (async () => {
+      try {
+        const r = await fetch(`/api/plans/${planIdFromUrl}`, { cache: 'no-store' });
+        const j = (await r.json()) as
+          | { ok: true; plan: { route: Route } }
+          | { ok: false; error?: { message?: string } };
+        if (!j.ok) {
+          setError(j.error?.message ?? 'plan not found');
+          return;
+        }
+        setRoute(j.plan.route);
+        // Seed start/end from the route's first/last leg so the markers
+        // on the chart reflect where this plan actually goes.
+        const legs = j.plan.route.legs;
+        if (legs.length > 0) {
+          const first = legs[0]!;
+          const last = legs[legs.length - 1]!;
+          setStart({ lat: first.lat, lon: first.lon });
+          setEnd({ lat: last.lat, lon: last.lon });
+          // Mark auto-set as done so live-position drift doesn't replace
+          // the start we just loaded from the plan.
+          didAutoSetStartRef.current = true;
+          didAutoSetEndRef.current = true;
+        }
+      } catch (e) {
+        setError(String(e));
+      }
+    })();
+  }, [planIdFromUrl]);
+
   // Auto-preselect on page mount: start = current boat position, end =
   // Bristol Marine. Done once each (via refs) so subsequent live-position
   // updates don't drag the start pin, and clearing the X on either marker
   // sticks — the user's manual choice wins for the rest of this mount. Also
   // gated on `restored` and skipped if the value was already restored from
   // localStorage so we don't stomp a saved selection.
-  const didAutoSetStartRef = useRef(false);
   useEffect(() => {
     if (!restored || didAutoSetStartRef.current) return;
     if (start !== undefined) {
@@ -209,7 +253,6 @@ export default function HomePage() {
     setStart({ lat: livePos.lat, lon: livePos.lon });
     didAutoSetStartRef.current = true;
   }, [livePos, restored, start]);
-  const didAutoSetEndRef = useRef(false);
   useEffect(() => {
     if (!restored || didAutoSetEndRef.current) return;
     if (end !== undefined) {
@@ -632,6 +675,20 @@ export default function HomePage() {
           </div>
         </div>
         <PlanControls start={start} end={end} onPlan={onPlan} loading={loading} />
+        <SavedPlanLoader
+          onLoad={(plan) => {
+            setRoute(plan.route);
+            const legs = plan.route.legs;
+            if (legs.length > 0) {
+              const first = legs[0]!;
+              const last = legs[legs.length - 1]!;
+              setStart({ lat: first.lat, lon: first.lon });
+              setEnd({ lat: last.lat, lon: last.lon });
+              didAutoSetStartRef.current = true;
+              didAutoSetEndRef.current = true;
+            }
+          }}
+        />
         {error && <div className="text-rose-400 text-xs">{error}</div>}
         {route && (
           <div className="text-xs text-slate-300">
@@ -689,6 +746,77 @@ function LiveValues({ p }: { p: LivePos | null }) {
       <div className="text-slate-400">
         HDG: <span className="text-slate-200 font-mono">{hdgDeg !== null ? `${hdgDeg.toFixed(0)}° T` : '—'}</span>
       </div>
+    </div>
+  );
+}
+
+interface PlanRecord {
+  id: string;
+  name: string;
+  createdAt: number;
+  route: Route;
+}
+
+/**
+ * Dropdown of saved plans. Selecting one fetches the full plan and calls
+ * `onLoad` so the parent can install the route + start/end markers on
+ * the map. Reads from /api/plans on mount and refreshes on focus.
+ */
+function SavedPlanLoader({ onLoad }: { onLoad: (plan: PlanRecord) => void }) {
+  const [items, setItems] = useState<PlanRecord[]>([]);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
+  const refresh = (): void => {
+    void fetch('/api/plans', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; items?: PlanRecord[] }) => {
+        if (j.ok && Array.isArray(j.items)) setItems(j.items.sort((a, b) => b.createdAt - a.createdAt));
+      })
+      .catch(() => {
+        /* ignore */
+      });
+  };
+  useEffect(() => {
+    refresh();
+    const onFocus = (): void => refresh();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+  const handleSelect = async (id: string): Promise<void> => {
+    if (!id) return;
+    setLoadingPlanId(id);
+    try {
+      const r = await fetch(`/api/plans/${id}`, { cache: 'no-store' });
+      const j = (await r.json()) as
+        | { ok: true; plan: PlanRecord }
+        | { ok: false; error?: { message?: string } };
+      if (j.ok) onLoad(j.plan);
+    } finally {
+      setLoadingPlanId(null);
+    }
+  };
+  if (items.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs text-slate-400">
+        Load saved plan
+        <select
+          value=""
+          disabled={loadingPlanId !== null}
+          onChange={(e) => {
+            const id = e.currentTarget.value;
+            e.currentTarget.value = '';
+            void handleSelect(id);
+          }}
+          className="block w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 mt-1 text-slate-200 disabled:opacity-50"
+        >
+          <option value="">— pick a saved plan —</option>
+          {items.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} · {(p.route.distance / 1852).toFixed(0)} NM
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }
