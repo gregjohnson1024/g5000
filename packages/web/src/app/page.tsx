@@ -1,14 +1,11 @@
-export default function Home() {
-  return (
-    <main className="p-6 space-y-2">
-      <h1 className="text-2xl font-semibold">G5000</h1>
-      <p className="text-slate-400">
-        Performance instrument processor. See{' '}
-        <a className="underline" href="/inspect">
-          /inspect
-        </a>{' '}
-        for live channel data.
-      </p>
-    </main>
-  );
+import { redirect } from 'next/navigation';
+
+/**
+ * Home (`/`) is just a redirect to `/helm`. The helm is the primary view
+ * for active passages — wanting the boat's live values on landing matches
+ * how the app actually gets used. /helm stays as a canonical URL so
+ * existing bookmarks keep working.
+ */
+export default function Home(): never {
+  redirect('/helm');
 }
