@@ -1,5 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
+import {
+  fmtTimestamp,
+  parseDatetimeLocalInput,
+  toDatetimeLocalInput,
+  type TzMode,
+} from '../lib/tz';
 
 export interface PlanRequest {
   start: { lat: number; lon: number };
@@ -20,11 +26,19 @@ export function PlanControls(props: {
   end?: { lat: number; lon: number };
   onPlan: (req: PlanRequest) => void;
   loading: boolean;
+  /** Page-level timezone display preference. Controls how the Departure
+   *  picker labels itself and how its input string is interpreted. */
+  tz: TzMode;
 }) {
+  const tz = props.tz;
   const [model, setModel] = useState<'GFS' | 'ECMWF'>('GFS');
-  const [departure, setDeparture] = useState<string>(
-    new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
+  // Departure is stored as an absolute UNIX-seconds anchor; the displayed
+  // string is derived from anchor + tz, so flipping the toggle preserves
+  // the moment in time rather than the wallclock typed.
+  const [departureAnchor, setDepartureAnchor] = useState<number>(
+    () => Date.now() / 1000 + 3600,
   );
+  const departureInput = toDatetimeLocalInput(departureAnchor, tz);
   const [useCurrents, setUseCurrents] = useState<boolean>(false);
   // Motor mode + cruise speed (knots). Persisted to localStorage so the
   // user's mode choice survives page reloads. Defaults to motor=true at
@@ -57,7 +71,7 @@ export function PlanControls(props: {
     const polarRes = await fetch('/api/wardrobe/active');
     if (!polarRes.ok) return alert('No polar available (live or cached).');
     const { polar } = await polarRes.json();
-    const t = Math.floor(new Date(departure).getTime() / 1000);
+    const t = Math.floor(departureAnchor);
     if (!props.start || !props.end) return alert('Click start and end on the map first.');
     props.onPlan({
       start: props.start,
@@ -79,13 +93,16 @@ export function PlanControls(props: {
   };
   return (
     <div className="space-y-2">
-      <label className="block text-sm">Departure (UTC)
+      <label className="block text-sm">Departure ({tz === 'utc' ? 'UTC' : 'local'})
         <input
           type="datetime-local"
-          value={departure}
-          onChange={(e) => setDeparture(e.target.value)}
+          value={departureInput}
+          onChange={(e) => setDepartureAnchor(parseDatetimeLocalInput(e.target.value, tz))}
           className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
         />
+        <span className="text-[10px] text-slate-500 font-mono">
+          ≡ {fmtTimestamp(departureAnchor, tz === 'utc' ? 'local' : 'utc')}
+        </span>
       </label>
       <label className="block text-sm">Wind model
         <select

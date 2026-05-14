@@ -16,6 +16,8 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 // pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid, type WindModel } from '../../components/WindOverlay';
 import { CogExtension } from '../../components/CogExtension';
+import { TzToggle } from '../../components/TzToggle';
+import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
@@ -54,6 +56,17 @@ function ChartPageInner() {
     ecmwf: null,
   });
   const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
+  // Page-level Local/UTC toggle for the forecast timeline label and the
+  // Departure picker. Default Local — per user request. Persisted to its
+  // own localStorage key (separate from /passage so each page remembers
+  // independently).
+  const [tz, setTz] = useState<TzMode>('local');
+  useEffect(() => {
+    setTz(readTzMode('chart:tz', 'local'));
+  }, []);
+  useEffect(() => {
+    writeTzMode('chart:tz', tz);
+  }, [tz]);
   // Default off — at the user's request. Isochrones add chart clutter and
   // are mostly useful when actively investigating a planned route's fan-out.
   const [showIsochrones, setShowIsochrones] = useState(false);
@@ -383,7 +396,10 @@ function ChartPageInner() {
         </div>
       </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
-        <StatusBadge />
+        <div className="flex items-center justify-between">
+          <StatusBadge />
+          <TzToggle tz={tz} setTz={setTz} />
+        </div>
         <LiveValues p={livePos} />
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
           <div className="flex items-center justify-between text-sm">
@@ -492,21 +508,20 @@ function ChartPageInner() {
             const goNext = (): void => {
               if (effectiveIdx < list.length - 1) setWindHours(list[effectiveIdx + 1]!);
             };
-            // Label: single UTC convention — "Valid HH:MMZ DD MMM" with
-            // a relative "(in N h)" so it's clear where we are on the
-            // timeline. Replaces the old "+X h forecast" which mixed
-            // run-relative with neither timezone.
+            // Label: "HH:MM[Z] DD MMM (in N h)" — absolute time in the
+            // page's current Local/UTC mode, plus a relative offset so
+            // it's clear where we are on the timeline.
             let label = `+${effectiveHours}h`;
             if (runAt) {
-              const validAt = new Date((runAt + effectiveHours * 3600) * 1000);
-              const utcLabel = `${String(validAt.getUTCHours()).padStart(2, '0')}:${String(validAt.getUTCMinutes()).padStart(2, '0')}Z ${String(validAt.getUTCDate()).padStart(2, '0')} ${validAt.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`;
-              const hoursFromNow = (runAt + effectiveHours * 3600 - nowS) / 3600;
+              const validUnix = runAt + effectiveHours * 3600;
+              const absLabel = fmtHourLabel(validUnix, tz);
+              const hoursFromNow = (validUnix - nowS) / 3600;
               const rel = Math.abs(hoursFromNow) < 0.5
                 ? 'now'
                 : hoursFromNow < 0
                 ? `${Math.round(-hoursFromNow)}h ago`
                 : `in ${Math.round(hoursFromNow)}h`;
-              label = `${utcLabel} (${rel})`;
+              label = `${absLabel} (${rel})`;
             }
             return (
               <div className="space-y-1">
@@ -555,8 +570,8 @@ function ChartPageInner() {
           {windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
               <div>Showing: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>
-              <div>Run: <span className="text-slate-200 font-mono">{new Date(windGrid.runAt * 1000).toISOString().slice(0, 16).replace('T', ' ')}Z</span></div>
-              <div>Valid: <span className="text-slate-200 font-mono">{new Date(windGrid.validAt * 1000).toISOString().slice(0, 16).replace('T', ' ')}Z</span> (+{windGrid.forecastHour}h)</div>
+              <div>Run: <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.runAt, tz)}</span></div>
+              <div>Valid: <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.validAt, tz)}</span> (+{windGrid.forecastHour}h)</div>
             </div>
           )}
           {windStatus && (
@@ -656,7 +671,7 @@ function ChartPageInner() {
             </div>
           </div>
         </div>
-        <PlanControls start={start} end={end} onPlan={onPlan} loading={loading} />
+        <PlanControls start={start} end={end} onPlan={onPlan} loading={loading} tz={tz} />
         <SavedPlanLoader
           onLoad={(plan) => {
             setRoute(plan.route);
@@ -672,7 +687,7 @@ function ChartPageInner() {
         {error && <div className="text-rose-400 text-xs">{error}</div>}
         {route && (
           <div className="text-xs text-slate-300">
-            ETA: {new Date(route.end * 1000).toISOString()}<br />
+            ETA: {fmtHourLabel(route.end, tz)}<br />
             Distance: {(route.distance / 1852).toFixed(0)} NM<br />
             Model: {route.model}{route.incomplete ? ` (incomplete: ${route.reason})` : ''}
           </div>

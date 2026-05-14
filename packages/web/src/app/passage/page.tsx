@@ -1,38 +1,18 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  fmtHourLabel,
+  fmtTimestamp,
+  parseDatetimeLocalInput,
+  readTzMode,
+  toDatetimeLocalInput,
+  writeTzMode,
+  type TzMode,
+} from '../../lib/tz';
+import { TzToggle } from '../../components/TzToggle';
 
 const M_TO_NM = 1 / 1852;
-
-type TzMode = 'utc' | 'local';
 const TZ_KEY = 'passage:tz';
-
-/** Format a UNIX seconds timestamp into the YYYY-MM-DDTHH:MM string a
- *  native `datetime-local` input expects. The "parts" zone is what the
- *  caller wants the user to see / type, not the storage zone. */
-function toDatetimeLocalInput(unixSec: number, tz: TzMode): string {
-  const d = new Date(unixSec * 1000);
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  if (tz === 'utc') {
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-  }
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/** Inverse of {@link toDatetimeLocalInput}: parse the input string under
- *  the user's chosen timezone interpretation, return UNIX seconds. */
-function parseDatetimeLocalInput(s: string, tz: TzMode): number {
-  // Browsers parse `YYYY-MM-DDTHH:MM` as local-time; appending Z forces UTC.
-  return new Date(tz === 'utc' ? `${s}:00Z` : `${s}:00`).getTime() / 1000;
-}
-
-function fmtTimestamp(unixSec: number, tz: TzMode): string {
-  const d = new Date(unixSec * 1000);
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  if (tz === 'utc') {
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}Z`;
-  }
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 interface DistanceStats {
   d1hM: number;
@@ -50,20 +30,6 @@ interface DistanceStats {
     distanceM: number;
     complete: boolean;
   }>;
-}
-
-function fmtHourLabel(unixSec: number, tz: TzMode): string {
-  const d = new Date(unixSec * 1000);
-  if (tz === 'utc') {
-    const hh = String(d.getUTCHours()).padStart(2, '0');
-    const dd = String(d.getUTCDate()).padStart(2, '0');
-    const mon = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
-    return `${hh}:00Z ${dd} ${mon}`;
-  }
-  const hh = String(d.getHours()).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mon = d.toLocaleString('en-GB', { month: 'short' });
-  return `${hh}:00 ${dd} ${mon}`;
 }
 
 function fmtDuration(secs: number): string {
@@ -155,19 +121,10 @@ export default function PassagePage() {
   // persisted to localStorage so the choice sticks across reloads.
   const [tz, setTz] = useState<TzMode>('utc');
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(TZ_KEY);
-      if (raw === 'local' || raw === 'utc') setTz(raw);
-    } catch {
-      /* ignore */
-    }
+    setTz(readTzMode(TZ_KEY, 'utc'));
   }, []);
   useEffect(() => {
-    try {
-      localStorage.setItem(TZ_KEY, tz);
-    } catch {
-      /* ignore */
-    }
+    writeTzMode(TZ_KEY, tz);
   }, [tz]);
 
   useEffect(() => {
@@ -304,34 +261,6 @@ function DailyTile({
       <div className="text-[10px] text-slate-500 font-mono">
         avg {(nm / 24).toFixed(2)} NM/h{bucket.complete ? '' : ' · partial'}
       </div>
-    </div>
-  );
-}
-
-function TzToggle({ tz, setTz }: { tz: TzMode; setTz: (v: TzMode) => void }) {
-  const base = 'px-2 py-1 text-xs font-mono';
-  return (
-    <div
-      role="group"
-      aria-label="Timezone display"
-      className="inline-flex rounded border border-slate-700 overflow-hidden"
-    >
-      <button
-        type="button"
-        onClick={() => setTz('utc')}
-        className={`${base} ${tz === 'utc' ? 'bg-amber-700 text-amber-100' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
-        title="Show and interpret times in UTC"
-      >
-        UTC
-      </button>
-      <button
-        type="button"
-        onClick={() => setTz('local')}
-        className={`${base} ${tz === 'local' ? 'bg-amber-700 text-amber-100' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
-        title="Show and interpret times in this device's local zone"
-      >
-        Local
-      </button>
     </div>
   );
 }
