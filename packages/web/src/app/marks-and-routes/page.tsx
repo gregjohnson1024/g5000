@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { parseCoordinate, parseLatLon, formatCoordinate } from '../../lib/coords';
 
 interface Waypoint {
@@ -11,7 +12,14 @@ interface Waypoint {
   createdAt: string;
 }
 
-export default function WaypointsPage() {
+interface PlanRecord {
+  id: string;
+  name: string;
+  createdAt: number;
+  route: { distance: number; model: string };
+}
+
+export default function MarksAndRoutesPage() {
   const [list, setList] = useState<Waypoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +39,11 @@ export default function WaypointsPage() {
   const [editLonRaw, setEditLonRaw] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
+  // Plans state + reload — same shape as the old /plans page, but rendered
+  // here as a section beneath the waypoints CRUD.
+  const [plans, setPlans] = useState<PlanRecord[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+
   const reload = useCallback(async () => {
     setLoading(true);
     try {
@@ -46,9 +59,37 @@ export default function WaypointsPage() {
     }
   }, []);
 
+  const reloadPlans = useCallback(async () => {
+    setPlansLoading(true);
+    try {
+      const r = await fetch('/api/plans', { cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) {
+        setPlans((j.items as PlanRecord[]).sort((a, b) => b.createdAt - a.createdAt));
+      }
+    } catch {
+      /* leave previous state */
+    } finally {
+      setPlansLoading(false);
+    }
+  }, []);
+
+  const deletePlan = async (id: string, name: string): Promise<void> => {
+    if (!window.confirm(`Delete saved route "${name}"?`)) return;
+    try {
+      const r = await fetch(`/api/plans/${id}`, { method: 'DELETE' });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error?.message ?? 'delete failed');
+      await reloadPlans();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   useEffect(() => {
     void reload();
-  }, [reload]);
+    void reloadPlans();
+  }, [reload, reloadPlans]);
 
   const handleAdd = async (): Promise<void> => {
     setError(null);
@@ -131,7 +172,7 @@ export default function WaypointsPage() {
 
   return (
     <main className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Waypoints</h1>
+      <h1 className="text-2xl font-semibold">Marks &amp; routes</h1>
 
       {error && <p className="text-rose-400 text-sm">{error}</p>}
 
@@ -302,6 +343,40 @@ export default function WaypointsPage() {
             )}
           </tbody>
         </table>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold">Saved routes</h2>
+        {plansLoading && <p className="text-slate-500 text-sm">Loading…</p>}
+        {!plansLoading && plans.length === 0 && (
+          <p className="text-slate-500 text-sm">No saved routes yet.</p>
+        )}
+        {plans.length > 0 && (
+          <ul className="divide-y divide-slate-800">
+            {plans.map((p) => (
+              <li key={p.id} className="py-2 flex items-center justify-between gap-2">
+                <Link
+                  href={`/chart?plan=${p.id}`}
+                  className="text-emerald-400 hover:text-emerald-300 flex-1"
+                >
+                  {p.name}
+                </Link>
+                <span className="text-xs text-slate-500 font-mono">
+                  {p.route.model} · {(p.route.distance / 1852).toFixed(0)} NM ·{' '}
+                  {new Date(p.createdAt * 1000).toISOString().slice(0, 10)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void deletePlan(p.id, p.name)}
+                  className="px-2 py-1 text-xs bg-red-900 hover:bg-red-800 text-red-100 rounded"
+                  title="Delete this saved route"
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
