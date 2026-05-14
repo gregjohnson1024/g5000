@@ -23,6 +23,7 @@ import {
   type OutgoingPgn,
 } from '@g5000/bridge';
 import { startDemoInjector } from './demo-injector.js';
+import { startSogStats } from './sog-stats.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { startHlinkServer } from './hlink/server.js';
@@ -214,6 +215,12 @@ async function main(): Promise<void> {
     const stopCompute = await startTrueWindPipeline({ bus, configStore: store });
     // eslint-disable-next-line no-console
     console.log('[autopilot] true-wind compute pipeline online');
+
+    // Rolling-window SOG stats (15-min mean), served via /api/stats/sog.
+    // Lives here so the buffer survives client navigation — see
+    // src/sog-stats.ts.
+    const sogStats = startSogStats(bus);
+    stops.push(async () => sogStats.stop());
 
     // True-wind TX wiring + device-registry refresh target.
     //   - True-wind TX is NGT-1-only (requires Fast Packet split).

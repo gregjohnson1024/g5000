@@ -8,7 +8,6 @@ import { HelmTile } from './HelmTile';
 
 const MS_TO_KNOTS = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
-const AVG_WINDOW_MS = 15 * 60 * 1000;
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
@@ -126,33 +125,46 @@ export default function HelmPage() {
   const positionLat = position ? fmtLat(position.lat) : null;
   const positionLon = position ? fmtLon(position.lon) : null;
 
-  // Rolling 30-min average SOG. Buffer holds raw m/s samples keyed by
-  // server-stamped t_ms; we prune-then-append on every new SOG event. Resets
-  // when the page reloads (no server persistence) — sub-label shows the
-  // actual window covered so a fresh page doesn't claim a 30-min average it
-  // hasn't earned yet.
-  const sogBufferRef = useRef<Array<{ t: number; v: number }>>([]);
-  const [avgSog, setAvgSog] = useState<{ ms: number; coveredMs: number } | null>(null);
-  const sogTms = sog?.t_ms;
-  const sogScalar = scalar(sog);
+  // Rolling-window SOG mean comes from /api/stats/sog. The autopilot-server
+  // owns the buffer (see apps/autopilot-server/src/sog-stats.ts), so it
+  // survives client navigation — switching tabs doesn't reset the average.
+  // Poll every 2 s; the window is whatever the server reports.
+  const [avgSog, setAvgSog] = useState<{
+    ms: number;
+    coveredMs: number;
+    windowMs: number;
+  } | null>(null);
   useEffect(() => {
-    if (sogTms === undefined || sogScalar === null) return;
-    const buf = sogBufferRef.current;
-    buf.push({ t: sogTms, v: sogScalar });
-    const cutoff = sogTms - AVG_WINDOW_MS;
-    let drop = 0;
-    while (drop < buf.length) {
-      const head = buf[drop];
-      if (head === undefined || head.t >= cutoff) break;
-      drop++;
-    }
-    if (drop > 0) buf.splice(0, drop);
-    const head = buf[0];
-    if (!head) return;
-    let sum = 0;
-    for (const s of buf) sum += s.v;
-    setAvgSog({ ms: sum / buf.length, coveredMs: sogTms - head.t });
-  }, [sogTms, sogScalar]);
+    let cancelled = false;
+    const tick = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/stats/sog', { cache: 'no-store' });
+        if (!r.ok || cancelled) return;
+        const j = (await r.json()) as {
+          ok: boolean;
+          stats?: {
+            avgMs: number | null;
+            coveredMs: number;
+            windowMs: number;
+          };
+        };
+        if (!j.ok || !j.stats || j.stats.avgMs === null) return;
+        setAvgSog({
+          ms: j.stats.avgMs,
+          coveredMs: j.stats.coveredMs,
+          windowMs: j.stats.windowMs,
+        });
+      } catch {
+        /* next tick retries */
+      }
+    };
+    void tick();
+    const id = setInterval(tick, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   return (
     <main className="p-4 min-h-screen bg-black">
@@ -211,8 +223,8 @@ export default function HelmPage() {
           unit="kn"
           sub={
             avgSog
-              ? avgSog.coveredMs >= AVG_WINDOW_MS - 1000
-                ? '15 min'
+              ? avgSog.coveredMs >= avgSog.windowMs - 1000
+                ? `${Math.round(avgSog.windowMs / 60000)} min`
                 : `${Math.max(1, Math.round(avgSog.coveredMs / 60000))} min so far`
               : '15 min'
           }
