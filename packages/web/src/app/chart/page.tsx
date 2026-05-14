@@ -43,16 +43,6 @@ export default function HomePage() {
   const [showIsochrones, setShowIsochrones] = useState(true);
   const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'RTOFS'>('GFS');
 
-  // Toggling isochrones after a route is planned re-attaches the route
-  // with the new flag, which clears or rebuilds the isochrones layer
-  // without needing to re-plan.
-  useEffect(() => {
-    if (route && mapRef.current) {
-      attachRoute(mapRef.current, 'route-gfs', route, '#000000', showIsochrones);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showIsochrones]);
-
   const saveRoiFromView = async (): Promise<void> => {
     const map = mapRef.current;
     if (!map) return;
@@ -90,6 +80,16 @@ export default function HomePage() {
   const [error, setError] = useState<string | undefined>();
   const [savedMsg, setSavedMsg] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
+
+  // Re-attach the route whenever it changes (planned, restored from
+  // localStorage, isochrone-toggle, or map first comes online). attachRoute
+  // is idempotent — same source/layer id just updates the data — so calling
+  // it on each change is cheap.
+  useEffect(() => {
+    if (route && mapInstance) {
+      attachRoute(mapInstance, 'route-gfs', route, '#000000', showIsochrones);
+    }
+  }, [route, mapInstance, showIsochrones]);
 
   // Manifest sync — three triggers, in priority order:
   //   1. BroadcastChannel('forecast-cache') message from the /forecast tab
@@ -160,6 +160,68 @@ export default function HomePage() {
       });
   }, []);
 
+  // Restore the in-progress route from localStorage so navigating to /helm
+  // and back doesn't wipe a freshly-planned route. Intentionally does NOT
+  // restore start/end — the user wants those auto-preselected to the live
+  // boat position and Bristol Marine on every visit (their words: "preselect
+  // ... whenever I come to the chart page"). The route polyline still
+  // renders against the actual lat/lons it was planned with, so a stale
+  // route stays accurate even if the boat has moved since.
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('chart:planState');
+      if (raw) {
+        const saved = JSON.parse(raw) as { route?: Route };
+        if (saved.route) setRoute(saved.route);
+      }
+    } catch {
+      /* corrupt or quota — drop it on the floor */
+    }
+    setRestored(true);
+  }, []);
+
+  // Persist the route. Start/end are deliberately omitted — see comment on
+  // the restore effect above.
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      localStorage.setItem('chart:planState', JSON.stringify({ route }));
+    } catch {
+      /* quota or disabled — silently drop */
+    }
+  }, [route, restored]);
+
+  // Auto-preselect on page mount: start = current boat position, end =
+  // Bristol Marine. Done once each (via refs) so subsequent live-position
+  // updates don't drag the start pin, and clearing the X on either marker
+  // sticks — the user's manual choice wins for the rest of this mount. Also
+  // gated on `restored` and skipped if the value was already restored from
+  // localStorage so we don't stomp a saved selection.
+  const didAutoSetStartRef = useRef(false);
+  useEffect(() => {
+    if (!restored || didAutoSetStartRef.current) return;
+    if (start !== undefined) {
+      didAutoSetStartRef.current = true;
+      return;
+    }
+    if (!livePos) return;
+    setStart({ lat: livePos.lat, lon: livePos.lon });
+    didAutoSetStartRef.current = true;
+  }, [livePos, restored, start]);
+  const didAutoSetEndRef = useRef(false);
+  useEffect(() => {
+    if (!restored || didAutoSetEndRef.current) return;
+    if (end !== undefined) {
+      didAutoSetEndRef.current = true;
+      return;
+    }
+    const bristol = waypoints.find((w) => w.id === 'bristol-marine');
+    if (!bristol) return;
+    setEnd({ lat: bristol.lat, lon: bristol.lon });
+    didAutoSetEndRef.current = true;
+  }, [waypoints, restored, end]);
+
   const onMapClick = (p: Pos) => {
     if (!start) setStart(p);
     else if (!end) setEnd(p);
@@ -181,9 +243,8 @@ export default function HomePage() {
       const j = await res.json();
       if (!j.ok) throw new Error(j.error?.message ?? 'plan failed');
       setRoute(j.route);
-      if (mapRef.current) {
-        attachRoute(mapRef.current, 'route-gfs', j.route, '#000000', showIsochrones);
-      }
+      // attach is handled by the effect on [route, mapInstance,
+      // showIsochrones] above — no need to call it inline here.
     } catch (e) {
       setError(String(e));
     } finally {
