@@ -33,4 +33,20 @@ describe('pruneByBearingBucket', () => {
   it('handles empty input', () => {
     expect(pruneByBearingBucket([], START, 2)).toEqual([]);
   });
+
+  it('does not let A→B→A oscillation inflate the prune metric', () => {
+    // Regression: prune used to bucket-by-bearing and keep the highest
+    // FrontierNode.distFromStart, which is accumulated path length. A node
+    // that bounced A→B→A→B has the same final position as one that took a
+    // single step to A, but a much higher distFromStart — the old prune
+    // wrongly preferred it, producing visible zigzag in real routes.
+    //
+    // Real progress: one step due north to lat 31. distFromStart ≈ 111 km.
+    const realProgress = mk(31, -75, 111_000);
+    // Oscillation: bounced around but ended up at almost the same place
+    // (slightly south, same lon). Accumulated path length is much larger.
+    const oscillation = mk(30.9, -75, 600_000);
+    const kept = pruneByBearingBucket([realProgress, oscillation], START, 2);
+    expect(kept).toEqual([realProgress]);
+  });
 });
