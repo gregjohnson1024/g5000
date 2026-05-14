@@ -39,7 +39,12 @@ const NMEA0183_PATHS = (process.env.NMEA0183_PATHS ?? '')
   .map((s) => s.trim())
   .filter((s) => s.length > 0);
 const NMEA0183_BAUD = Number(process.env.NMEA0183_BAUD ?? 4800);
-const YDWG_HOST = process.env.YDWG_HOST ?? null;
+// Default to Sula's YDWG-02 at 192.168.1.100 — same fixed IP on every
+// vessel network we currently use (documented in the boat-network-map).
+// Override with YDWG_HOST=… for testing or a different boat; set
+// YDWG_HOST=none to disable the driver outright.
+const YDWG_HOST_RAW = process.env.YDWG_HOST ?? '192.168.1.100';
+const YDWG_HOST = YDWG_HOST_RAW === 'none' ? null : YDWG_HOST_RAW;
 const YDWG_PORT = Number(process.env.YDWG_PORT ?? 1457);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
 const REPLAY = process.env.REPLAY ?? null;
