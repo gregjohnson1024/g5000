@@ -15,6 +15,19 @@ function scalar(s: JsonSafeSample | undefined): number | null {
   return s.value.value;
 }
 
+function geo(s: JsonSafeSample | undefined): { lat: number; lon: number } | null {
+  if (!s || s.value.kind !== 'geo') return null;
+  return s.value.value;
+}
+
+function fmtLat(lat: number): { mag: string; hemi: 'N' | 'S' } {
+  return { mag: Math.abs(lat).toFixed(4), hemi: lat >= 0 ? 'N' : 'S' };
+}
+
+function fmtLon(lon: number): { mag: string; hemi: 'E' | 'W' } {
+  return { mag: Math.abs(lon).toFixed(4), hemi: lon >= 0 ? 'E' : 'W' };
+}
+
 function fmtSpeed(s: JsonSafeSample | undefined): string {
   const v = scalar(s);
   return v === null ? '—' : `${(v * MS_TO_KNOTS).toFixed(1)}`;
@@ -100,6 +113,9 @@ export default function HelmPage() {
 
   const heel = channels.get('motion.heel');
   const pitch = channels.get('motion.pitch');
+  const position = geo(channels.get('nav.gps.position'));
+  const positionLat = position ? fmtLat(position.lat) : null;
+  const positionLon = position ? fmtLon(position.lon) : null;
 
   // Rolling 30-min average SOG. Buffer holds raw m/s samples keyed by
   // server-stamped t_ms; we prune-then-append on every new SOG event. Resets
@@ -195,6 +211,33 @@ export default function HelmPage() {
 
         <HelmTile label="Heel" value={fmtAngleSigned(heel)} unit="°" small />
         <HelmTile label="Pitch" value={fmtAngleSigned(pitch)} unit="°" small />
+
+        {/* Position — two stacked coordinates rather than the one-number-per-tile
+            idiom every other tile follows. Hemisphere suffixes ride at unit
+            size so the magnitudes line up vertically. */}
+        <div className="bg-slate-900 border border-slate-800 rounded p-4 flex flex-col gap-1 col-span-2">
+          <div className="text-xs uppercase tracking-wider text-slate-400">Position</div>
+          <div className="text-3xl font-mono text-slate-100 leading-tight">
+            {positionLat ? (
+              <>
+                {positionLat.mag}
+                <span className="text-xl text-slate-500 ml-2">° {positionLat.hemi}</span>
+              </>
+            ) : (
+              <span className="text-slate-500">—</span>
+            )}
+          </div>
+          <div className="text-3xl font-mono text-slate-100 leading-tight">
+            {positionLon ? (
+              <>
+                {positionLon.mag}
+                <span className="text-xl text-slate-500 ml-2">° {positionLon.hemi}</span>
+              </>
+            ) : (
+              <span className="text-slate-500">—</span>
+            )}
+          </div>
+        </div>
       </div>
     </main>
   );
