@@ -208,11 +208,6 @@ function ChartPageInner() {
     }
   }, [route, restored]);
 
-  // Refs declared up here because they're shared between the load-from-URL
-  // effect (just below) and the auto-preselect effects (further down).
-  const didAutoSetStartRef = useRef(false);
-  const didAutoSetEndRef = useRef(false);
-
   // Load a saved plan via the ?plan=<id> URL param so /plans → click name
   // takes you to the chart with that route already overlaid. Runs once
   // when the param is present.
@@ -241,10 +236,6 @@ function ChartPageInner() {
           const last = legs[legs.length - 1]!;
           setStart({ lat: first.lat, lon: first.lon });
           setEnd({ lat: last.lat, lon: last.lon });
-          // Mark auto-set as done so live-position drift doesn't replace
-          // the start we just loaded from the plan.
-          didAutoSetStartRef.current = true;
-          didAutoSetEndRef.current = true;
         }
       } catch (e) {
         setError(String(e));
@@ -252,33 +243,9 @@ function ChartPageInner() {
     })();
   }, [planIdFromUrl]);
 
-  // Auto-preselect on page mount: start = current boat position, end =
-  // Bristol Marine. Done once each (via refs) so subsequent live-position
-  // updates don't drag the start pin, and clearing the X on either marker
-  // sticks — the user's manual choice wins for the rest of this mount. Also
-  // gated on `restored` and skipped if the value was already restored from
-  // localStorage so we don't stomp a saved selection.
-  useEffect(() => {
-    if (!restored || didAutoSetStartRef.current) return;
-    if (start !== undefined) {
-      didAutoSetStartRef.current = true;
-      return;
-    }
-    if (!livePos) return;
-    setStart({ lat: livePos.lat, lon: livePos.lon });
-    didAutoSetStartRef.current = true;
-  }, [livePos, restored, start]);
-  useEffect(() => {
-    if (!restored || didAutoSetEndRef.current) return;
-    if (end !== undefined) {
-      didAutoSetEndRef.current = true;
-      return;
-    }
-    const bristol = waypoints.find((w) => w.id === 'bristol-marine');
-    if (!bristol) return;
-    setEnd({ lat: bristol.lat, lon: bristol.lon });
-    didAutoSetEndRef.current = true;
-  }, [waypoints, restored, end]);
+  // Auto-preselect of start/end on mount has been removed at the user's
+  // request — the chart loads empty and the user picks start/end via map
+  // clicks, the "Use boat position" button, or a saved-plan load.
 
   const onMapClick = (p: Pos) => {
     if (!start) setStart(p);
@@ -699,8 +666,6 @@ function ChartPageInner() {
               const last = legs[legs.length - 1]!;
               setStart({ lat: first.lat, lon: first.lon });
               setEnd({ lat: last.lat, lon: last.lon });
-              didAutoSetStartRef.current = true;
-              didAutoSetEndRef.current = true;
             }
           }}
         />
