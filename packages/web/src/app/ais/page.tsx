@@ -58,7 +58,7 @@ function fmtTcpa(seconds: number): string {
 function useThreatAudio(
   threatMmsis: Set<number>,
   enabled: boolean,
-): { armed: boolean; arm: () => void } {
+): { armed: boolean; arm: () => void; test: (durationMs?: number) => void; testing: boolean } {
   const ctxRef = useRef<AudioContext | null>(null);
   const klaxonRef = useRef<{
     osc: OscillatorNode;
@@ -66,6 +66,8 @@ function useThreatAudio(
     toneTimer: ReturnType<typeof setInterval>;
   } | null>(null);
   const [armed, setArmed] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const testTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const arm = () => {
     if (ctxRef.current) return;
@@ -73,7 +75,14 @@ function useThreatAudio(
       const Ctor =
         window.AudioContext ??
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      ctxRef.current = new Ctor();
+      const ctx = new Ctor();
+      ctxRef.current = ctx;
+      // Safari (and some Chromium builds) instantiate AudioContext in
+      // `suspended` state even when constructed inside a user gesture.
+      // resume() inside the same gesture unblocks it.
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
       setArmed(true);
     } catch {
       /* AudioContext not available; alarm stays visual-only */
@@ -124,23 +133,42 @@ function useThreatAudio(
   };
 
   useEffect(() => {
-    if (!enabled || !ctxRef.current) {
+    // Gate on `armed` (state) rather than `ctxRef.current` (ref) so React
+    // knows to re-run this effect when the user clicks "Arm audio". Refs
+    // are invisible to the deps array.
+    if (!armed) {
       stopKlaxon();
       return;
     }
-    if (threatMmsis.size > 0) {
+    // Test mode bypasses the alarm-enabled gate so a "Test alarm" press
+    // always sounds, even when the alarm is OFF. Real threats still respect
+    // the gate. If both are true the klaxon just stays playing.
+    if (testing || (enabled && threatMmsis.size > 0)) {
       startKlaxon();
     } else {
       stopKlaxon();
     }
-  }, [threatMmsis, enabled]);
+  }, [threatMmsis, enabled, testing, armed]);
 
   // Cleanup on unmount — otherwise the klaxon survives a hot reload.
   useEffect(() => {
-    return () => stopKlaxon();
+    return () => {
+      stopKlaxon();
+      if (testTimerRef.current) clearTimeout(testTimerRef.current);
+    };
   }, []);
 
-  return { armed, arm };
+  const test = (durationMs = 3000): void => {
+    if (!ctxRef.current) return;
+    if (testTimerRef.current) clearTimeout(testTimerRef.current);
+    setTesting(true);
+    testTimerRef.current = setTimeout(() => {
+      setTesting(false);
+      testTimerRef.current = null;
+    }, durationMs);
+  };
+
+  return { armed, arm, test, testing };
 }
 
 export default function ChartPage() {
@@ -272,7 +300,12 @@ export default function ChartPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetsWithCpa, alarmConfig.enabled, alarmConfig.cpaMeters, alarmConfig.tcpaSeconds, mutes]);
 
-  const { armed: audioArmed, arm: armAudio } = useThreatAudio(threatMmsis, alarmConfig.enabled);
+  const {
+    armed: audioArmed,
+    arm: armAudio,
+    test: testAudio,
+    testing: audioTesting,
+  } = useThreatAudio(threatMmsis, alarmConfig.enabled);
 
   // Course-up rotation: in course-up mode, the canvas rotates clockwise by
   // own's heading so own's heading points up. North-up means no rotation.
@@ -354,6 +387,25 @@ export default function ChartPage() {
             }`}
           >
             {audioArmed ? 'Audio armed' : 'Arm audio'}
+          </button>
+          <button
+            type="button"
+            onClick={() => testAudio()}
+            disabled={!audioArmed || audioTesting}
+            title={
+              audioArmed
+                ? 'Plays the klaxon for 3 seconds — bypasses Alarm ON/OFF'
+                : 'Arm audio first'
+            }
+            className={`px-2 py-1 rounded text-xs ${
+              !audioArmed
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                : audioTesting
+                  ? 'bg-red-700 cursor-default'
+                  : 'bg-slate-700 hover:bg-slate-600'
+            }`}
+          >
+            {audioTesting ? 'Testing…' : 'Test alarm'}
           </button>
           <button
             type="button"
