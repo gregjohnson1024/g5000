@@ -1,17 +1,18 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { Map } from '../components/Map';
-import { StatusBadge } from '../components/StatusBadge';
-import { PlanControls, type PlanRequest } from '../components/PlanControls';
-import { attachRoute } from '../components/RoutePolyline';
-import { RouteTimeline } from '../components/RouteTimeline';
-import { LiveBoatMarker, type LivePos } from '../components/LiveBoatMarker';
+import { Map } from '../../components/Map';
+import { StatusBadge } from '../../components/StatusBadge';
+import { PlanControls, type PlanRequest } from '../../components/PlanControls';
+import { attachRoute } from '../../components/RoutePolyline';
+import { RouteTimeline } from '../../components/RouteTimeline';
+import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
+import { AisTargets } from '../../components/AisTargets';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
-import { WindOverlay, type WindGrid, type WindModel } from '../components/WindOverlay';
-import { CogExtension } from '../components/CogExtension';
+import { WindOverlay, type WindGrid, type WindModel } from '../../components/WindOverlay';
+import { CogExtension } from '../../components/CogExtension';
 import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
@@ -174,6 +175,7 @@ export default function HomePage() {
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
         <CogExtension map={mapInstance} p={livePos} hidden={!cogExtOn} />
+        <AisTargets map={mapInstance} />
         <WindOverlay
           map={mapInstance}
           centerLat={livePos?.lat ?? null}

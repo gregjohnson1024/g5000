@@ -1,8 +1,0 @@
-@import 'tailwindcss';
-
-:root {
-  color-scheme: dark;
-  /* Match the autopilot-server's bumped root size so the chart UI text is
-   * as readable as /helm. ~2 pt larger than browser default. */
-  font-size: 18px;
-}

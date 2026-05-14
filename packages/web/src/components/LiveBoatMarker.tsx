@@ -27,7 +27,7 @@ const TRAIL_LAYER_ID = 'live-trail-layer';
 /**
  * Trail strategy: hydrate from `/api/tracks/active` on mount (so a page
  * reload preserves the breadcrumb across all of the active recording),
- * then append live `/api/live/position` fixes on top. A
+ * then append live `/api/position` fixes on top. A
  * `BroadcastChannel('tracks')` listener triggers a re-fetch when the
  * /tracks page interrupts the active recording, so the chart drops the
  * previous breadcrumb and starts a fresh line for the new track.
@@ -121,7 +121,7 @@ export function LiveBoatMarker({
       }
     });
 
-    const es = new EventSource('/api/live/position');
+    const es = new EventSource('/api/position');
     es.onmessage = (e) => {
       try {
         const p = JSON.parse(e.data) as LivePos;

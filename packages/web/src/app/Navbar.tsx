@@ -10,9 +10,14 @@ interface NavItem {
 
 const ITEMS: NavItem[] = [
   { href: '/helm', label: 'Helm' },
+  { href: '/chart', label: 'Chart' },
   { href: '/ais', label: 'AIS' },
   { href: '/polars', label: 'Polars' },
   { href: '/sails', label: 'Sails' },
+  { href: '/forecast', label: 'Forecast' },
+  { href: '/waypoints', label: 'Waypoints' },
+  { href: '/tracks', label: 'Tracks' },
+  { href: '/plans', label: 'Plans' },
   { href: '/calibration/wind', label: 'Wind cal' },
   { href: '/calibration/bsp', label: 'BSP cal' },
   { href: '/calibration/compass', label: 'Compass' },

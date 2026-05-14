@@ -82,7 +82,7 @@ export default function ForecastPage() {
   // Poll the live position once on mount so we can auto-fill an ROI centred
   // on the boat the first time the user lands here.
   useEffect(() => {
-    const es = new EventSource('/api/live/position');
+    const es = new EventSource('/api/position');
     es.onmessage = (e) => {
       try {
         const p = JSON.parse(e.data) as { lat?: number; lon?: number };

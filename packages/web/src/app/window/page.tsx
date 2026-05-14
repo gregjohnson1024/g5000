@@ -44,7 +44,7 @@ export default function WindowPage() {
     }
     setLoading(true);
     try {
-      const polarRes = await fetch('/api/live/polar');
+      const polarRes = await fetch('/api/wardrobe/active');
       if (!polarRes.ok) {
         setError('No polar available (live or cached).');
         return;

@@ -23,7 +23,7 @@ export function PlanControls(props: {
   );
   const [useCurrents, setUseCurrents] = useState<boolean>(false);
   const onSubmit = async () => {
-    const polarRes = await fetch('/api/live/polar');
+    const polarRes = await fetch('/api/wardrobe/active');
     if (!polarRes.ok) return alert('No polar available (live or cached).');
     const { polar } = await polarRes.json();
     const t = Math.floor(new Date(departure).getTime() / 1000);

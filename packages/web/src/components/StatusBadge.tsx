@@ -9,7 +9,7 @@ export function StatusBadge() {
     let cancelled = false;
     const check = async () => {
       try {
-        const r = await fetch('/api/live/polar', { signal: AbortSignal.timeout(3000) });
+        const r = await fetch('/api/wardrobe/active', { signal: AbortSignal.timeout(3000) });
         if (cancelled) return;
         setMode(r.ok ? 'live' : 'offline');
       } catch {

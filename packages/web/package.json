@@ -11,15 +11,21 @@
   },
   "dependencies": {
     "@g5000/bridge": "*",
+    "@g5000/coastline": "*",
     "@g5000/compute": "*",
     "@g5000/core": "*",
     "@g5000/db": "*",
+    "@g5000/grib": "*",
+    "@g5000/routing": "*",
+    "d3-contour": "^4.0.2",
+    "maplibre-gl": "^4.7.0",
     "next": "^16",
     "react": "^19",
     "react-dom": "^19"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-contour": "^3.0.6",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
