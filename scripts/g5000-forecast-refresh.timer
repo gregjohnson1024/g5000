@@ -1,0 +1,15 @@
+[Unit]
+Description=G5000 forecast refresh — every 3 h
+# GFS publishes ~4 h after each 6-hourly run; ECMWF ~6-9 h. A 3 h cadence
+# guarantees the cache picks up each new run within a couple of hours of
+# availability. OnBootSec ensures the first refresh runs ~2 min after boot
+# (after the autopilot has come up).
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3h
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

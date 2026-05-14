@@ -1,0 +1,14 @@
+[Unit]
+Description=G5000 forecast refresh (hits /api/forecast/refresh on the local autopilot)
+After=g5000-autopilot.service network-online.target
+# Intentionally NOT `Requires=g5000-autopilot.service` — we don't want
+# systemd to auto-start the autopilot just to run a forecast refresh.
+# The script self-guards with `systemctl is-active --quiet` and exits 0
+# if the autopilot isn't running.
+
+[Service]
+Type=oneshot
+User=greg
+ExecStart=/home/greg/autopilot/scripts/refresh-forecast.sh
+StandardOutput=journal
+StandardError=journal
