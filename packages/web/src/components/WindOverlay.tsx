@@ -436,19 +436,45 @@ export function WindOverlay({
         }, beforeId());
       }
     };
-    if (map.isStyleLoaded()) ensure();
-    else map.once('load', ensure);
+    // Closure-staleness recap: ensure() + setData must run AS A PAIR
+    // *after* the style is loaded. The previous version called
+    // `map.once('load', ensure)` which silently no-op'd when load had
+    // already fired before WindOverlay mounted — and worse, the
+    // setData calls below would silently miss because `getSource()`
+    // returned undefined. Wrap both in a single render() and retry on
+    // styledata until the style is ready.
+    // isStyleLoaded() returns false during ANY pending style mutation
+    // (tile loads, other components adding sources/layers, etc.). It
+    // never reliably becomes true while the chart is alive — which
+    // means a `if (!isStyleLoaded()) defer()` guard creates an infinite
+    // retry loop. addSource/addLayer work fine regardless; the only
+    // thing they need is that the style ROOT spec is parsed, which
+    // happens before the very first 'load' event.
+    const render = (): void => {
+      ensure();
+      doRender();
+    };
+    const doRender = (): void => {
+      const fillSrc = map.getSource(SRC_FILL) as maplibregl.GeoJSONSource | undefined;
+      const barbSrc = map.getSource(SRC_BARBS) as maplibregl.GeoJSONSource | undefined;
+      const isoSrc = map.getSource(SRC_ISOBARS) as maplibregl.GeoJSONSource | undefined;
+      if (hidden || !grid) {
+        fillSrc?.setData({ type: 'FeatureCollection', features: [] });
+        barbSrc?.setData({ type: 'FeatureCollection', features: [] });
+        isoSrc?.setData({ type: 'FeatureCollection', features: [] });
+        return;
+      }
+      renderBody(fillSrc, barbSrc, isoSrc, grid);
+    };
+    render();
+    return;
 
-    const fillSrc = map.getSource(SRC_FILL) as maplibregl.GeoJSONSource | undefined;
-    const barbSrc = map.getSource(SRC_BARBS) as maplibregl.GeoJSONSource | undefined;
-    const isoSrc = map.getSource(SRC_ISOBARS) as maplibregl.GeoJSONSource | undefined;
-
-    if (hidden || !grid) {
-      fillSrc?.setData({ type: 'FeatureCollection', features: [] });
-      barbSrc?.setData({ type: 'FeatureCollection', features: [] });
-      isoSrc?.setData({ type: 'FeatureCollection', features: [] });
-      return;
-    }
+    function renderBody(
+      fillSrc: maplibregl.GeoJSONSource | undefined,
+      barbSrc: maplibregl.GeoJSONSource | undefined,
+      isoSrc: maplibregl.GeoJSONSource | undefined,
+      grid: WindGrid,
+    ): void {
     if (showIsobars && isoSrc) {
       isoSrc.setData(buildIsobars(grid));
     } else if (isoSrc) {
@@ -485,6 +511,7 @@ export function WindOverlay({
     } else if (barbSrc) {
       barbSrc.setData({ type: 'FeatureCollection', features: [] });
     }
+    } // renderBody
   }, [map, grid, hidden, stride, showFill, showBarbs, showIsobars]);
 
   // Live opacity update
