@@ -31,9 +31,14 @@ export interface YdwgSocket {
   on(event: 'close', cb: () => void): this;
   on(event: 'error', cb: (err: Error) => void): this;
   on(event: 'connect', cb: () => void): this;
+  on(event: 'timeout', cb: () => void): this;
   removeAllListeners(event?: string): this;
   write(data: string | Buffer, cb?: (err?: Error | null) => void): boolean;
   destroy(err?: Error): this;
+  /** OS-level TCP keep-alive. Optional so test fakes don't have to implement it. */
+  setKeepAlive?(enable: boolean, initialDelayMs?: number): unknown;
+  /** Node app-level inactivity timer; fires a 'timeout' event after `ms` of socket silence. */
+  setTimeout?(ms: number): unknown;
 }
 
 export interface YdwgRawTcpDriverOptions {
@@ -44,6 +49,18 @@ export interface YdwgRawTcpDriverOptions {
   socketFactory: () => YdwgSocket;
   /** Reconnect backoff config. Default { initialMs: 1000, maxMs: 30000 }. */
   backoffMs?: { initialMs: number; maxMs: number };
+  /**
+   * Liveness config — protects against half-open sockets where the peer has
+   * gone away but TCP has no FIN/RST to confirm it (NAT drop, peer crash,
+   * network partition mid-session). Two independent layers:
+   *   - `keepAliveDelayMs`: OS-level keep-alive probes after this much idle.
+   *   - `idleTimeoutMs`: Node 'timeout' event after no socket data; the
+   *     driver responds by destroying the socket so the reconnect path runs.
+   * Defaults: keepAliveDelayMs=10000, idleTimeoutMs=30000. The bus is
+   * normally chatty (>50 Hz) so 30s of complete silence is a strong signal
+   * that the connection is dead even if TCP doesn't yet know.
+   */
+  liveness?: { keepAliveDelayMs?: number; idleTimeoutMs?: number };
 }
 
 /** Build a socket factory wired to net.createConnection for production use. */
@@ -79,6 +96,8 @@ export class YdwgRawTcpDriver implements WireDriver {
   private readonly socketFactory: () => YdwgSocket;
   private readonly initialBackoffMs: number;
   private readonly maxBackoffMs: number;
+  private readonly keepAliveDelayMs: number;
+  private readonly idleTimeoutMs: number;
 
   private socket: YdwgSocket | null = null;
   private active = false;
@@ -90,6 +109,8 @@ export class YdwgRawTcpDriver implements WireDriver {
     this.socketFactory = opts.socketFactory;
     this.initialBackoffMs = opts.backoffMs?.initialMs ?? 1000;
     this.maxBackoffMs = opts.backoffMs?.maxMs ?? 30000;
+    this.keepAliveDelayMs = opts.liveness?.keepAliveDelayMs ?? 10_000;
+    this.idleTimeoutMs = opts.liveness?.idleTimeoutMs ?? 30_000;
     this.currentBackoffMs = this.initialBackoffMs;
     this.rxCan = this.rxSubject.asObservable();
     this.health = this.healthSubject.asObservable();
@@ -188,6 +209,15 @@ export class YdwgRawTcpDriver implements WireDriver {
       return;
     }
     this.socket = socket;
+    // Enable liveness probes BEFORE the socket connects so they take effect
+    // as soon as it does. Both calls are best-effort: test fakes may omit
+    // the methods.
+    if (this.keepAliveDelayMs > 0) {
+      socket.setKeepAlive?.(true, this.keepAliveDelayMs);
+    }
+    if (this.idleTimeoutMs > 0) {
+      socket.setTimeout?.(this.idleTimeoutMs);
+    }
     socket.on('connect', () => {
       this.currentBackoffMs = this.initialBackoffMs;
       this.healthSubject.next({ ...this.healthSubject.value, connected: true });
@@ -196,6 +226,14 @@ export class YdwgRawTcpDriver implements WireDriver {
     socket.on('error', () => {
       const h = this.healthSubject.value;
       this.healthSubject.next({ ...h, errorCount: h.errorCount + 1 });
+    });
+    socket.on('timeout', () => {
+      // No socket data for idleTimeoutMs — assume the connection is dead
+      // (half-open, NAT drop, peer crash). Destroy it; the resulting
+      // 'close' event routes through onClose() → reconnect.
+      const h = this.healthSubject.value;
+      this.healthSubject.next({ ...h, errorCount: h.errorCount + 1 });
+      socket.destroy();
     });
     socket.on('close', () => this.onClose());
   }

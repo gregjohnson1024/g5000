@@ -15,14 +15,21 @@ class FakeSocket implements YdwgSocket {
   closeCb: (() => void) | null = null;
   errorCb: ((err: Error) => void) | null = null;
   connectCb: (() => void) | null = null;
+  timeoutCb: (() => void) | null = null;
   writes: string[] = [];
   destroyed = false;
+  keepAliveCalls: Array<{ enable: boolean; initialDelayMs?: number }> = [];
+  setTimeoutCalls: number[] = [];
 
-  on(event: 'data' | 'close' | 'error' | 'connect', cb: (...args: never[]) => void): this {
+  on(
+    event: 'data' | 'close' | 'error' | 'connect' | 'timeout',
+    cb: (...args: never[]) => void,
+  ): this {
     if (event === 'data') this.dataCb = cb as (c: Buffer) => void;
     if (event === 'close') this.closeCb = cb as () => void;
     if (event === 'error') this.errorCb = cb as (e: Error) => void;
     if (event === 'connect') this.connectCb = cb as () => void;
+    if (event === 'timeout') this.timeoutCb = cb as () => void;
     return this;
   }
   removeAllListeners(): this {
@@ -30,6 +37,7 @@ class FakeSocket implements YdwgSocket {
     this.closeCb = null;
     this.errorCb = null;
     this.connectCb = null;
+    this.timeoutCb = null;
     return this;
   }
   write(data: string | Buffer, cb?: (err?: Error | null) => void): boolean {
@@ -39,6 +47,16 @@ class FakeSocket implements YdwgSocket {
   }
   destroy(): this {
     this.destroyed = true;
+    // Mimic net.Socket: destroy() leads to a 'close' event.
+    queueMicrotask(() => this.closeCb?.());
+    return this;
+  }
+  setKeepAlive(enable: boolean, initialDelayMs?: number): this {
+    this.keepAliveCalls.push({ enable, initialDelayMs });
+    return this;
+  }
+  setTimeout(ms: number): this {
+    this.setTimeoutCalls.push(ms);
     return this;
   }
   // Test helpers
@@ -50,6 +68,9 @@ class FakeSocket implements YdwgSocket {
   }
   fireClose(): void {
     this.closeCb?.();
+  }
+  fireTimeout(): void {
+    this.timeoutCb?.();
   }
 }
 
@@ -334,6 +355,75 @@ describe('YdwgRawTcpDriver — reconnect', () => {
     await driver.stop();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(factoryCalls).toHaveLength(1);
+  });
+
+  it('configures TCP keep-alive and idle timeout on each new socket', async () => {
+    const factoryCalls: FakeSocket[] = [];
+    const driver = new YdwgRawTcpDriver({
+      socketFactory: () => {
+        const s = new FakeSocket();
+        factoryCalls.push(s);
+        return s;
+      },
+      backoffMs: { initialMs: 100, maxMs: 1000 },
+      liveness: { keepAliveDelayMs: 7_000, idleTimeoutMs: 21_000 },
+    });
+    await driver.start();
+    const first = factoryCalls[0]!;
+    expect(first.keepAliveCalls).toEqual([{ enable: true, initialDelayMs: 7_000 }]);
+    expect(first.setTimeoutCalls).toEqual([21_000]);
+
+    // After a drop + reconnect, the new socket should also be configured.
+    first.fireConnect();
+    first.fireClose();
+    await vi.advanceTimersByTimeAsync(100);
+    const second = factoryCalls[1]!;
+    expect(second.keepAliveCalls).toEqual([{ enable: true, initialDelayMs: 7_000 }]);
+    expect(second.setTimeoutCalls).toEqual([21_000]);
+    await driver.stop();
+  });
+
+  it('uses default liveness config when none supplied', async () => {
+    const factoryCalls: FakeSocket[] = [];
+    const driver = new YdwgRawTcpDriver({
+      socketFactory: () => {
+        const s = new FakeSocket();
+        factoryCalls.push(s);
+        return s;
+      },
+      backoffMs: { initialMs: 100, maxMs: 1000 },
+    });
+    await driver.start();
+    expect(factoryCalls[0]!.keepAliveCalls).toEqual([{ enable: true, initialDelayMs: 10_000 }]);
+    expect(factoryCalls[0]!.setTimeoutCalls).toEqual([30_000]);
+    await driver.stop();
+  });
+
+  it('destroys and reconnects on idle-timeout event', async () => {
+    const factoryCalls: FakeSocket[] = [];
+    const driver = new YdwgRawTcpDriver({
+      socketFactory: () => {
+        const s = new FakeSocket();
+        factoryCalls.push(s);
+        return s;
+      },
+      backoffMs: { initialMs: 100, maxMs: 1000 },
+      liveness: { keepAliveDelayMs: 1_000, idleTimeoutMs: 5_000 },
+    });
+    await driver.start();
+    const first = factoryCalls[0]!;
+    first.fireConnect();
+    expect(first.destroyed).toBe(false);
+
+    // Simulate Node's socket emitting 'timeout' after idle.
+    first.fireTimeout();
+    expect(first.destroyed).toBe(true);
+
+    // destroy() queues a microtask to fire 'close'; flush it, then advance
+    // past the reconnect backoff. The driver should open a fresh socket.
+    await vi.advanceTimersByTimeAsync(100);
+    expect(factoryCalls.length).toBeGreaterThanOrEqual(2);
+    await driver.stop();
   });
 
   it('schedules reconnect when socketFactory itself throws', async () => {
