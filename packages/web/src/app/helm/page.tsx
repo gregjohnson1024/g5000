@@ -8,7 +8,7 @@ import { HelmTile } from './HelmTile';
 
 const MS_TO_KNOTS = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
-const AVG_WINDOW_MS = 30 * 60 * 1000;
+const AVG_WINDOW_MS = 15 * 60 * 1000;
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
@@ -203,9 +203,9 @@ export default function HelmPage() {
           sub={
             avgSog
               ? avgSog.coveredMs >= AVG_WINDOW_MS - 1000
-                ? '30 min'
+                ? '15 min'
                 : `${Math.max(1, Math.round(avgSog.coveredMs / 60000))} min so far`
-              : '30 min'
+              : '15 min'
           }
           small
         />
