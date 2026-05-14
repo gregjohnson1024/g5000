@@ -357,6 +357,12 @@ export function WindOverlay({
   // Render
   useEffect(() => {
     if (!map) return;
+    // All wind layers insert below the '__above-wind__' sentinel set up
+    // in Map.tsx — keeps wind permanently between OSM and the annotation
+    // layers (trail, COG, AIS, route, isochrones, waypoints). If the
+    // sentinel isn't ready yet, fall back to undefined (append).
+    const beforeId = (): string | undefined =>
+      map.getLayer('__above-wind__') ? '__above-wind__' : undefined;
     const ensure = (): void => {
       if (!map.getSource(SRC_FILL)) {
         map.addSource(SRC_FILL, {
@@ -386,7 +392,7 @@ export function WindOverlay({
             'fill-opacity': opacity,
             'fill-antialias': true,
           },
-        });
+        }, beforeId());
       }
       if (!map.getSource(SRC_BARBS)) {
         map.addSource(SRC_BARBS, {
@@ -399,14 +405,14 @@ export function WindOverlay({
           source: SRC_BARBS,
           filter: ['in', ['get', 'kind'], ['literal', ['shaft', 'barb']]],
           paint: { 'line-color': '#000000', 'line-width': 1.4 },
-        });
+        }, beforeId());
         map.addLayer({
           id: LAYER_BARB_PENNANT,
           type: 'fill',
           source: SRC_BARBS,
           filter: ['==', ['get', 'kind'], 'pennant'],
           paint: { 'fill-color': '#000000' },
-        });
+        }, beforeId());
       }
       if (!map.getSource(SRC_ISOBARS)) {
         map.addSource(SRC_ISOBARS, {
@@ -427,7 +433,7 @@ export function WindOverlay({
             ],
             'line-opacity': 0.85,
           },
-        });
+        }, beforeId());
       }
     };
     if (map.isStyleLoaded()) ensure();

@@ -131,16 +131,10 @@ export function LiveBoatMarker({
         if (typeof p.cog === 'number') {
           marker.setRotation((p.cog * 180) / Math.PI);
         }
-        // Keep the trail above wind / fill / barb / isobar layers that the
-        // /forecast tab's WindOverlay adds later. moveLayer() is cheap and
-        // idempotent — calling it on every fix (1 Hz) costs nothing.
-        if (map.getLayer(TRAIL_LAYER_ID)) {
-          try {
-            map.moveLayer(TRAIL_LAYER_ID);
-          } catch {
-            /* style not ready */
-          }
-        }
+        // Z-order is enforced by the `__above-wind__` sentinel in Map.tsx:
+        // wind layers add with beforeId='__above-wind__' so all annotation
+        // layers (this trail, AIS, COG ext, route, isochrones, waypoints)
+        // sit above wind automatically. No moveLayer needed.
         // Append to in-memory trail. The server-side recorder writes its
         // own down-sampled copy to disk; we don't reach back to /api/tracks
         // on every fix. On reload, hydrate() picks up the persisted copy.

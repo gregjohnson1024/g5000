@@ -9,7 +9,8 @@ export function attachRoute(
   map: maplibregl.Map,
   id: string,
   route: Route,
-  color = '#22d3ee',
+  color = '#000000',
+  showIsochrones = true,
 ): void {
   const data: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
@@ -26,6 +27,8 @@ export function attachRoute(
   };
   if (map.getSource(id)) {
     (map.getSource(id) as maplibregl.GeoJSONSource).setData(data);
+    // Update colour in case caller passed a different one.
+    if (map.getLayer(id)) map.setPaintProperty(id, 'line-color', color);
   } else {
     map.addSource(id, { type: 'geojson', data });
     map.addLayer({
@@ -35,10 +38,17 @@ export function attachRoute(
       paint: { 'line-color': color, 'line-width': 3 },
     });
   }
-  // Attach isochrones if the planner captured them — one feature per
-  // frontier, properties.hours = forecast offset for label/styling.
-  attachIsochrones(map, route);
-  // Make sure the route line is rendered above the isochrones.
+  // Isochrones either attach (showing exploration depth) or clear.
+  if (showIsochrones) {
+    attachIsochrones(map, route);
+  } else if (map.getSource(ISOCHRONE_SRC)) {
+    (map.getSource(ISOCHRONE_SRC) as maplibregl.GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: [],
+    });
+  }
+  // Make sure the route line is rendered above the isochrones (both
+  // already above the wind sentinel — this just enforces the inner order).
   try {
     map.moveLayer(id);
   } catch {

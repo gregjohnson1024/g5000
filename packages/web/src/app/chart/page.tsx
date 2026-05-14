@@ -8,6 +8,8 @@ import { attachRoute } from '../../components/RoutePolyline';
 import { RouteTimeline } from '../../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
+import { WaypointsLayer, type MarkLike } from '../../components/WaypointsLayer';
+import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
@@ -34,6 +36,18 @@ export default function HomePage() {
     ecmwf: [],
   });
   const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
+  const [showIsochrones, setShowIsochrones] = useState(true);
+  const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'RTOFS'>('GFS');
+
+  // Toggling isochrones after a route is planned re-attaches the route
+  // with the new flag, which clears or rebuilds the isochrones layer
+  // without needing to re-plan.
+  useEffect(() => {
+    if (route && mapRef.current) {
+      attachRoute(mapRef.current, 'route-gfs', route, '#000000', showIsochrones);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showIsochrones]);
 
   const saveRoiFromView = async (): Promise<void> => {
     const map = mapRef.current;
@@ -158,7 +172,9 @@ export default function HomePage() {
       const j = await res.json();
       if (!j.ok) throw new Error(j.error?.message ?? 'plan failed');
       setRoute(j.route);
-      if (mapRef.current) attachRoute(mapRef.current, 'route-gfs', j.route);
+      if (mapRef.current) {
+        attachRoute(mapRef.current, 'route-gfs', j.route, '#000000', showIsochrones);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -202,6 +218,19 @@ export default function HomePage() {
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
         <CogExtension map={mapInstance} p={livePos} hidden={false} />
         <AisTargets map={mapInstance} />
+        <WaypointsLayer
+          map={mapInstance}
+          marks={(() => {
+            const list: MarkLike[] = waypoints.map((w) => ({
+              lat: w.lat,
+              lon: w.lon,
+              name: w.name,
+            }));
+            if (start) list.push({ lat: start.lat, lon: start.lon, name: 'start', badge: 'S' });
+            if (end) list.push({ lat: end.lat, lon: end.lon, name: 'end', badge: 'E' });
+            return list;
+          })()}
+        />
         <WindOverlay
           map={mapInstance}
           centerLat={livePos?.lat ?? null}
@@ -263,7 +292,7 @@ export default function HomePage() {
         <LiveValues p={livePos} />
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400 font-medium">Wind</span>
+            <span className="text-slate-400 font-medium">Model display</span>
             <label className="flex items-center gap-1 text-xs">
               <input
                 type="checkbox"
@@ -277,16 +306,27 @@ export default function HomePage() {
             <label className="flex items-center gap-1">
               <span className="text-slate-400">Model</span>
               <select
-                value={windModel}
-                onChange={(e) => setWindModel(e.target.value as WindModel)}
+                value={displayModel}
+                onChange={(e) => {
+                  const m = e.target.value as 'GFS' | 'ECMWF' | 'RTOFS';
+                  setDisplayModel(m);
+                  // GFS/ECMWF select wind grids; RTOFS is surface currents
+                  // — keep windModel in sync so the overlay/hours slider
+                  // reads from the right cache.
+                  if (m === 'GFS') setWindModel('gfs');
+                  else if (m === 'ECMWF') setWindModel('ecmwf');
+                  // RTOFS leaves windModel alone — currents overlay is a
+                  // separate render path (TODO when /api/currents lands).
+                }}
                 className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200"
               >
-                <option value="gfs">
-                  GFS{availableHours.gfs.length ? '' : ' (no cache)'}
+                <option value="GFS">
+                  GFS (wind){availableHours.gfs.length ? '' : ' (no cache)'}
                 </option>
-                <option value="ecmwf">
-                  ECMWF{availableHours.ecmwf.length ? '' : ' (no cache)'}
+                <option value="ECMWF">
+                  ECMWF (wind){availableHours.ecmwf.length ? '' : ' (no cache)'}
                 </option>
+                <option value="RTOFS">RTOFS (currents)</option>
               </select>
             </label>
           </div>
@@ -371,13 +411,21 @@ export default function HomePage() {
           {windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
           )}
+          <label className="flex items-center gap-2 text-xs pt-1 border-t border-slate-800 mt-2">
+            <input
+              type="checkbox"
+              checked={showIsochrones}
+              onChange={(e) => setShowIsochrones(e.target.checked)}
+            />
+            <span className="text-slate-300">Show isochrones</span>
+          </label>
         </div>
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-400 w-10">Start:</span>
               <span className="font-mono text-slate-200 flex-1">
-                {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}
+                {start ? fmtLatLonDmm(start.lat, start.lon) : '— click map'}
               </span>
               {start && (
                 <button
@@ -424,7 +472,7 @@ export default function HomePage() {
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-400 w-10">End:</span>
               <span className="font-mono text-slate-200 flex-1">
-                {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}
+                {end ? fmtLatLonDmm(end.lat, end.lon) : '— click map'}
               </span>
               {end && (
                 <button

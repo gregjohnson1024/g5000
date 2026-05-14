@@ -13,6 +13,15 @@ export interface MapProps {
 export function Map({ center, zoom, onClick, onLoad }: MapProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  // Track the latest onClick/onLoad in a ref so the map's listeners (which
+  // are bound once in the [] effect below) always call through to the
+  // current closure. Without this, the click handler captures the initial
+  // `start`/`end` props from the parent and never sees state updates —
+  // every click would set start, never end.
+  const onClickRef = useRef(onClick);
+  const onLoadRef = useRef(onLoad);
+  onClickRef.current = onClick;
+  onLoadRef.current = onLoad;
   useEffect(() => {
     if (!ref.current) return;
     const map = new maplibregl.Map({
@@ -36,15 +45,27 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
       new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }),
       'bottom-left',
     );
-    // Expose for in-page debugging — set on a global so we can inspect
-    // layer order from the dev console / playwright.
     (window as unknown as { __g5kMap?: maplibregl.Map }).__g5kMap = map;
-    if (onClick) {
-      map.on('click', (e) => onClick({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
-    }
-    if (onLoad) {
-      map.on('load', () => onLoad(map));
-    }
+    map.on('click', (e) => {
+      onClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+    });
+    map.on('load', () => {
+      // Canonical z-order sentinel. Wind layers add with
+      // `beforeId='__above-wind__'` so they sit between OSM and this
+      // marker; all annotation layers (trail, COG ext, AIS, route,
+      // isochrones, waypoints) just appendLayer — they end up above the
+      // sentinel and therefore above all wind layers. Single rule, no
+      // moveLayer fights between components.
+      if (!map.getLayer('__above-wind__')) {
+        map.addLayer({
+          id: '__above-wind__',
+          type: 'background',
+          layout: { visibility: 'none' },
+          paint: { 'background-color': 'rgba(0,0,0,0)' },
+        });
+      }
+      onLoadRef.current?.(map);
+    });
     mapRef.current = map;
     return () => { map.remove(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps

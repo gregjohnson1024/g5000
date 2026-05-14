@@ -27,6 +27,7 @@ import { installLogStream } from './log-stream-impl.js';
 import { startHlinkServer } from './hlink/server.js';
 import { installObservedSourcesTracker } from './observed-sources.js';
 import { installDeviceDiscovery } from './device-discovery.js';
+import { notifyReady, startWatchdog } from './sd-notify.js';
 
 const SERIAL_PATH = process.env.NGT1_PATH ?? '/dev/ttyUSB0';
 const BAUD_RATE = Number(process.env.NGT1_BAUD ?? 115200);
@@ -374,7 +375,17 @@ async function main(): Promise<void> {
   server.listen(HTTP_PORT, () => {
     // eslint-disable-next-line no-console
     console.log(`[autopilot] web UI on http://0.0.0.0:${HTTP_PORT}`);
+    // Tell systemd we're done initialising. Required under Type=notify;
+    // no-op when run standalone. Sent here (not earlier) so systemd
+    // doesn't flip to "active" until the HTTP listener actually exists.
+    notifyReady();
   });
+
+  // Watchdog heartbeat. Fires every WatchdogSec/2 if systemd asked us
+  // to. If the event loop blocks long enough that we miss a ping,
+  // systemd SIGKILLs us and `Restart=on-failure` brings us back.
+  const stopWatchdog = startWatchdog();
+  teardown.push(async () => stopWatchdog());
 
   // Graceful shutdown — reverse the start order.
   const shutdown = async (): Promise<void> => {

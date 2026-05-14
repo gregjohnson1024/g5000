@@ -1,0 +1,35 @@
+[Unit]
+Description=G5000 Autopilot Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Type=notify with WatchdogSec=60 — the daemon sends READY=1 after init
+# and a WATCHDOG=1 heartbeat every ~30 s. If the event loop blocks long
+# enough that systemd doesn't see a ping inside 60 s, systemd SIGKILLs
+# the process and `Restart=on-failure` brings it back. This catches the
+# "process is alive but accept queue is full" failure mode that systemd
+# would otherwise report as healthy.
+Type=notify
+WatchdogSec=60
+# Allow `systemd-notify` spawned as a child PID to send READY/WATCHDOG.
+# Default is `main` which would reject the child's message. The
+# `systemd-notify` CLI is the simplest way to reach $NOTIFY_SOCKET from
+# Node because Node's `dgram` module doesn't support Unix datagram
+# sockets — so without `NotifyAccess=all` the service would never
+# report ready and systemd would time out the start.
+NotifyAccess=all
+User=greg
+WorkingDirectory=/home/greg/autopilot/apps/autopilot-server
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+# Override existing drop-in (YDWG host) lives at:
+#   /etc/systemd/system/g5000-autopilot.service.d/override.conf
+Environment=NODE_ENV=production
+Environment=PORT=3000
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

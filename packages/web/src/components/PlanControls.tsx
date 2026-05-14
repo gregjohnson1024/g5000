@@ -9,6 +9,7 @@ export interface PlanRequest {
   polarId: string;
   polar: unknown;
   useCurrents?: boolean;
+  options?: Record<string, unknown>;
 }
 
 export function PlanControls(props: {
@@ -36,6 +37,10 @@ export function PlanControls(props: {
       polarId: polar.id ?? 'default',
       polar: polar.polar ?? polar,
       useCurrents,
+      // Always capture isochrones — the chart draws them as a fan-out
+      // visualisation behind the route polyline so the user can see the
+      // exploration depth at each step.
+      options: { captureIsochrones: true },
     });
   };
   return (

@@ -27,7 +27,11 @@ async function fetchEcmwfMessagesS3(opts: {
   const stem = `${date}${hh}0000-${opts.forecastHour}h-oper-fc`;
   const idxUrl = `${base}/${stem}.index`;
   const gribUrl = `${base}/${stem}.grib2`;
-  const idxRes = await fetch(idxUrl);
+  // Hard 30-s timeout on every outbound fetch — a slow ECMWF S3 connection
+  // without this will hang the autopilot's event loop indefinitely (the
+  // refresh endpoint loops 50+ times per model, so one hung fetch stalls
+  // every subsequent request).
+  const idxRes = await fetch(idxUrl, { signal: AbortSignal.timeout(30_000) });
   if (!idxRes.ok) {
     throw new Error(`ECMWF S3 index ${idxUrl} → ${idxRes.status}`);
   }
@@ -41,6 +45,7 @@ async function fetchEcmwfMessagesS3(opts: {
   for (const w of wanted) {
     const res = await fetch(gribUrl, {
       headers: { Range: `bytes=${w._offset}-${w._offset + w._length - 1}` },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!(res.status === 200 || res.status === 206)) {
       throw new Error(`ECMWF S3 range fetch failed: ${res.status} for param=${w.param}`);
@@ -294,7 +299,9 @@ export async function fetchWindGrid(
     forecastHour,
     bbox,
   });
-  const resp = await fetch(url);
+  // 60-s timeout for GFS NOMADS — it does its own server-side bbox subsetting
+  // so the response can take a beat to assemble for larger ROIs.
+  const resp = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!resp.ok) {
     throw new Error(`NOMADS GFS fetch failed: HTTP ${resp.status} ${resp.statusText}`);
   }

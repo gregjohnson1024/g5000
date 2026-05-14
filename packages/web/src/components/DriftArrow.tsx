@@ -107,16 +107,9 @@ export function DriftArrow({ map, p, scaleNmPerKt = 5 }: DriftArrowProps) {
     if (map.isStyleLoaded()) ensureLayers();
     else map.once('load', ensureLayers);
 
-    // Keep instrument layers on top of any wind overlay layers added later.
-    for (const id of [LAYER_LINE, LAYER_HEAD, LAYER_LABEL]) {
-      if (map.getLayer(id)) {
-        try {
-          map.moveLayer(id);
-        } catch {
-          /* style not ready */
-        }
-      }
-    }
+    // Z-order is enforced by Map.tsx's `__above-wind__` sentinel; this
+    // component's layers were added without a beforeId so they're above
+    // the sentinel (and therefore above wind). No moveLayer needed.
 
     const drift = computeDrift(p.hdg, p.cog, p.sog);
     const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
