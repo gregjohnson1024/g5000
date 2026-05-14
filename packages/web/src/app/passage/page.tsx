@@ -117,11 +117,11 @@ export default function PassagePage() {
   const [error, setError] = useState<string | null>(null);
   // Page-level timezone preference — controls how every timestamp on this
   // page is displayed AND how datetime-local form inputs are interpreted.
-  // Default UTC (matches the marine-nav convention and the rest of g5000);
-  // persisted to localStorage so the choice sticks across reloads.
-  const [tz, setTz] = useState<TzMode>('utc');
+  // Default Local (matches /chart and what the user prefers for passage
+  // planning); persisted to localStorage so the choice sticks across reloads.
+  const [tz, setTz] = useState<TzMode>('local');
   useEffect(() => {
-    setTz(readTzMode(TZ_KEY, 'utc'));
+    setTz(readTzMode(TZ_KEY, 'local'));
   }, []);
   useEffect(() => {
     writeTzMode(TZ_KEY, tz);
