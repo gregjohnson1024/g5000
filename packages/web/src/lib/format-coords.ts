@@ -32,5 +32,8 @@ export function fmtLonDmm(lon: number): DmmParts {
 export function fmtLatLonDmm(lat: number, lon: number): string {
   const a = fmtLatDmm(lat);
   const b = fmtLonDmm(lon);
-  return `${a.deg}° ${a.min}' ${a.hemi}, ${b.deg}° ${b.min}' ${b.hemi}`;
+  // Compact marine format: `33 42.232n 66 25.240w` — no degree/prime
+  // symbols (easier to read in monospace columns and to type back),
+  // lowercase hemispheres, single space between coords.
+  return `${a.deg} ${a.min}${a.hemi.toLowerCase()} ${b.deg} ${b.min}${b.hemi.toLowerCase()}`;
 }

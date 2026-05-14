@@ -154,7 +154,7 @@ export default function WaypointsPage() {
             type="text"
             value={pasteRaw}
             onChange={(e) => setPasteRaw(e.target.value)}
-            placeholder={`41°45'53.9"N 71°07'42.6"W`}
+            placeholder={`41 45.898n 71 07.710w`}
             className="block w-full max-w-2xl mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
           />
         </label>
@@ -166,7 +166,7 @@ export default function WaypointsPage() {
               type="text"
               value={latRaw}
               onChange={(e) => setLatRaw(e.target.value)}
-              placeholder={`41° 45.898' N`}
+              placeholder={`41 45.898n`}
               className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
             />
           </label>
@@ -176,7 +176,7 @@ export default function WaypointsPage() {
               type="text"
               value={lonRaw}
               onChange={(e) => setLonRaw(e.target.value)}
-              placeholder={`71° 07.710' W`}
+              placeholder={`71 07.710w`}
               className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
             />
           </label>

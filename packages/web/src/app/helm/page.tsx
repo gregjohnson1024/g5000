@@ -20,12 +20,21 @@ function geo(s: JsonSafeSample | undefined): { lat: number; lon: number } | null
   return s.value.value;
 }
 
-function fmtLat(lat: number): { mag: string; hemi: 'N' | 'S' } {
-  return { mag: Math.abs(lat).toFixed(4), hemi: lat >= 0 ? 'N' : 'S' };
+// Marine DMM format matching the rest of the app:
+// `33 42.232n` — integer degrees, decimal minutes, lowercase hemisphere
+// glued to the minute number with no separator.
+function fmtLat(lat: number): string {
+  const abs = Math.abs(lat);
+  const deg = Math.floor(abs);
+  const min = ((abs - deg) * 60).toFixed(3);
+  return `${deg} ${min}${lat >= 0 ? 'n' : 's'}`;
 }
 
-function fmtLon(lon: number): { mag: string; hemi: 'E' | 'W' } {
-  return { mag: Math.abs(lon).toFixed(4), hemi: lon >= 0 ? 'E' : 'W' };
+function fmtLon(lon: number): string {
+  const abs = Math.abs(lon);
+  const deg = Math.floor(abs);
+  const min = ((abs - deg) * 60).toFixed(3);
+  return `${deg} ${min}${lon >= 0 ? 'e' : 'w'}`;
 }
 
 function fmtSpeed(s: JsonSafeSample | undefined): string {
@@ -219,24 +228,10 @@ export default function HelmPage() {
         <div className="bg-slate-900 border border-slate-800 rounded p-4 flex flex-col gap-1 col-span-2">
           <div className="text-xs uppercase tracking-wider text-slate-400">Position</div>
           <div className="text-3xl font-mono text-slate-100 leading-tight">
-            {positionLat ? (
-              <>
-                {positionLat.mag}
-                <span className="text-xl text-slate-500 ml-2">° {positionLat.hemi}</span>
-              </>
-            ) : (
-              <span className="text-slate-500">—</span>
-            )}
+            {positionLat ?? <span className="text-slate-500">—</span>}
           </div>
           <div className="text-3xl font-mono text-slate-100 leading-tight">
-            {positionLon ? (
-              <>
-                {positionLon.mag}
-                <span className="text-xl text-slate-500 ml-2">° {positionLon.hemi}</span>
-              </>
-            ) : (
-              <span className="text-slate-500">—</span>
-            )}
+            {positionLon ?? <span className="text-slate-500">—</span>}
           </div>
         </div>
       </div>

@@ -602,12 +602,14 @@ function LiveValues({ p }: { p: LivePos | null }) {
   }
   const MS_TO_KN = 1 / 0.514444;
   const RAD_TO_DEG = 180 / Math.PI;
+  // Compact marine DMM matching the shared format-coords helper:
+  // `33 42.232n` (no °/′ symbols, lowercase hemisphere).
   const fmtCoord = (deg: number, axis: 'lat' | 'lon'): string => {
-    const hemi = deg >= 0 ? (axis === 'lat' ? 'N' : 'E') : axis === 'lat' ? 'S' : 'W';
+    const hemi = (deg >= 0 ? (axis === 'lat' ? 'n' : 'e') : axis === 'lat' ? 's' : 'w');
     const abs = Math.abs(deg);
     const d = Math.floor(abs);
     const m = (abs - d) * 60;
-    return `${d}° ${m.toFixed(3)}' ${hemi}`;
+    return `${d} ${m.toFixed(3)}${hemi}`;
   };
   const wrap360 = (deg: number): number => ((deg % 360) + 360) % 360;
   const cogDeg = typeof p.cog === 'number' ? wrap360(p.cog * RAD_TO_DEG) : null;
