@@ -18,6 +18,7 @@ import {
   startSessionLogger,
   startTrueWindTx,
   getSharedDeviceRegistry,
+  createAlertsRegistry,
   type WireDriver,
   type OutgoingPgn,
 } from '@g5000/bridge';
@@ -229,12 +230,16 @@ async function main(): Promise<void> {
       const registry = getSharedDeviceRegistry();
       registeredTxer = (pgn) => ngt.txPgn(pgn);
       registry.registerTxer(registeredTxer);
+      // Alerts registry shares the same txer for Alert Response (126984).
+      createAlertsRegistry().setTxer(registeredTxer);
       // eslint-disable-next-line no-console
       console.log('[autopilot] device-registry refresh target = NGT-1');
     } else if (ydwg) {
       const registry = getSharedDeviceRegistry();
       registeredTxer = (pgn) => ydwg.txPgn(pgn);
       registry.registerTxer(registeredTxer);
+      // 126984 is single-frame so YDWG can also send it.
+      createAlertsRegistry().setTxer(registeredTxer);
       // eslint-disable-next-line no-console
       console.log('[autopilot] device-registry refresh target = YDWG (single-frame PGNs only)');
     }
@@ -265,6 +270,9 @@ async function main(): Promise<void> {
       if (stopDiscoveryFn) stopDiscoveryFn();
       if (registeredTxer) {
         getSharedDeviceRegistry().unregisterTxer(registeredTxer);
+        // Drop the alerts txer too so unack'd Acknowledge clicks fail
+        // cleanly with "no transmitter" rather than calling a stale ngt.
+        createAlertsRegistry().setTxer(null);
       }
       if (stopTxFn) await safe('tx', stopTxFn);
       await safe('compute', stopCompute);

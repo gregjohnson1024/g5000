@@ -6,6 +6,7 @@ import { mapPgnToSamples } from './channel-mapper.js';
 import { mapSentenceToSamples } from './nmea0183/channel-mapper.js';
 import { getSharedDeviceRegistry } from './index.js';
 import { handleAisPgn, isAisPgn } from './ais/ais-handler.js';
+import { handleAlertPgn } from './alerts/handler.js';
 
 export interface BridgeOptions {
   bus: Bus;
@@ -62,6 +63,22 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
         error: (err) => {
           // eslint-disable-next-line no-console
           console.error('[bridge] AIS pipeline error', err);
+        },
+      }),
+    );
+
+    // Alerts path: PGN 126983 (Alert) and 126985 (Alert Text) feed a
+    // shared registry keyed by (src, system, sub-system, id, occurrence).
+    // /api/alerts reads from there; the helm UI's Acknowledge button
+    // round-trips through to send PGN 126984 back to the issuer.
+    subs.push(
+      decoded$.subscribe({
+        next: (pgn) => {
+          if (pgn.pgn === 126983 || pgn.pgn === 126985) handleAlertPgn(pgn);
+        },
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] alerts pipeline error', err);
         },
       }),
     );
