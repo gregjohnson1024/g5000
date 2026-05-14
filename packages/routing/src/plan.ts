@@ -24,6 +24,8 @@ const DEFAULTS: Required<PlanOptions> = {
   useCurrents: false,
   pruneBucketDeg: 2,
   captureIsochrones: false,
+  motor: false,
+  motorSpeed: 2.572, // 5 kn in m/s
 };
 
 export function plan(input: PlanInput): Route {
@@ -147,7 +149,12 @@ function propagate(
   }
   const { tws, twd } = decomposeWind(wind.u, wind.v);
   const twa = twaFromWindAndHeading(twd, heading);
-  const bsp = interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+  // Motor mode bypasses the polar — engine doesn't care about TWA. Wind
+  // data is still read above so legs carry tws/twa for display and the
+  // wind-field bbox still gates the planner's reach.
+  const bsp = o.motor
+    ? o.motorSpeed
+    : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
   if (bsp < 0.1) return null; // in-irons / no progress
 
   let vGroundX = Math.sin(heading) * bsp;

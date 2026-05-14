@@ -73,6 +73,45 @@ describe('plan (core)', () => {
     expect(route.reason).toBe('exceeded_max_hours');
   });
 
+  it('motor mode ignores the polar and uses constant speed', () => {
+    // Polar that says "you can't sail at all" (all zeros). If the planner
+    // honoured it, it would return incomplete in zero hops. With motor
+    // mode + 5 m/s, it should still reach the destination.
+    const deadPolar: PolarTable = {
+      twsBins: [0, 5, 10, 15, 20].map((kn) => kn * 0.514444),
+      twaBins: [0, 30, 45, 60, 90, 120, 150, 180].map((d) => (d * Math.PI) / 180),
+      boatSpeed: [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+      ],
+    };
+    const route = plan({
+      start: { lat: 30, lon: -75 },
+      end: { lat: 30, lon: -65 }, // 600 km east
+      departure: 0,
+      wind: uniformWind(),
+      polar: deadPolar,
+      polarId: 'test',
+      coastline: fakeCoastline,
+      options: {
+        avoidLand: false,
+        maxHours: 96,
+        stepMinutes: 60,
+        motor: true,
+        motorSpeed: 5, // 5 m/s ~= 9.7 kn
+      },
+    });
+    expect(route.incomplete).toBeFalsy();
+    expect(route.legs.length).toBeGreaterThan(2);
+    // Every leg's bsp must equal motorSpeed (polar contributes nothing).
+    for (const l of route.legs.slice(1)) {
+      expect(l.bsp).toBeCloseTo(5, 6);
+    }
+  });
+
   it('records polarId in the result', () => {
     const route = plan({
       start: { lat: 30, lon: -75 },
