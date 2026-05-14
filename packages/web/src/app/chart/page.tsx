@@ -330,6 +330,30 @@ export default function HomePage() {
               </select>
             </label>
           </div>
+          {displayModel === 'RTOFS' && (
+            <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
+              <p className="text-slate-400">
+                Native RTOFS rendering pending. For now, open the
+                surface-current view on earth.nullschool — same data
+                (NOAA RTOFS), centred on your position. Best public
+                view of the Gulf Stream meanders and eddies.
+              </p>
+              <a
+                href={(() => {
+                  const lon = livePos?.lon ?? -66;
+                  const lat = livePos?.lat ?? 36;
+                  // orthographic={lon},{lat},{zoom}. ~3500 puts the
+                  // whole western Atlantic in view with the GS visible.
+                  return `https://earth.nullschool.net/#current/ocean/surface/currents/orthographic=${lon.toFixed(2)},${lat.toFixed(2)},3500`;
+                })()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-2 py-1 bg-amber-700 hover:bg-amber-600 text-amber-100 rounded font-medium"
+              >
+                Open in earth.nullschool ↗
+              </a>
+            </div>
+          )}
           {(() => {
             const list = availableHours[windModel];
             if (list.length === 0) {
