@@ -79,7 +79,48 @@ function ChartPageInner() {
   // Default off — at the user's request. Isochrones add chart clutter and
   // are mostly useful when actively investigating a planned route's fan-out.
   const [showIsochrones, setShowIsochrones] = useState(false);
-  const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'RTOFS'>('GFS');
+  const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'CMEMS'>('GFS');
+
+  // Persist the user-tunable chart settings to localStorage so switching to
+  // a different tab and back doesn't reset them. Two-effect dance: hydrate
+  // on mount, then write on every change but only AFTER hydration finishes
+  // (so we don't clobber the saved state with first-render defaults).
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('chart:settings');
+      if (raw) {
+        const j = JSON.parse(raw) as Partial<{
+          windOn: boolean;
+          windModel: WindModel;
+          windHours: number;
+          displayModel: 'GFS' | 'ECMWF' | 'CMEMS';
+          showIsochrones: boolean;
+        }>;
+        if (typeof j.windOn === 'boolean') setWindOn(j.windOn);
+        if (j.windModel === 'gfs' || j.windModel === 'ecmwf') setWindModel(j.windModel);
+        if (typeof j.windHours === 'number') setWindHours(j.windHours);
+        if (j.displayModel === 'GFS' || j.displayModel === 'ECMWF' || j.displayModel === 'CMEMS') {
+          setDisplayModel(j.displayModel);
+        }
+        if (typeof j.showIsochrones === 'boolean') setShowIsochrones(j.showIsochrones);
+      }
+    } catch {
+      /* corrupt blob; ignore */
+    }
+    setSettingsHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!settingsHydrated) return;
+    try {
+      localStorage.setItem(
+        'chart:settings',
+        JSON.stringify({ windOn, windModel, windHours, displayModel, showIsochrones }),
+      );
+    } catch {
+      /* quota / private-mode; ignore */
+    }
+  }, [settingsHydrated, windOn, windModel, windHours, displayModel, showIsochrones]);
 
   const saveRoiFromView = async (): Promise<void> => {
     const map = mapRef.current;
@@ -373,7 +414,7 @@ function ChartPageInner() {
           centerLon={livePos?.lon ?? null}
           model={windModel}
           hours={windHours}
-          hidden={!windOn || displayModel === 'RTOFS'}
+          hidden={!windOn || displayModel === 'CMEMS'}
           opacity={0.5}
           showFill={true}
           showBarbs={true}
@@ -391,18 +432,18 @@ function ChartPageInner() {
         />
         <CurrentOverlay
           map={mapInstance}
-          hidden={!windOn || displayModel !== 'RTOFS'}
+          hidden={!windOn || displayModel !== 'CMEMS'}
           day={0}
           opacity={0.85}
           refreshKey={currentRefreshKey}
           onLoaded={({ grid, error }) => {
             if (error === 'not cached') {
-              setCurrentStatus('No RTOFS grid cached. Click Refresh.');
+              setCurrentStatus('No CMEMS grid cached. Click Refresh.');
             } else if (error) {
               setCurrentStatus(`Error: ${error}`);
             } else if (grid) {
               const ageH = Math.round((Date.now() / 1000 - grid.validAt) / 3600);
-              setCurrentStatus(`RTOFS run ${new Date(grid.runAt * 1000).toISOString().slice(0, 10)} · valid ${new Date(grid.validAt * 1000).toISOString().slice(11, 16)}Z (${ageH >= 0 ? '+' : ''}${ageH}h)`);
+              setCurrentStatus(`CMEMS daily mean for ${new Date(grid.validAt * 1000).toISOString().slice(0, 10)}`);
             }
           }}
         />
@@ -465,15 +506,15 @@ function ChartPageInner() {
               <select
                 value={displayModel}
                 onChange={(e) => {
-                  const m = e.target.value as 'GFS' | 'ECMWF' | 'RTOFS';
+                  const m = e.target.value as 'GFS' | 'ECMWF' | 'CMEMS';
                   setDisplayModel(m);
-                  // GFS/ECMWF select wind grids; RTOFS is surface currents
+                  // GFS/ECMWF select wind grids; CMEMS is surface currents
                   // — keep windModel in sync so the overlay/hours slider
                   // reads from the right cache.
                   if (m === 'GFS') setWindModel('gfs');
                   else if (m === 'ECMWF') setWindModel('ecmwf');
-                  // RTOFS leaves windModel alone — currents overlay is a
-                  // separate render path (TODO when /api/currents lands).
+                  // CMEMS leaves windModel alone — currents overlay is a
+                  // separate render path.
                 }}
                 className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200"
               >
@@ -483,15 +524,16 @@ function ChartPageInner() {
                 <option value="ECMWF">
                   ECMWF (wind){availableHours.ecmwf.length ? '' : ' (no cache)'}
                 </option>
-                <option value="RTOFS">RTOFS (currents)</option>
+                <option value="CMEMS">CMEMS (currents)</option>
               </select>
             </label>
           </div>
-          {displayModel === 'RTOFS' && (
+          {displayModel === 'CMEMS' && (
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
               <p className="text-slate-400">
-                Surface currents from NOAA RTOFS (1/12°, daily run, +3 h
-                forecast). Colour = speed in knots; arrows = direction.
+                Surface currents from Copernicus Marine (CMEMS) daily-mean
+                global analysis (1/12°, surface depth). Colour = speed in
+                knots; arrows = direction.
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -499,7 +541,7 @@ function ChartPageInner() {
                   disabled={currentFetching}
                   onClick={async () => {
                     setCurrentFetching(true);
-                    setCurrentStatus('Fetching RTOFS…');
+                    setCurrentStatus('Fetching CMEMS…');
                     try {
                       // Western North Atlantic — covers Bermuda → New England
                       // and the full Gulf Stream meander region.
@@ -531,7 +573,7 @@ function ChartPageInner() {
                   }}
                   className="px-2 py-1 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-amber-100 rounded font-medium"
                 >
-                  {currentFetching ? 'Fetching…' : 'Refresh RTOFS'}
+                  {currentFetching ? 'Fetching…' : 'Refresh CMEMS'}
                 </button>
                 {currentStatus && <span className="text-slate-400">{currentStatus}</span>}
               </div>
