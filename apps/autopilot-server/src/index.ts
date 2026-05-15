@@ -24,6 +24,7 @@ import {
 } from '@g5000/bridge';
 import { startDemoInjector } from './demo-injector.js';
 import { startSogStats } from './sog-stats.js';
+import { startCogStats } from './cog-stats.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { startHlinkServer } from './hlink/server.js';
@@ -221,6 +222,8 @@ async function main(): Promise<void> {
     // src/sog-stats.ts.
     const sogStats = startSogStats(bus);
     stops.push(async () => sogStats.stop());
+    const cogStats = startCogStats(bus);
+    stops.push(async () => cogStats.stop());
 
     // True-wind TX wiring + device-registry refresh target.
     //   - True-wind TX is NGT-1-only (requires Fast Packet split).

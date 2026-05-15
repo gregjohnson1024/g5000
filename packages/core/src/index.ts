@@ -11,4 +11,5 @@ export * from './observed-sources.js';
 export * from './ais-targets.js';
 export * from './alerts.js';
 export * from './sog-stats.js';
+export * from './cog-stats.js';
 export * from './pgn-firehose.js';

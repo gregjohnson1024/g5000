@@ -134,26 +134,57 @@ export default function HelmPage() {
     coveredMs: number;
     windowMs: number;
   } | null>(null);
+  // Same pattern for COG — circular-mean computed server-side, so a boat
+  // crossing 0° doesn't average to 180°. `concentration` is the
+  // mean-resultant length; near 0 means the average isn't statistically
+  // meaningful (used to grey out the tile).
+  const [avgCog, setAvgCog] = useState<{
+    rad: number;
+    concentration: number;
+    coveredMs: number;
+    windowMs: number;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     const tick = async (): Promise<void> => {
       try {
-        const r = await fetch('/api/stats/sog', { cache: 'no-store' });
-        if (!r.ok || cancelled) return;
-        const j = (await r.json()) as {
-          ok: boolean;
-          stats?: {
-            avgMs: number | null;
-            coveredMs: number;
-            windowMs: number;
+        const [sogR, cogR] = await Promise.all([
+          fetch('/api/stats/sog', { cache: 'no-store' }),
+          fetch('/api/stats/cog', { cache: 'no-store' }),
+        ]);
+        if (cancelled) return;
+        if (sogR.ok) {
+          const j = (await sogR.json()) as {
+            ok: boolean;
+            stats?: { avgMs: number | null; coveredMs: number; windowMs: number };
           };
-        };
-        if (!j.ok || !j.stats || j.stats.avgMs === null) return;
-        setAvgSog({
-          ms: j.stats.avgMs,
-          coveredMs: j.stats.coveredMs,
-          windowMs: j.stats.windowMs,
-        });
+          if (j.ok && j.stats && j.stats.avgMs !== null) {
+            setAvgSog({
+              ms: j.stats.avgMs,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
+          }
+        }
+        if (cogR.ok) {
+          const j = (await cogR.json()) as {
+            ok: boolean;
+            stats?: {
+              avgRad: number | null;
+              concentration: number;
+              coveredMs: number;
+              windowMs: number;
+            };
+          };
+          if (j.ok && j.stats && j.stats.avgRad !== null) {
+            setAvgCog({
+              rad: j.stats.avgRad,
+              concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
+          }
+        }
       } catch {
         /* next tick retries */
       }
@@ -226,6 +257,20 @@ export default function HelmPage() {
               ? avgSog.coveredMs >= avgSog.windowMs - 1000
                 ? `${Math.round(avgSog.windowMs / 60000)} min`
                 : `${Math.max(1, Math.round(avgSog.coveredMs / 60000))} min so far`
+              : '15 min'
+          }
+          small
+        />
+
+        <HelmTile
+          label="Avg COG"
+          value={avgCog ? fmtHeadingRad(avgCog.rad) : '—'}
+          unit="°"
+          sub={
+            avgCog
+              ? avgCog.coveredMs >= avgCog.windowMs - 1000
+                ? `${Math.round(avgCog.windowMs / 60000)} min`
+                : `${Math.max(1, Math.round(avgCog.coveredMs / 60000))} min so far`
               : '15 min'
           }
           small
