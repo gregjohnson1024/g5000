@@ -579,7 +579,10 @@ function ChartPageInner() {
               </div>
             </div>
           )}
-          {(() => {
+          {/* Wind-forecast timeline (run, valid time, hour stepper). Hidden
+              when the user has CMEMS selected — currents are a daily mean
+              and don't have an hour-stepped slider. */}
+          {displayModel !== 'CMEMS' && (() => {
             const fullList = availableHours[windModel];
             if (fullList.length === 0) {
               return (
@@ -681,14 +684,14 @@ function ChartPageInner() {
               </div>
             );
           })()}
-          {windGrid && (
+          {displayModel !== 'CMEMS' && windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
               <div>Showing: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>
               <div>Run: <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.runAt, tz)}</span></div>
               <div>Valid: <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.validAt, tz)}</span> (+{windGrid.forecastHour}h)</div>
             </div>
           )}
-          {windStatus && (
+          {displayModel !== 'CMEMS' && windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
           )}
           <label className="flex items-center gap-2 text-xs pt-1 border-t border-slate-800 mt-2">
