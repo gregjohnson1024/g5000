@@ -71,7 +71,7 @@ export function LiveBoatMarker({
         source: TRAIL_SOURCE_ID,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#000000',
+          'line-color': '#22c55e',
           'line-width': 2,
           'line-opacity': 0.85,
         },
