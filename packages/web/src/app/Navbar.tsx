@@ -31,15 +31,17 @@ const ITEMS: NavItem[] = [
   { href: '/sniff', label: 'Sniff' },
 ];
 
-export function Navbar() {
+export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
   const pathname = usePathname();
+  const hidden = new Set(hiddenHrefs ?? []);
+  const items = ITEMS.filter((it) => !hidden.has(it.href));
 
   return (
     <nav className="bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center gap-1 flex-wrap text-sm">
       <a href="/" className="font-semibold text-slate-100 mr-3">
         G5000
       </a>
-      {ITEMS.map((it) => {
+      {items.map((it) => {
         const active = pathname === it.href || pathname?.startsWith(it.href + '/');
         return (
           <a
