@@ -27,16 +27,14 @@ export function GulfStreamLayer({ map }: { map: maplibregl.Map | null }) {
 
   useEffect(() => {
     let cancelled = false;
-    console.log('[GulfStream] fetching /api/gulf-stream/north-wall');
     fetch('/api/gulf-stream/north-wall')
       .then((r) => r.json() as Promise<ApiResponse>)
       .then((j) => {
         if (cancelled) return;
-        console.log('[GulfStream] fetch result ok=', j.ok, 'features=', j.geojson?.features?.length);
         if (j.ok && j.geojson) setData(j.geojson);
       })
-      .catch((e) => {
-        console.log('[GulfStream] fetch error', e);
+      .catch(() => {
+        /* ignore — chart works fine without the overlay */
       });
     return () => {
       cancelled = true;
@@ -44,18 +42,14 @@ export function GulfStreamLayer({ map }: { map: maplibregl.Map | null }) {
   }, []);
 
   useEffect(() => {
-    console.log('[GulfStream] render effect: map=', !!map, 'data=', !!data);
     if (!map || !data) return;
 
     const ensure = (): void => {
-      console.log('[GulfStream] ensure() — styleLoaded=', map.isStyleLoaded());
       if (!map.getSource(SOURCE_ID)) {
         map.addSource(SOURCE_ID, { type: 'geojson', data });
-        console.log('[GulfStream] addSource done');
       } else {
         const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource;
         src.setData(data);
-        console.log('[GulfStream] setData done');
       }
       if (!map.getLayer(CASING_LAYER)) {
         map.addLayer({
@@ -69,7 +63,6 @@ export function GulfStreamLayer({ map }: { map: maplibregl.Map | null }) {
             'line-opacity': 0.6,
           },
         });
-        console.log('[GulfStream] casing layer added');
       }
       if (!map.getLayer(LINE_LAYER)) {
         map.addLayer({
@@ -83,19 +76,27 @@ export function GulfStreamLayer({ map }: { map: maplibregl.Map | null }) {
             'line-opacity': 0.95,
           },
         });
-        console.log('[GulfStream] line layer added — total layers now', map.getStyle().layers.length);
       }
     };
 
-    if (map.isStyleLoaded()) {
-      console.log('[GulfStream] style already loaded, calling ensure');
+    // `'load'` is one-shot and may already be in the past by the time the
+    // chart page's onLoad callback hands us the map instance — so
+    // `map.once('load', ...)` would never fire. `'styledata'` fires on every
+    // style change and any time the style first becomes ready; we use it as
+    // a retry signal. ensure() is idempotent (the getSource/getLayer guards
+    // make repeated calls cheap), so leaving the listener registered after
+    // the layers are added does no harm.
+    const tryEnsure = (): void => {
+      if (!map.isStyleLoaded()) return;
       ensure();
-    } else {
-      console.log('[GulfStream] style NOT loaded, waiting for load event');
-      map.once('load', ensure);
-    }
+    };
+    tryEnsure();
+    map.on('styledata', tryEnsure);
+    map.on('load', tryEnsure);
 
     return () => {
+      map.off('styledata', tryEnsure);
+      map.off('load', tryEnsure);
       // The map may already be torn down by the time we cleanup.
       try {
         for (const id of [LINE_LAYER, CASING_LAYER]) {
