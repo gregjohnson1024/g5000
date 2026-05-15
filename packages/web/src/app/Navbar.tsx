@@ -28,6 +28,7 @@ const ITEMS: NavItem[] = [
   { href: '/sessions', label: 'Sessions' },
   { href: '/logs', label: 'Logs' },
   { href: '/inspect', label: 'Inspect' },
+  { href: '/sniff', label: 'Sniff' },
 ];
 
 export function Navbar() {

@@ -1,4 +1,5 @@
 import type { Bus } from '@g5000/core';
+import { getPgnFirehose } from '@g5000/core';
 import { mergeMap, from, share, type Subscription } from 'rxjs';
 import type { WireDriver } from './wire-driver.js';
 import { decode } from './decoder.js';
@@ -49,6 +50,28 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
         error: (err) => {
           // eslint-disable-next-line no-console
           console.error('[bridge] device-registry pipeline error', err);
+        },
+      }),
+    );
+
+    // Firehose: every decoded PGN also goes to the shared subject so
+    // sniffers can subscribe without plumbing through the bridge. See
+    // packages/core/src/pgn-firehose.ts.
+    const firehose = getPgnFirehose();
+    subs.push(
+      decoded$.subscribe({
+        next: (pgn) =>
+          firehose.next({
+            pgn: pgn.pgn,
+            src: pgn.src,
+            prio: pgn.prio,
+            dst: pgn.dst,
+            fields: pgn.fields,
+            rxTimestamp: pgn.rxTimestamp,
+          }),
+        error: (err) => {
+          // eslint-disable-next-line no-console
+          console.error('[bridge] firehose pipeline error', err);
         },
       }),
     );
