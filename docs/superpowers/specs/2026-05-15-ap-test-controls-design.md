@@ -31,7 +31,6 @@ This work is a precursor to broader integrated autopilot control (route-driven h
 | `packages/bridge/src/tx/fast-packet.test.ts` | Unit tests: round-trip for PGN 130850, sequence-counter increment across consecutive sends, single-frame regression for PGN 60928. |
 | `packages/web/src/app/autopilot/control-panel.tsx` | Client component: buttons, confirmation modal, recent-command log. Reads capture-codes via `/api/autopilot/capture-codes`. |
 | `packages/web/src/app/api/autopilot/command/route.ts` | POST endpoint. Layer-2 env-var gate, calls `getSharedAutopilotTx().sendCommand(...)`. Single-in-flight serialization. |
-| `packages/web/src/app/api/autopilot/control-enabled/route.ts` | GET endpoint returns `{enabled: boolean}` based on `G5000_ENABLE_AP_TX`. Read by the page's server-component wrapper. |
 | `packages/web/src/app/api/autopilot/capture-codes/route.ts` | GET endpoint returns the contents of `~/.g5000-router/ap-tx-codes.json` (or empty `{captures:{}}` if missing). Used by control-panel to gate increment buttons. |
 
 ### Modify
@@ -84,7 +83,7 @@ NMEA 2000 fast-packet protocol (NOT ISO-TP):
 - Frame 0 only: byte 1 = total payload length in bytes; bytes 2–7 carry 6 payload bytes.
 - Subsequent frames: bytes 1–7 carry 7 payload bytes each. Last frame pads with 0xFF.
 
-PGN 130850 with PropID=255 is 12 bytes → 2 frames. canboatjs's `pgnToActisenseSerialFormat` already produces correctly-split Actisense lines; the implementation just parses & emits each frame in order via the existing `txCan` path. No inter-frame delay needed — TCP preserves order to the YDWG, which forwards frame-by-frame to the bus.
+PGN 130850 sub-PGNs (PropID=255) are 11–14 bytes per canboat, so 2 fast-packet frames each. canboatjs's `pgnToActisenseSerialFormat` already produces correctly-split Actisense lines; the implementation just parses & emits each frame in order via the existing `txCan` path. No inter-frame delay needed — TCP preserves order to the YDWG, which forwards frame-by-frame to the bus per the YDWG-RAW protocol (each newline-terminated line = one CAN frame).
 
 Sequence number is managed internally by canboatjs; we trust it but add a regression test that two consecutive sends use different sequence values.
 
@@ -115,9 +114,9 @@ Layout under the existing readouts, only rendered when `G5000_ENABLE_AP_TX=1`:
 - Amber warning banner: "Sends real PGN 130850 frames to the live AP. Confirm each press."
 - Two-button mode grid: `ENABLE (AUTO)` / `DISABLE (STBY)`.
 - Four-button course grid: `−10` / `−1` / `+1` / `+10`. Greyed when capture-codes file lacks the entry; tooltip names the missing key.
-- Recent-command log: last 10 sends, format `HH:MM:SS  COMMAND  → ack: <result>` where result is one of:
-  - `mode→<value> (<ms>)` — observed channel update within 2 s
-  - `no ack within 2 s`
+- Recent-command log: last 10 sends, format `HH:MM:SS  COMMAND  → <result>`. The "ack" is a heuristic correlation, not a true protocol ack — we watch the existing `autopilot.mode` channel for a state change within a 2 s window. Could be a false positive if someone presses the Triton during the window. Results:
+  - `mode→<value> (<ms>)` — channel changed within 2 s
+  - `no mode change within 2 s` — sent OK but AP didn't transition (may be intentional, e.g. +1 while in heading mode shifts target without mode change)
   - `TX error: <message>`
   - `bus down — check YDWG` (503 from API)
 
@@ -132,7 +131,7 @@ Every press shows a confirmation modal with command-specific text describing the
 | Interleaved fast-packet sequences | Single-in-flight serialization mutex in `AutopilotTx.sendCommand` |
 | Incorrect captured-code clobbers the AP | Capture buttons are disabled until JSON entry exists; user hand-edits with the values they saw at `/sniff`; modal still confirms |
 | Unintended retries | API does not auto-retry on `txPgn` failure; error surfaces to user; resend is a deliberate second click |
-| User confusion about ack | Recent-command log shows real ack state observed from the bus, not optimistic UI |
+| User confusion about ack | Recent-command log clearly labels the result as "mode change observed", not a true ack; +1 / −1 / +10 / −10 specifically may show "no mode change within 2 s" even on success because they shift target heading without leaving Heading mode |
 
 ## 7. Test plan
 
