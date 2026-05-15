@@ -16,6 +16,7 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid, type WindModel } from '../../components/WindOverlay';
+import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { CogExtension } from '../../components/CogExtension';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
@@ -48,6 +49,9 @@ function ChartPageInner() {
   const [windRefreshKey, setWindRefreshKey] = useState(1);
   const [windGrid, setWindGrid] = useState<WindGrid | null>(null);
   const [windStatus, setWindStatus] = useState<string | null>(null);
+  const [currentRefreshKey, setCurrentRefreshKey] = useState(1);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+  const [currentFetching, setCurrentFetching] = useState(false);
   const [availableHours, setAvailableHours] = useState<{ gfs: number[]; ecmwf: number[] }>({
     gfs: [],
     ecmwf: [],
@@ -369,7 +373,7 @@ function ChartPageInner() {
           centerLon={livePos?.lon ?? null}
           model={windModel}
           hours={windHours}
-          hidden={!windOn}
+          hidden={!windOn || displayModel === 'RTOFS'}
           opacity={0.5}
           showFill={true}
           showBarbs={true}
@@ -383,6 +387,23 @@ function ChartPageInner() {
               if (identical) setWindStatus(null);
             }
             if (windStatus) setTimeout(() => setWindStatus(null), 4000);
+          }}
+        />
+        <CurrentOverlay
+          map={mapInstance}
+          hidden={!windOn || displayModel !== 'RTOFS'}
+          day={0}
+          opacity={0.85}
+          refreshKey={currentRefreshKey}
+          onLoaded={({ grid, error }) => {
+            if (error === 'not cached') {
+              setCurrentStatus('No RTOFS grid cached. Click Refresh.');
+            } else if (error) {
+              setCurrentStatus(`Error: ${error}`);
+            } else if (grid) {
+              const ageH = Math.round((Date.now() / 1000 - grid.validAt) / 3600);
+              setCurrentStatus(`RTOFS run ${new Date(grid.runAt * 1000).toISOString().slice(0, 10)} · valid ${new Date(grid.validAt * 1000).toISOString().slice(11, 16)}Z (${ageH >= 0 ? '+' : ''}${ageH}h)`);
+            }
           }}
         />
         <div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
@@ -469,25 +490,51 @@ function ChartPageInner() {
           {displayModel === 'RTOFS' && (
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
               <p className="text-slate-400">
-                Native RTOFS rendering pending. For now, open the
-                surface-current view on earth.nullschool — same data
-                (NOAA RTOFS), centred on your position. Best public
-                view of the Gulf Stream meanders and eddies.
+                Surface currents from NOAA RTOFS (1/12°, daily run, +3 h
+                forecast). Colour = speed in knots; arrows = direction.
               </p>
-              <a
-                href={(() => {
-                  const lon = livePos?.lon ?? -66;
-                  const lat = livePos?.lat ?? 36;
-                  // orthographic={lon},{lat},{zoom}. ~3500 puts the
-                  // whole western Atlantic in view with the GS visible.
-                  return `https://earth.nullschool.net/#current/ocean/surface/currents/orthographic=${lon.toFixed(2)},${lat.toFixed(2)},3500`;
-                })()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-2 py-1 bg-amber-700 hover:bg-amber-600 text-amber-100 rounded font-medium"
-              >
-                Open in earth.nullschool ↗
-              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentFetching}
+                  onClick={async () => {
+                    setCurrentFetching(true);
+                    setCurrentStatus('Fetching RTOFS…');
+                    try {
+                      // Western North Atlantic — covers Bermuda → New England
+                      // and the full Gulf Stream meander region.
+                      const r = await fetch('/api/current/refresh', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          bbox: { latMin: 20, latMax: 50, lonMin: -82, lonMax: -40 },
+                          days: [0],
+                        }),
+                      });
+                      const j = (await r.json()) as {
+                        ok: boolean;
+                        results?: Array<{ day: number; ok: boolean; error?: string }>;
+                        error?: { message?: string };
+                      };
+                      if (!j.ok || !j.results?.[0]?.ok) {
+                        const err = j.results?.[0]?.error ?? j.error?.message ?? 'fetch failed';
+                        setCurrentStatus(`Refresh failed: ${err}`);
+                      } else {
+                        setCurrentStatus('Refresh OK');
+                        setCurrentRefreshKey((k) => k + 1);
+                      }
+                    } catch (e) {
+                      setCurrentStatus(`Refresh error: ${(e as Error).message}`);
+                    } finally {
+                      setCurrentFetching(false);
+                    }
+                  }}
+                  className="px-2 py-1 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-amber-100 rounded font-medium"
+                >
+                  {currentFetching ? 'Fetching…' : 'Refresh RTOFS'}
+                </button>
+                {currentStatus && <span className="text-slate-400">{currentStatus}</span>}
+              </div>
             </div>
           )}
           {(() => {
