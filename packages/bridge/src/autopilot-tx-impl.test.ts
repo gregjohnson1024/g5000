@@ -14,11 +14,11 @@ function fakeDriver(): WireDriver & { txPgnSpy: ReturnType<typeof vi.fn> } {
     stop: vi.fn().mockResolvedValue(undefined),
     rxCan: { subscribe: () => ({ unsubscribe: () => {} }) } as never,
     rx0183: { subscribe: () => ({ unsubscribe: () => {} }) } as never,
-    health$: { subscribe: () => ({ unsubscribe: () => {} }) } as never,
+    health: { subscribe: () => ({ unsubscribe: () => {} }) } as never,
     txCan: vi.fn().mockResolvedValue(undefined),
     tx0183: vi.fn().mockResolvedValue(undefined),
     txPgn: txPgnSpy,
-  } as unknown as WireDriver & { txPgnSpy: ReturnType<typeof vi.fn> };
+  } as WireDriver & { txPgnSpy: ReturnType<typeof vi.fn> };
 }
 
 afterEach(() => {

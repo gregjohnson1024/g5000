@@ -49,7 +49,7 @@ export function createAutopilotTx(opts: CreateAutopilotTxOpts): AutopilotTx {
         ok: false,
         error: {
           kind: 'tx_error',
-          message: (e as Error).message,
+          message: e instanceof Error ? e.message : String(e),
         },
       };
     }
