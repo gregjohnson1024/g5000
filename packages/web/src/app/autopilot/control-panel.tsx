@@ -31,6 +31,13 @@ export function ControlPanel(): React.ReactElement {
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const logIdRef = useRef(0);
   const { channels } = useSse();
+  // useSse returns a fresh Map on every SSE event. The 2s ack-poll below
+  // runs inside a long-lived closure; without this ref it would keep reading
+  // the snapshot taken at click time and never observe the mode change.
+  const channelsRef = useRef(channels);
+  useEffect(() => {
+    channelsRef.current = channels;
+  }, [channels]);
 
   useEffect(() => {
     fetch('/api/autopilot/capture-codes')
@@ -59,7 +66,7 @@ export function ControlPanel(): React.ReactElement {
   async function confirmAndSend(name: AutopilotCommandName): Promise<void> {
     setPendingCommand(null);
     const t0 = Date.now();
-    const modeBefore = channels.get('autopilot.mode') as JsonSafeSample | undefined;
+    const modeBefore = channelsRef.current.get('autopilot.mode') as JsonSafeSample | undefined;
     const modeBeforeValue =
       modeBefore?.value.kind === 'enum' ? modeBefore.value.value : null;
 
@@ -81,7 +88,7 @@ export function ControlPanel(): React.ReactElement {
         const deadline = Date.now() + 2000;
         while (Date.now() < deadline) {
           await new Promise((r) => setTimeout(r, 100));
-          const after = channels.get('autopilot.mode') as JsonSafeSample | undefined;
+          const after = channelsRef.current.get('autopilot.mode') as JsonSafeSample | undefined;
           const v = after?.value.kind === 'enum' ? after.value.value : null;
           if (v && v !== modeBeforeValue) {
             resultText = `mode→${v} (${Date.now() - t0} ms)`;
