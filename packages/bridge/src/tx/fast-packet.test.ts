@@ -58,12 +58,4 @@ describe('encodePgnToCanFrames', () => {
       }),
     ).toThrow();
   });
-
-  it('rejects malformed YDWG-RAW lines (synthetic defense)', () => {
-    // Confidence test: if canboatjs ever emits something we cannot parse, the
-    // helper should fail loudly rather than write malformed bytes onto the bus.
-    // We can't easily induce canboatjs to misbehave, so this test is informational
-    // — the parser is exercised positively by the PGN 130850 test above.
-    // (Intentionally no expect — keep the spec honest about test coverage.)
-  });
 });
