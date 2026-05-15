@@ -15,7 +15,7 @@ This work is a precursor to broader integrated autopilot control (route-driven h
 ## 2. Existing state
 
 - `/autopilot` page (`packages/web/src/app/autopilot/page.tsx`): client-side, channel-driven readouts via `useSse` hook. Footer literally says "Listen-only. The G5000 does not transmit any autopilot commands."
-- YDWG-RAW driver (`packages/bridge/src/ydwg-raw-tcp-driver.ts`): has a `txPgn(pgn)` method that uses canboatjs's `pgnToActisenseSerialFormat` round-trip + `txCan(frame)`. Currently throws on fast-packet (line 182, `lines.length !== 1`).
+- YDWG-RAW driver (`packages/bridge/src/ydwg-raw-tcp-driver.ts`): has a `txPgn(pgn)` method. Previously threw on fast-packet; now delegates to `encodePgnToCanFrames` (Task 1) which wraps canboatjs's `pgnToYdgwRawFormat` (the correct per-CAN-frame encoder — `pgnToActisenseSerialFormat` returns a single reassembled-payload line, not per-frame).
 - Bridge singletons: established `globalThis.__g5000_*__` pattern with paired `setShared*` / `getShared*` getters (see `packages/core/src/alerts.ts:84-95` as the canonical example).
 - canboat PGN database (verified during brainstorming): PGN 130850 has 11 variants discriminated by `Proprietary ID` (1=Alarm, 2=Follow-up, 255=AP command). Mode commands use `PropID=255, CommandType=10` with `Event` values 6=Standby, 9=Heading, 10=Nav, 12=NoDrift, 15=Wind, 17=Tack. Course-change uses `Event=26` with undocumented magnitude/direction encoding (needs Triton capture).
 - `/sniff` page (just extended): captures PGN 130850 + 130845 frames with marker insertion for keypad-press identification.
@@ -27,8 +27,8 @@ This work is a precursor to broader integrated autopilot control (route-driven h
 | File | Purpose |
 |---|---|
 | `packages/core/src/autopilot-tx.ts` | Defines `AutopilotTx` interface (`sendCommand(req): Promise<{ok, error?}>`) + `setSharedAutopilotTx` / `getSharedAutopilotTx`. Mirrors `alerts.ts` pattern. |
-| `packages/bridge/src/tx/fast-packet.ts` | Pure helper `parseActisenseFrameLines(encoded: string): RawCanFrame[]`. Splits canboatjs's multi-line output, parses each line, returns frames in emission order. Asserts frame# strictly ascending. |
-| `packages/bridge/src/tx/fast-packet.test.ts` | Unit tests: round-trip for PGN 130850, sequence-counter increment across consecutive sends, single-frame regression for PGN 60928. |
+| `packages/bridge/src/tx/fast-packet.ts` | Pure helper `encodePgnToCanFrames(pgn: OutgoingPgn): RawCanFrame[]`. Wraps canboatjs `pgnToYdgwRawFormat`, parses each YDWG-RAW line into a RawCanFrame, asserts frame# strictly ascending. |
+| `packages/bridge/src/tx/fast-packet.test.ts` | Unit tests: round-trip for PGN 130850 → 2 ordered frames; single-frame regression for PGN 60928; canboatjs failure throws. |
 | `packages/web/src/app/autopilot/control-panel.tsx` | Client component: buttons, confirmation modal, recent-command log. Reads capture-codes via `/api/autopilot/capture-codes`. |
 | `packages/web/src/app/api/autopilot/command/route.ts` | POST endpoint. Layer-2 env-var gate, calls `getSharedAutopilotTx().sendCommand(...)`. Single-in-flight serialization. |
 | `packages/web/src/app/api/autopilot/capture-codes/route.ts` | GET endpoint returns the contents of `~/.g5000-router/ap-tx-codes.json` (or empty `{captures:{}}` if missing). Used by control-panel to gate increment buttons. |
@@ -37,7 +37,7 @@ This work is a precursor to broader integrated autopilot control (route-driven h
 
 | File | Change |
 |---|---|
-| `packages/bridge/src/ydwg-raw-tcp-driver.ts` | Rewrite the `lines.length !== 1` branch in `txPgn`: instead of throwing, parse all lines via `parseActisenseFrameLines`, await `txCan(frame)` for each in order. Drop the `frame.data.length > 8` throw (no longer reachable post-split). |
+| `packages/bridge/src/ydwg-raw-tcp-driver.ts` | Rewrite the `lines.length !== 1` branch in `txPgn`: instead of throwing, parse all lines via `encodePgnToCanFrames`, await `txCan(frame)` for each in order. Drop the `frame.data.length > 8` throw (no longer reachable post-split). |
 | `packages/bridge/src/ydwg-raw-tcp-driver.test.ts` | Replace the existing "Fast Packet split not implemented" rejection test with a positive test: send PGN 130850 → assert N CAN frames written, each ending `\n`, frame counters strictly ascending. |
 | `packages/bridge/src/bridge.ts` | At boot, if `process.env.G5000_ENABLE_AP_TX === '1'`, construct the AutopilotTx implementation (closes over the driver + a serialization mutex) and call `setSharedAutopilotTx(...)`. Otherwise log a one-line disabled message and skip registration. |
 | `packages/web/src/app/autopilot/page.tsx` | Convert to a Server Component shell that reads `process.env.G5000_ENABLE_AP_TX`, then renders the existing read-only content (split into a client component) followed by `<ControlPanel />` only when the flag is set. Rewrite the trailing footnote conditionally. |
@@ -60,7 +60,7 @@ Browser /autopilot button click
      → resolve event → PGN 130850 field-bag (from canboat enum OR ap-tx-codes.json for captures)
      → driver.txPgn({ pgn: 130850, prio: 3, dst: 255, fields })
        → canboatjs encodes → multi-line Actisense text
-       → parseActisenseFrameLines() → ordered RawCanFrame[]
+       → encodePgnToCanFrames() → ordered RawCanFrame[]
        → for each frame: await txCan(frame)
          → "16:XX...\n" line → socket.write()
   → returns { ok: true, txMs }
@@ -83,7 +83,7 @@ NMEA 2000 fast-packet protocol (NOT ISO-TP):
 - Frame 0 only: byte 1 = total payload length in bytes; bytes 2–7 carry 6 payload bytes.
 - Subsequent frames: bytes 1–7 carry 7 payload bytes each. Last frame pads with 0xFF.
 
-PGN 130850 sub-PGNs (PropID=255) are 11–14 bytes per canboat, so 2 fast-packet frames each. canboatjs's `pgnToActisenseSerialFormat` already produces correctly-split Actisense lines; the implementation just parses & emits each frame in order via the existing `txCan` path. No inter-frame delay needed — TCP preserves order to the YDWG, which forwards frame-by-frame to the bus per the YDWG-RAW protocol (each newline-terminated line = one CAN frame).
+PGN 130850 sub-PGNs (PropID=Autopilot) are 11–14 bytes per canboat, so 2 fast-packet frames each. canboatjs's `pgnToYdgwRawFormat` produces one YDWG-RAW wire-format line per CAN frame, with the NMEA-2000 Fast Packet order byte (top 3 bits = sequence, bottom 5 = frame#) already baked into byte 0. The implementation parses each line into a `RawCanFrame` and emits in order via the existing `txCan` path. No inter-frame delay needed — TCP preserves order to the YDWG, which forwards frame-by-frame to the bus.
 
 Sequence number is managed internally by canboatjs; we trust it but add a regression test that two consecutive sends use different sequence values.
 
@@ -137,7 +137,7 @@ Every press shows a confirmation modal with command-specific text describing the
 
 ### Unit (Vitest, CI)
 
-- `parseActisenseFrameLines`: PGN 130850 round-trip → 2 frames, frame counters [0, 1], byte-1-of-frame-0 = 12.
+- `encodePgnToCanFrames`: PGN 130850 round-trip → 2 frames, frame counters [0, 1], byte-1-of-frame-0 = 12.
 - Sequence counter: two consecutive `txPgn(PGN 130850)` calls → sequence-bits differ in the order byte.
 - Single-frame regression: `txPgn` for PGN 60928 (ISO Address Claim, 8 bytes) still emits exactly one frame.
 - Singleton gating: with `G5000_ENABLE_AP_TX` unset, `getSharedAutopilotTx()` after `boot()` is `undefined`; with `='1'`, it's defined.
