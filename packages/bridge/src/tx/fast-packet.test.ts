@@ -58,4 +58,23 @@ describe('encodePgnToCanFrames', () => {
       }),
     ).toThrow();
   });
+
+  it('pins canboatjs sequence-byte behavior across consecutive calls', () => {
+    // Regression test: if canboatjs ever starts rotating the sequence
+    // number across consecutive Fast Packet encodes, we want to know —
+    // our single-in-flight serialization at the AutopilotTx layer assumes
+    // a stable per-call sequence so consecutive 130850 sends don't
+    // interleave at the receiver. Today both calls produce seq=2.
+    const fields = {
+      'Manufacturer Code': 'Simrad',
+      'Industry Code': 'Marine Industry',
+      Address: 0,
+      'Proprietary ID': 'Autopilot',
+      'Command Type': 'AP Command',
+      Event: 'Standby',
+    };
+    const a = encodePgnToCanFrames({ pgn: 130850, prio: 3, dst: 255, fields });
+    const b = encodePgnToCanFrames({ pgn: 130850, prio: 3, dst: 255, fields });
+    expect(a[0]!.data[0]! >> 5).toBe(b[0]!.data[0]! >> 5);
+  });
 });

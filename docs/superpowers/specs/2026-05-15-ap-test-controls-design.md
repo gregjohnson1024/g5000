@@ -137,7 +137,7 @@ Every press shows a confirmation modal with command-specific text describing the
 
 ### Unit (Vitest, CI)
 
-- `encodePgnToCanFrames`: PGN 130850 round-trip → 2 frames, frame counters [0, 1], byte-1-of-frame-0 = 12.
+- `encodePgnToCanFrames`: PGN 130850 round-trip → 2 frames, frame counters [0, 1], byte-1-of-frame-0 = 11.
 - Sequence counter: two consecutive `txPgn(PGN 130850)` calls → sequence-bits differ in the order byte.
 - Single-frame regression: `txPgn` for PGN 60928 (ISO Address Claim, 8 bytes) still emits exactly one frame.
 - Singleton gating: with `G5000_ENABLE_AP_TX` unset, `getSharedAutopilotTx()` after `boot()` is `undefined`; with `='1'`, it's defined.

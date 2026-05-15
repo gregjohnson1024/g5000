@@ -1,5 +1,7 @@
 # AP Test Controls Implementation Plan
 
+> **Status:** Executed 2026-05-15. Implementation deviated from this plan in one substantive way: Task 1's helper was renamed `encodePgnToCanFrames` and switched from `pgnToActisenseSerialFormat` (which returns a single reassembled-payload line, not per-CAN-frame) to `pgnToYdgwRawFormat` (the correct per-frame encoder). All downstream tasks consume the new name. The spec at `docs/superpowers/specs/2026-05-15-ap-test-controls-design.md` reflects the final design; this plan is preserved as the historical execution record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Augment `/autopilot` with Mac-only TX buttons that send real PGN 130850 frames to the H5000 over the YDWG-02 RAW TCP gateway. Pi cannot accidentally transmit (three-layer env-var gate).
