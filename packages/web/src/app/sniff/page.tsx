@@ -12,7 +12,7 @@ interface Frame {
   rowId: number;
 }
 
-const DEFAULT_PGNS = '130850,130845,65305,65341,65302,65340,127237';
+const DEFAULT_PGNS = '130850,130845,126208,126720,65302,65340';
 const MAX_ROWS = 200;
 
 function fmtSrcHex(n: number): string {
@@ -86,6 +86,31 @@ function summary(pgn: number, fields: Record<string, unknown>): string {
     if (mode !== undefined) parts.push(`Mode=${JSON.stringify(mode)}`);
     if (angle !== undefined && angle !== null) parts.push(`Angle=${JSON.stringify(angle)}`);
     return parts.join('  ');
+  }
+  if (pgn === 126208) {
+    // NMEA Group Function — Request / Command / Acknowledge / Read / Write Fields.
+    // The Function Code says which kind and `PGN` says which PGN is being addressed.
+    const fn = fields['Function Code'];
+    const target = fields['PGN'];
+    const parts: string[] = [];
+    if (fn !== undefined) parts.push(`Fn=${JSON.stringify(fn)}`);
+    if (target !== undefined) parts.push(`PGN=${JSON.stringify(target)}`);
+    const otherKeys = Object.keys(fields).filter(
+      (k) =>
+        !['Manufacturer Code', 'Industry Code', 'Function Code', 'PGN', 'Reserved'].includes(k),
+    );
+    for (const k of otherKeys) {
+      parts.push(`${k}=${JSON.stringify(fields[k])}`);
+    }
+    return parts.join('  ');
+  }
+  if (pgn === 126720) {
+    // Proprietary Fast Packet — vendor PGN carrying many Simnet sub-messages.
+    // canboat usually decodes meaningful fields; show everything non-boilerplate.
+    const keys = Object.keys(fields).filter(
+      (k) => !['Manufacturer Code', 'Industry Code', 'Reserved'].includes(k),
+    );
+    return keys.map((k) => `${k}=${JSON.stringify(fields[k])}`).join('  ');
   }
   if (pgn === 65302 || pgn === 65340) {
     // Simnet AP Unknown 1/2 — unmapped. Show every numeric field so patterns are visible.
@@ -195,15 +220,16 @@ export default function SniffPage() {
       <div className="bg-amber-900/30 border border-amber-700 rounded p-3 text-amber-100 text-sm space-y-2">
         <div className="font-semibold">Triton-keypad event capture</div>
         <p>
-          Watching a widened set: PGN 130850 (Simnet AP command / Alarm),
-          130845 (Simnet Key Value — keypad), 65305 (Device Status / Pilot
-          Mode), 65341 (Autopilot Angle setpoint), 65302/65340 (unmapped
-          AP traffic), 127237 (standard Heading/Track Control). Press one
-          key on the Triton at a time, then drop a marker labeling which
-          key it was. The marker arrives AFTER the press by however long
-          it takes to type, so frames appear above the marker that names
-          them. Watch the helm display to confirm the AP actually responded
-          to each press.
+          Watching command-carrier PGNs only: 130850 (Simnet AP command /
+          Alarm), 130845 (Simnet Key Value — keypad), 126208 (NMEA Group
+          Function — standard Request/Command/Ack), 126720 (Proprietary
+          Fast Packet — vendor stuff), 65302/65340 (unmapped Simnet AP).
+          Status PGNs (65305, 65341, 127237) are deliberately omitted to
+          cut noise; add them via the input above if you need to see Mode
+          / Steer change confirmations. Press one key at a time, then drop
+          a marker labeling it — markers arrive AFTER the press by however
+          long typing takes, so frames appear above the marker that names
+          them. Watch the helm display to confirm the AP responded.
         </p>
         <div className="flex gap-2 items-center">
           <input
