@@ -56,6 +56,10 @@ function ChartPageInner() {
     ecmwf: null,
   });
   const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
+  // Lat/lon under the mouse — populated while the cursor is over the map,
+  // cleared when it leaves. Used by the bottom-left cursor-position panel
+  // (distance + bearing from the live boat fix when available).
+  const [cursorLatLon, setCursorLatLon] = useState<{ lat: number; lon: number } | null>(null);
   // Page-level Local/UTC toggle for the forecast timeline label and the
   // Departure picker. Default Local — per user request. Persisted to its
   // own localStorage key (separate from /passage so each page remembers
@@ -119,6 +123,24 @@ function ChartPageInner() {
       attachRoute(mapInstance, 'route-gfs', route, '#000000', showIsochrones);
     }
   }, [route, mapInstance, showIsochrones]);
+
+  // Track the cursor position over the map so the bottom-left readout
+  // can show "lat lon, distance + bearing from boat". Cleared on
+  // mouseleave so the panel disappears when not pointing at the map.
+  useEffect(() => {
+    if (!mapInstance) return;
+    const onMove = (e: maplibregl.MapMouseEvent): void => {
+      setCursorLatLon({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+    };
+    const onLeave = (): void => setCursorLatLon(null);
+    mapInstance.on('mousemove', onMove);
+    const canvas = mapInstance.getCanvas();
+    canvas.addEventListener('mouseleave', onLeave);
+    return () => {
+      mapInstance.off('mousemove', onMove);
+      canvas.removeEventListener('mouseleave', onLeave);
+    };
+  }, [mapInstance]);
 
   // Manifest sync — three triggers, in priority order:
   //   1. BroadcastChannel('forecast-cache') message from the /forecast tab
@@ -394,6 +416,7 @@ function ChartPageInner() {
             </div>
           )}
         </div>
+        <CursorReadout cursor={cursorLatLon} boat={livePos} />
       </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <div className="flex items-center justify-between">
@@ -814,4 +837,60 @@ function SavedPlanLoader({ onLoad }: { onLoad: (plan: PlanRecord) => void }) {
       </label>
     </div>
   );
+}
+
+/**
+ * Bottom-left chart overlay showing the lat/lon under the mouse plus
+ * distance and bearing from the live boat fix. Renders nothing when the
+ * cursor isn't over the map.
+ */
+function CursorReadout({
+  cursor,
+  boat,
+}: {
+  cursor: { lat: number; lon: number } | null;
+  boat: LivePos | null;
+}) {
+  if (!cursor) return null;
+  const hasBoat =
+    !!boat && Number.isFinite(boat.lat) && Number.isFinite(boat.lon);
+  const rangeBearing = hasBoat
+    ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
+    : null;
+  return (
+    <div className="absolute bottom-10 left-3 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
+      <div>{fmtLatLonDmm(cursor.lat, cursor.lon)}</div>
+      <div className="text-slate-300 mt-1">
+        {rangeBearing
+          ? `${rangeBearing.distNm.toFixed(1)} NM · ${rangeBearing.bearingDeg
+              .toFixed(0)
+              .padStart(3, '0')}° from boat`
+          : '— · — (boat fix pending)'}
+      </div>
+    </div>
+  );
+}
+
+/** Great-circle distance (NM) and initial bearing (deg, 0-360, true). */
+function haversineAndBearing(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): { distNm: number; bearingDeg: number } {
+  const R_NM = 3440.065;
+  const DEG = Math.PI / 180;
+  const phi1 = a.lat * DEG;
+  const phi2 = b.lat * DEG;
+  const dphi = (b.lat - a.lat) * DEG;
+  const dlam = (b.lon - a.lon) * DEG;
+  const h =
+    Math.sin(dphi / 2) ** 2 +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
+  const distNm = 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(h)));
+  const y = Math.sin(dlam) * Math.cos(phi2);
+  const x =
+    Math.cos(phi1) * Math.sin(phi2) -
+    Math.sin(phi1) * Math.cos(phi2) * Math.cos(dlam);
+  let bearingDeg = (Math.atan2(y, x) * 180) / Math.PI;
+  if (bearingDeg < 0) bearingDeg += 360;
+  return { distNm, bearingDeg };
 }
