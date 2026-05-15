@@ -10,6 +10,21 @@ import {
   type TzMode,
 } from '../../lib/tz';
 import { TzToggle } from '../../components/TzToggle';
+import { fmtLatLonDmm } from '../../lib/format-coords';
+
+interface EtaSnapshot {
+  destinationLat: number;
+  destinationLon: number;
+  destinationLabel: string;
+  distanceNm: number;
+  bearingDeg: number;
+  avgSpeedKn3h: number | null;
+  etaUnixSec: number | null;
+  etaSecRemaining: number | null;
+  currentLat: number;
+  currentLon: number;
+  currentAtUnixSec: number;
+}
 
 const M_TO_NM = 1 / 1852;
 const TZ_KEY = 'passage:tz';
@@ -114,6 +129,7 @@ function Sparkline({
 
 export default function PassagePage() {
   const [stats, setStats] = useState<DistanceStats | null>(null);
+  const [eta, setEta] = useState<EtaSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Page-level timezone preference — controls how every timestamp on this
   // page is displayed AND how datetime-local form inputs are interpreted.
@@ -131,17 +147,24 @@ export default function PassagePage() {
     let cancelled = false;
     const tick = async (): Promise<void> => {
       try {
-        const r = await fetch('/api/stats/distance', { cache: 'no-store' });
-        const j = (await r.json()) as
+        const [distR, etaR] = await Promise.all([
+          fetch('/api/stats/distance', { cache: 'no-store' }),
+          fetch('/api/stats/eta', { cache: 'no-store' }),
+        ]);
+        const distJ = (await distR.json()) as
           | { ok: true; stats: DistanceStats }
           | { ok: false; error?: { message?: string } };
+        const etaJ = (await etaR.json()) as
+          | { ok: true; eta: EtaSnapshot }
+          | { ok: false; error?: { message?: string } };
         if (cancelled) return;
-        if (j.ok) {
-          setStats(j.stats);
+        if (distJ.ok) {
+          setStats(distJ.stats);
           setError(null);
         } else {
-          setError(j.error?.message ?? 'unknown error');
+          setError(distJ.error?.message ?? 'unknown error');
         }
+        setEta(etaJ.ok ? etaJ.eta : null);
       } catch (e) {
         if (!cancelled) setError(String(e));
       }
@@ -188,6 +211,8 @@ export default function PassagePage() {
 
       {stats?.trackId && (
         <>
+          {eta && <EtaTile eta={eta} tz={tz} />}
+
           <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <DistanceTile label="Last 1 h" valueNm={stats.d1hM * M_TO_NM} hours={1} />
             <DistanceTile label="Last 3 h" valueNm={stats.d3hM * M_TO_NM} hours={3} />
@@ -713,5 +738,55 @@ function DistanceTile({
         avg {avgKn.toFixed(2)} NM/h
       </div>
     </div>
+  );
+}
+
+function EtaTile({ eta, tz }: { eta: EtaSnapshot; tz: TzMode }) {
+  const altTz: TzMode = tz === 'utc' ? 'local' : 'utc';
+  return (
+    <section className="bg-slate-900 border border-amber-700 rounded p-4 space-y-3">
+      <div className="flex items-baseline justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-amber-400">ETA</div>
+          <div className="text-lg font-semibold text-slate-100">
+            {eta.destinationLabel}
+          </div>
+          <div className="text-xs text-slate-500 font-mono">
+            {fmtLatLonDmm(eta.destinationLat, eta.destinationLon)}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="flex items-baseline gap-1 justify-end">
+            <div className="text-4xl font-mono text-slate-100">{eta.distanceNm.toFixed(1)}</div>
+            <div className="text-sm text-slate-400">NM remaining</div>
+          </div>
+          <div className="text-xs text-slate-500 font-mono">
+            bearing {eta.bearingDeg.toFixed(0)}°T
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm font-mono">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-slate-500">Avg speed (last 3 h)</div>
+          <div className="text-xl text-slate-100">
+            {eta.avgSpeedKn3h !== null ? `${eta.avgSpeedKn3h.toFixed(2)} kn` : '—'}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs uppercase tracking-wider text-slate-500">Time remaining</div>
+          <div className="text-xl text-slate-100">
+            {eta.etaSecRemaining !== null ? fmtDuration(eta.etaSecRemaining) : '—'}
+          </div>
+        </div>
+      </div>
+      <div className="text-base font-mono text-slate-100">
+        {eta.etaUnixSec !== null ? fmtTimestamp(eta.etaUnixSec, tz) : '— stopped, no ETA'}
+        {eta.etaUnixSec !== null && (
+          <span className="text-xs text-slate-500 ml-2">
+            ({fmtTimestamp(eta.etaUnixSec, altTz)})
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
