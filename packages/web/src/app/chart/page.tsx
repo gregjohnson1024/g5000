@@ -10,6 +10,7 @@ import { RouteTimeline } from '../../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { WaypointsLayer, type MarkLike } from '../../components/WaypointsLayer';
+import { GulfStreamLayer } from '../../components/GulfStreamLayer';
 import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
@@ -348,6 +349,7 @@ function ChartPageInner() {
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
         <CogExtension map={mapInstance} p={livePos} hidden={false} />
         <AisTargets map={mapInstance} />
+        <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
           map={mapInstance}
           marks={(() => {
