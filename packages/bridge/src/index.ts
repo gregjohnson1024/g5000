@@ -19,6 +19,8 @@ export * from './tx/true-wind-tx.js';
 export * from './devices/device-registry.js';
 export * from './ais/targets-registry.js';
 export * from './alerts/registry.js';
+export { readCaptureCodes } from './capture-codes.js';
+export type { CaptureCodes, CaptureEntry } from './autopilot-commands.js';
 
 import { DeviceRegistry } from './devices/device-registry.js';
 
