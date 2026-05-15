@@ -1,6 +1,5 @@
 import { Subject, BehaviorSubject, EMPTY, type Observable } from 'rxjs';
 import * as net from 'node:net';
-import canboat from '@canboat/canboatjs';
 import type {
   RawCanFrame,
   Raw0183Sentence,
@@ -8,17 +7,7 @@ import type {
   DriverHealth,
   OutgoingPgn,
 } from './wire-driver.js';
-import { parseActisenseLine } from './ngt-driver.js';
-
-const { pgnToActisenseSerialFormat } = canboat as unknown as {
-  pgnToActisenseSerialFormat: (pgn: {
-    pgn: number;
-    prio?: number;
-    dst?: number;
-    src?: number;
-    fields: Record<string, unknown>;
-  }) => string;
-};
+import { encodePgnToCanFrames } from './tx/fast-packet.js';
 
 /**
  * Minimal shape we need from a socket. Production: `net.Socket`. Tests pass
@@ -74,9 +63,10 @@ export function createYdwgTcpSocketFactory(host: string, port: number): () => Yd
  * RX: parses YD RAW text lines (`HH:MM:SS.mmm R 19FA041F 23 80 0C FF FF FF 7F 02`)
  * into `RawCanFrame` events. Direction='T' echoes are skipped.
  *
- * TX: only single-frame `txCan` is supported. `txPgn` throws — PGN→CAN
- * encoding with Fast Packet split lives outside this driver; route
- * tx-by-PGN through the NGT-1 driver until that helper exists.
+ * TX: `txCan` writes a single CAN frame. `txPgn` encodes the typed PGN
+ * via `encodePgnToCanFrames` (which uses canboatjs' YDGW-raw encoder
+ * under the hood) and emits each resulting frame in order via `txCan`,
+ * so Fast Packet PGNs are split correctly with the NMEA-2000 order byte.
  *
  * Reconnect: exponential backoff on socket drop or error, capped at
  * `maxMs`. The backoff resets after a successful `connect` event.
@@ -157,44 +147,14 @@ export class YdwgRawTcpDriver implements WireDriver {
   }
 
   async txPgn(pgn: OutgoingPgn): Promise<void> {
-    // Encode the typed PGN to canboat ASCII via canboatjs, then parse it back
-    // into a RawCanFrame so we can send it through txCan. This round-trip
-    // sidesteps writing our own PGN field-packer. Fast Packet PGNs encode as
-    // multiple newline-separated lines — we'd need to TX each as its own CAN
-    // frame plus the TP-Connection-Management envelope, which isn't done yet,
-    // so we explicitly reject multi-line output.
-    //
-    // `src` defaults to 254 (J1939 "null address") since the g5000 has not
-    // claimed an N2K address. Diagnostic / ISO-Request traffic accepts this.
-    const encoded = pgnToActisenseSerialFormat({
-      pgn: pgn.pgn,
-      prio: pgn.prio ?? 6,
-      dst: pgn.dst ?? 255,
-      src: 254,
-      fields: pgn.fields,
-    });
-    if (!encoded) {
-      throw new Error(`YdwgRawTcpDriver.txPgn: canboatjs returned empty encoding for PGN ${pgn.pgn}`);
+    // Encode the PGN into ordered CAN frames (single for short PGNs, multiple
+    // with the Fast Packet order byte already set for long ones). Each frame
+    // goes out via the existing txCan path so all socket-format logic stays
+    // in one place.
+    const frames = encodePgnToCanFrames(pgn);
+    for (const frame of frames) {
+      await this.txCan(frame);
     }
-    const lines = encoded.split('\n').map((s) => s.trim()).filter((s) => s.length > 0);
-    if (lines.length !== 1) {
-      throw new Error(
-        `YdwgRawTcpDriver.txPgn: Fast Packet split not implemented (PGN ${pgn.pgn} encoded to ${lines.length} frames)`,
-      );
-    }
-    const frame = parseActisenseLine(lines[0]!);
-    if (!frame) {
-      throw new Error(`YdwgRawTcpDriver.txPgn: failed to parse canboatjs output for PGN ${pgn.pgn}`);
-    }
-    if (frame.data.length > 8) {
-      // canboatjs collapsed a multi-frame PGN into one trace line. We can't
-      // send >8 bytes as a single CAN frame; Fast Packet split would need to
-      // emit TP-Connection-Management envelope + sequenced data frames.
-      throw new Error(
-        `YdwgRawTcpDriver.txPgn: Fast Packet split not implemented (PGN ${pgn.pgn}, ${frame.data.length} bytes)`,
-      );
-    }
-    await this.txCan(frame);
   }
 
   private connect(): void {

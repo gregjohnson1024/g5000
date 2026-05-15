@@ -263,20 +263,34 @@ describe('YdwgRawTcpDriver — TX', () => {
     expect(line).toContain('00 EE 00');
   });
 
-  it('txPgn throws for Fast Packet PGNs (multi-frame encoding not implemented)', async () => {
-    // PGN 129029 (GNSS Position Data) is a Fast Packet PGN (43 bytes typical).
-    await expect(
-      driver.txPgn({
-        pgn: 129029,
-        fields: {
-          SID: 1,
-          Date: 0,
-          Time: 0,
-          Latitude: 32.7833,
-          Longitude: -64.8333,
-        },
-      }),
-    ).rejects.toThrow(/Fast Packet split not implemented/);
+  it('txPgn writes ordered frames for Fast Packet PGN 130850', async () => {
+    await driver.txPgn({
+      pgn: 130850,
+      prio: 3,
+      dst: 255,
+      fields: {
+        'Manufacturer Code': 'Simrad',
+        'Industry Code': 'Marine Industry',
+        Address: 0,
+        'Proprietary ID': 'Autopilot',
+        'Command Type': 'AP Command',
+        Event: 'Standby',
+      },
+    });
+    // PGN 130850 PropID=Autopilot Event=Standby is 11 bytes = 2 Fast Packet frames.
+    expect(socket.writes.length).toBe(2);
+    socket.writes.forEach((line) => {
+      // YDWG-RAW line: "<CANID> <BYTE> <BYTE> ...\r\n"
+      expect(line).toMatch(/^[0-9A-F]{8}( [0-9A-F]{2})+\r\n$/);
+    });
+    // Helper to extract data byte 0 from a YDWG-raw line "<CANID> <B0> <B1> ...".
+    const dataByte0 = (line: string): number => {
+      const parts = line.trim().split(/\s+/);
+      return parseInt(parts[1]!, 16);
+    };
+    // Frame counters (low 5 bits of first data byte) should be 0 then 1.
+    expect(dataByte0(socket.writes[0]!) & 0x1f).toBe(0);
+    expect(dataByte0(socket.writes[1]!) & 0x1f).toBe(1);
   });
 });
 
