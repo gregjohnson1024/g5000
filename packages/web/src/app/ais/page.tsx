@@ -176,7 +176,10 @@ export default function ChartPage() {
   const [targets, setTargets] = useState<AisTarget[]>([]);
   const [alarmConfig, setAlarmConfig] = useState<AisAlarmConfig>(DEFAULT_ALARM);
   const [rangeNm, setRangeNm] = useState(15);
-  const [northUp, setNorthUp] = useState(true);
+  // North-up toggle removed at the user's request — page is permanently
+  // north-up. The branch below in canvasRotationDeg is now effectively a
+  // no-op; left in place in case we want the toggle back.
+  const northUp = true;
   const [selectedMmsi, setSelectedMmsi] = useState<number | null>(null);
   const [showAlarmEdit, setShowAlarmEdit] = useState(false);
   const [draftCpaNm, setDraftCpaNm] = useState(1);
@@ -355,14 +358,6 @@ export default function ChartPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label className="text-slate-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={northUp}
-              onChange={(e) => setNorthUp(e.target.checked)}
-            />
-            &nbsp;North up
           </label>
           <button
             type="button"
