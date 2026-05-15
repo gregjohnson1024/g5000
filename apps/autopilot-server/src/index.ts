@@ -402,6 +402,24 @@ async function main(): Promise<void> {
     // no-op when run standalone. Sent here (not earlier) so systemd
     // doesn't flip to "active" until the HTTP listener actually exists.
     notifyReady();
+    // Wake the track recorder. It only starts on the first hit to
+    // /api/tracks/active — without this kick, a service restart leaves
+    // it idle until someone opens the chart page, and the boat
+    // moves with no track points appended. Fire-and-forget; failures
+    // are non-fatal (next page visit will wake it anyway).
+    setTimeout(() => {
+      fetch(`http://127.0.0.1:${HTTP_PORT}/api/tracks/active`)
+        .then(() => {
+          // eslint-disable-next-line no-console
+          console.log('[autopilot] track recorder kicked');
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[autopilot] track recorder kick failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }, 2000);
   });
 
   // Watchdog heartbeat. Fires every WatchdogSec/2 if systemd asked us
