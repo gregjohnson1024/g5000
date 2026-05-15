@@ -12,7 +12,7 @@ interface Frame {
   rowId: number;
 }
 
-const DEFAULT_PGNS = '130850';
+const DEFAULT_PGNS = '130850,130845';
 const MAX_ROWS = 200;
 
 function fmtSrcHex(n: number): string {
@@ -39,12 +39,30 @@ function summary(pgn: number, fields: Record<string, unknown>): string {
     const angle = fields['Angle'];
     const ctrl = fields['Controlling Device'];
     const propId = fields['Proprietary ID'];
+    const alarm = fields['Alarm'];
+    const msgId = fields['Message ID'];
     const parts: string[] = [];
-    parts.push(`Event=${JSON.stringify(ev)}`);
+    if (propId !== undefined) parts.push(`PropID=${JSON.stringify(propId)}`);
+    if (ev !== undefined) parts.push(`Event=${JSON.stringify(ev)}`);
+    if (alarm !== undefined) parts.push(`Alarm=${JSON.stringify(alarm)}`);
+    if (msgId !== undefined) parts.push(`MsgID=${JSON.stringify(msgId)}`);
     if (dir !== undefined) parts.push(`Dir=${JSON.stringify(dir)}`);
     if (angle !== undefined && angle !== null) parts.push(`Angle=${JSON.stringify(angle)}`);
     if (ctrl !== undefined) parts.push(`Ctrl=${ctrl}`);
-    if (propId !== undefined) parts.push(`PropID=${JSON.stringify(propId)}`);
+    return parts.join('  ');
+  }
+  if (pgn === 130845) {
+    const addr = fields['Address'];
+    const group = fields['Display Group'];
+    const key = fields['Key'];
+    const value = fields['Value'];
+    const minLen = fields['MinLength'];
+    const parts: string[] = [];
+    if (addr !== undefined) parts.push(`Addr=${JSON.stringify(addr)}`);
+    if (group !== undefined) parts.push(`Group=${JSON.stringify(group)}`);
+    if (key !== undefined) parts.push(`Key=${JSON.stringify(key)}`);
+    if (minLen !== undefined) parts.push(`MinLen=${JSON.stringify(minLen)}`);
+    if (value !== undefined) parts.push(`Val=${JSON.stringify(value)}`);
     return parts.join('  ');
   }
   return JSON.stringify(fields);
@@ -133,10 +151,12 @@ export default function SniffPage() {
       <div className="bg-amber-900/30 border border-amber-700 rounded p-3 text-amber-100 text-sm space-y-2">
         <div className="font-semibold">Triton-keypad event capture</div>
         <p>
-          Watching PGN 130850 (Simnet: AP command). Press one key on the Triton
+          Watching PGN 130850 (Simnet: AP command / Alarm) and PGN 130845
+          (Simnet: Key Value — keypad emissions). Press one key on the Triton
           at a time, then drop a marker labeling which key it was. After
-          you&apos;ve pressed AUTO / STBY / +1 / −1 / +10 / −10, the
-          combinations of <span className="font-mono">Event / Direction / Angle</span>{' '}
+          you&apos;ve pressed AUTO / STBY / +1 / −1 / +10 / −10 (and
+          Silence/Ack while an alarm is sounding), the combinations of{' '}
+          <span className="font-mono">PropID / Event / Direction / Key</span>{' '}
           will identify the exact frames to emit back when our control buttons
           fire.
         </p>
