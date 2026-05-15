@@ -8,6 +8,7 @@ import { mapSentenceToSamples } from './nmea0183/channel-mapper.js';
 import { getSharedDeviceRegistry } from './index.js';
 import { handleAisPgn, isAisPgn } from './ais/ais-handler.js';
 import { handleAlertPgn } from './alerts/handler.js';
+import { registerAutopilotTxIfEnabled } from './autopilot-tx-impl.js';
 
 export interface BridgeOptions {
   bus: Bus;
@@ -24,6 +25,12 @@ export async function runBridge(opts: BridgeOptions): Promise<() => Promise<void
   const { bus, drivers } = opts;
   const registry = getSharedDeviceRegistry();
   await Promise.all(drivers.map((d) => d.start()));
+
+  // AP TX is disabled by default. Mac dev enables it by setting
+  // G5000_ENABLE_AP_TX=1 before launching the autopilot server.
+  if (drivers.length > 0) {
+    registerAutopilotTxIfEnabled(drivers[0]!);
+  }
 
   const subs: Subscription[] = [];
 
