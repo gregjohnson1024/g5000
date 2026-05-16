@@ -13,4 +13,6 @@ export * from './alerts.js';
 export * from './autopilot-tx.js';
 export * from './sog-stats.js';
 export * from './cog-stats.js';
+export * from './hdg-stats.js';
+export * from './motion-stats.js';
 export * from './pgn-firehose.js';

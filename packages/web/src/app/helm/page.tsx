@@ -144,13 +144,28 @@ export default function HelmPage() {
     coveredMs: number;
     windowMs: number;
   } | null>(null);
+  const [avgHdg, setAvgHdg] = useState<{
+    rad: number;
+    concentration: number;
+    coveredMs: number;
+    windowMs: number;
+  } | null>(null);
+  const [motion, setMotion] = useState<{
+    heelRmsRad: number | null;
+    pitchRmsRad: number | null;
+    combinedRmsRad: number | null;
+    coveredMs: number;
+    windowMs: number;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     const tick = async (): Promise<void> => {
       try {
-        const [sogR, cogR] = await Promise.all([
+        const [sogR, cogR, hdgR, motionR] = await Promise.all([
           fetch('/api/stats/sog', { cache: 'no-store' }),
           fetch('/api/stats/cog', { cache: 'no-store' }),
+          fetch('/api/stats/hdg', { cache: 'no-store' }),
+          fetch('/api/stats/motion', { cache: 'no-store' }),
         ]);
         if (cancelled) return;
         if (sogR.ok) {
@@ -180,6 +195,46 @@ export default function HelmPage() {
             setAvgCog({
               rad: j.stats.avgRad,
               concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
+          }
+        }
+        if (hdgR.ok) {
+          const j = (await hdgR.json()) as {
+            ok: boolean;
+            stats?: {
+              avgRad: number | null;
+              concentration: number;
+              coveredMs: number;
+              windowMs: number;
+            };
+          };
+          if (j.ok && j.stats && j.stats.avgRad !== null) {
+            setAvgHdg({
+              rad: j.stats.avgRad,
+              concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
+          }
+        }
+        if (motionR.ok) {
+          const j = (await motionR.json()) as {
+            ok: boolean;
+            stats?: {
+              heelRmsRad: number | null;
+              pitchRmsRad: number | null;
+              combinedRmsRad: number | null;
+              coveredMs: number;
+              windowMs: number;
+            };
+          };
+          if (j.ok && j.stats) {
+            setMotion({
+              heelRmsRad: j.stats.heelRmsRad,
+              pitchRmsRad: j.stats.pitchRmsRad,
+              combinedRmsRad: j.stats.combinedRmsRad,
               coveredMs: j.stats.coveredMs,
               windowMs: j.stats.windowMs,
             });
@@ -271,6 +326,65 @@ export default function HelmPage() {
               ? avgCog.coveredMs >= avgCog.windowMs - 1000
                 ? `${Math.round(avgCog.windowMs / 60000)} min`
                 : `${Math.max(1, Math.round(avgCog.coveredMs / 60000))} min so far`
+              : '15 min'
+          }
+          small
+        />
+
+        <HelmTile
+          label="Avg HDG"
+          value={avgHdg ? fmtHeadingRad(avgHdg.rad) : '—'}
+          unit="°"
+          sub={
+            avgHdg
+              ? avgHdg.coveredMs >= avgHdg.windowMs - 1000
+                ? `${Math.round(avgHdg.windowMs / 60000)} min`
+                : `${Math.max(1, Math.round(avgHdg.coveredMs / 60000))} min so far`
+              : '15 min'
+          }
+          small
+        />
+
+        {/* Drift = avg COG − avg HDG, normalised to [-π, π]. Approximates
+            the perpendicular component of the current pushing the boat
+            sideways. Positive = COG drifted to starboard of HDG (current
+            setting starboard). Greyed when either input is missing. */}
+        {(() => {
+          let driftDeg: number | null = null;
+          if (avgCog && avgHdg) {
+            let d = avgCog.rad - avgHdg.rad;
+            while (d > Math.PI) d -= 2 * Math.PI;
+            while (d < -Math.PI) d += 2 * Math.PI;
+            driftDeg = (d * 180) / Math.PI;
+          }
+          const label = driftDeg === null
+            ? '—'
+            : `${driftDeg >= 0 ? '+' : ''}${driftDeg.toFixed(1)}`;
+          return (
+            <HelmTile
+              label="Drift (COG−HDG)"
+              value={label}
+              unit="°"
+              sub={driftDeg === null ? '15 min' : driftDeg >= 0 ? 'set stbd' : 'set port'}
+              small
+            />
+          );
+        })()}
+
+        {/* Motion: combined RMS of heel + pitch over the 15-min window.
+            Higher number = bouncier. Calm = <1°; choppy = 3–6°; rough = 8°+. */}
+        <HelmTile
+          label="Motion"
+          value={
+            motion?.combinedRmsRad !== null && motion?.combinedRmsRad !== undefined
+              ? ((motion.combinedRmsRad * 180) / Math.PI).toFixed(1)
+              : '—'
+          }
+          unit="°"
+          sub={
+            motion?.heelRmsRad !== null && motion?.heelRmsRad !== undefined &&
+            motion?.pitchRmsRad !== null && motion?.pitchRmsRad !== undefined
+              ? `h ${((motion.heelRmsRad * 180) / Math.PI).toFixed(1)}° p ${((motion.pitchRmsRad * 180) / Math.PI).toFixed(1)}°`
               : '15 min'
           }
           small

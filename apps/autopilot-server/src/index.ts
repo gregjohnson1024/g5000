@@ -25,6 +25,8 @@ import {
 import { startDemoInjector } from './demo-injector.js';
 import { startSogStats } from './sog-stats.js';
 import { startCogStats } from './cog-stats.js';
+import { startHdgStats } from './hdg-stats.js';
+import { startMotionStats } from './motion-stats.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { startHlinkServer } from './hlink/server.js';
@@ -224,6 +226,10 @@ async function main(): Promise<void> {
     stops.push(async () => sogStats.stop());
     const cogStats = startCogStats(bus);
     stops.push(async () => cogStats.stop());
+    const hdgStats = startHdgStats(bus);
+    stops.push(async () => hdgStats.stop());
+    const motionStats = startMotionStats(bus);
+    stops.push(async () => motionStats.stop());
 
     // True-wind TX wiring + device-registry refresh target.
     //   - True-wind TX is NGT-1-only (requires Fast Packet split).
