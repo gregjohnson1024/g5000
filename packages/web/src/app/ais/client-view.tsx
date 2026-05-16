@@ -8,7 +8,7 @@ import { useSse } from '../../hooks/use-sse';
 const NM = 1852;
 const MS_TO_KN = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
-const RANGE_OPTIONS_NM = [1, 2, 4, 8, 15];
+const RANGE_OPTIONS_NM = [1, 2, 4, 8, 20];
 /** Fixed-length COG extension drawn for own ship and every AIS target. */
 const COG_EXTENSION_NM = 10;
 
@@ -175,7 +175,7 @@ export function AisClientView() {
   const { channels } = useSse();
   const [targets, setTargets] = useState<AisTarget[]>([]);
   const [alarmConfig, setAlarmConfig] = useState<AisAlarmConfig>(DEFAULT_ALARM);
-  const [rangeNm, setRangeNm] = useState(15);
+  const [rangeNm, setRangeNm] = useState(20);
   // North-up toggle removed at the user's request — page is permanently
   // north-up. The branch below in canvasRotationDeg is now effectively a
   // no-op; left in place in case we want the toggle back.
