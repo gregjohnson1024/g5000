@@ -8,11 +8,15 @@ export interface AisTargetsProps {
   map: maplibregl.Map | null;
   /** Polling interval in ms. Default 2000 — matches the /ais radar page. */
   pollMs?: number;
-  /** Length of the COG extension line, nautical miles. Default 10. */
-  cogExtensionNm?: number;
+  /**
+   * Minutes of travel to project ahead along each target's COG, at the
+   * target's reported SOG. Mirrors CogExtension's own-boat horizon so a
+   * single time scale governs every vessel on the chart. Default 360 (6 h).
+   */
+  cogExtensionMinutes?: number;
 }
 
-const NM_TO_DEG_LAT = 1 / 60;
+const M_PER_DEG_LAT = 111_320;
 const TARGET_SOURCE_ID = 'ais-targets';
 const TARGET_CIRCLE_ID = 'ais-targets-circle';
 const COG_SOURCE_ID = 'ais-cog-extensions';
@@ -37,7 +41,11 @@ interface TargetsResponse {
  * dedicated /ais page handles. The chart's purpose is situational
  * awareness only.
  */
-export function AisTargets({ map, pollMs = 2000, cogExtensionNm = 10 }: AisTargetsProps) {
+export function AisTargets({
+  map,
+  pollMs = 2000,
+  cogExtensionMinutes = 360,
+}: AisTargetsProps) {
   useEffect(() => {
     if (!map) return;
     let cancelled = false;
@@ -141,21 +149,29 @@ export function AisTargets({ map, pollMs = 2000, cogExtensionNm = 10 }: AisTarge
         }));
       tgtSrc.setData({ type: 'FeatureCollection', features: tgtFeatures });
 
+      const totalSec = cogExtensionMinutes * 60;
       const cogFeatures = targets
         .filter(
           (t) =>
             Number.isFinite(t.lat) &&
             Number.isFinite(t.lon) &&
             typeof t.cog === 'number' &&
-            Number.isFinite(t.cog),
+            Number.isFinite(t.cog) &&
+            typeof t.sog === 'number' &&
+            Number.isFinite(t.sog) &&
+            // Mirror CogExtension's gate so anchored/drifting targets don't
+            // draw zero-length lines that maplibre would round into a dot.
+            t.sog > 0.05,
         )
         .map((t) => {
-          // Flat-earth projection — 10 NM is small enough that great-circle
-          // bias is well below pixel precision at typical chart zooms.
-          const dLat = cogExtensionNm * NM_TO_DEG_LAT * Math.cos(t.cog!);
+          // Flat-earth projection — at 360 min × ~20 kn this is ~120 NM and
+          // the great-circle bias is still well below chart-pixel precision
+          // at typical zooms. Slower targets stay even smaller.
+          const distM = t.sog! * totalSec;
+          const dLat = (distM * Math.cos(t.cog!)) / M_PER_DEG_LAT;
           const dLon =
-            (cogExtensionNm * NM_TO_DEG_LAT * Math.sin(t.cog!)) /
-            Math.max(0.05, Math.cos((t.lat! * Math.PI) / 180));
+            (distM * Math.sin(t.cog!)) /
+            (M_PER_DEG_LAT * Math.max(0.05, Math.cos((t.lat! * Math.PI) / 180)));
           return {
             type: 'Feature' as const,
             geometry: {
@@ -217,7 +233,7 @@ export function AisTargets({ map, pollMs = 2000, cogExtensionNm = 10 }: AisTarge
         }
       }
     };
-  }, [map, pollMs, cogExtensionNm]);
+  }, [map, pollMs, cogExtensionMinutes]);
 
   return null;
 }

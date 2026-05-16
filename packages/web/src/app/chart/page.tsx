@@ -25,6 +25,14 @@ import type { Route } from '@g5000/routing';
 
 type Pos = { lat: number; lon: number };
 
+/**
+ * Minutes of travel projected ahead from each vessel's current position
+ * along its COG. Shared between own-boat (CogExtension) and AIS targets
+ * (AisTargets) so the chart visually answers "where will everyone be in
+ * the next N minutes?" with a single time horizon.
+ */
+const COG_EXTENSION_MINUTES = 360;
+
 export default function ChartPage() {
   // Next.js requires useSearchParams() to be wrapped in a Suspense boundary
   // because the search params can suspend during static prerender. This
@@ -444,9 +452,14 @@ function ChartPageInner() {
           }}
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
-        <CogExtension map={mapInstance} p={livePos} hidden={false} />
+        <CogExtension
+          map={mapInstance}
+          p={livePos}
+          totalMinutes={COG_EXTENSION_MINUTES}
+          hidden={false}
+        />
         <RangeRings map={mapInstance} p={livePos} radiiNm={[250, 260, 270, 280, 290]} />
-        <AisTargets map={mapInstance} />
+        <AisTargets map={mapInstance} cogExtensionMinutes={COG_EXTENSION_MINUTES} />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
           map={mapInstance}
