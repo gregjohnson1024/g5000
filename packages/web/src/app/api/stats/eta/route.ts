@@ -3,13 +3,13 @@ import { computeEta } from '../../../../lib/eta-stats';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Hardcoded passage destination — Madaket Harbor, western Nantucket MA.
-// 41°16.32'N 70°12.30'W. User pivoted destination from Bristol Marine
-// to Madaket mid-passage 2026-05-16.
+// Hardcoded passage destination — Nantucket Harbor (Brant Point Light area),
+// north side of Nantucket Island MA. 41°17.4'N 70°05.4'W. User pivoted
+// destination Bristol Marine → Madaket → Nantucket Harbor across the passage.
 const DESTINATION = {
-  lat: 41.272,
-  lon: -70.205,
-  label: 'Madaket',
+  lat: 41.29,
+  lon: -70.09,
+  label: 'Nantucket',
 };
 
 /**

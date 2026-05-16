@@ -13,15 +13,15 @@ export interface Waypoint {
   createdAt: string;
 }
 
-const MADAKET: Waypoint = {
-  id: 'madaket',
-  name: 'Madaket',
-  // 41°16.32'N 70°12.30'W → decimal. Madaket Harbor / west end of
-  // Nantucket. Active destination for the Bermuda → Nantucket passage
-  // (2026; pivoted from Bristol Marine mid-passage on 2026-05-16).
-  lat: 41.272,
-  lon: -70.205,
-  notes: 'Madaket Harbor, Nantucket MA — destination for the Bermuda → Nantucket passage (2026)',
+const NANTUCKET: Waypoint = {
+  id: 'nantucket',
+  name: 'Nantucket',
+  // 41°17.4'N 70°05.4'W → decimal. Nantucket Harbor entrance (Brant
+  // Point Light area). Active destination for the Bermuda → Nantucket
+  // passage (2026; pivoted Bristol Marine → Madaket → Nantucket Harbor).
+  lat: 41.29,
+  lon: -70.09,
+  notes: 'Nantucket Harbor (Brant Point), Nantucket MA — destination for the Bermuda → Nantucket passage (2026)',
   createdAt: '2026-05-16T00:00:00.000Z',
 };
 
@@ -29,15 +29,15 @@ async function readWaypoints(): Promise<Waypoint[]> {
   try {
     const buf = await fs.readFile(WAYPOINTS, 'utf8');
     const parsed = JSON.parse(buf) as unknown;
-    if (!Array.isArray(parsed)) return [MADAKET];
+    if (!Array.isArray(parsed)) return [NANTUCKET];
     const cleaned = parsed.filter(isWaypoint) as Waypoint[];
     return cleaned;
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // First run: seed Madaket so the chart has at least one
-      // destination to plan against without the user typing it in.
-      await writeWaypoints([MADAKET]);
-      return [MADAKET];
+      // First run: seed the active destination so the chart has at
+      // least one waypoint to plan against without the user typing it in.
+      await writeWaypoints([NANTUCKET]);
+      return [NANTUCKET];
     }
     throw err;
   }
