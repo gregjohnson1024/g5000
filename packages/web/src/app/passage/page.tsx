@@ -29,6 +29,42 @@ interface EtaSnapshot {
 const M_TO_NM = 1 / 1852;
 const TZ_KEY = 'passage:tz';
 
+/**
+ * Bermuda reference for the "distance to/from Bermuda" tile. St George's
+ * Town Cut entrance is the customary departure / clearance point for any
+ * passage to the US East Coast or transatlantic, so it's the right anchor
+ * for "how far back to Bermuda" thinking. At passage range the choice of
+ * Bermuda landmark only matters to a couple of NM (the island is ~22 NM
+ * long); this is precise enough for return-decision purposes.
+ */
+const BERMUDA = {
+  lat: 32 + 22.7 / 60,
+  lon: -(64 + 40.2 / 60),
+  label: "St George's, Bermuda",
+};
+
+function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R_NM = 3440.065;
+  const toRad = (d: number): number => (d * Math.PI) / 180;
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const dp = toRad(lat2 - lat1);
+  const dl = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number): number => (d * Math.PI) / 180;
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const dl = toRad(lon2 - lon1);
+  const y = Math.sin(dl) * Math.cos(p2);
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
 interface DistanceStats {
   d1hM: number;
   d3hM: number;
@@ -246,6 +282,8 @@ export default function PassagePage() {
       {stats?.trackId && (
         <>
           {eta && <EtaTile eta={eta} tz={tz} log={log} />}
+
+          {eta && <BermudaTile eta={eta} />}
 
           {log && (
             <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />
@@ -776,6 +814,31 @@ function DistanceTile({
         avg {avgKn.toFixed(2)} NM/h
       </div>
     </div>
+  );
+}
+
+function BermudaTile({ eta }: { eta: EtaSnapshot }) {
+  const distNm = greatCircleNm(eta.currentLat, eta.currentLon, BERMUDA.lat, BERMUDA.lon);
+  const brgDeg = initialBearingDeg(eta.currentLat, eta.currentLon, BERMUDA.lat, BERMUDA.lon);
+  return (
+    <section className="bg-slate-900 border border-cyan-700 rounded p-4 flex items-baseline justify-between gap-4 flex-wrap">
+      <div>
+        <div className="text-xs uppercase tracking-wider text-cyan-400">From</div>
+        <div className="text-lg font-semibold text-slate-100">{BERMUDA.label}</div>
+        <div className="text-xs text-slate-500 font-mono">
+          {fmtLatLonDmm(BERMUDA.lat, BERMUDA.lon)}
+        </div>
+      </div>
+      <div className="text-right">
+        <div className="flex items-baseline gap-1 justify-end">
+          <div className="text-4xl font-mono text-slate-100">{distNm.toFixed(1)}</div>
+          <div className="text-sm text-slate-400">NM</div>
+        </div>
+        <div className="text-xs text-slate-500 font-mono">
+          bearing to Bermuda {String(Math.round(brgDeg)).padStart(3, '0')}°T
+        </div>
+      </div>
+    </section>
   );
 }
 
