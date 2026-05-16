@@ -445,7 +445,7 @@ function ChartPageInner() {
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension map={mapInstance} p={livePos} hidden={false} />
-        <RangeRings map={mapInstance} p={livePos} />
+        <RangeRings map={mapInstance} p={livePos} radiiNm={[250, 260, 270, 280, 290]} />
         <AisTargets map={mapInstance} />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
