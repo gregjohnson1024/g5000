@@ -395,16 +395,14 @@ export default function HelmPage() {
 
         {/* Position — two stacked coordinates rather than the one-number-per-tile
             idiom every other tile follows. Hemisphere suffixes ride at unit
-            size so the magnitudes line up vertically. */}
-        <div className="bg-slate-900 border border-slate-800 rounded p-4 flex flex-col gap-1 col-span-2">
-          <div className="text-xs uppercase tracking-wider text-slate-400">Position</div>
-          <div className="text-3xl font-mono text-slate-100 leading-tight">
-            {positionLat ?? <span className="text-slate-500">—</span>}
-          </div>
-          <div className="text-3xl font-mono text-slate-100 leading-tight">
-            {positionLon ?? <span className="text-slate-500">—</span>}
-          </div>
-        </div>
+            size so the magnitudes line up vertically. The Copy button is
+            essential here because the live tile redraws every SSE frame —
+            text selection drops on every re-render, so the user can't grab
+            the coordinates the usual way. */}
+        <PositionTile
+          positionLat={positionLat}
+          positionLon={positionLon}
+        />
       </div>
     </main>
   );
@@ -431,6 +429,63 @@ const ALERT_TYPE_STYLE: Record<string, string> = {
   Caution: 'bg-yellow-900/30 border-yellow-700 text-yellow-200',
   unknown: 'bg-slate-800 border-slate-700 text-slate-200',
 };
+
+/**
+ * Position tile with a Copy button. SSE-driven re-renders happen ~5× / sec,
+ * which kills any in-progress text selection — making the displayed
+ * coordinates effectively un-grabbable by the usual select-and-copy gesture.
+ * The button writes the displayed strings verbatim (whatever DMM format
+ * fmtLat/fmtLon produce, so what's copied matches exactly what's shown).
+ */
+function PositionTile({
+  positionLat,
+  positionLon,
+}: {
+  positionLat: string | null;
+  positionLon: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCopy = useCallback(async () => {
+    if (!positionLat || !positionLon) return;
+    const text = `${positionLat}\n${positionLon}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard refused (insecure context / permission) — silent */
+    }
+  }, [positionLat, positionLon]);
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded p-4 flex flex-col gap-1 col-span-2 relative">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-slate-400">Position</div>
+        <button
+          type="button"
+          onClick={onCopy}
+          disabled={!positionLat || !positionLon}
+          className="text-xs px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40"
+          title="Copy lat / lon to clipboard"
+        >
+          {copied ? 'copied' : 'copy'}
+        </button>
+      </div>
+      <div className="text-3xl font-mono text-slate-100 leading-tight">
+        {positionLat ?? <span className="text-slate-500">—</span>}
+      </div>
+      <div className="text-3xl font-mono text-slate-100 leading-tight">
+        {positionLon ?? <span className="text-slate-500">—</span>}
+      </div>
+    </div>
+  );
+}
 
 function AlertsPanel(): ReactElement | null {
   const [alerts, setAlerts] = useState<AlertSnapshot[]>([]);
