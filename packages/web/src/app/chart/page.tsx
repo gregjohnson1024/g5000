@@ -458,7 +458,11 @@ function ChartPageInner() {
           totalMinutes={COG_EXTENSION_MINUTES}
           hidden={false}
         />
-        <RangeRings map={mapInstance} p={livePos} radiiNm={[250, 260, 270, 280, 290]} />
+        <RangeRings
+          map={mapInstance}
+          p={livePos}
+          radiiNm={[250, 260, 270, 280, 290, 300, 310, 320]}
+        />
         <AisTargets map={mapInstance} cogExtensionMinutes={COG_EXTENSION_MINUTES} />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
