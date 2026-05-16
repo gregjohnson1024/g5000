@@ -312,7 +312,7 @@ function ChartPageInner() {
   // Restore the in-progress route from localStorage so navigating to /helm
   // and back doesn't wipe a freshly-planned route. Intentionally does NOT
   // restore start/end — the user wants those auto-preselected to the live
-  // boat position and Bristol Marine on every visit (their words: "preselect
+  // boat position and the active passage destination on every visit (their words: "preselect
   // ... whenever I come to the chart page"). The route polyline still
   // renders against the actual lat/lons it was planned with, so a stale
   // route stays accurate even if the boat has moved since.

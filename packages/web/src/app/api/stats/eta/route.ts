@@ -3,12 +3,13 @@ import { computeEta } from '../../../../lib/eta-stats';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Hardcoded passage destination — Bristol Marine, Bristol RI.
-// From destination-and-waypoints memory: 41°45'53.9"N 71°07'42.6"W.
-const BRISTOL_MARINE = {
-  lat: 41.76497,
-  lon: -71.12850,
-  label: 'Bristol Marine',
+// Hardcoded passage destination — Madaket Harbor, western Nantucket MA.
+// 41°16.32'N 70°12.30'W. User pivoted destination from Bristol Marine
+// to Madaket mid-passage 2026-05-16.
+const DESTINATION = {
+  lat: 41.272,
+  lon: -70.205,
+  label: 'Madaket',
 };
 
 /**
@@ -18,9 +19,9 @@ const BRISTOL_MARINE = {
  */
 export async function GET(): Promise<Response> {
   const eta = await computeEta(
-    BRISTOL_MARINE.lat,
-    BRISTOL_MARINE.lon,
-    BRISTOL_MARINE.label,
+    DESTINATION.lat,
+    DESTINATION.lon,
+    DESTINATION.label,
   );
   if (!eta) {
     return Response.json(
