@@ -952,7 +952,7 @@ function CursorReadout({
     ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
     : null;
   return (
-    <div className="absolute bottom-10 left-3 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
+    <div className="fixed bottom-3 left-3 z-30 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
       <div>{fmtLatLonDmm(cursor.lat, cursor.lon)}</div>
       <div className="text-slate-300 mt-1">
         {rangeBearing
