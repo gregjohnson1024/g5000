@@ -52,3 +52,8 @@ export const aisAlarmConfig = sqliteTable('ais_alarm_config', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded AisAlarmConfig
 });
+
+export const passageLog = sqliteTable('passage_log', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded PassageLog
+});

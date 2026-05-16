@@ -127,9 +127,16 @@ function Sparkline({
   );
 }
 
+interface PassageLogSnapshot {
+  anchorAt: number | null;
+  distanceM: number;
+}
+
 export default function PassagePage() {
   const [stats, setStats] = useState<DistanceStats | null>(null);
   const [eta, setEta] = useState<EtaSnapshot | null>(null);
+  const [log, setLog] = useState<PassageLogSnapshot | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Page-level timezone preference — controls how every timestamp on this
   // page is displayed AND how datetime-local form inputs are interpreted.
@@ -147,15 +154,19 @@ export default function PassagePage() {
     let cancelled = false;
     const tick = async (): Promise<void> => {
       try {
-        const [distR, etaR] = await Promise.all([
+        const [distR, etaR, logR] = await Promise.all([
           fetch('/api/stats/distance', { cache: 'no-store' }),
           fetch('/api/stats/eta', { cache: 'no-store' }),
+          fetch('/api/passage/log', { cache: 'no-store' }),
         ]);
         const distJ = (await distR.json()) as
           | { ok: true; stats: DistanceStats }
           | { ok: false; error?: { message?: string } };
         const etaJ = (await etaR.json()) as
           | { ok: true; eta: EtaSnapshot }
+          | { ok: false; error?: { message?: string } };
+        const logJ = (await logR.json()) as
+          | { ok: true; log: PassageLogSnapshot }
           | { ok: false; error?: { message?: string } };
         if (cancelled) return;
         if (distJ.ok) {
@@ -165,6 +176,7 @@ export default function PassagePage() {
           setError(distJ.error?.message ?? 'unknown error');
         }
         setEta(etaJ.ok ? etaJ.eta : null);
+        setLog(logJ.ok ? logJ.log : null);
       } catch (e) {
         if (!cancelled) setError(String(e));
       }
@@ -175,6 +187,26 @@ export default function PassagePage() {
       cancelled = true;
       clearInterval(id);
     };
+  }, []);
+
+  const resetLog = useCallback(async (): Promise<void> => {
+    setResetting(true);
+    try {
+      const r = await fetch('/api/passage/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetToNow: true }),
+      });
+      const j = (await r.json()) as
+        | { ok: true; log: PassageLogSnapshot }
+        | { ok: false; error?: { message?: string } };
+      if (j.ok) setLog(j.log);
+      else setError(j.error?.message ?? 'reset failed');
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setResetting(false);
+    }
   }, []);
 
   return (
@@ -212,6 +244,10 @@ export default function PassagePage() {
       {stats?.trackId && (
         <>
           {eta && <EtaTile eta={eta} tz={tz} />}
+
+          {log && (
+            <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />
+          )}
 
           <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <DistanceTile label="Last 1 h" valueNm={stats.d1hM * M_TO_NM} hours={1} />
@@ -738,6 +774,51 @@ function DistanceTile({
         avg {avgKn.toFixed(2)} NM/h
       </div>
     </div>
+  );
+}
+
+function LogTile({
+  log,
+  tz,
+  onReset,
+  resetting,
+}: {
+  log: PassageLogSnapshot;
+  tz: TzMode;
+  onReset: () => void;
+  resetting: boolean;
+}) {
+  const distNm = log.distanceM * M_TO_NM;
+  const sinceText =
+    log.anchorAt !== null
+      ? `since ${weekdayFor(log.anchorAt, tz)} ${fmtTimestamp(log.anchorAt, tz)}`
+      : 'no anchor set';
+  const elapsedText =
+    log.anchorAt !== null
+      ? ` · ${fmtDuration(Date.now() / 1000 - log.anchorAt)} elapsed`
+      : '';
+  return (
+    <section className="bg-slate-900 border border-emerald-700 rounded p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-1">
+        <div className="text-xs uppercase tracking-wider text-emerald-400">Log</div>
+        <div className="flex items-baseline gap-1">
+          <div className="text-4xl font-mono text-slate-100">{distNm.toFixed(1)}</div>
+          <div className="text-sm text-slate-400">NM travelled</div>
+        </div>
+        <div className="text-xs text-slate-500 font-mono">
+          {sinceText}
+          {elapsedText}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onReset}
+        disabled={resetting}
+        className="bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 text-white px-4 py-2 rounded text-sm self-start md:self-auto"
+      >
+        {resetting ? 'Resetting…' : 'Reset to now'}
+      </button>
+    </section>
   );
 }
 

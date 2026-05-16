@@ -18,6 +18,7 @@ import {
   type BspCal,
   type CompassDeviation,
   type DampingConfig,
+  type PassageLog,
   type PolarTable,
   type SailWardrobe,
   type SourcePriorityConfig,
@@ -29,6 +30,7 @@ import {
   boatConfig as boatConfigTable,
   compassDeviation,
   dampingConfig as dampingConfigTable,
+  passageLog as passageLogTable,
   polars,
   sailWardrobe,
   sourcePriorityConfig as sourcePriorityConfigTable,
@@ -58,6 +60,7 @@ export class ConfigStore {
     dampingConfig: BehaviorSubject<DampingConfig>;
     sourcePriority: BehaviorSubject<SourcePriorityConfig>;
     aisAlarm: BehaviorSubject<AisAlarmConfig>;
+    passageLog: BehaviorSubject<PassageLog>;
   };
 
   private constructor(
@@ -72,6 +75,7 @@ export class ConfigStore {
       dampingConfig: DampingConfig;
       sourcePriority: SourcePriorityConfig;
       aisAlarm: AisAlarmConfig;
+      passageLog: PassageLog;
     },
   ) {
     this.subjects = {
@@ -83,6 +87,7 @@ export class ConfigStore {
       dampingConfig: new BehaviorSubject(initial.dampingConfig),
       sourcePriority: new BehaviorSubject(initial.sourcePriority),
       aisAlarm: new BehaviorSubject(initial.aisAlarm),
+      passageLog: new BehaviorSubject(initial.passageLog),
     };
   }
 
@@ -102,6 +107,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS damping_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS source_priority_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ais_alarm_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS passage_log (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -147,6 +153,25 @@ export class ConfigStore {
         .run();
     }
 
+    // Passage log: NOT a static default — anchor is seeded with the
+    // current time on the first open so "the zero point is now" happens
+    // automatically when this feature first ships. Subsequent restarts
+    // preserve whatever anchor the user (or earlier seed) set.
+    const passageRows = db
+      .select()
+      .from(passageLogTable)
+      .where(eq(passageLogTable.id, SINGLETON))
+      .all();
+    let passageLogValue: PassageLog;
+    if (passageRows[0]) {
+      passageLogValue = JSON.parse((passageRows[0] as { value: string }).value) as PassageLog;
+    } else {
+      passageLogValue = { anchorAt: Math.floor(Date.now() / 1000) };
+      db.insert(passageLogTable)
+        .values({ id: SINGLETON, value: JSON.stringify(passageLogValue) })
+        .run();
+    }
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
@@ -159,6 +184,7 @@ export class ConfigStore {
         DEFAULT_SOURCE_PRIORITY,
       ),
       aisAlarm: loadOrInsert<AisAlarmConfig>(aisAlarmConfigTable, DEFAULT_AIS_ALARM_CONFIG),
+      passageLog: passageLogValue,
     };
 
     return new ConfigStore(raw, db, initial);
@@ -208,6 +234,13 @@ export class ConfigStore {
   /** Synchronous read of the current AIS alarm config (BehaviorSubject.value). */
   getAisAlarmConfig(): AisAlarmConfig {
     return this.subjects.aisAlarm.value;
+  }
+  get passageLog$(): Observable<PassageLog> {
+    return this.subjects.passageLog.asObservable();
+  }
+  /** Synchronous read of the current passage log anchor. */
+  getPassageLog(): PassageLog {
+    return this.subjects.passageLog.value;
   }
   /** Derived from sails$ — returns the active config's polar. */
   get activePolar$(): Observable<PolarTable> {
@@ -268,6 +301,18 @@ export class ConfigStore {
     this.upsert(sourcePriorityConfigTable, cleaned);
     this.subjects.sourcePriority.next(cleaned);
   }
+  async setPassageLog(value: PassageLog): Promise<void> {
+    // anchorAt may legitimately be null only via callers that explicitly
+    // want to clear; the seed on open keeps it non-null in practice.
+    if (value.anchorAt !== null) {
+      if (!Number.isFinite(value.anchorAt) || value.anchorAt <= 0) {
+        throw new Error('passageLog.anchorAt must be a positive finite UNIX seconds value or null');
+      }
+    }
+    const cleaned: PassageLog = { anchorAt: value.anchorAt };
+    this.upsert(passageLogTable, cleaned);
+    this.subjects.passageLog.next(cleaned);
+  }
   async setAisAlarmConfig(value: AisAlarmConfig): Promise<void> {
     // Validate: enabled boolean, thresholds finite & positive.
     if (typeof value.enabled !== 'boolean') {
@@ -320,6 +365,7 @@ export class ConfigStore {
     this.subjects.dampingConfig.complete();
     this.subjects.sourcePriority.complete();
     this.subjects.aisAlarm.complete();
+    this.subjects.passageLog.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

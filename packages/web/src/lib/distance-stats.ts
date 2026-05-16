@@ -19,7 +19,7 @@ function haversineM(a: TrackPoint, b: TrackPoint): number {
  * Lower-bounded by a binary search so a single 24h scan over a multi-day
  * track stays cheap.
  */
-function distanceInWindow(
+export function distanceInWindow(
   points: TrackPoint[],
   fromS: number,
   toS: number,

@@ -242,6 +242,19 @@ export const DEFAULT_AIS_ALARM_CONFIG: AisAlarmConfig = {
   tcpaSeconds: 600,
 };
 
+/**
+ * Passage log — the maritime "log" (distance instrument). Persists a single
+ * anchor timestamp; the /passage page sums over-ground distance from
+ * `anchorAt` to now using the active track. The anchor is seeded on first
+ * ConfigStore open with the current time, so the zero point is "the moment
+ * this feature first ran on the boat". The user can re-anchor to now from
+ * the UI.
+ */
+export interface PassageLog {
+  /** UNIX seconds; null only in transient default-construction code paths. */
+  anchorAt: number | null;
+}
+
 /** Default wardrobe: one config wrapping the existing DEFAULT_POLARS. */
 export const DEFAULT_WARDROBE: SailWardrobe = {
   configs: [
