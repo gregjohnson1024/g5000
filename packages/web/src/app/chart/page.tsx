@@ -81,6 +81,57 @@ function ChartPageInner() {
   const [showIsochrones, setShowIsochrones] = useState(false);
   const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'CMEMS'>('GFS');
 
+  // Restore the camera (center + zoom + bearing) from the last time the
+  // user was on /chart. Synchronous useState initializer so the Map's
+  // first render uses the saved values — no default-zoom flash. Falls
+  // back to the western-North-Atlantic overview when nothing is saved
+  // (first ever visit, or localStorage cleared).
+  const [initialCamera] = useState<{ lat: number; lon: number; zoom: number; bearing: number }>(() => {
+    const fallback = { lat: 35, lon: -70, zoom: 4, bearing: 0 };
+    if (typeof window === 'undefined') return fallback;
+    try {
+      const raw = window.localStorage.getItem('chart:camera');
+      if (!raw) return fallback;
+      const c = JSON.parse(raw) as Partial<typeof fallback>;
+      if (
+        typeof c.lat === 'number' && Number.isFinite(c.lat) &&
+        typeof c.lon === 'number' && Number.isFinite(c.lon) &&
+        typeof c.zoom === 'number' && Number.isFinite(c.zoom)
+      ) {
+        return {
+          lat: c.lat,
+          lon: c.lon,
+          zoom: c.zoom,
+          bearing: typeof c.bearing === 'number' && Number.isFinite(c.bearing) ? c.bearing : 0,
+        };
+      }
+    } catch { /* corrupt blob; fall through */ }
+    return fallback;
+  });
+  // Persist camera state on every pan / zoom / rotation. moveend fires
+  // for both user-driven and programmatic camera changes; that's fine —
+  // any flyTo we issue (e.g. "fly to boat" button) is something the user
+  // initiated and would want remembered.
+  useEffect(() => {
+    if (!mapInstance) return;
+    // Map's prop interface only has center+zoom; bearing has to be set
+    // imperatively after construction.
+    if (initialCamera.bearing) mapInstance.setBearing(initialCamera.bearing);
+    const handler = (): void => {
+      const c = mapInstance.getCenter();
+      try {
+        window.localStorage.setItem('chart:camera', JSON.stringify({
+          lat: c.lat,
+          lon: c.lng,
+          zoom: mapInstance.getZoom(),
+          bearing: mapInstance.getBearing(),
+        }));
+      } catch { /* quota / private mode; ignore */ }
+    };
+    mapInstance.on('moveend', handler);
+    return () => { mapInstance.off('moveend', handler); };
+  }, [mapInstance, initialCamera.bearing]);
+
   // Persist the user-tunable chart settings to localStorage so switching to
   // a different tab and back doesn't reset them. Two-effect dance: hydrate
   // on mount, then write on every change but only AFTER hydration finishes
@@ -383,15 +434,15 @@ function ChartPageInner() {
     <main className="grid grid-cols-[1fr_360px] h-full [&>div:first-child]:relative">
       <div className="relative">
         <Map
-          center={{ lat: 35, lon: -70 }}
-          zoom={4}
+          center={{ lat: initialCamera.lat, lon: initialCamera.lon }}
+          zoom={initialCamera.zoom}
           onClick={onMapClick}
           onLoad={(m) => {
             mapRef.current = m;
             setMapInstance(m);
           }}
         />
-        <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} />
+        <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension map={mapInstance} p={livePos} hidden={false} />
         <AisTargets map={mapInstance} />
         <GulfStreamLayer map={mapInstance} />

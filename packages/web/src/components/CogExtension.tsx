@@ -5,11 +5,9 @@ import type { LivePos } from './LiveBoatMarker';
 
 const SOURCE_ID = 'cog-extension';
 const LAYER_LINE = 'cog-extension-line';
-const LAYER_TICKS = 'cog-extension-ticks';
-const LAYER_LABELS = 'cog-extension-labels';
+const LAYER_TIP = 'cog-extension-tip';
 
 const M_PER_DEG_LAT = 111_320;
-const M_PER_NM = 1852;
 
 function project(
   fromLat: number,
@@ -27,25 +25,21 @@ function project(
 export interface CogExtensionProps {
   map: maplibregl.Map | null;
   p: LivePos | null;
-  /** Minutes ahead to extend. Default 120. Tick marks at every 30 min. */
+  /** Minutes ahead to extend the line. Default 360 (6 h). */
   totalMinutes?: number;
-  /** Spacing between tick marks in minutes. Default 30. */
-  tickMinutes?: number;
   /** When true, hide the line. */
   hidden?: boolean;
 }
 
 /**
- * Renders a line from the boat extending along COG for `totalMinutes` of
- * travel at the current SOG, with perpendicular tick marks at every
- * `tickMinutes` step. Useful for collision-avoidance and close-quarters
- * planning — answers "where will I be in N minutes if conditions hold".
+ * Renders a dashed line from the boat extending along COG for
+ * `totalMinutes` of travel at the current SOG, with a single circle
+ * at the tip showing where the boat will be at that time.
  */
 export function CogExtension({
   map,
   p,
-  totalMinutes = 120,
-  tickMinutes = 30,
+  totalMinutes = 360,
   hidden = false,
 }: CogExtensionProps) {
   useEffect(() => {
@@ -68,22 +62,12 @@ export function CogExtension({
         },
       });
       map.addLayer({
-        id: LAYER_TICKS,
-        type: 'line',
-        source: SOURCE_ID,
-        filter: ['==', ['get', 'kind'], 'tick'],
-        paint: { 'line-color': '#a78bfa', 'line-width': 2 },
-      });
-      // Tick labels use ['get', 'label'] which requires no glyphs URL since
-      // we set the layer below as 'circle' (kept simple — labels shown as
-      // small filled dots; pixel-precise text would need a glyphs source).
-      map.addLayer({
-        id: LAYER_LABELS,
+        id: LAYER_TIP,
         type: 'circle',
         source: SOURCE_ID,
-        filter: ['==', ['get', 'kind'], 'tick-point'],
+        filter: ['==', ['get', 'kind'], 'tip'],
         paint: {
-          'circle-radius': 4,
+          'circle-radius': 5,
           'circle-color': '#a78bfa',
           'circle-stroke-color': '#0b0e14',
           'circle-stroke-width': 1.5,
@@ -116,28 +100,14 @@ export function CogExtension({
         properties: { kind: 'shaft' },
         geometry: { type: 'LineString', coordinates: [[p.lon, p.lat], tip] },
       },
+      {
+        type: 'Feature',
+        properties: { kind: 'tip' },
+        geometry: { type: 'Point', coordinates: tip },
+      },
     ];
-    const tickHalf = Math.max(totalM * 0.02, 250);
-    for (let mins = tickMinutes; mins <= totalMinutes; mins += tickMinutes) {
-      const dist = p.sog * (mins * 60);
-      const center = project(p.lat, p.lon, dist, p.cog);
-      const leftBearing = p.cog - Math.PI / 2;
-      const rightBearing = p.cog + Math.PI / 2;
-      const left = project(center[1], center[0], tickHalf, leftBearing);
-      const right = project(center[1], center[0], tickHalf, rightBearing);
-      features.push({
-        type: 'Feature',
-        properties: { kind: 'tick', minutes: mins },
-        geometry: { type: 'LineString', coordinates: [left, right] },
-      });
-      features.push({
-        type: 'Feature',
-        properties: { kind: 'tick-point', minutes: mins },
-        geometry: { type: 'Point', coordinates: center },
-      });
-    }
     src.setData({ type: 'FeatureCollection', features });
-  }, [map, p, totalMinutes, tickMinutes, hidden]);
+  }, [map, p, totalMinutes, hidden]);
   // Layer cleanup intentionally not registered — the parent Map component
   // calls `map.remove()` on unmount which discards every layer. A separate
   // cleanup effect would race against StrictMode's double-mount and leave
