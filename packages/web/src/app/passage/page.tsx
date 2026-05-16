@@ -741,6 +741,13 @@ function DistanceTile({
   );
 }
 
+function weekdayFor(unixSec: number, tz: TzMode): string {
+  return new Date(unixSec * 1000).toLocaleString('en-US', {
+    weekday: 'short',
+    timeZone: tz === 'utc' ? 'UTC' : undefined,
+  });
+}
+
 function EtaTile({ eta, tz }: { eta: EtaSnapshot; tz: TzMode }) {
   const altTz: TzMode = tz === 'utc' ? 'local' : 'utc';
   return (
@@ -780,10 +787,12 @@ function EtaTile({ eta, tz }: { eta: EtaSnapshot; tz: TzMode }) {
         </div>
       </div>
       <div className="text-base font-mono text-slate-100">
-        {eta.etaUnixSec !== null ? fmtTimestamp(eta.etaUnixSec, tz) : '— stopped, no ETA'}
+        {eta.etaUnixSec !== null
+          ? `${weekdayFor(eta.etaUnixSec, tz)} ${fmtTimestamp(eta.etaUnixSec, tz)}`
+          : '— stopped, no ETA'}
         {eta.etaUnixSec !== null && (
           <span className="text-xs text-slate-500 ml-2">
-            ({fmtTimestamp(eta.etaUnixSec, altTz)})
+            ({weekdayFor(eta.etaUnixSec, altTz)} {fmtTimestamp(eta.etaUnixSec, altTz)})
           </span>
         )}
       </div>
