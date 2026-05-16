@@ -18,6 +18,7 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 import { WindOverlay, type WindGrid, type WindModel } from '../../components/WindOverlay';
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { CogExtension } from '../../components/CogExtension';
+import { RangeRings } from '../../components/RangeRings';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
@@ -444,6 +445,7 @@ function ChartPageInner() {
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension map={mapInstance} p={livePos} hidden={false} />
+        <RangeRings map={mapInstance} p={livePos} />
         <AisTargets map={mapInstance} />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
