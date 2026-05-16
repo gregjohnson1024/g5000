@@ -245,7 +245,7 @@ export default function PassagePage() {
 
       {stats?.trackId && (
         <>
-          {eta && <EtaTile eta={eta} tz={tz} />}
+          {eta && <EtaTile eta={eta} tz={tz} log={log} />}
 
           {log && (
             <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />
@@ -905,7 +905,15 @@ function weekdayFor(unixSec: number, tz: TzMode): string {
   });
 }
 
-function EtaTile({ eta, tz }: { eta: EtaSnapshot; tz: TzMode }) {
+function EtaTile({
+  eta,
+  tz,
+  log,
+}: {
+  eta: EtaSnapshot;
+  tz: TzMode;
+  log: PassageLogSnapshot | null;
+}) {
   const altTz: TzMode = tz === 'utc' ? 'local' : 'utc';
   return (
     <section className="bg-slate-900 border border-amber-700 rounded p-4 space-y-3">
@@ -953,6 +961,9 @@ function EtaTile({ eta, tz }: { eta: EtaSnapshot; tz: TzMode }) {
           </span>
         )}
       </div>
+      {log && log.anchorAt !== null && (
+        <CumulativeSparkline anchorAt={log.anchorAt} history={log.history} tz={tz} />
+      )}
     </section>
   );
 }
