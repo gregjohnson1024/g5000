@@ -8,9 +8,28 @@ import { useSse } from '../../hooks/use-sse';
 const NM = 1852;
 const MS_TO_KN = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
-const RANGE_OPTIONS_NM = [1, 2, 4, 8, 20];
+const RANGE_OPTIONS_NM = [1, 2, 4, 8, 20, 30];
+const DEFAULT_RANGE_NM = 30;
+/** localStorage key for the user's preferred radar range. Survives tab
+ *  navigation and page reloads. */
+const RANGE_STORAGE_KEY = 'ais:rangeNm';
 /** Fixed-length COG extension drawn for own ship and every AIS target. */
 const COG_EXTENSION_NM = 10;
+
+function readSavedRange(): number {
+  try {
+    const raw = localStorage.getItem(RANGE_STORAGE_KEY);
+    if (raw === null) return DEFAULT_RANGE_NM;
+    const n = Number(raw);
+    // Validate against the current option set so old saved values that
+    // are no longer offered (e.g. the previous 15) silently fall back to
+    // the default instead of leaving the select empty.
+    if (RANGE_OPTIONS_NM.includes(n)) return n;
+  } catch {
+    /* SSR / quota — keep default */
+  }
+  return DEFAULT_RANGE_NM;
+}
 
 interface AisAlarmConfig {
   enabled: boolean;
@@ -175,7 +194,20 @@ export function AisClientView() {
   const { channels } = useSse();
   const [targets, setTargets] = useState<AisTarget[]>([]);
   const [alarmConfig, setAlarmConfig] = useState<AisAlarmConfig>(DEFAULT_ALARM);
-  const [rangeNm, setRangeNm] = useState(20);
+  // Seed with the default to avoid SSR/client hydration mismatch, then
+  // hydrate from localStorage on mount. Mirrors the pattern in
+  // passage/page.tsx for the tz toggle.
+  const [rangeNm, setRangeNm] = useState(DEFAULT_RANGE_NM);
+  useEffect(() => {
+    setRangeNm(readSavedRange());
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(RANGE_STORAGE_KEY, String(rangeNm));
+    } catch {
+      /* quota / private mode — silently drop */
+    }
+  }, [rangeNm]);
   // North-up toggle removed at the user's request — page is permanently
   // north-up. The branch below in canvasRotationDeg is now effectively a
   // no-op; left in place in case we want the toggle back.
@@ -767,6 +799,9 @@ export function AisClientView() {
               <tr className="text-slate-400 border-b border-slate-800">
                 <th className="text-left py-1">MMSI</th>
                 <th className="text-left py-1">Name</th>
+                <th className="text-right py-1">LOA</th>
+                <th className="text-right py-1">SOG</th>
+                <th className="text-right py-1">COG</th>
                 <th className="text-right py-1">Range</th>
                 <th className="text-right py-1">CPA</th>
                 <th className="text-right py-1">TCPA</th>
@@ -799,6 +834,17 @@ export function AisClientView() {
                     >
                       <td className="py-1">{target.mmsi}</td>
                       <td className="py-1">{target.name ?? '—'}</td>
+                      <td className="py-1 text-right">
+                        {target.length !== undefined ? `${target.length.toFixed(0)}m` : '—'}
+                      </td>
+                      <td className="py-1 text-right">
+                        {target.sog !== undefined ? (target.sog * MS_TO_KN).toFixed(1) : '—'}
+                      </td>
+                      <td className="py-1 text-right">
+                        {target.cog !== undefined
+                          ? `${String(Math.round(((target.cog * RAD_TO_DEG) % 360 + 360) % 360)).padStart(3, '0')}°`
+                          : '—'}
+                      </td>
                       <td className="py-1 text-right">
                         {cpa ? `${(cpa.rangeMeters / NM).toFixed(2)}` : '—'}
                       </td>
