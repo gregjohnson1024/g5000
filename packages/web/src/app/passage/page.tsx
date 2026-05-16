@@ -130,6 +130,8 @@ function Sparkline({
 interface PassageLogSnapshot {
   anchorAt: number | null;
   distanceM: number;
+  /** Cumulative-distance buckets from anchor to now. Empty if no anchor. */
+  history: Array<{ t: number; cumulativeM: number }>;
 }
 
 export default function PassagePage() {
@@ -798,27 +800,101 @@ function LogTile({
       ? ` · ${fmtDuration(Date.now() / 1000 - log.anchorAt)} elapsed`
       : '';
   return (
-    <section className="bg-slate-900 border border-emerald-700 rounded p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-      <div className="flex flex-col gap-1">
-        <div className="text-xs uppercase tracking-wider text-emerald-400">Log</div>
-        <div className="flex items-baseline gap-1">
-          <div className="text-4xl font-mono text-slate-100">{distNm.toFixed(1)}</div>
-          <div className="text-sm text-slate-400">NM travelled</div>
+    <section className="bg-slate-900 border border-emerald-700 rounded p-4 space-y-3">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="text-xs uppercase tracking-wider text-emerald-400">Log</div>
+          <div className="flex items-baseline gap-1">
+            <div className="text-4xl font-mono text-slate-100">{distNm.toFixed(1)}</div>
+            <div className="text-sm text-slate-400">NM travelled</div>
+          </div>
+          <div className="text-xs text-slate-500 font-mono">
+            {sinceText}
+            {elapsedText}
+          </div>
         </div>
-        <div className="text-xs text-slate-500 font-mono">
-          {sinceText}
-          {elapsedText}
-        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={resetting}
+          className="bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 text-white px-4 py-2 rounded text-sm self-start md:self-auto"
+        >
+          {resetting ? 'Resetting…' : 'Reset to now'}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={onReset}
-        disabled={resetting}
-        className="bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 text-white px-4 py-2 rounded text-sm self-start md:self-auto"
-      >
-        {resetting ? 'Resetting…' : 'Reset to now'}
-      </button>
+      {log.anchorAt !== null && (
+        <CumulativeSparkline
+          anchorAt={log.anchorAt}
+          history={log.history}
+          tz={tz}
+        />
+      )}
     </section>
+  );
+}
+
+function CumulativeSparkline({
+  anchorAt,
+  history,
+  tz,
+  width = 600,
+  height = 60,
+}: {
+  anchorAt: number;
+  history: Array<{ t: number; cumulativeM: number }>;
+  tz: TzMode;
+  width?: number;
+  height?: number;
+}) {
+  if (history.length < 2) {
+    return (
+      <div className="text-xs text-slate-500 italic">
+        Sparkline appears once at least an hour of travel has accumulated.
+      </div>
+    );
+  }
+  // Always start the curve at (anchorAt, 0) so the slope from the origin
+  // is visible — otherwise the first bucket starts mid-air and the user
+  // can't see the zero baseline.
+  const series = [{ t: anchorAt, cumulativeM: 0 }, ...history];
+  const xs = series.map((d) => d.t);
+  const ys = series.map((d) => d.cumulativeM * M_TO_NM);
+  const xMin = xs[0]!;
+  const xMax = xs[xs.length - 1]!;
+  // Cumulative distance starts at 0 by construction; clamp yLo to 0 so the
+  // baseline is always at the bottom even if the boat has barely moved.
+  const yMax = Math.max(...ys);
+  const padY = yMax * 0.1 || 1;
+  const yHi = yMax + padY;
+  const px = (x: number): number =>
+    ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
+  const py = (y: number): number =>
+    height - 12 - (y / Math.max(0.0001, yHi)) * (height - 24);
+  const path = series
+    .map((d, i) => {
+      const x = px(d.t);
+      const y = py(d.cumulativeM * M_TO_NM);
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  const latestNm = ys[ys.length - 1]!.toFixed(1);
+  return (
+    <div className="space-y-1">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        className="bg-slate-950 border border-slate-800 rounded"
+      >
+        <path d={path} fill="none" stroke="#34d399" strokeWidth="1.5" />
+        <circle cx={px(xMax)} cy={py(ys[ys.length - 1]!)} r={2.5} fill="#34d399" />
+      </svg>
+      <div className="flex justify-between text-[10px] text-slate-500 font-mono px-1">
+        <span>{fmtHourLabel(xMin, tz)}</span>
+        <span>0 → {latestNm} NM cumulative</span>
+        <span>{fmtHourLabel(xMax, tz)}</span>
+      </div>
+    </div>
   );
 }
 
