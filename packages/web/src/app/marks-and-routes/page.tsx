@@ -19,6 +19,33 @@ interface PlanRecord {
   route: { distance: number; model: string };
 }
 
+interface CurrentPos {
+  lat: number;
+  lon: number;
+}
+
+function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R_NM = 3440.065;
+  const toRad = (d: number): number => (d * Math.PI) / 180;
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const dp = toRad(lat2 - lat1);
+  const dl = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number): number => (d * Math.PI) / 180;
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const dl = toRad(lon2 - lon1);
+  const y = Math.sin(dl) * Math.cos(p2);
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
 export default function MarksAndRoutesPage() {
   const [list, setList] = useState<Waypoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +70,11 @@ export default function MarksAndRoutesPage() {
   // here as a section beneath the waypoints CRUD.
   const [plans, setPlans] = useState<PlanRecord[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
+
+  // Current boat position for the "Distance" column. Sourced from
+  // /api/stats/eta (which reads the active track's last point); shows "—"
+  // if there's no active track yet.
+  const [currentPos, setCurrentPos] = useState<CurrentPos | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -90,6 +122,32 @@ export default function MarksAndRoutesPage() {
     void reload();
     void reloadPlans();
   }, [reload, reloadPlans]);
+
+  // Poll current position so the Distance column stays live as the boat
+  // moves. 15 s matches the SOG rolling-average window — finer doesn't
+  // buy useful precision for a list view.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/stats/eta', { cache: 'no-store' });
+        const j = (await r.json()) as
+          | { ok: true; eta: { currentLat: number; currentLon: number } }
+          | { ok: false };
+        if (cancelled) return;
+        if (j.ok) setCurrentPos({ lat: j.eta.currentLat, lon: j.eta.currentLon });
+        else setCurrentPos(null);
+      } catch {
+        if (!cancelled) setCurrentPos(null);
+      }
+    };
+    void tick();
+    const id = setInterval(tick, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   const handleAdd = async (): Promise<void> => {
     setError(null);
@@ -253,6 +311,12 @@ export default function MarksAndRoutesPage() {
               <th className="p-2">Latitude</th>
               <th className="p-2">Longitude</th>
               <th className="p-2">Decimal</th>
+              <th className="p-2" title={currentPos ? 'great-circle from boat' : 'no active track'}>
+                Distance
+                {currentPos === null && (
+                  <span className="text-[10px] text-slate-600 normal-case ml-1">(no track)</span>
+                )}
+              </th>
               <th className="p-2">Notes</th>
               <th className="p-2 text-right">Actions</th>
             </tr>
@@ -286,6 +350,7 @@ export default function MarksAndRoutesPage() {
                     />
                   </td>
                   <td className="p-2 text-slate-500 text-xs">edit above</td>
+                  <td className="p-2 text-slate-600 text-xs">—</td>
                   <td className="p-2">
                     <input
                       type="text"
@@ -321,6 +386,24 @@ export default function MarksAndRoutesPage() {
                   </td>
                   <td className="p-2 font-mono text-slate-400">
                     {w.lat.toFixed(5)}, {w.lon.toFixed(5)}
+                  </td>
+                  <td className="p-2 font-mono text-slate-200">
+                    {currentPos ? (
+                      <>
+                        {greatCircleNm(currentPos.lat, currentPos.lon, w.lat, w.lon).toFixed(1)}{' '}
+                        <span className="text-slate-500">NM</span>{' '}
+                        <span className="text-xs text-slate-500">
+                          {String(
+                            Math.round(
+                              initialBearingDeg(currentPos.lat, currentPos.lon, w.lat, w.lon),
+                            ),
+                          ).padStart(3, '0')}
+                          °T
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
                   </td>
                   <td className="p-2 text-slate-300">{w.notes ?? ''}</td>
                   <td className="p-2 text-right space-x-1">
