@@ -74,13 +74,6 @@ export function RangeRings({
   const layerId = `range-rings-line-${id}`;
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[RangeRings:effect]', id, {
-      hasMap: !!map,
-      origin,
-      styleLoaded: map?.isStyleLoaded(),
-      radii: radiiNm,
-    });
     if (!map) return;
     const labels = labelMarkersRef.current;
 
@@ -169,9 +162,26 @@ export function RangeRings({
       }
     };
 
-    if (map.isStyleLoaded()) run();
-    else map.once('load', run);
-  }, [map, origin, radiiNm, hidden, color, labelPrefix, sourceId, layerId]);
+    // Don't gate on `isStyleLoaded()`: on a chart with constantly
+    // updating sources (live-trail, AIS targets, cog-extension),
+    // `isStyleLoaded()` is essentially never true because some
+    // source is always mid-fetch. And `map.once('load', run)` is
+    // useless if `load` already fired before this component mounted,
+    // which is the common case here — the parent's mapInstance state
+    // is only set AFTER the map's load event fires. addSource/addLayer
+    // work as soon as the style spec is parsed (true once the map is
+    // exposed to React), so just run. If something genuinely isn't
+    // ready yet, the try/catch absorbs and the next effect re-run
+    // (origin change) retries.
+    try {
+      run();
+    } catch (err) {
+      // Most likely "style is not done loading" — shouldn't happen given
+      // the discussion above, but if it does, surface for debugging.
+      // eslint-disable-next-line no-console
+      console.warn('[RangeRings] addSource/addLayer failed:', id, err);
+    }
+  }, [map, origin, radiiNm, hidden, color, labelPrefix, sourceId, layerId, id]);
 
   // Layer cleanup intentionally not registered — matches the established
   // pattern in CogExtension/AisTargets/etc. The parent Map component
