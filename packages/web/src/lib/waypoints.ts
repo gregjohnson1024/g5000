@@ -16,28 +16,80 @@ export interface Waypoint {
 const NANTUCKET: Waypoint = {
   id: 'nantucket',
   name: 'Nantucket',
-  // 41°17.4'N 70°05.4'W → decimal. Nantucket Harbor entrance (Brant
-  // Point Light area). Active destination for the Bermuda → Nantucket
-  // passage (2026; pivoted Bristol Marine → Madaket → Nantucket Harbor).
+  // 41°17.4'N 70°05.4'W. Nantucket Harbor entrance (Brant Point
+  // Light area). Was the active destination earlier in the Bermuda
+  // passage; kept as a waypoint since it's a real anchor point.
   lat: 41.29,
   lon: -70.09,
-  notes: 'Nantucket Harbor (Brant Point), Nantucket MA — destination for the Bermuda → Nantucket passage (2026)',
+  notes: 'Nantucket Harbor (Brant Point), Nantucket MA',
   createdAt: '2026-05-16T00:00:00.000Z',
 };
+
+const NEWPORT: Waypoint = {
+  id: 'newport',
+  name: 'Newport',
+  // 41°29.2'N 71°19.5'W. Newport Shipyard, RI — the final
+  // destination of the Bermuda passage as of 2026-05-17.
+  lat: 41.4869,
+  lon: -71.3258,
+  notes: 'Newport Shipyard, RI — destination for the Bermuda → Newport passage (2026)',
+  createdAt: '2026-05-17T00:00:00.000Z',
+};
+
+const BLOCK_ISLAND: Waypoint = {
+  id: 'block-island',
+  name: 'Block Island',
+  // 41°10.9'N 71°34.0'W. Champlin's Marina, Great Salt Pond — the
+  // planned fuel-stop option on the way to Newport.
+  lat: 41.1817,
+  lon: -71.5667,
+  notes: "Champlin's Marina, Great Salt Pond — fuel-stop option on the Bermuda → Newport passage",
+  createdAt: '2026-05-17T00:00:00.000Z',
+};
+
+const MOORE_BROS: Waypoint = {
+  id: 'moore-bros',
+  name: 'Moore Bros',
+  // ~41°40.6'N 71°16.9'W. Moore Brothers Co., Bristol RI — sailboat
+  // service yard up Narragansett Bay past Newport. Coordinates are
+  // approximate (water-access side of the yard); edit via the UI if a
+  // more precise dock fix is needed.
+  lat: 41.6760,
+  lon: -71.2810,
+  notes: 'Moore Brothers Co., Bristol RI (approximate)',
+  createdAt: '2026-05-17T00:00:00.000Z',
+};
+
+/**
+ * Canonical seeded waypoints. On every read we ensure any seed whose
+ * `id` is missing from the persisted file gets added back — so a fresh
+ * install or a deployed Pi without these IDs picks them up automatically,
+ * but a user-edited copy of "newport" (different coords/notes) is left
+ * alone because the id collision is checked, not the content. Re-adding
+ * a seed waypoint after manual deletion is the documented trade-off.
+ */
+const SEED_WAYPOINTS: Waypoint[] = [NANTUCKET, NEWPORT, BLOCK_ISLAND, MOORE_BROS];
+
+async function ensureSeeded(list: Waypoint[]): Promise<Waypoint[]> {
+  const known = new Set(list.map((w) => w.id));
+  const missing = SEED_WAYPOINTS.filter((w) => !known.has(w.id));
+  if (missing.length === 0) return list;
+  const merged = [...list, ...missing];
+  await writeWaypoints(merged);
+  return merged;
+}
 
 async function readWaypoints(): Promise<Waypoint[]> {
   try {
     const buf = await fs.readFile(WAYPOINTS, 'utf8');
     const parsed = JSON.parse(buf) as unknown;
-    if (!Array.isArray(parsed)) return [NANTUCKET];
+    if (!Array.isArray(parsed)) return ensureSeeded([]);
     const cleaned = parsed.filter(isWaypoint) as Waypoint[];
-    return cleaned;
+    return ensureSeeded(cleaned);
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      // First run: seed the active destination so the chart has at
-      // least one waypoint to plan against without the user typing it in.
-      await writeWaypoints([NANTUCKET]);
-      return [NANTUCKET];
+      await writeWaypoints(SEED_WAYPOINTS);
+      return SEED_WAYPOINTS;
     }
     throw err;
   }
