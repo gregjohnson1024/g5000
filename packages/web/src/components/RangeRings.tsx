@@ -74,6 +74,13 @@ export function RangeRings({
   const layerId = `range-rings-line-${id}`;
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[RangeRings:effect]', id, {
+      hasMap: !!map,
+      origin,
+      styleLoaded: map?.isStyleLoaded(),
+      radii: radiiNm,
+    });
     if (!map) return;
     const labels = labelMarkersRef.current;
 
