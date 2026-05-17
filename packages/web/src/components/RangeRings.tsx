@@ -77,7 +77,16 @@ export function RangeRings({
     if (!map) return;
     const labels = labelMarkersRef.current;
 
-    const ensure = (): void => {
+    // Everything in one callback so the layer/source creation, setData,
+    // and label sync all happen atomically — either right now (if the
+    // style is already loaded) or on the upcoming `load` event. Splitting
+    // them caused a real bug: a static-origin instance (e.g. West
+    // Falmouth) had its effect run exactly once before the style was
+    // ready, scheduled the source/layer creation async, then bailed
+    // before reaching setData — and never re-ran, so the rings stayed
+    // empty forever. The original code hid this because every consumer
+    // had a dynamic origin (live boat position) that forced re-runs.
+    const run = (): void => {
       if (!map.getSource(sourceId)) {
         map.addSource(sourceId, {
           type: 'geojson',
@@ -99,82 +108,70 @@ export function RangeRings({
       } else {
         map.setPaintProperty(layerId, 'line-color', color);
       }
+
+      const src = map.getSource(sourceId) as maplibregl.GeoJSONSource;
+
+      if (hidden || !origin || !Number.isFinite(origin.lat) || !Number.isFinite(origin.lon)) {
+        src.setData({ type: 'FeatureCollection', features: [] });
+        for (const mk of labels.values()) {
+          try { mk.remove(); } catch { /* map gone */ }
+        }
+        labels.clear();
+        return;
+      }
+
+      const features: GeoJSON.Feature[] = radiiNm.map((nm) => ({
+        type: 'Feature',
+        properties: { nm },
+        geometry: { type: 'LineString', coordinates: ring(origin.lat, origin.lon, nm) },
+      }));
+      src.setData({ type: 'FeatureCollection', features });
+
+      // Labels at the due-north intersection so they stack vertically above
+      // the origin. Reuse markers across updates by keying on radius.
+      const live = new Set<number>();
+      for (const nm of radiiNm) {
+        live.add(nm);
+        const [latLabel, lonLabel] = destPoint(origin.lat, origin.lon, nm, 0);
+        let mk = labels.get(nm);
+        const text = labelPrefix ? `${labelPrefix} ${nm} NM` : `${nm} NM`;
+        if (!mk) {
+          const el = document.createElement('div');
+          el.style.cssText =
+            'font: 10px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
+            `color: ${color}; background: rgba(11,14,20,0.7);` +
+            'padding: 1px 4px; border-radius: 2px;' +
+            'transform: translateY(-50%); white-space: nowrap;' +
+            'pointer-events: none;';
+          el.textContent = text;
+          mk = new maplibregl.Marker({ element: el, anchor: 'left' });
+          mk.setLngLat([lonLabel, latLabel]).addTo(map);
+          labels.set(nm, mk);
+        } else {
+          mk.setLngLat([lonLabel, latLabel]);
+          const el = mk.getElement();
+          el.textContent = text;
+          el.style.color = color;
+        }
+      }
+      for (const [k, mk] of labels) {
+        if (!live.has(k)) {
+          try { mk.remove(); } catch { /* map gone */ }
+          labels.delete(k);
+        }
+      }
     };
-    if (map.isStyleLoaded()) ensure();
-    else map.once('load', ensure);
 
-    const src = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
-    if (!src) return;
-
-    if (hidden || !origin || !Number.isFinite(origin.lat) || !Number.isFinite(origin.lon)) {
-      src.setData({ type: 'FeatureCollection', features: [] });
-      for (const mk of labels.values()) {
-        try { mk.remove(); } catch { /* map gone */ }
-      }
-      labels.clear();
-      return;
-    }
-
-    const features: GeoJSON.Feature[] = radiiNm.map((nm) => ({
-      type: 'Feature',
-      properties: { nm },
-      geometry: { type: 'LineString', coordinates: ring(origin.lat, origin.lon, nm) },
-    }));
-    src.setData({ type: 'FeatureCollection', features });
-
-    // Labels at the due-north intersection so they stack vertically above
-    // the origin. Reuse markers across updates by keying on radius.
-    const live = new Set<number>();
-    for (const nm of radiiNm) {
-      live.add(nm);
-      const [latLabel, lonLabel] = destPoint(origin.lat, origin.lon, nm, 0);
-      let mk = labels.get(nm);
-      const text = labelPrefix ? `${labelPrefix} ${nm} NM` : `${nm} NM`;
-      if (!mk) {
-        const el = document.createElement('div');
-        el.style.cssText =
-          'font: 10px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-          `color: ${color}; background: rgba(11,14,20,0.7);` +
-          'padding: 1px 4px; border-radius: 2px;' +
-          'transform: translateY(-50%); white-space: nowrap;' +
-          'pointer-events: none;';
-        el.textContent = text;
-        mk = new maplibregl.Marker({ element: el, anchor: 'left' });
-        mk.setLngLat([lonLabel, latLabel]).addTo(map);
-        labels.set(nm, mk);
-      } else {
-        mk.setLngLat([lonLabel, latLabel]);
-        // Refresh text + color in case props changed.
-        const el = mk.getElement();
-        el.textContent = text;
-        el.style.color = color;
-      }
-    }
-    for (const [k, mk] of labels) {
-      if (!live.has(k)) {
-        try { mk.remove(); } catch { /* map gone */ }
-        labels.delete(k);
-      }
-    }
+    if (map.isStyleLoaded()) run();
+    else map.once('load', run);
   }, [map, origin, radiiNm, hidden, color, labelPrefix, sourceId, layerId]);
 
-  // Clean up on unmount so layer/source/labels go away with the component.
-  useEffect(() => {
-    return () => {
-      const labels = labelMarkersRef.current;
-      for (const mk of labels.values()) {
-        try { mk.remove(); } catch { /* map gone */ }
-      }
-      labels.clear();
-      if (!map) return;
-      try {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
-        if (map.getSource(sourceId)) map.removeSource(sourceId);
-      } catch {
-        /* map already torn down */
-      }
-    };
-  }, [map, sourceId, layerId]);
+  // Layer cleanup intentionally not registered — matches the established
+  // pattern in CogExtension/AisTargets/etc. The parent Map component
+  // calls `map.remove()` on unmount which discards every layer. A
+  // separate cleanup effect races against StrictMode's double-mount and
+  // ends up tearing the layer down right after it was created, leaving
+  // the rings invisible (this was the bug I shipped in the first cut).
 
   return null;
 }
