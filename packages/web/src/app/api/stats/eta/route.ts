@@ -3,13 +3,14 @@ import { computeEta } from '../../../../lib/eta-stats';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Hardcoded passage destination — Nantucket Harbor (Brant Point Light area),
-// north side of Nantucket Island MA. 41°17.4'N 70°05.4'W. User pivoted
-// destination Bristol Marine → Madaket → Nantucket Harbor across the passage.
+// Hardcoded passage destination — Newport Shipyard, RI. 41°29.2'N 71°19.5'W.
+// User pivoted destination Bristol → Madaket → Nantucket → Newport across the
+// passage; Block Island is the planned fuel-stop option (see BlockIslandTile
+// on /passage for the diversion math).
 const DESTINATION = {
-  lat: 41.29,
-  lon: -70.09,
-  label: 'Nantucket',
+  lat: 41.4869,
+  lon: -71.3258,
+  label: 'Newport',
 };
 
 /**
