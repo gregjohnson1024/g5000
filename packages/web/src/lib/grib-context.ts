@@ -1,5 +1,4 @@
 import type { WindField, CurrentField, Bbox } from '@g5000/grib';
-import { fetchRtofsBlobs, runWgrib2, parseGrib2Json } from '@g5000/grib';
 import {
   windFieldFromCache,
   fetchWindGrid,
@@ -8,7 +7,7 @@ import {
   bboxKey,
   type WindModel,
 } from './wind-fetch';
-import { GRIB_CACHE } from './paths';
+import { fetchCurrentGrid } from './current-fetch';
 
 /**
  * Wind loader for the routing planner.
@@ -77,19 +76,35 @@ export async function loadWindFor(
   }
 }
 
+/**
+ * Current loader for the routing planner. Reads Copernicus Marine (CMEMS)
+ * daily-mean surface currents via the helper in `./current-fetch`. NOAA
+ * retired the RTOFS NOMADS subset filter in early 2026, so the planner
+ * now uses the same provider as the chart overlay.
+ *
+ * CMEMS delivers one 2D grid per day; we fetch enough days to bracket the
+ * planner's horizon and stack them into a `CurrentField` whose `times`
+ * axis carries the per-day valid-time (midnight UTC of the represented
+ * day). The interpolator linearly blends across consecutive days, which
+ * is the right thing to do for a daily-mean product.
+ */
 export async function loadCurrentFor(bbox: Bbox, hours: number): Promise<CurrentField> {
-  const { cachedPaths, runDateUtc } = await fetchRtofsBlobs({
-    bbox,
-    hours,
-    cacheRoot: GRIB_CACHE,
-  });
-  const runTime =
-    Date.UTC(
-      Number(runDateUtc.slice(0, 4)),
-      Number(runDateUtc.slice(5, 7)) - 1,
-      Number(runDateUtc.slice(8, 10)),
-      0,
-    ) / 1000;
-  const messages = (await Promise.all(cachedPaths.map((p) => runWgrib2(p)))).flat();
-  return parseGrib2Json(messages, 'RTOFS', runTime) as CurrentField;
+  // CMEMS forecast horizon is ~10 days; cap there to stop the fetch from
+  // exploding on accidental long horizons. Always grab at least 2 days
+  // so the interpolator has a valid time axis (locate() needs ≥2 points).
+  const numDays = Math.min(10, Math.max(2, Math.ceil(hours / 24) + 1));
+  const grids = await Promise.all(
+    Array.from({ length: numDays }, (_, d) => fetchCurrentGrid(bbox, d)),
+  );
+  grids.sort((a, b) => a.validAt - b.validAt);
+  const first = grids[0]!;
+  return {
+    lats: first.lats,
+    lons: first.lons,
+    times: grids.map((g) => g.validAt),
+    u: grids.map((g) => g.u),
+    v: grids.map((g) => g.v),
+    source: 'CMEMS',
+    runTime: first.runAt,
+  };
 }

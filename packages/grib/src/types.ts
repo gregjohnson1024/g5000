@@ -47,6 +47,6 @@ export interface CurrentField {
   times: number[];
   u: number[][][];
   v: number[][][];
-  source: 'RTOFS';
+  source: 'RTOFS' | 'CMEMS';
   runTime: number;
 }
