@@ -26,7 +26,25 @@ npm run bench --workspace @g5000/routing          # routing benchmarks
 
 Node ≥22, ESM-only, strict TypeScript (`noUncheckedIndexedAccess`, composite project refs).
 
+`autopilot-server`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under *Deployment* is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
+
 **Known gotcha:** the top-level `tsconfig.json` still lists `apps/router` in its `references`. That dir was merged into `packages/web` and `tsc -b` reports `TS5083 Cannot read file …/apps/router/tsconfig.json`. Individual workspace builds (`npm run build`, `npm test`) work; only the orchestrated `tsc -b` stops at the missing ref. Remove the ref when convenient.
+
+### Env-var gates
+
+Common runtime knobs (set on the autopilot-server process):
+
+- `DEMO_MODE=1` — boot in demo mode (synthetic injector instead of NGT-1 / YDWG).
+- `REPLAY=path/to/session.jsonl.gz` + `REPLAY_MODE=asap|realtime` — boot in replay mode against a stored session.
+- `SKIP_BRIDGE=1` — start without the N2K bridge (web-only smoke testing).
+- `G5000_ENABLE_AP_TX=1` — opt-in three-layer gate that allows the autopilot N2K TX path (fast-packet split via NGT-1 only). Off by default for safety; H5000 currently rejects spoofed `src=254` so this is research-only.
+- `G5000_HIDE_AIS=1` — suppress AIS targets on the chart (used on Pi when running near AIS-equipped boats in port).
+- `YDWG_HOST=192.168.1.100` (default) — set to `none` to disable the YDWG-02 TCP driver; override for a different boat.
+- `HLINK_ENABLED=0` / `HLINK_PORT=5050` — toggle / move the H-LINK TCP server.
+- `NGT1_PATH=/dev/ttyUSB0` / `NGT1_BAUD=115200` — NGT-1 serial.
+- `NMEA0183_PATHS=/dev/ttyUSB1,/dev/ttyUSB2` / `NMEA0183_BAUD=4800` — optional 0183 inputs.
+- `CONFIG_DB=./data/config.db` and `SESSION_LOG_DIR=./data/sessions` — persistence paths.
+- `G5000_ROUTER_ROOT=~/.g5000-router` — OSM tile + GRIB cache root.
 
 ## Architecture
 
