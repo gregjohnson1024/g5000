@@ -50,13 +50,13 @@ const BLOCK_ISLAND: Waypoint = {
 const MOORE_BROS: Waypoint = {
   id: 'moore-bros',
   name: 'Moore Bros',
-  // ~41°40.6'N 71°16.9'W. Moore Brothers Co., Bristol RI — sailboat
-  // service yard up Narragansett Bay past Newport. Coordinates are
-  // approximate (water-access side of the yard); edit via the UI if a
-  // more precise dock fix is needed.
-  lat: 41.6760,
-  lon: -71.2810,
-  notes: 'Moore Brothers Co., Bristol RI (approximate)',
+  // 115 Broadcommon Road, Bristol RI 02809. ~41°41.0'N 71°15.3'W —
+  // address-derived; the actual dock/launch point may be a bit east
+  // of this on the Mt Hope Bay shoreline. Edit via the UI for a more
+  // precise fix.
+  lat: 41.6840,
+  lon: -71.2545,
+  notes: 'Moore Brothers Co., 115 Broadcommon Rd, Bristol RI 02809',
   createdAt: '2026-05-17T00:00:00.000Z',
 };
 
