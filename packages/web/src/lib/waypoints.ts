@@ -50,12 +50,11 @@ const BLOCK_ISLAND: Waypoint = {
 const MOORE_BROS: Waypoint = {
   id: 'moore-bros',
   name: 'Moore Bros',
-  // 115 Broadcommon Road, Bristol RI 02809. ~41°41.0'N 71°15.3'W —
-  // address-derived; the actual dock/launch point may be a bit east
-  // of this on the Mt Hope Bay shoreline. Edit via the UI for a more
-  // precise fix.
-  lat: 41.6840,
-  lon: -71.2545,
+  // 41°42.237'N 71°16.226'W — user-supplied fix for Moore Brothers
+  // Co., 115 Broadcommon Rd, Bristol RI. Sits up the bay on the
+  // Mt Hope Bay side, north of Bristol Harbor.
+  lat: 41.70395,
+  lon: -71.27043,
   notes: 'Moore Brothers Co., 115 Broadcommon Rd, Bristol RI 02809',
   createdAt: '2026-05-17T00:00:00.000Z',
 };
