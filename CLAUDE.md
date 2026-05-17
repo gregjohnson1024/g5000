@@ -120,7 +120,9 @@ Tests sit next to source as `*.test.ts(x)` in `packages/*/src/**`, `packages/*/t
 
 Production runs on RPi5 `sula-bassana` reachable via Tailscale (`100.64.0.117`), boat ethernet (`192.168.2.2`), boat wifi (`192.168.1.232`), or `https://g5000.sulabassana.net` (cloudflared). Systemd unit is `scripts/g5000-autopilot.service` (`Type=notify`, `WatchdogSec=60`). A separate `g5000-forecast-refresh.timer` pokes `/api/forecast/refresh` every ~3h on a curated bbox read live from `/api/settings`.
 
-Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge` → build `autopilot-server` → build `web` → `systemctl restart g5000-autopilot`.
+Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge grib` → build `autopilot-server` → build `web` → `systemctl restart g5000-autopilot`.
+
+> **Note:** `grib` MUST be in that tsc step even though `autopilot-server` doesn't depend on it — `packages/web` imports types from `@g5000/grib` (e.g. `CurrentField` in `grib-context.ts`) and `next build` resolves those via the package's compiled `dist/*.d.ts`. Omit it and a stale `dist/types.d.ts` will make `next build` fail with confusing `Type "X" is not assignable to type "Y"` errors. Failed `next build` also wipes `.next/BUILD_ID`, which prevents the autopilot-server from booting on the next restart — so leaving `grib` out turns a build error into a production outage.
 
 ## When designing new features
 
