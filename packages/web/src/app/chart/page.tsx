@@ -473,7 +473,12 @@ function ChartPageInner() {
           map={mapInstance}
           origin={livePos}
           radiiNm={RANGE_RING_RADII_NM}
-          color="#7dd3fc"
+          // Pink-500 — distinct from CogExtension's violet, AIS's orange,
+          // and the WF rings' amber, and crucially high-contrast against
+          // both water (light blue) and land (light green) basemap tiles.
+          // The earlier sky-300 (#7dd3fc) was the right vibe for "Sula"
+          // but invisible against the OSM ocean. Lesson re-learned.
+          color="#ec4899"
           labelPrefix="Sula"
         />
         <RangeRings
