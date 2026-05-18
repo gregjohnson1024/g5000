@@ -5,10 +5,10 @@ import { homedir } from 'node:os';
 import { mkdir, readFile } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus } from '@g5000/core';
+import { getSharedBus, createAlarmsRegistry, setSharedAlarms } from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
-import { ConfigStore, setSharedConfigStore } from '@g5000/db';
-import { startTrueWindPipeline, startPolarPipeline } from '@g5000/compute';
+import { ConfigStore, setSharedConfigStore, loadAlarmsConfig, type AlarmsConfig } from '@g5000/db';
+import { startTrueWindPipeline, startPolarPipeline, startAlarmsPipeline } from '@g5000/compute';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -126,6 +126,23 @@ async function main(): Promise<void> {
   teardown.push(() => store.close());
   // eslint-disable-next-line no-console
   console.log(`[autopilot] config db: ${CONFIG_DB_PATH}`);
+
+  // --- Safety alarms (g5000-derived) ---
+  // Built right after ConfigStore so API routes that touch the registry or
+  // its config (e.g. /api/alarms/*) always find both wired. Disposed in the
+  // shutdown handler below.
+  const alarmsRegistry = createAlarmsRegistry();
+  setSharedAlarms(alarmsRegistry);
+  const initialAlarmsConfig = await loadAlarmsConfig(store);
+  const alarmsConfigRef: { current: AlarmsConfig } = { current: initialAlarmsConfig };
+  const alarmsPipelineHandle = startAlarmsPipeline(bus, alarmsRegistry, alarmsConfigRef);
+  // Expose the ref so API routes that update config (e.g. PUT /api/alarms/config)
+  // can swap it without restarting the predicates.
+  (globalThis as { __g5000_alarms_config_ref__?: typeof alarmsConfigRef }).__g5000_alarms_config_ref__ =
+    alarmsConfigRef;
+  teardown.push(async () => alarmsPipelineHandle.dispose());
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] alarms pipeline online');
 
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });
