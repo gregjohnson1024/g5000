@@ -195,62 +195,46 @@ export const DEFAULT_POLARS: PolarTable = {
 };
 
 /**
- * One sail-configuration entry in the wardrobe. Identity ("what sails are
- * up", "what's the daggerboard doing") lives here; the polar that describes
- * how the boat performs in this configuration lives in `polar_revisions`
- * rows pointed at by `modes[mode].activeRevisionId`. The legacy `polar?`
- * field is only present on pre-migration rows and is read once by the
- * boot-time migrator.
+ * Sail wardrobe — Model B (atomic sails). Each sail is one piece of canvas
+ * with its own valid region on a fixed (TWS, TWA) grid. The skipper composes a
+ * sail plan by picking one sail per category (headsail / main / downwind).
  */
-export interface SailConfig {
-  /** Stable unique ID (e.g. 'default', 'full-j1', 'reef1-a2'). */
-  id: string;
-  /** Human-readable name (e.g. 'Full main + J1'). */
-  name: string;
-  /** Optional structured metadata for filtering / sorting. */
-  mainState?: string;
-  headsail?: string;
-  downwindSail?: string;
-  /** Daggerboard state: 'down' (upwind/reaching), 'half', 'up' (running). */
-  daggerboard?: 'down' | 'half' | 'up';
-  /** Optional axes for high-performance boats. Carried but unused on Sula. */
-  foilMode?: 'displacement' | 'foiling' | 'transition' | string;
-  /** Mast rotation, radians. Rotating-rig boats only. */
-  mastRotation?: number;
-  /** Free-form rig-tension tag. */
-  rigTensionState?: string;
-  /** Displacement, kg. Used by crew-weight-sensitive classes. */
-  displacement?: number;
-  notes?: string;
-  /**
-   * v1 compatibility: legacy embedded polar. Present only on rows that have
-   * not yet been migrated to v2. Once migrated, this field is undefined and
-   * `modes[…].activeRevisionId` carries the truth. The migrator reads this
-   * to seed revision-0 rows.
-   */
-  polar?: PolarTable;
-  /**
-   * v2 pointer: per-mode active polar revision id. Always present on
-   * migrated rows. May be `{}` if no revision exists yet (resolver falls back
-   * to DEFAULT_POLARS in that case).
-   */
-  modes: Partial<Record<PolarMode, { activeRevisionId: string }>>;
+export type SailCategory = 'headsail' | 'main' | 'downwind';
+export const SAIL_CATEGORIES: readonly SailCategory[] = [
+  'headsail',
+  'main',
+  'downwind',
+] as const;
+
+export interface SailRegion {
+  /** Grid cell keys "twsIdx,twaIdx" against the fixed grid in @g5000/core. */
+  cells: string[];
 }
 
-/**
- * The sail wardrobe: a list of configurations + which one (and which mode)
- * is currently active. `ConfigStore.activePolar$` resolves the active
- * config's active-mode revision and emits the resulting `PolarTable`; the
- * compute and routing pipelines subscribe there. Scoped to one `boatId`
- * (single-active-boat-per-process today).
- */
+export interface Sail {
+  /** Stable unique id (e.g. 'j0', 'reef1', 'g0'). */
+  id: string;
+  /** Human-readable name (e.g. 'J0', 'Reef 1'). */
+  name: string;
+  category: SailCategory;
+  /** Sail area in m² (optional; used to sort recommendations). */
+  areaSqM?: number;
+  notes?: string;
+  region: SailRegion;
+}
+
 export interface SailWardrobe {
-  /** Which boat this wardrobe belongs to. Defaults to 'sula' on existing installs. */
+  /** Schema version. v3 = atomic sails. */
+  schemaVersion: 3;
   boatId: BoatId;
-  configs: SailConfig[];
-  /** ID of the active configuration. Must reference a configs[].id. */
-  activeConfigId: string;
-  /** Active mode for the active config. Defaults to 'default'. */
+  sails: Sail[];
+  /** Currently hoisted sail in each category. All optional. */
+  active: {
+    headsail?: string;
+    main?: string;
+    downwind?: string;
+  };
+  /** Selects which polar revision is active for the boat. */
   activeMode: PolarMode;
 }
 
@@ -335,51 +319,17 @@ export const DEFAULT_AIS_ALARM_CONFIG: AisAlarmConfig = {
 };
 
 /**
- * Which sail configuration is recommended at each (TWS, TWA) cell of the
- * polar grid. One row per (boatId, mode). Cells absent from the map are
- * "no recommendation" — consumers render the chart cell uncoloured and
- * the recommendation tile shows neutral.
- *
- * Cell keys are `${twsIdx},${twaIdx}` (zero-indexed into the active polar
- * for the same (boatId, mode)). When the polar is re-binned with a
- * different `twsBins`/`twaBins` length, the migrator clears the map (see
- * ConfigStore.setActiveRevision).
- */
-export interface CrossoverMap {
-  boatId: BoatId;
-  mode: PolarMode;
-  cells: Record<string, string>;
-  /** UNIX seconds; updated on every write. */
-  updatedAt: number;
-}
-
-export const DEFAULT_CROSSOVER_MAP: CrossoverMap = {
-  boatId: 'sula',
-  mode: 'default',
-  cells: {},
-  updatedAt: 0,
-};
-
-/**
- * Per-boat settings for the sail-crossover feature. Mode-agnostic for now.
- * Hysteresis is time-based (cell must be stable for N seconds) because
- * Model A uses a single polar across all configs — there is no speed-delta
- * to compare like the prior per-config-polar design.
+ * Per-boat settings for the sail-crossover feature. Mode-agnostic.
+ * The grid is fixed in @g5000/core; chart bounds are no longer stored here.
  */
 export interface CrossoverSettings {
   recommendationStableSeconds: number;
-  chartTwsMaxKn: number;
-  chartTwaMinDeg: number;
-  chartTwaMaxDeg: number;
   forecastIntervalMinutes: number;
   forecastDurationHours: number;
 }
 
 export const DEFAULT_CROSSOVER_SETTINGS: CrossoverSettings = {
   recommendationStableSeconds: 30,
-  chartTwsMaxKn: 30,
-  chartTwaMinDeg: 30,
-  chartTwaMaxDeg: 180,
   forecastIntervalMinutes: 30,
   forecastDurationHours: 12,
 };
@@ -397,22 +347,10 @@ export interface PassageLog {
   anchorAt: number | null;
 }
 
-/**
- * Default wardrobe: one slot, v2 shape, empty `modes`. The boot-time migrator
- * inserts a `revision-0` polar row from DEFAULT_POLARS and rewrites
- * `modes['default'].activeRevisionId` to point at it. Until that happens the
- * `activePolar$` resolver falls back to DEFAULT_POLARS.
- */
 export const DEFAULT_WARDROBE: SailWardrobe = {
+  schemaVersion: 3,
   boatId: 'sula',
-  configs: [
-    {
-      id: 'default',
-      name: 'Default',
-      notes: 'Initial baseline polar. Replace with your boat-specific data.',
-      modes: {},
-    },
-  ],
-  activeConfigId: 'default',
+  sails: [],
+  active: {},
   activeMode: 'default',
 };
