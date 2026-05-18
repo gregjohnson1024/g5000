@@ -88,6 +88,27 @@ export function RaceTimer(): React.ReactElement {
           <>
             <button
               type="button"
+              onClick={() => {
+                if (timer.startMs === null) return;
+                // Snap startMs so that the displayed time becomes the
+                // nearest whole-minute value. Used to align the timer with
+                // the warning gun ("sync to gun"): if the gun fires while
+                // the clock shows 4:32, press Sync and the display jumps
+                // to 5:00 (28 s adjustment) so subsequent minute beeps
+                // land on the right boundaries.
+                const secsToGun = (timer.startMs - Date.now()) / 1000;
+                const nearestMinSecs = Math.round(secsToGun / 60) * 60;
+                const adjustSec = nearestMinSecs - secsToGun;
+                if (Math.abs(adjustSec) < 0.5) return; // already aligned
+                void post({ action: 'sync', adjustSec });
+              }}
+              className="px-3 py-2 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-semibold"
+              title="Snap countdown to nearest whole minute (sync to gun)"
+            >
+              Sync
+            </button>
+            <button
+              type="button"
               onClick={() => void post({ action: 'sync', adjustSec: 60 })}
               className="px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 text-slate-100"
             >
