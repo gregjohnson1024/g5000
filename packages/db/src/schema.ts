@@ -129,3 +129,8 @@ export const shipLogEntries = sqliteTable('ship_log_entries', {
   author: text('author'),
   boatId: text('boat_id').notNull(),
 });
+
+export const raceState = sqliteTable('race_state', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded RaceStateConfig
+});

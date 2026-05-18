@@ -170,6 +170,7 @@ export class ConfigStore {
       );
       CREATE INDEX IF NOT EXISTS idx_ship_log_entries_ts
         ON ship_log_entries (boat_id, ts_ms DESC);
+      CREATE TABLE IF NOT EXISTS race_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
