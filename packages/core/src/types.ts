@@ -10,7 +10,17 @@ export type ChannelValue =
   | { kind: 'vec3'; value: [number, number, number] }
   | { kind: 'quat'; value: [number, number, number, number] } // x, y, z, w
   | { kind: 'geo'; value: { lat: number; lon: number } }
-  | { kind: 'enum'; value: string };
+  | { kind: 'enum'; value: string }
+  | {
+      /** Active sail-crossover recommendation; payload published on Channels.SAIL_RECOMMENDATION. */
+      kind: 'sail_recommendation';
+      recommendedConfigId: string | null;
+      activeConfigId: string;
+      cellTwsIdx: number;
+      cellTwaIdx: number;
+      enteredAt: number;
+      stableSeconds: number;
+    };
 
 export type SourceTag = string; // e.g. "n2k:127250@dev0x10", "0183:port1"
 
