@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SailConfig, SailWardrobe, PolarTable } from '@g5000/db';
 import { PolarHeatmap } from '../polars/PolarHeatmap';
+import { RecommendationPanel } from './RecommendationPanel';
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
@@ -149,6 +150,8 @@ export default function SailsPage() {
       {err && <div className="text-red-400 text-sm">{err}</div>}
 
       {!wardrobe && !err && <p className="text-slate-400">Loading…</p>}
+
+      {wardrobe && <RecommendationPanel wardrobe={wardrobe} />}
 
       {wardrobe && (
         <div className="space-y-2">
