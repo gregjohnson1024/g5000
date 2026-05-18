@@ -6,6 +6,7 @@ import {
   distanceToLineMeters,
   timeToLineSeconds,
   lineBiasRad,
+  sideOfLine,
 } from './line-geometry.js';
 
 const port = { lat: 41.5000, lon: -71.3000 };
@@ -37,17 +38,18 @@ describe('distanceToLineMeters', () => {
     expect(Math.abs(r)).toBeLessThan(1);
   });
   it('returns a positive distance when boat is on the declared pre-start side', () => {
-    // Boat south of the line (line runs east-west) → south is the pre-start side.
+    // Boat south of east-pointing line. sideOfLine() returns 'stbd' for south
+    // (south is to the RIGHT of port→stbd, which is the stbd side).
     const south = { lat: 41.4900, lon: -71.2950 };
-    const r = distanceToLineMeters(south, port, stbd, 'port'); // pre-start = south
+    const r = distanceToLineMeters(south, port, stbd, 'stbd'); // pre-start = stbd (south)
     expect(r).toBeGreaterThan(0);
     expect(r).toBeGreaterThan(1000);  // ~1.1 km south
     expect(r).toBeLessThan(1200);
   });
   it('returns a negative distance after the boat crosses to the other side', () => {
     const north = { lat: 41.5100, lon: -71.2950 };
-    // Boat south is pre-start side → crossing north is past-line.
-    const r = distanceToLineMeters(north, port, stbd, 'port');
+    // Pre-start side is stbd (south). Crossing to north (port side) is past-line.
+    const r = distanceToLineMeters(north, port, stbd, 'stbd');
     expect(r).toBeLessThan(0);
   });
 });
@@ -84,5 +86,36 @@ describe('lineBiasRad', () => {
     const twd = -Math.PI / 8;
     const bias = lineBiasRad(lineBearing, twd);
     expect(bias).toBeGreaterThan(0);
+  });
+});
+
+describe('sideOfLine', () => {
+  it('south of east-pointing line is stbd side', () => {
+    const south = { lat: 41.49, lon: -71.295 };
+    expect(sideOfLine(south, port, stbd)).toBe('stbd');
+  });
+  it('north of east-pointing line is port side', () => {
+    const north = { lat: 41.51, lon: -71.295 };
+    expect(sideOfLine(north, port, stbd)).toBe('port');
+  });
+});
+
+describe('DTL round-trip with sideOfLine', () => {
+  it('boat south of east-pointing line: sideOfLine gives preStartSide → DTL positive', () => {
+    // This is the canonical round-trip: sideOfLine determines preStartSide, then
+    // distanceToLineMeters must return a positive value for the same boat.
+    const south = { lat: 41.49, lon: -71.295 };
+    const preStartSide = sideOfLine(south, port, stbd); // 'stbd'
+    expect(preStartSide).toBe('stbd');
+    const dtl = distanceToLineMeters(south, port, stbd, preStartSide);
+    expect(dtl).toBeGreaterThan(0);
+    expect(dtl).toBeGreaterThan(1000); // ~1.1 km south
+  });
+  it('boat north (past-line side): DTL is negative after crossing', () => {
+    const north = { lat: 41.51, lon: -71.295 };
+    const south = { lat: 41.49, lon: -71.295 };
+    const preStartSide = sideOfLine(south, port, stbd); // pre-start is south = 'stbd'
+    const dtl = distanceToLineMeters(north, port, stbd, preStartSide);
+    expect(dtl).toBeLessThan(0); // past the line
   });
 });

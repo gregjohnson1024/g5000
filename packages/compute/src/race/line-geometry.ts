@@ -54,11 +54,31 @@ export function distanceToLineMeters(
   const θ13 = initialBearingRad(port, boat);
   const θ12 = initialBearingRad(port, stbd);
   const δ = Math.asin(Math.sin(d13 / EARTH_R_M) * Math.sin(θ13 - θ12)) * EARTH_R_M;
-  // δ > 0 means boat is to the LEFT of the port→stbd track.
-  // Match the sign to preStartSide: if preStartSide is 'port', boat starting
-  // on the LEFT (δ > 0) should be positive; if preStartSide is 'stbd',
-  // boat starting on the RIGHT (δ < 0) should be positive.
-  return preStartSide === 'port' ? δ : -δ;
+  // Aviation Formulary convention: δ > 0 when the boat is to the RIGHT of the
+  // port→stbd track (i.e. on the starboard side). sideOfLine() returns 'stbd'
+  // for that same geometry (cross product < 0 in lon/lat space → 'stbd').
+  // Match the sign to preStartSide: return +δ when the boat is on the declared
+  // pre-start side, −δ when past the line.
+  return preStartSide === 'stbd' ? δ : -δ;
+}
+
+/**
+ * Determine which side of the port→stbd line the boat is on.
+ * Uses a planar cross-product in lon/lat space (valid for start-line
+ * distances of < ~10 km).
+ *
+ * Returns 'stbd' when the boat is to the RIGHT of the port→stbd direction
+ * (i.e. the starboard side, δ > 0 from distanceToLineMeters), 'port' otherwise.
+ */
+export function sideOfLine(
+  boat: LatLon,
+  port: LatLon,
+  stbd: LatLon,
+): 'port' | 'stbd' {
+  const cross =
+    (stbd.lon - port.lon) * (boat.lat - port.lat) -
+    (stbd.lat - port.lat) * (boat.lon - port.lon);
+  return cross > 0 ? 'port' : 'stbd';
 }
 
 /**
