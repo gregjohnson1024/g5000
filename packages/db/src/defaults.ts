@@ -95,6 +95,68 @@ export interface PolarTable {
   twaBins: number[];
   /** Target boat speed in m/s, indexed [twsIdx][twaIdx]. */
   boatSpeed: number[][];
+  /**
+   * Optional heel grid, radians (signed; lee positive). Same shape as boatSpeed.
+   * Absent means "unknown" — consumers that don't need heel ignore this field.
+   */
+  heel?: number[][];
+  /**
+   * Optional leeway grid, radians. Same shape as boatSpeed. Absent means
+   * "unknown".
+   */
+  leeway?: number[][];
+}
+
+/** Stable per-boat identifier. Single active boat per process today. */
+export type BoatId = string;
+
+/**
+ * Operating regime for a polar. 'default' is the universal fallback when a
+ * boat has only one regime. High-performance boats may carry several (e.g.
+ * 'displacement', 'planing', 'foiling'). Unknown values are accepted at the
+ * type level — modes are configuration, not enum-policed.
+ */
+export type PolarMode = 'default' | 'displacement' | 'planing' | 'foiling' | string;
+
+/** Provenance kind for an individual polar revision. */
+export type PolarLineageKind =
+  | 'migrated'
+  | 'manual_edit'
+  | 'imported_csv'
+  | 'imported_pol'
+  | 'vpp'
+  | 'cfd'
+  | 'towing_tank'
+  | 'measured'
+  | 'regression'
+  | 'expert_judgment';
+
+/** Free-form provenance metadata attached to a revision. */
+export interface PolarLineage {
+  kind: PolarLineageKind;
+  /** Optional citation: designer name, file path, run-id, etc. */
+  source?: string;
+  notes?: string;
+}
+
+/**
+ * An immutable polar revision. One row in the `polar_revisions` table.
+ * The `table` field is JSON-encoded into `value_json` at the SQL layer.
+ */
+export interface PolarRevision {
+  /** ULID. Lexicographically sortable by createdAt. */
+  id: string;
+  boatId: BoatId;
+  sailConfigId: string;
+  mode: PolarMode;
+  /** Parent revision in the lineage chain, or null for a root. */
+  parentRevisionId: string | null;
+  /** UNIX seconds. */
+  createdAt: number;
+  lineage: PolarLineage;
+  /** Optional scalar uncertainty in m/s. Reserved for future fusion work. */
+  sigma?: number;
+  table: PolarTable;
 }
 
 /**
