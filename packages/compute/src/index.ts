@@ -12,3 +12,4 @@ export * from './alarms/index.js';
 export * from './race/index.js';
 export type { LatLon } from './race/line-geometry.js';
 export { sideOfLine } from './race/line-geometry.js';
+export * from './sail-crossover/index.js';
