@@ -24,6 +24,9 @@
     "rxjs": "^7",
     "serialport": "^12"
   },
+  "optionalDependencies": {
+    "socketcan": "^4.0.7"
+  },
   "devDependencies": {
     "@types/node": "^22",
     "tsx": "^4",
