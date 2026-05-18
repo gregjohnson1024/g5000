@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 G5000 is a sailing instrumentation platform for a real boat (`Sula`). It ingests NMEA 2000 / NMEA 0183 from B&G/Navico/YDWG hardware, runs compute pipelines (true wind, polars, currents, routing), serves a Next.js web UI with helm/chart/forecast/autopilot views, and exposes its data back out via an H-LINK TCP server so Expedition can read it. Production target is a Raspberry Pi (`sula-bassana`) running a single Node systemd service.
 
-Git remote is Forgejo (`git.rbr-global.com`), not Bitbucket.
+Git remote is GitHub (`github.com/gregjohnson1024/g5000`). Public repo; deploy on the Pi pulls from this remote via HTTPS (no auth needed for `git pull` on a public repo). Switched from a private Forgejo at `git.rbr-global.com` on 2026-05-18 — if a stale clone is still pointing there, it'll fail to pull and needs `git remote set-url origin https://github.com/gregjohnson1024/g5000.git`.
 
 ## Commands
 
