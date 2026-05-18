@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DEFAULT_CROSSOVER_SETTINGS, type CrossoverSettings } from '@g5000/db';
+import type { CrossoverSettings } from '@g5000/db';
 
 interface Props {
   initial: CrossoverSettings;
@@ -75,7 +75,7 @@ export function SettingsDrawer({ initial, onSave }: Props) {
               onChange={(e) =>
                 setDraft({
                   ...draft,
-                  [f.key]: Number(e.target.value) || DEFAULT_CROSSOVER_SETTINGS[f.key],
+                  [f.key]: Number(e.target.value) || initial[f.key],
                 })
               }
               className="w-full rounded bg-slate-900 px-2 py-1 text-slate-100"
