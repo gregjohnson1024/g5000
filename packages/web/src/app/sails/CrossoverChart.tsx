@@ -2,23 +2,13 @@
 
 import { useMemo, useState, type ReactElement } from 'react';
 import { computeCrossoverGrid, type CrossoverGrid } from '@g5000/compute';
-import type { SailWardrobe, WardrobeSettings } from '@g5000/db';
+import {
+  DEFAULT_WARDROBE_SETTINGS,
+  wardrobeSettingsOf,
+  type SailWardrobe,
+  type WardrobeSettings,
+} from '@g5000/db/defaults';
 import { getConfigColor } from '../../lib/config-color';
-
-// Inlined to avoid pulling the @g5000/db barrel (and its better-sqlite3
-// dependency) into the client bundle. Mirrors DEFAULT_WARDROBE_SETTINGS +
-// wardrobeSettingsOf in packages/db/src/defaults.ts.
-const DEFAULT_WARDROBE_SETTINGS: WardrobeSettings = {
-  hysteresisPercent: 3,
-  chartTwsMaxKn: 30,
-  chartTwaMinDeg: 30,
-  chartTwaMaxDeg: 180,
-  forecastIntervalMinutes: 30,
-  forecastDurationHours: 12,
-};
-function wardrobeSettingsOf(w: SailWardrobe): WardrobeSettings {
-  return { ...DEFAULT_WARDROBE_SETTINGS, ...(w.settings ?? {}) };
-}
 
 const CELL_W = 16;
 const CELL_H = 16;
