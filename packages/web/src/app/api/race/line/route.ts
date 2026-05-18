@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSharedRaceState } from '@g5000/core';
 import { getSharedConfigStore, saveRaceState } from '@g5000/db';
-import { sideOfLine } from '@g5000/compute';
+import { sideOfLine } from '@g5000/compute/race';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
