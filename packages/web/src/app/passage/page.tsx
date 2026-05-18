@@ -43,19 +43,6 @@ const BERMUDA = {
   label: "St George's, Bermuda",
 };
 
-/**
- * Block Island (Champlin's Marina, Great Salt Pond) — the planned fuel-stop
- * option for the Bermuda → Newport passage. Sits ~21 NM SSW of Newport, so
- * stopping here adds only ~10 NM to the direct-to-Newport route while giving
- * reliable, season-long fuel availability (Cuttyhunk is geometrically nicer
- * but much smaller / less reliable).
- */
-const BLOCK_ISLAND = {
-  lat: 41.1817,
-  lon: -71.5667,
-  label: "Block Island — Champlin's",
-};
-
 function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R_NM = 3440.065;
   const toRad = (d: number): number => (d * Math.PI) / 180;
@@ -76,30 +63,6 @@ function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: numbe
   const y = Math.sin(dl) * Math.cos(p2);
   const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-}
-
-/**
- * Cross-track and along-track distance of an off-route point relative to a
- * great-circle from `current` to `dest`. `alongTrackNm` is the distance from
- * `current` to the foot of the perpendicular from `offRoute` onto the route —
- * i.e. the "abeam of offRoute" point along the route, which is the natural
- * closest-point-of-approach. `crossTrackNm` is the perpendicular distance from
- * `offRoute` to the route (always positive).
- */
-function crossAlongTrackNm(
-  current: { lat: number; lon: number },
-  dest: { lat: number; lon: number },
-  offRoute: { lat: number; lon: number },
-): { alongTrackNm: number; crossTrackNm: number } {
-  const R_NM = 3440.065;
-  const dOff = greatCircleNm(current.lat, current.lon, offRoute.lat, offRoute.lon);
-  const brgDest = initialBearingDeg(current.lat, current.lon, dest.lat, dest.lon);
-  const brgOff = initialBearingDeg(current.lat, current.lon, offRoute.lat, offRoute.lon);
-  // Signed bearing difference normalized to (−180, 180].
-  const delta = (((brgOff - brgDest + 540) % 360) - 180) * (Math.PI / 180);
-  const cross = Math.asin(Math.sin(dOff / R_NM) * Math.sin(delta)) * R_NM;
-  const along = Math.acos(Math.cos(dOff / R_NM) / Math.cos(cross / R_NM)) * R_NM;
-  return { alongTrackNm: along, crossTrackNm: Math.abs(cross) };
 }
 
 interface DistanceStats {
@@ -321,8 +284,6 @@ export default function PassagePage() {
           {eta && <EtaTile eta={eta} tz={tz} log={log} />}
 
           {eta && <BermudaTile eta={eta} />}
-
-          {eta && <BlockIslandTile eta={eta} />}
 
           {log && (
             <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />
@@ -875,113 +836,6 @@ function BermudaTile({ eta }: { eta: EtaSnapshot }) {
         </div>
         <div className="text-xs text-slate-500 font-mono">
           bearing to Bermuda {String(Math.round(brgDeg)).padStart(3, '0')}°T
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/**
- * Block Island fuel-stop option. Shows the direct distance/bearing to BI,
- * the "divert to BI then to Newport" totals, and the deciding metric: how
- * far / how long until the boat is abeam of Block Island along the
- * Newport-bound great-circle. Past that point, the diversion penalty stops
- * being free and starts growing because every additional mile toward
- * Newport puts Block Island farther astern.
- *
- * The avg-speed used for time calculations comes from the same 3-h rolling
- * window the ETA tile uses, so this tile rises and falls with the same
- * speed signal — no second source of truth.
- */
-function BlockIslandTile({ eta }: { eta: EtaSnapshot }) {
-  const current = { lat: eta.currentLat, lon: eta.currentLon };
-  const dest = { lat: eta.destinationLat, lon: eta.destinationLon };
-  const directBi = greatCircleNm(current.lat, current.lon, BLOCK_ISLAND.lat, BLOCK_ISLAND.lon);
-  const brgBi = initialBearingDeg(current.lat, current.lon, BLOCK_ISLAND.lat, BLOCK_ISLAND.lon);
-  const biToDest = greatCircleNm(BLOCK_ISLAND.lat, BLOCK_ISLAND.lon, dest.lat, dest.lon);
-  const viaTotal = directBi + biToDest;
-  const penalty = viaTotal - eta.distanceNm;
-  const { alongTrackNm, crossTrackNm } = crossAlongTrackNm(current, dest, BLOCK_ISLAND);
-  const sogKn = eta.avgSpeedKn3h;
-  const fmtH = (nm: number): string =>
-    sogKn && sogKn > 0.1 ? fmtDuration((nm / sogKn) * 3600) : '—';
-  // Heading bias: how many degrees off the direct-to-Newport bearing is
-  // the direct-to-BI bearing? If small, BI is essentially on-track and
-  // you have lots of room to decide.
-  const bearingBias =
-    ((Math.abs(initialBearingDeg(current.lat, current.lon, dest.lat, dest.lon) - brgBi) + 540) %
-      360) -
-    180;
-
-  return (
-    <section className="bg-slate-900 border border-sky-700 rounded p-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-4 flex-wrap">
-        <div>
-          <div className="text-xs uppercase tracking-wider text-sky-400">Fuel stop option</div>
-          <div className="text-lg font-semibold text-slate-100">{BLOCK_ISLAND.label}</div>
-          <div className="text-xs text-slate-500 font-mono">
-            {fmtLatLonDmm(BLOCK_ISLAND.lat, BLOCK_ISLAND.lon)}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="flex items-baseline gap-1 justify-end">
-            <div className="text-4xl font-mono text-slate-100">{directBi.toFixed(1)}</div>
-            <div className="text-sm text-slate-400">NM direct</div>
-          </div>
-          <div className="text-xs text-slate-500 font-mono">
-            bearing {String(Math.round(brgBi)).padStart(3, '0')}°T
-            {' · '}
-            {bearingBias >= 0 ? '+' : ''}
-            {bearingBias.toFixed(0)}° vs Newport
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 text-sm font-mono">
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">
-            Via BI, then to Newport
-          </div>
-          <div className="text-xl text-slate-100">{viaTotal.toFixed(1)} NM</div>
-          <div className="text-[10px] text-slate-500">
-            {directBi.toFixed(1)} + {biToDest.toFixed(1)} (BI → Newport){' '}
-            {sogKn ? `· ETA ${fmtH(viaTotal)}` : ''}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">
-            Diversion penalty
-          </div>
-          <div className="text-xl text-slate-100">
-            +{penalty.toFixed(1)} NM
-            {sogKn && sogKn > 0.1 ? ` (+${fmtH(penalty)})` : ''}
-          </div>
-          <div className="text-[10px] text-slate-500">vs direct to Newport</div>
-        </div>
-      </div>
-
-      <div className="bg-slate-950 border border-slate-800 rounded p-3 space-y-1">
-        <div className="text-xs uppercase tracking-wider text-sky-400">
-          Deciding metric — abeam of BI along Newport route
-        </div>
-        <div className="flex items-baseline gap-4 flex-wrap">
-          <div className="flex items-baseline gap-1">
-            <div className="text-2xl font-mono text-slate-100">
-              {alongTrackNm.toFixed(1)}
-            </div>
-            <div className="text-xs text-slate-400">NM along route</div>
-          </div>
-          <div className="flex items-baseline gap-1">
-            <div className="text-2xl font-mono text-slate-100">{fmtH(alongTrackNm)}</div>
-            <div className="text-xs text-slate-400">at current 3h-avg speed</div>
-          </div>
-          <div className="text-[10px] text-slate-500 font-mono">
-            cross-track {crossTrackNm.toFixed(1)} NM
-          </div>
-        </div>
-        <div className="text-[11px] text-slate-500">
-          Past this point, the diversion penalty grows — every additional mile toward
-          Newport puts Block Island further astern.
         </div>
       </div>
     </section>

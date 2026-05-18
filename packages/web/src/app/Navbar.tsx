@@ -24,6 +24,7 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/forecast', label: 'Forecast' },
   { href: '/marks-and-routes', label: 'Marks & routes' },
   { href: '/tracks', label: 'Tracks' },
+  { href: '/log', label: 'Log' },
   { href: '/autopilot', label: 'Autopilot' },
 ];
 

@@ -4,6 +4,7 @@ export * from './config-store.js';
 export { validatePolarTable } from './polar-revisions.js';
 export * from './alarms-config.js';
 export * from './alarms-history.js';
+export * from './ship-log.js';
 
 import { ConfigStore } from './config-store.js';
 

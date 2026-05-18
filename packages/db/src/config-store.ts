@@ -152,6 +152,24 @@ export class ConfigStore {
         context TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_alarms_history_fired_at ON alarms_history (fired_at DESC);
+      CREATE TABLE IF NOT EXISTS ship_log_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts_ms INTEGER NOT NULL,
+        source TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        text TEXT,
+        lat REAL,
+        lon REAL,
+        cog_deg REAL,
+        sog_kn REAL,
+        hdg_deg REAL,
+        tws_kn REAL,
+        twd_deg REAL,
+        author TEXT,
+        boat_id TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ship_log_entries_ts
+        ON ship_log_entries (boat_id, ts_ms DESC);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';

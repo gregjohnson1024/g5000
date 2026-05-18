@@ -96,3 +96,36 @@ export const alarmsHistory = sqliteTable('alarms_history', {
   ackedAt: text('acked_at'),
   context: text('context'), // JSON-encoded Record<string, unknown> or null
 });
+
+/**
+ * Ship's log — chronological human-readable record of the boat.
+ *
+ * Two `source` values:
+ *  - 'manual': crew-typed entry. `text` always populated; nav snapshot
+ *    columns optional (client supplies current values).
+ *  - 'auto': written by the autopilot-server's hourly auto-logger.
+ *    `kind='position'` and nav columns populated; `text` is null or
+ *    a templated summary.
+ *
+ * `kind` is a soft enum (no DB constraint) so future categories can be
+ * added without migration.
+ */
+export const shipLogEntries = sqliteTable('ship_log_entries', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** Epoch ms when the entry's event happened (also when it was logged). */
+  tsMs: integer('ts_ms').notNull(),
+  /** 'manual' | 'auto' */
+  source: text('source').notNull(),
+  /** 'note' | 'position' | 'weather' | 'equipment' | 'incident' | 'crew' */
+  kind: text('kind').notNull(),
+  text: text('text'),
+  lat: real('lat'),
+  lon: real('lon'),
+  cogDeg: real('cog_deg'),
+  sogKn: real('sog_kn'),
+  hdgDeg: real('hdg_deg'),
+  twsKn: real('tws_kn'),
+  twdDeg: real('twd_deg'),
+  author: text('author'),
+  boatId: text('boat_id').notNull(),
+});

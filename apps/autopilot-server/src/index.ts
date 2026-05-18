@@ -36,6 +36,7 @@ import {
   type OutgoingPgn,
 } from '@g5000/bridge';
 import { startDemoInjector } from './demo-injector.js';
+import { startShipLogAuto } from './ship-log-auto.js';
 import { startSogStats } from './sog-stats.js';
 import { startCogStats } from './cog-stats.js';
 import { startHdgStats } from './hdg-stats.js';
@@ -218,6 +219,15 @@ async function main(): Promise<void> {
     aisRegistry.evictStale(AIS_MAX_AGE_MS);
   }, 15_000);
   teardown.push(async () => clearInterval(aisEvictTimer));
+
+  // Ship's log hourly auto-logger. Persists a position snapshot every hour
+  // so the narrative log doesn't depend on someone remembering to write
+  // anything down. Manual entries are written via /api/log POST.
+  const activeBoatId = process.env.G5000_BOAT_ID ?? 'sula';
+  const shipLogAuto = startShipLogAuto({ bus, store, boatId: activeBoatId });
+  teardown.push(async () => shipLogAuto.dispose());
+  // eslint-disable-next-line no-console
+  console.log("[autopilot] ship's log auto-logger online");
 
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });
