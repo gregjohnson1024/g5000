@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Navbar } from './Navbar';
+import { AlarmBanner } from '../components/AlarmBanner';
 
 export const metadata: Metadata = {
   title: 'G5000',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="min-h-screen">
+        <AlarmBanner />
         <Navbar hiddenHrefs={hiddenHrefs} />
         {children}
       </body>
