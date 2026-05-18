@@ -19,7 +19,13 @@ import {
   type AlarmsConfig,
   type PolarTable,
 } from '@g5000/db';
-import { startTrueWindPipeline, startPolarPipeline, startAlarmsPipeline, startRaceComputePipeline } from '@g5000/compute';
+import {
+  startTrueWindPipeline,
+  startPolarPipeline,
+  startAlarmsPipeline,
+  startRaceComputePipeline,
+  startSailCrossoverPipeline,
+} from '@g5000/compute';
 import type { LatLon } from '@g5000/compute';
 import type { CurrentField } from '@g5000/grib';
 import {
@@ -532,6 +538,14 @@ async function main(): Promise<void> {
     teardown.push(stopPolarPipeline);
     // eslint-disable-next-line no-console
     console.log('[autopilot] polar pipeline online');
+
+    // Sail-crossover pipeline — publishes sail.recommendation based on the
+    // active crossover map + current TWS/TWA. Consumes calibrated wind off
+    // the bus, same as the polar pipeline, so it runs in live and demo.
+    const stopSailCrossover = startSailCrossoverPipeline({ bus, store });
+    teardown.push(async () => stopSailCrossover());
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] sail-crossover pipeline online');
 
     // Tear down whatever base source the controller currently owns on shutdown.
     teardown.push(async () => {

@@ -38,10 +38,16 @@ function validate(v: unknown): v is SailWardrobe {
     if (!c || typeof c !== 'object') return false;
     const cc = c as Record<string, unknown>;
     if (typeof cc.id !== 'string' || typeof cc.name !== 'string') return false;
-    if (!cc.polar || typeof cc.polar !== 'object') return false;
-    const p = cc.polar as Record<string, unknown>;
-    if (!Array.isArray(p.twsBins) || !Array.isArray(p.twaBins) || !Array.isArray(p.boatSpeed))
-      return false;
+    // v2 SailConfig: `modes` is the per-mode revision pointer (may be empty
+    // {} on a freshly-added config). `polar` is the legacy inline polar,
+    // optional and drained into a revision row by the v1→v2 migrator.
+    if (!cc.modes || typeof cc.modes !== 'object') return false;
+    if (cc.polar !== undefined) {
+      if (!cc.polar || typeof cc.polar !== 'object') return false;
+      const p = cc.polar as Record<string, unknown>;
+      if (!Array.isArray(p.twsBins) || !Array.isArray(p.twaBins) || !Array.isArray(p.boatSpeed))
+        return false;
+    }
   }
   return true;
 }

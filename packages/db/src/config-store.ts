@@ -9,6 +9,8 @@ import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
+  DEFAULT_CROSSOVER_MAP,
+  DEFAULT_CROSSOVER_SETTINGS,
   DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
@@ -18,6 +20,8 @@ import {
   type BoatId,
   type BspCal,
   type CompassDeviation,
+  type CrossoverMap,
+  type CrossoverSettings,
   type DampingConfig,
   type PassageLog,
   type PolarMode,
@@ -32,6 +36,8 @@ import {
   bspCal,
   boatConfig as boatConfigTable,
   compassDeviation,
+  crossoverMap as crossoverMapTable,
+  crossoverSettings as crossoverSettingsTable,
   dampingConfig as dampingConfigTable,
   passageLog as passageLogTable,
   polars,
@@ -68,6 +74,8 @@ export class ConfigStore {
     aisAlarm: BehaviorSubject<AisAlarmConfig>;
     passageLog: BehaviorSubject<PassageLog>;
     polarRevisions: BehaviorSubject<Map<string, PolarRevision>>;
+    crossoverMap: BehaviorSubject<CrossoverMap>;
+    crossoverSettings: BehaviorSubject<CrossoverSettings>;
   };
 
   private readonly __activeBoatId: BoatId;
@@ -91,6 +99,8 @@ export class ConfigStore {
       aisAlarm: AisAlarmConfig;
       passageLog: PassageLog;
       polarRevisions: Map<string, PolarRevision>;
+      crossoverMap: CrossoverMap;
+      crossoverSettings: CrossoverSettings;
     },
     activeBoatId: BoatId,
   ) {
@@ -106,6 +116,8 @@ export class ConfigStore {
       aisAlarm: new BehaviorSubject(initial.aisAlarm),
       passageLog: new BehaviorSubject(initial.passageLog),
       polarRevisions: new BehaviorSubject(initial.polarRevisions),
+      crossoverMap: new BehaviorSubject(initial.crossoverMap),
+      crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
     };
   }
 
@@ -171,6 +183,16 @@ export class ConfigStore {
       CREATE INDEX IF NOT EXISTS idx_ship_log_entries_ts
         ON ship_log_entries (boat_id, ts_ms DESC);
       CREATE TABLE IF NOT EXISTS race_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS crossover_map (
+        boat_id TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        value TEXT NOT NULL,
+        PRIMARY KEY (boat_id, mode)
+      );
+      CREATE TABLE IF NOT EXISTS crossover_settings (
+        boat_id TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -267,6 +289,40 @@ export class ConfigStore {
         .run();
     }
 
+    // Load the crossover_map row for the active (boat, mode) and seed the
+    // BehaviorSubject. The row is keyed by composite PK (boat_id, mode); the
+    // active mode comes from the wardrobe we just resolved. Drizzle returns
+    // the JS-side camelCase column names from the schema (`boatId`).
+    const xmRows = db
+      .select()
+      .from(crossoverMapTable)
+      .where(eq(crossoverMapTable.boatId, activeBoatId))
+      .all() as Array<{ boatId: string; mode: string; value: string }>;
+    const xmForMode = xmRows.find((r) => r.mode === wardrobeValue.activeMode);
+    const crossoverMapValue: CrossoverMap = xmForMode
+      ? {
+          ...DEFAULT_CROSSOVER_MAP,
+          ...(JSON.parse(xmForMode.value) as Partial<CrossoverMap>),
+          boatId: activeBoatId,
+          mode: wardrobeValue.activeMode,
+        }
+      : { ...DEFAULT_CROSSOVER_MAP, boatId: activeBoatId, mode: wardrobeValue.activeMode };
+
+    // Load the crossover_settings row for the active boat. Single-row table
+    // keyed by boatId — no mode component. Stored value is merged with
+    // DEFAULT_CROSSOVER_SETTINGS so partial writes get sensible fallbacks.
+    const xsRows = db
+      .select()
+      .from(crossoverSettingsTable)
+      .where(eq(crossoverSettingsTable.boatId, activeBoatId))
+      .all() as Array<{ boatId: string; value: string }>;
+    const crossoverSettingsValue: CrossoverSettings = xsRows[0]
+      ? {
+          ...DEFAULT_CROSSOVER_SETTINGS,
+          ...(JSON.parse(xsRows[0].value) as Partial<CrossoverSettings>),
+        }
+      : DEFAULT_CROSSOVER_SETTINGS;
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
@@ -281,6 +337,8 @@ export class ConfigStore {
       aisAlarm: loadOrInsert<AisAlarmConfig>(aisAlarmConfigTable, DEFAULT_AIS_ALARM_CONFIG),
       passageLog: passageLogValue,
       polarRevisions: revisionsMap,
+      crossoverMap: crossoverMapValue,
+      crossoverSettings: crossoverSettingsValue,
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -379,6 +437,55 @@ export class ConfigStore {
   /** Legacy alias — backed by activePolar$ for backward compatibility. */
   get polars$(): Observable<PolarTable> {
     return this.activePolar$;
+  }
+  /**
+   * Crossover map for the active (boatId, mode). Seeded at open() from the
+   * crossover_map row that matches `(activeBoatId, wardrobe.activeMode)`, or
+   * DEFAULT_CROSSOVER_MAP if no row exists yet. Writers must keep
+   * `value.boatId`/`value.mode` aligned with the active selection —
+   * setCrossoverMap rejects mismatches.
+   */
+  get crossoverMap$(): Observable<CrossoverMap> {
+    return this.subjects.crossoverMap.asObservable();
+  }
+
+  async setCrossoverMap(value: CrossoverMap): Promise<void> {
+    if (value.boatId !== this.__activeBoatId) {
+      throw new Error(
+        `setCrossoverMap: boatId ${value.boatId} != active ${this.__activeBoatId}`,
+      );
+    }
+    const activeMode = this.subjects.sails.value.activeMode;
+    if (value.mode !== activeMode) {
+      throw new Error(`setCrossoverMap: mode ${value.mode} != active ${activeMode}`);
+    }
+    const stored: CrossoverMap = { ...value, updatedAt: Math.floor(Date.now() / 1000) };
+    this.raw
+      .prepare(
+        'INSERT INTO crossover_map (boat_id, mode, value) VALUES (?, ?, ?) ON CONFLICT (boat_id, mode) DO UPDATE SET value = excluded.value',
+      )
+      .run(stored.boatId, stored.mode, JSON.stringify(stored));
+    this.subjects.crossoverMap.next(stored);
+  }
+
+  /**
+   * Crossover settings (recommendation hysteresis, chart bounds, forecast
+   * cadence) for the active boat. Seeded at open() from the
+   * crossover_settings row for `activeBoatId`, merged over
+   * DEFAULT_CROSSOVER_SETTINGS so missing keys fall back. Single-row table
+   * keyed on `boatId` — there is no per-mode component.
+   */
+  get crossoverSettings$(): Observable<CrossoverSettings> {
+    return this.subjects.crossoverSettings.asObservable();
+  }
+
+  async setCrossoverSettings(value: CrossoverSettings): Promise<void> {
+    this.raw
+      .prepare(
+        'INSERT INTO crossover_settings (boat_id, value) VALUES (?, ?) ON CONFLICT (boat_id) DO UPDATE SET value = excluded.value',
+      )
+      .run(this.__activeBoatId, JSON.stringify(value));
+    this.subjects.crossoverSettings.next(value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
@@ -552,6 +659,8 @@ export class ConfigStore {
     this.subjects.aisAlarm.complete();
     this.subjects.passageLog.complete();
     this.subjects.polarRevisions.complete();
+    this.subjects.crossoverMap.complete();
+    this.subjects.crossoverSettings.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

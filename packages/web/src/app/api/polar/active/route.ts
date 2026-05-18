@@ -1,3 +1,4 @@
+import { firstValueFrom } from 'rxjs';
 import { getSharedConfigStore } from '@g5000/db';
 import type { PolarMode } from '@g5000/db';
 
@@ -5,6 +6,19 @@ interface Body {
   sailConfigId?: string;
   mode?: PolarMode;
   revisionId?: string;
+}
+
+export async function GET(): Promise<Response> {
+  try {
+    const store = getSharedConfigStore();
+    const polar = await firstValueFrom(store.activePolar$);
+    return Response.json({ ok: true, polar });
+  } catch (err) {
+    return Response.json(
+      { ok: false, error: { message: err instanceof Error ? err.message : String(err) } },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(req: Request): Promise<Response> {

@@ -203,6 +203,14 @@ export default function SailsPage() {
 
   return (
     <main className="p-6 space-y-6">
+      <div className="mb-3">
+        <a
+          href="/sails/crossover"
+          className="text-sm underline text-amber-300 hover:text-amber-200"
+        >
+          Sail-crossover chart →
+        </a>
+      </div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Sail wardrobe</h1>
         <button

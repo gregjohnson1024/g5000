@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
  * All config rows are stored as JSON-serialized blobs in a `value` column.
@@ -133,4 +133,21 @@ export const shipLogEntries = sqliteTable('ship_log_entries', {
 export const raceState = sqliteTable('race_state', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded RaceStateConfig
+});
+
+export const crossoverMap = sqliteTable(
+  'crossover_map',
+  {
+    boatId: text('boat_id').notNull(),
+    mode: text('mode').notNull(),
+    value: text('value').notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.boatId, t.mode] }),
+  }),
+);
+
+export const crossoverSettings = sqliteTable('crossover_settings', {
+  boatId: text('boat_id').primaryKey(),
+  value: text('value').notNull(),
 });

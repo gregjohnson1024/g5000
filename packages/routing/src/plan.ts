@@ -1,6 +1,6 @@
 import type { PlanInput, Route, RouteLeg, PlanOptions, LatLon, Isochrone } from './types.js';
 import { interpolateWind, interpolateCurrent } from '@g5000/grib';
-import { interpolatePolarSpeed } from '@g5000/compute';
+import { interpolatePolarSpeed, lookupConfigId } from '@g5000/compute';
 import { intersectsLand } from '@g5000/coastline';
 import {
   greatCircleBearing,
@@ -234,6 +234,15 @@ function assembleRoute(
     cur = cur.parent;
   }
   legs.reverse();
+  if (input.crossover) {
+    const validIds = new Set(input.crossover.wardrobe.configs.map((c) => c.id));
+    for (const leg of legs) {
+      const id = lookupConfigId(input.crossover.map, input.polar, leg.tws, leg.twa);
+      if (id !== null && validIds.has(id)) {
+        leg.configId = id;
+      }
+    }
+  }
   return {
     legs,
     start: legs[0]!.t,

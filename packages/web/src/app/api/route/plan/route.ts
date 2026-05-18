@@ -1,4 +1,4 @@
-import { plan } from '@g5000/routing';
+import { plan, computeSailTimeline } from '@g5000/routing';
 import { firstValueFrom } from 'rxjs';
 import { getSharedConfigStore } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
@@ -72,6 +72,7 @@ export async function POST(req: Request): Promise<Response> {
       cfg?.modes.default?.activeRevisionId ??
       'default';
     const polar = await firstValueFrom(store.activePolar$);
+    const crossoverMap = await firstValueFrom(store.crossoverMap$);
     const route = plan({
       start: b.start,
       end: b.end,
@@ -82,8 +83,10 @@ export async function POST(req: Request): Promise<Response> {
       coastline,
       currents,
       options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents, captureIsochrones: true },
+      crossover: { map: crossoverMap, wardrobe },
     });
-    return Response.json({ ok: true, route });
+    const sailTimeline = computeSailTimeline(route.legs);
+    return Response.json({ ok: true, route: { ...route, sailTimeline } });
   } catch (err) {
     const e = err as { kind?: string; status?: number; retryable?: boolean; message?: string };
     return Response.json(
