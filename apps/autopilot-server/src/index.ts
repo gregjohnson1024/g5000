@@ -102,9 +102,8 @@ async function readSocketCanSettings(): Promise<SocketCanSettings> {
     if (sc && typeof sc === 'object') {
       return {
         enabled: sc.enabled === true,
-        interface: typeof sc.interface === 'string' && sc.interface.length > 0
-          ? sc.interface
-          : 'can0',
+        interface:
+          typeof sc.interface === 'string' && sc.interface.length > 0 ? sc.interface : 'can0',
       };
     }
   } catch {
@@ -174,6 +173,14 @@ async function main(): Promise<void> {
     const rowId = rowIdByAlarmId.get(id);
     if (rowId !== undefined) {
       updateAlarmHistoryClear(store, rowId, new Date().toISOString()).catch(() => {});
+      // For non-sticky alarms, re-fires should open a NEW history row, so drop
+      // the mapping here. For sticky alarms (mob, anchor-watch), the alarm
+      // stays active until ack — the ack wrapper still needs the rowId to
+      // close out ackedAt, so we leave the mapping intact until ack.
+      const snapshot = alarmsRegistry.get(id);
+      if (snapshot && !snapshot.sticky) {
+        rowIdByAlarmId.delete(id);
+      }
     }
   };
 
@@ -192,8 +199,9 @@ async function main(): Promise<void> {
   const alarmsPipelineHandle = startAlarmsPipeline(bus, alarmsRegistry, alarmsConfigRef);
   // Expose the ref so API routes that update config (e.g. PUT /api/alarms/config)
   // can swap it without restarting the predicates.
-  (globalThis as { __g5000_alarms_config_ref__?: typeof alarmsConfigRef }).__g5000_alarms_config_ref__ =
-    alarmsConfigRef;
+  (
+    globalThis as { __g5000_alarms_config_ref__?: typeof alarmsConfigRef }
+  ).__g5000_alarms_config_ref__ = alarmsConfigRef;
   teardown.push(async () => alarmsPipelineHandle.dispose());
   // eslint-disable-next-line no-console
   console.log('[autopilot] alarms pipeline online');
@@ -330,9 +338,7 @@ async function main(): Promise<void> {
       const hub = getSharedDriverHub();
       if (!hub) {
         // eslint-disable-next-line no-console
-        console.warn(
-          '[autopilot] SocketCAN requested but no DriverHub — was runBridge called?',
-        );
+        console.warn('[autopilot] SocketCAN requested but no DriverHub — was runBridge called?');
       } else {
         try {
           await hub.addDriver(
