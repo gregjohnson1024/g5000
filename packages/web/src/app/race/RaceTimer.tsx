@@ -96,10 +96,18 @@ export function RaceTimer(): React.ReactElement {
                 // the clock shows 4:32, press Sync and the display jumps
                 // to 5:00 (28 s adjustment) so subsequent minute beeps
                 // land on the right boundaries.
-                const secsToGun = (timer.startMs - Date.now()) / 1000;
+                const startMs = timer.startMs;
+                const secsToGun = (startMs - Date.now()) / 1000;
                 const nearestMinSecs = Math.round(secsToGun / 60) * 60;
                 const adjustSec = nearestMinSecs - secsToGun;
                 if (Math.abs(adjustSec) < 0.5) return; // already aligned
+                // Optimistic local snap so the next 100ms render shows
+                // the new whole-minute value — without this, the display
+                // keeps counting down off the stale startMs until the
+                // next 1s /api/race/state poll, by which point the value
+                // has ticked past 5:00 and lands on 4:59. The poll-and-
+                // overwrite a moment later confirms the server agrees.
+                setTimer((t) => ({ ...t, startMs: startMs + adjustSec * 1000 }));
                 void post({ action: 'sync', adjustSec });
               }}
               className="px-3 py-2 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-semibold"
