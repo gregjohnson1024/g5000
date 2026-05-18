@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { ConfigStore } from '@g5000/db';
 import {
   setSharedConfigStore,
-  __resetSharedConfigStoreForTests,
+  _resetSharedConfigStoreForTests,
 } from '@g5000/db';
 import { DEFAULT_POLARS, type PolarTable } from '@g5000/db';
 import { GET, POST } from './route.js';
@@ -18,7 +18,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await store.close();
-  __resetSharedConfigStoreForTests();
+  _resetSharedConfigStoreForTests();
 });
 
 describe('GET /api/polar/revisions', () => {

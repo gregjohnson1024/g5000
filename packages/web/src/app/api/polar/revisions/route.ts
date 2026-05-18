@@ -42,7 +42,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const rev: PolarRevision = {
     id: ulid().toLowerCase(),
-    boatId: 'sula', // active boat — ConfigStore filters/reads on the active boat
+    boatId: store.activeBoatId, // active boat — ConfigStore filters/reads on the active boat
     sailConfigId: body.sailConfigId,
     mode: body.mode,
     parentRevisionId: body.parentRevisionId ?? null,

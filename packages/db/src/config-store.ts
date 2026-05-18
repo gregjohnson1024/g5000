@@ -70,7 +70,12 @@ export class ConfigStore {
     polarRevisions: BehaviorSubject<Map<string, PolarRevision>>;
   };
 
-  private readonly activeBoatId: BoatId;
+  private readonly __activeBoatId: BoatId;
+
+  /** The active boat id this process is bound to (G5000_BOAT_ID env var, default 'sula'). */
+  get activeBoatId(): BoatId {
+    return this.__activeBoatId;
+  }
 
   private constructor(
     private readonly raw: Database.Database,
@@ -89,7 +94,7 @@ export class ConfigStore {
     },
     activeBoatId: BoatId,
   ) {
-    this.activeBoatId = activeBoatId;
+    this.__activeBoatId = activeBoatId;
     this.subjects = {
       boatConfig: new BehaviorSubject(initial.boatConfig),
       awsAwaCal: new BehaviorSubject(initial.awsAwaCal),
@@ -438,7 +443,7 @@ export class ConfigStore {
     const id = ulid().toLowerCase();
     const rev: PolarRevision = {
       id,
-      boatId: this.activeBoatId,
+      boatId: this.__activeBoatId,
       sailConfigId: slot.id,
       mode: wardrobe.activeMode,
       parentRevisionId: slot.modes[wardrobe.activeMode]?.activeRevisionId ?? null,
@@ -481,7 +486,7 @@ export class ConfigStore {
   }
 
   listRevisions(filter: ListFilter = {}): PolarRevision[] {
-    return listRevisionsRepo(this.db, { ...filter, boatId: filter.boatId ?? this.activeBoatId });
+    return listRevisionsRepo(this.db, { ...filter, boatId: filter.boatId ?? this.__activeBoatId });
   }
 
   getRevision(id: string): PolarRevision | undefined {
