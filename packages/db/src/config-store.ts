@@ -46,6 +46,8 @@ import {
 } from './polar-revisions.js';
 import { migrateWardrobeV1ToV2 } from './migrate-wardrobe-v2.js';
 
+const __warnedMissingRevisions = new Set<string>();
+
 const SINGLETON = 'singleton';
 
 /**
@@ -312,10 +314,13 @@ export class ConfigStore {
         const rev = ref ? revisionsById.get(ref) : undefined;
         if (!ref) return DEFAULT_POLARS;
         if (!rev) {
-          // Dangling pointer — log once and fall back. Wardrobe is not auto-repaired.
-          console.warn(
-            `[config-store] active revision ${ref} not found; falling back to DEFAULT_POLARS`,
-          );
+          // Dangling pointer — warn once per ref; resolver feeds a hot pipeline.
+          if (!__warnedMissingRevisions.has(ref)) {
+            __warnedMissingRevisions.add(ref);
+            console.warn(
+              `[config-store] active revision ${ref} not found; falling back to DEFAULT_POLARS`,
+            );
+          }
           return DEFAULT_POLARS;
         }
         return rev.table;
