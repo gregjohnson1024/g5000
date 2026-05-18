@@ -13,6 +13,7 @@ const ITEMS: NavItem[] = [
   { href: '/passage', label: 'Passage' },
   { href: '/tracker', label: 'Tracker' },
   { href: '/ais', label: 'AIS' },
+  { href: '/alerts', label: 'Alerts' },
   { href: '/polars', label: 'Polars' },
   { href: '/sails', label: 'Sails' },
   { href: '/forecast', label: 'Forecast' },
