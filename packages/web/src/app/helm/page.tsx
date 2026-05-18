@@ -6,6 +6,7 @@ import type { SailWardrobe } from '@g5000/db';
 import { useSse } from '../../hooks/use-sse';
 import { HelmTile } from './HelmTile';
 import { MobButton } from './MobButton';
+import { SailRecommendationTile } from './SailRecommendationTile';
 import { AudibleAlarm } from '../../components/AudibleAlarm';
 import { RaceMiniTimer } from './RaceMiniTimer';
 import { RaceTiles } from '../../components/RaceTiles';
@@ -423,6 +424,8 @@ export default function HelmPage() {
 
         <HelmTile label="Heel" value={fmtAngleSigned(heel)} unit="°" small />
         <HelmTile label="Pitch" value={fmtAngleSigned(pitch)} unit="°" small />
+
+        <SailRecommendationTile />
 
         {/* Position — two stacked coordinates rather than the one-number-per-tile
             idiom every other tile follows. Hemisphere suffixes ride at unit
