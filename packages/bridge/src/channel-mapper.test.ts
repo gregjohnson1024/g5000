@@ -116,6 +116,19 @@ describe('mapPgnToSamples', () => {
     expect(samples.find((s) => s.channel === Channels.Electrical.BatteryVoltage)).toBeUndefined();
   });
 
+  it('maps PGN 128267 (Water Depth) raw transducer depth to nav.depth', () => {
+    const decoded = make(128267, { Depth: 2.5, Offset: -0.3 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Nav.Depth]);
+    expect(samples[0]?.value).toEqual({ kind: 'scalar', value: 2.5, unit: 'm' });
+  });
+
+  it('skips PGN 128267 when Depth is missing or non-numeric', () => {
+    expect(mapPgnToSamples(make(128267, { Offset: 0 }))).toEqual([]);
+    expect(mapPgnToSamples(make(128267, { Depth: 'n/a' }))).toEqual([]);
+    expect(mapPgnToSamples(make(128267, { Depth: Number.NaN }))).toEqual([]);
+  });
+
   it('maps PGN 129026 True reference to nav.gps.cog and nav.gps.sog', () => {
     const decoded = make(129026, { 'COG Reference': 'True', COG: 5.27, SOG: 3.6 });
     const samples = mapPgnToSamples(decoded);

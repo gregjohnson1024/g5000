@@ -216,6 +216,24 @@ const mappers: Record<number, MapperFn> = {
     ];
   },
 
+  // PGN 128267 — Water Depth. We publish the raw transducer depth (the
+  // `Depth` field, meters below transducer) on `nav.depth`. The `Offset`
+  // field is intentionally ignored in v1 — alarms config has the user
+  // dial in a threshold matching whatever reference their depth sounder
+  // is reporting (below-transducer vs. below-keel vs. below-waterline).
+  128267: (pgn) => {
+    const v = pgn.fields['Depth'];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return [];
+    return [
+      {
+        channel: Channels.Nav.Depth,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(v, 'm'),
+        source: sourceTag(pgn),
+      },
+    ];
+  },
+
   // PGN 127257 — attitude (yaw/pitch/roll, all in radians).
   // Sailing convention: roll = heel.
   127257: (pgn) => {
