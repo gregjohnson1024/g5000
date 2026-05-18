@@ -17,3 +17,4 @@ export * from './cog-stats.js';
 export * from './hdg-stats.js';
 export * from './motion-stats.js';
 export * from './pgn-firehose.js';
+export * from './race-state.js';
