@@ -15,6 +15,7 @@ interface SettingsGroup {
 
 const TOP_LEVEL: NavItem[] = [
   { href: '/helm', label: 'Helm' },
+  { href: '/race', label: 'Race' },
   { href: '/chart', label: 'Chart' },
   { href: '/passage', label: 'Passage' },
   { href: '/tracker', label: 'Tracker' },
