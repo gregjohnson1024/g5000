@@ -2,21 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import {
+  bboxesEqual,
+  cornersFromBbox,
+  CORNERS,
+  polygonFromBbox,
+  updateCorner,
+  type Bbox,
+  type Corner,
+} from './forecast-roi-math';
 
 const SOURCE_ID = 'forecast-roi-source';
 const FILL_LAYER_ID = 'forecast-roi-fill';
 const OUTLINE_LAYER_ID = 'forecast-roi-outline';
-
-interface Bbox {
-  latMin: number;
-  latMax: number;
-  lonMin: number;
-  lonMax: number;
-}
-
-type Corner = 'sw' | 'se' | 'ne' | 'nw';
-
-const CORNERS: Corner[] = ['sw', 'se', 'ne', 'nw'];
 
 /** Forecast hours fetched on every refresh. Mirrors /forecast page so a
  *  ROI resize on /chart yields the same depth of forecast as the manual
@@ -27,34 +25,6 @@ const REFRESH_MODELS = ['gfs', 'ecmwf'] as const;
 /** Wait this long after the last drag completes before firing the refresh.
  *  Lets the user nudge several corners without firing redundant fetches. */
 const REFRESH_DEBOUNCE_MS = 4000;
-
-function cornersFromBbox(b: Bbox): Record<Corner, [number, number]> {
-  return {
-    sw: [b.lonMin, b.latMin],
-    se: [b.lonMax, b.latMin],
-    ne: [b.lonMax, b.latMax],
-    nw: [b.lonMin, b.latMax],
-  };
-}
-
-function polygonFromBbox(b: Bbox): GeoJSON.Feature<GeoJSON.Polygon> {
-  return {
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'Polygon',
-      coordinates: [
-        [
-          [b.lonMin, b.latMin],
-          [b.lonMax, b.latMin],
-          [b.lonMax, b.latMax],
-          [b.lonMin, b.latMax],
-          [b.lonMin, b.latMin],
-        ],
-      ],
-    },
-  };
-}
 
 function makeHandleEl(): HTMLDivElement {
   const el = document.createElement('div');
@@ -90,6 +60,10 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef<AbortController | null>(null);
   const bboxRef = useRef<Bbox | null>(null);
+  /** Last bbox that we successfully PUT to /api/settings. Used to short-
+   *  circuit a misclick-without-drag dragend that would otherwise trigger
+   *  a full model refresh against an unchanged bbox. */
+  const lastCommittedRef = useRef<Bbox | null>(null);
 
   // Load initial bbox from /api/settings. If none, optionally seed from
   // defaultBbox so the user has something to grab. Seeding does NOT
@@ -103,6 +77,10 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
         if (cancelled) return;
         if (j.settings?.forecastBbox) {
           setBbox(j.settings.forecastBbox);
+          // Server already has this bbox — seed lastCommittedRef so a
+          // misclick (dragend with no movement) doesn't fire a refresh
+          // against an unchanged bbox.
+          lastCommittedRef.current = j.settings.forecastBbox;
         } else if (defaultBbox) {
           setBbox(defaultBbox);
         }
@@ -194,13 +172,21 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
         // up on dragend so consumers see the final committed bbox.
         const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
         if (src) src.setData(polygonFromBbox(next));
-        // Snap sibling markers so they track the resizing corner.
-        positionMarkers(corners, next);
+        // Snap sibling markers so they track the resizing corner. Skip the
+        // one being dragged — maplibre is already updating its position
+        // and writing on top would fight the drag handler.
+        positionMarkers(corners, next, c);
       });
       marker.on('dragend', () => {
         const final = bboxRef.current;
         if (!final) return;
         setBbox(final);
+        // A click without movement still fires dragend with bbox unchanged.
+        // Skip the network calls in that case — otherwise a misclick on a
+        // handle pays for a 2-model × 57-hour refresh.
+        if (lastCommittedRef.current && bboxesEqual(lastCommittedRef.current, final)) {
+          return;
+        }
         void commitBbox(final);
       });
       corners[c] = marker;
@@ -255,6 +241,7 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
       setStatusText(`save failed: ${String(e)}`);
       return;
     }
+    lastCommittedRef.current = next;
     setStatus('idle');
     setStatusText(null);
     scheduleRefresh(next);
@@ -333,37 +320,14 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
   );
 }
 
-function updateCorner(b: Bbox, c: Corner, lngLat: maplibregl.LngLat): Bbox {
-  // Map each corner to which (lat, lon) extremum it owns. The 4-marker
-  // model lets the user freely drag corners "past" each other; we always
-  // re-normalize to canonical min/max so downstream consumers see a
-  // well-formed bbox.
-  const corners: Record<Corner, { lat: number; lon: number }> = {
-    sw: { lat: b.latMin, lon: b.lonMin },
-    se: { lat: b.latMin, lon: b.lonMax },
-    ne: { lat: b.latMax, lon: b.lonMax },
-    nw: { lat: b.latMax, lon: b.lonMin },
-  };
-  corners[c] = { lat: lngLat.lat, lon: lngLat.lng };
-  // Re-derive the bbox from whichever corner is now the extremum.
-  // (Dragging "SW" past "NE" just flips the rectangle inside-out and
-  // the new min/max reflect the post-flip geometry.)
-  const lats = Object.values(corners).map((p) => p.lat);
-  const lons = Object.values(corners).map((p) => p.lon);
-  return {
-    latMin: Math.min(...lats),
-    latMax: Math.max(...lats),
-    lonMin: Math.min(...lons),
-    lonMax: Math.max(...lons),
-  };
-}
-
 function positionMarkers(
   markers: Record<Corner, maplibregl.Marker>,
   bbox: Bbox,
+  skip?: Corner,
 ): void {
   const positions = cornersFromBbox(bbox);
   for (const c of CORNERS) {
+    if (c === skip) continue;
     markers[c].setLngLat(positions[c]);
   }
 }
