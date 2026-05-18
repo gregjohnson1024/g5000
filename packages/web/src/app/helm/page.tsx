@@ -7,6 +7,8 @@ import { useSse } from '../../hooks/use-sse';
 import { HelmTile } from './HelmTile';
 import { MobButton } from './MobButton';
 import { AudibleAlarm } from '../../components/AudibleAlarm';
+import { RaceMiniTimer } from './RaceMiniTimer';
+import { RaceTiles } from '../../components/RaceTiles';
 
 const MS_TO_KNOTS = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -91,8 +93,15 @@ export default function HelmPage() {
     await reloadWardrobe();
   };
 
-  // Wind + polar/VMG channels intentionally not subscribed — no wind sensor attached.
   const sog = channels.get('nav.gps.sog');
+  // Wind + race-derived channels — rendered conditionally; tiles appear only when the channel publishes.
+  const tws = channels.get('wind.true.speed');
+  const twa = channels.get('wind.true.angle');
+  const awa = channels.get('wind.apparent.angle');
+  const aws = channels.get('wind.apparent.speed');
+  const tbsSample = channels.get('race.targetSpeed');
+  const tTwaSample = channels.get('race.targetTwa');
+  const pctPolarSample = channels.get('race.percentPolar');
   // COG can arrive in either True or Magnetic reference; prefer True.
   const cogTrue = channels.get('nav.gps.cog');
   const cogMag = channels.get('nav.gps.cog.magnetic');
@@ -258,7 +267,10 @@ export default function HelmPage() {
     <main className="p-4 min-h-screen bg-black">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
-        <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
+        <div className="flex items-center gap-3">
+          <RaceMiniTimer />
+          <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
+        </div>
       </div>
       <AlertsPanel />
 
@@ -288,10 +300,27 @@ export default function HelmPage() {
         </div>
       )}
 
-      {/* Wind-derived tiles (TWS/TWA/AWA, Target speed, % polar, VMG, Target VMG)
-          hidden — no wind sensor attached. Re-add when masthead is wired. */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <HelmTile label="SOG" value={fmtSpeed(sog)} unit="kn" />
+        {/* Wind tiles — render only when the corresponding channel publishes,
+            so a missing masthead leaves the grid clean. */}
+        {tws && <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" />}
+        {twa && <HelmTile label="TWA" value={fmtAngleSigned(twa)} unit="°" />}
+        {aws && <HelmTile label="AWS" value={fmtSpeed(aws)} unit="kn" small />}
+        {awa && <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />}
+        {tbsSample && <HelmTile label="TBS" value={fmtSpeed(tbsSample)} unit="kn" small />}
+        {tTwaSample && <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />}
+        {pctPolarSample && (
+          <HelmTile
+            label="% polar"
+            value={(() => {
+              const v = scalar(pctPolarSample);
+              return v === null ? '—' : v.toFixed(0);
+            })()}
+            unit="%"
+            small
+          />
+        )}
         <HelmTile
           label="COG"
           value={fmtHeading(cog)}
@@ -406,6 +435,7 @@ export default function HelmPage() {
           positionLon={positionLon}
         />
       </div>
+      <RaceTiles />
       <MobButton />
       <AudibleAlarm />
     </main>
