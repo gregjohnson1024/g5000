@@ -4,11 +4,8 @@ export * from './config-store.js';
 export { validatePolarTable } from './polar-revisions.js';
 export * from './alarms-config.js';
 export * from './alarms-history.js';
-<<<<<<< HEAD
 export * from './ship-log.js';
-=======
 export * from './race-state.js';
->>>>>>> 8f97937 (feat(db): loadRaceState/saveRaceState with default-merge)
 
 import { ConfigStore } from './config-store.js';
 
