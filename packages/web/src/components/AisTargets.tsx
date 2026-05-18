@@ -21,6 +21,11 @@ const TARGET_SOURCE_ID = 'ais-targets';
 const TARGET_CIRCLE_ID = 'ais-targets-circle';
 const COG_SOURCE_ID = 'ais-cog-extensions';
 const COG_LAYER_ID = 'ais-cog-extensions-line';
+/** Render targets unseen for >1 min in a faded "stale" style. */
+const STALE_MS = 60_000;
+/** Drop targets unseen for >5 min from the chart entirely (server also
+ *  evicts at this threshold). */
+const DROP_MS = 5 * 60_000;
 // Name labels aren't a maplibre symbol layer — the map style has no
 // `glyphs` URL, so a `text-field` layer would silently be dropped. The
 // AisNameMarkers helper below renders names as DOM markers instead.
@@ -54,17 +59,19 @@ export function AisTargets({
 
     const syncNameMarkers = (targets: AisTarget[]): void => {
       const live = new Set<number>();
+      const now = Date.now();
       for (const t of targets) {
         if (!Number.isFinite(t.lat) || !Number.isFinite(t.lon)) continue;
         live.add(t.mmsi);
         const label = t.name ?? String(t.mmsi);
+        const stale = now - t.lastSeenMs > STALE_MS;
         let m = nameMarkers.get(t.mmsi);
         if (!m) {
           const el = document.createElement('div');
           el.className = 'ais-name-label';
           el.style.cssText =
             'font: 11px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-            'color: #cbd5e1; background: rgba(11,14,20,0.7);' +
+            'background: rgba(11,14,20,0.7);' +
             'padding: 1px 4px; border-radius: 2px;' +
             'transform: translateY(8px); white-space: nowrap;' +
             'pointer-events: none;';
@@ -76,6 +83,10 @@ export function AisTargets({
           if (m.getElement().textContent !== label) m.getElement().textContent = label;
           m.setLngLat([t.lon!, t.lat!]);
         }
+        const el = m.getElement();
+        el.style.color = stale ? '#64748b' : '#cbd5e1';
+        el.style.fontStyle = stale ? 'italic' : 'normal';
+        el.style.opacity = stale ? '0.7' : '1';
       }
       for (const [mmsi, m] of nameMarkers) {
         if (!live.has(mmsi)) {
@@ -117,9 +128,21 @@ export function AisTargets({
           source: TARGET_SOURCE_ID,
           paint: {
             'circle-radius': 5,
-            'circle-color': '#94a3b8',
-            'circle-stroke-color': '#0f172a',
+            // Stale targets render hollow + dim; fresh ones solid grey.
+            'circle-color': [
+              'case',
+              ['get', 'stale'],
+              'rgba(0,0,0,0)',
+              '#94a3b8',
+            ],
+            'circle-stroke-color': [
+              'case',
+              ['get', 'stale'],
+              '#64748b',
+              '#0f172a',
+            ],
             'circle-stroke-width': 1.2,
+            'circle-opacity': ['case', ['get', 'stale'], 0.6, 1],
           },
         });
       }
@@ -135,7 +158,12 @@ export function AisTargets({
       const tgtSrc = map.getSource(TARGET_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
       const cogSrc = map.getSource(COG_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
       if (!tgtSrc || !cogSrc) return;
-      const tgtFeatures = targets
+      const now = Date.now();
+      // Defense-in-depth — the server evicts at the same threshold, but a
+      // stale poll response or transient server hiccup shouldn't leave dots
+      // on the chart past their welcome.
+      const visible = targets.filter((t) => now - t.lastSeenMs < DROP_MS);
+      const tgtFeatures = visible
         .filter((t) => Number.isFinite(t.lat) && Number.isFinite(t.lon))
         .map((t) => ({
           type: 'Feature' as const,
@@ -145,14 +173,18 @@ export function AisTargets({
             name: t.name ?? null,
             cog: t.cog ?? null,
             sog: t.sog ?? null,
+            stale: now - t.lastSeenMs > STALE_MS,
           },
         }));
       tgtSrc.setData({ type: 'FeatureCollection', features: tgtFeatures });
 
       const totalSec = cogExtensionMinutes * 60;
-      const cogFeatures = targets
+      const cogFeatures = visible
         .filter(
           (t) =>
+            // Drop COG extensions for stale targets — projecting forward
+            // from a >1-min-old position is misleading.
+            now - t.lastSeenMs <= STALE_MS &&
             Number.isFinite(t.lat) &&
             Number.isFinite(t.lon) &&
             typeof t.cog === 'number' &&
@@ -185,7 +217,7 @@ export function AisTargets({
           };
         });
       cogSrc.setData({ type: 'FeatureCollection', features: cogFeatures });
-      syncNameMarkers(targets.filter((t) => Number.isFinite(t.lat) && Number.isFinite(t.lon)));
+      syncNameMarkers(visible.filter((t) => Number.isFinite(t.lat) && Number.isFinite(t.lon)));
     };
 
     const poll = async (): Promise<void> => {

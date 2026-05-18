@@ -31,6 +31,7 @@ import {
   startTrueWindTx,
   getSharedDeviceRegistry,
   createAlertsRegistry,
+  createAisTargetsRegistry,
   type WireDriver,
   type OutgoingPgn,
 } from '@g5000/bridge';
@@ -207,6 +208,16 @@ async function main(): Promise<void> {
   teardown.push(async () => alarmsPipelineHandle.dispose());
   // eslint-disable-next-line no-console
   console.log('[autopilot] alarms pipeline online');
+
+  // AIS targets registry — proactively create so the eviction loop has
+  // something to operate on even before the first PGN arrives. The bridge
+  // (live) and demo-injector both upsert into the same singleton.
+  const aisRegistry = createAisTargetsRegistry();
+  const AIS_MAX_AGE_MS = 5 * 60_000;
+  const aisEvictTimer = setInterval(() => {
+    aisRegistry.evictStale(AIS_MAX_AGE_MS);
+  }, 15_000);
+  teardown.push(async () => clearInterval(aisEvictTimer));
 
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });

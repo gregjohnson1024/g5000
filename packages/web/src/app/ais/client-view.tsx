@@ -15,6 +15,11 @@ const DEFAULT_RANGE_NM = 30;
 const RANGE_STORAGE_KEY = 'ais:rangeNm';
 /** Fixed-length COG extension drawn for own ship and every AIS target. */
 const COG_EXTENSION_NM = 10;
+/** Targets unseen for this long render in a "stale" style. */
+const STALE_MS = 60_000;
+/** Targets unseen for this long are dropped from the UI (server evicts at
+ *  the same threshold; client filter is defense-in-depth). */
+const DROP_MS = 5 * 60_000;
 
 function readSavedRange(): number {
   try {
@@ -260,16 +265,23 @@ export function AisClientView() {
   const ownHeading = scalarValue(channels.get('boat.heading.magnetic')) ?? ownCog;
 
   // Compute CPA per target — depends on own pos + every target's pos/cog/sog.
+  // Targets unseen >5 min are dropped here so the rest of the UI never has to
+  // think about them. Targets unseen >1 min carry a `stale` flag so the icon
+  // and row both render in a faded state.
   const targetsWithCpa = useMemo(() => {
     if (!ownPos) return [];
-    return targets.map((t) => {
-      if (t.lat === undefined || t.lon === undefined) {
-        return { target: t, cpa: null as CpaResult | null };
-      }
-      const own = { lat: ownPos.lat, lon: ownPos.lon, cog: ownCog, sog: ownSog };
-      const tgt = { lat: t.lat, lon: t.lon, cog: t.cog ?? 0, sog: t.sog ?? 0 };
-      return { target: t, cpa: computeCpa(own, tgt) };
-    });
+    const now = Date.now();
+    return targets
+      .filter((t) => now - t.lastSeenMs < DROP_MS)
+      .map((t) => {
+        const stale = now - t.lastSeenMs > STALE_MS;
+        if (t.lat === undefined || t.lon === undefined) {
+          return { target: t, cpa: null as CpaResult | null, stale };
+        }
+        const own = { lat: ownPos.lat, lon: ownPos.lon, cog: ownCog, sog: ownSog };
+        const tgt = { lat: t.lat, lon: t.lon, cog: t.cog ?? 0, sog: t.sog ?? 0 };
+        return { target: t, cpa: computeCpa(own, tgt), stale };
+      });
   }, [targets, ownPos, ownCog, ownSog]);
 
   const svgSize = 600;
@@ -323,10 +335,12 @@ export function AisClientView() {
   };
 
   // Set of currently-threatening MMSIs that drive the klaxon. Muted vessels
-  // are excluded unless they've auto-unmuted on the close-by-10% rule above.
+  // and stale targets (>1 min unseen) are excluded — stale-position CPA is
+  // not actionable and would generate false alarms.
   const threatMmsis = useMemo(() => {
     const s = new Set<number>();
     for (const r of targetsWithCpa) {
+      if (r.stale) continue;
       if (!isThreat(r.cpa)) continue;
       if (mutes[r.target.mmsi] !== undefined) continue;
       s.add(r.target.mmsi);
@@ -593,14 +607,16 @@ export function AisClientView() {
               })}
 
               {/* AIS targets */}
-              {targetsWithCpa.map(({ target, cpa }) => {
+              {targetsWithCpa.map(({ target, cpa, stale }) => {
                 if (!cpa) return null;
                 // Position in the (world-frame) canvas: bearing 0 = up (N).
                 const dist = cpa.rangeMeters * metersToPx;
                 if (dist > svgRadius) return null;
                 const x = center + dist * Math.sin(cpa.bearingRadians);
                 const y = center - dist * Math.cos(cpa.bearingRadians);
-                const threat = isThreat(cpa);
+                // Stale targets never count as threats (last position is too
+                // old to be tactically meaningful).
+                const threat = !stale && isThreat(cpa);
                 const cogDeg = ((target.cog ?? 0) * RAD_TO_DEG) % 360;
                 // Fixed 10 NM COG extension for every target (not SOG-scaled).
                 // Clipped to the current radar range so it doesn't run off-screen.
@@ -608,19 +624,24 @@ export function AisClientView() {
                   COG_EXTENSION_NM * NM * metersToPx,
                   svgRadius - dist + 7,
                 );
+                const triFill = stale ? 'none' : threat ? '#ef4444' : '#94a3b8';
+                const triStroke = stale ? '#64748b' : '#0f172a';
+                const leaderStroke = stale ? '#475569' : threat ? '#ef4444' : '#475569';
                 return (
                   <g
                     key={target.mmsi}
                     onClick={() => setSelectedMmsi(target.mmsi)}
                     style={{ cursor: 'pointer' }}
+                    opacity={stale ? 0.55 : 1}
                   >
                     <g transform={`translate(${x}, ${y})`}>
                       <g transform={`rotate(${cogDeg})`}>
                         <polygon
                           points="0,-14 -8,10 8,10"
-                          fill={threat ? '#ef4444' : '#94a3b8'}
-                          stroke="#0f172a"
-                          strokeWidth="1"
+                          fill={triFill}
+                          stroke={triStroke}
+                          strokeWidth={stale ? 1.5 : 1}
+                          strokeDasharray={stale ? '3 2' : undefined}
                         />
                         {leaderLen > 1 && (
                           <line
@@ -628,8 +649,9 @@ export function AisClientView() {
                             y1="-14"
                             x2="0"
                             y2={-14 - leaderLen}
-                            stroke={threat ? '#ef4444' : '#475569'}
+                            stroke={leaderStroke}
                             strokeWidth="1.5"
+                            strokeDasharray={stale ? '4 3' : undefined}
                           />
                         )}
                       </g>
@@ -818,22 +840,39 @@ export function AisClientView() {
                   if (ta !== tb) return ta - tb;
                   return (a.cpa?.cpaMeters ?? Infinity) - (b.cpa?.cpaMeters ?? Infinity);
                 })
-                .map(({ target, cpa }) => {
-                  const threat = isThreat(cpa);
+                .map(({ target, cpa, stale }) => {
+                  const threat = !stale && isThreat(cpa);
                   const selected = selectedMmsi === target.mmsi;
                   const mutedAt = mutes[target.mmsi];
                   const muted = mutedAt !== undefined;
                   const remutedTriggerNm = muted ? (mutedAt * 0.9) / NM : null;
+                  const rowClass = stale
+                    ? 'text-slate-500 italic'
+                    : muted
+                      ? 'text-slate-500'
+                      : threat
+                        ? 'text-red-300'
+                        : '';
                   return (
                     <tr
                       key={target.mmsi}
                       className={`border-b border-slate-900 cursor-pointer hover:bg-slate-900 ${
                         selected ? 'bg-slate-800' : ''
-                      } ${muted ? 'text-slate-500' : threat ? 'text-red-300' : ''}`}
+                      } ${rowClass}`}
                       onClick={() => setSelectedMmsi(target.mmsi)}
                     >
                       <td className="py-1">{target.mmsi}</td>
-                      <td className="py-1">{target.name ?? '—'}</td>
+                      <td className="py-1">
+                        {target.name ?? '—'}
+                        {stale && (
+                          <span
+                            className="ml-1 px-1 text-[10px] uppercase rounded bg-slate-800 text-slate-400"
+                            title={`Last seen ${Math.round((Date.now() - target.lastSeenMs) / 1000)}s ago`}
+                          >
+                            stale
+                          </span>
+                        )}
+                      </td>
                       <td className="py-1 text-right">
                         {target.length !== undefined ? `${target.length.toFixed(0)}m` : '—'}
                       </td>
