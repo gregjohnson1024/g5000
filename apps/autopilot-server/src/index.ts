@@ -582,8 +582,44 @@ async function main(): Promise<void> {
   // to the in-process current-field cache once one is exposed.
   const currentFieldRef: { current: CurrentField | null } = { current: null };
 
-  // Waypoints ref: v1 starts empty; populated by a follow-up issue.
+  // Waypoints ref: populated from ~/.g5000-router/waypoints.json at boot and
+  // refreshed every 5 s so mutations made via the web UI are picked up without
+  // a server restart. Reading directly avoids importing @g5000/web from here.
+  const waypointsPath = path.join(SOCKETCAN_ROOT, 'waypoints.json');
+
+  interface RawWaypoint {
+    id: string;
+    lat: number;
+    lon: number;
+  }
+
+  function isRawWaypoint(v: unknown): v is RawWaypoint {
+    if (!v || typeof v !== 'object') return false;
+    const o = v as Record<string, unknown>;
+    return typeof o.id === 'string' && typeof o.lat === 'number' && typeof o.lon === 'number';
+  }
+
+  async function refreshWaypoints(): Promise<void> {
+    try {
+      const buf = await readFile(waypointsPath, 'utf8');
+      const parsed = JSON.parse(buf) as unknown;
+      if (!Array.isArray(parsed)) return;
+      const next = new Map<string, LatLon>();
+      for (const w of parsed) {
+        if (isRawWaypoint(w)) next.set(w.id, { lat: w.lat, lon: w.lon });
+      }
+      waypointsRef.current = next;
+    } catch {
+      /* keep previous map — ENOENT on fresh install, parse errors, etc. */
+    }
+  }
+
   const waypointsRef: { current: Map<string, LatLon> } = { current: new Map() };
+  await refreshWaypoints();
+  const waypointsRefreshInterval = setInterval(() => {
+    void refreshWaypoints();
+  }, 5000);
+  teardown.push(async () => clearInterval(waypointsRefreshInterval));
 
   // COG concentration ref: initialised to 0 (conservative — OCS predictor
   // will return null until the COG stats window has enough data). Updated at
