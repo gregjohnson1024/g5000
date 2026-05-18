@@ -64,4 +64,24 @@ describe('/api/race/line', () => {
     const r = await POST(req({ action: 'ping', end: 'port' }));
     expect(r.status).toBe(400);
   });
+
+  it('boatPos equal to position (degenerate on-line case) does not set preStartSide', async () => {
+    // When the user pings the stbd end while standing at the stbd mark,
+    // boatPos === position so the cross product is ~0. preStartSide must
+    // be deferred (left undefined) so the pipeline can set it from the
+    // first off-line GPS sample.
+    const rs = createRaceState();
+    setSharedRaceState(rs);
+    await POST(req({ action: 'ping', end: 'port', position: { lat: 41.5, lon: -71.3 } }));
+    await POST(
+      req({
+        action: 'ping',
+        end: 'stbd',
+        position: { lat: 41.5, lon: -71.29 },
+        // boatPos === position → boat is exactly on the stbd endpoint, cross product ≈ 0
+        boatPos: { lat: 41.5, lon: -71.29 },
+      }),
+    );
+    expect(rs.get().line.preStartSide).toBeUndefined();
+  });
 });

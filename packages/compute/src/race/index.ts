@@ -11,6 +11,7 @@ import {
   timeToLineSeconds,
   lineBiasRad,
   initialBearingRad,
+  sideOfLine,
   type LatLon,
 } from './line-geometry.js';
 import { vmc } from './vmc.js';
@@ -216,11 +217,35 @@ export function startRaceComputePipeline(
   // --- Line geometry recomputation ---
   function recomputeLineGeometry(t_ns: bigint): void {
     const { line } = raceState.get();
-    if (!line.port || !line.stbd || !line.preStartSide || latest.pos === undefined) return;
-    const bearing = lineBearingRad(line.port, line.stbd);
-    const dPort = haversineMeters(latest.pos, line.port);
-    const dStbd = haversineMeters(latest.pos, line.stbd);
-    const dtl = distanceToLineMeters(latest.pos, line.port, line.stbd, line.preStartSide);
+    if (!line.port || !line.stbd || latest.pos === undefined) return;
+
+    // Lazily determine preStartSide from the boat's first non-degenerate
+    // off-line position. This fires when the user pinged both ends while
+    // standing at an endpoint (boatPos ≈ endpoint, cross product ≈ 0) and
+    // the API deferred the decision. Uses the same 1e-7 deg² threshold as
+    // the API route.
+    if (!line.preStartSide) {
+      const crossMag = Math.abs(
+        (line.stbd.lon - line.port.lon) * (latest.pos.lat - line.port.lat) -
+        (line.stbd.lat - line.port.lat) * (latest.pos.lon - line.port.lon),
+      );
+      if (crossMag > 1e-7) {
+        raceState.mutate((d) => {
+          if (d.line.port && d.line.stbd && !d.line.preStartSide) {
+            d.line.preStartSide = sideOfLine(latest.pos!, d.line.port, d.line.stbd);
+          }
+        });
+      }
+      // Still undefined — come back on the next GPS sample.
+      if (!raceState.get().line.preStartSide) return;
+    }
+
+    const freshLine = raceState.get().line;
+    if (!freshLine.preStartSide || !freshLine.port || !freshLine.stbd) return;
+    const bearing = lineBearingRad(freshLine.port, freshLine.stbd);
+    const dPort = haversineMeters(latest.pos, freshLine.port);
+    const dStbd = haversineMeters(latest.pos, freshLine.stbd);
+    const dtl = distanceToLineMeters(latest.pos, freshLine.port, freshLine.stbd, freshLine.preStartSide);
     bus.publish({
       channel: Channels.Race.LineDistancePort,
       t_ns,
@@ -241,7 +266,7 @@ export function startRaceComputePipeline(
     });
     if (latest.cog !== undefined && latest.sog !== undefined) {
       const normalToLine =
-        line.preStartSide === 'port' ? bearing - Math.PI / 2 : bearing + Math.PI / 2;
+        freshLine.preStartSide === 'port' ? bearing - Math.PI / 2 : bearing + Math.PI / 2;
       let dθ = latest.cog - normalToLine;
       while (dθ > Math.PI) dθ -= 2 * Math.PI;
       while (dθ < -Math.PI) dθ += 2 * Math.PI;

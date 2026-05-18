@@ -97,6 +97,11 @@ export function LinePingPanel(): React.ReactElement {
           )}
         </button>
       </div>
+      {line.port && line.stbd && !line.preStartSide && (
+        <div className="text-xs text-amber-400 font-mono">
+          motor off the line — pre-start side will set automatically
+        </div>
+      )}
       {line.preStartSide && (
         <div className="text-xs text-slate-400 font-mono">
           pre-start side: {line.preStartSide}
