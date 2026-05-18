@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import type { Bbox } from '@g5000/grib';
 
 export interface CurrentGrid {
@@ -117,6 +117,32 @@ class PersistentCurrentCache {
     } catch (err) {
       console.warn('[current-cache] persist failed:', (err as Error).message);
     }
+  }
+
+  /**
+   * Delete entries whose validAt is older than `now - graceMs`. CMEMS data
+   * is daily-mean so the grace defaults to 36 h — yesterday's grid stays
+   * useful through "today" because the boat may still be using it for
+   * interpolation against today's grid.
+   */
+  async pruneStale(
+    now: number = Date.now(),
+    graceMs: number = 36 * 60 * 60_000,
+  ): Promise<number> {
+    const cutoffSec = (now - graceMs) / 1000;
+    let pruned = 0;
+    for (const [key, entry] of this.mem) {
+      if (entry.grid.validAt < cutoffSec) {
+        this.mem.delete(key);
+        try {
+          await rm(join(CURRENT_CACHE_DIR, `${key}.json`), { force: true });
+        } catch {
+          /* best-effort */
+        }
+        pruned += 1;
+      }
+    }
+    return pruned;
   }
 }
 

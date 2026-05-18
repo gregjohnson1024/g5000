@@ -9,6 +9,7 @@ import { attachRoute } from '../../components/RoutePolyline';
 import { RouteTimeline } from '../../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
+import { ForecastRoi } from '../../components/ForecastRoi';
 import { WaypointsLayer, type MarkLike } from '../../components/WaypointsLayer';
 import { GulfStreamLayer } from '../../components/GulfStreamLayer';
 import { fmtLatLonDmm } from '../../lib/format-coords';
@@ -79,7 +80,6 @@ function ChartPageInner() {
     gfs: null,
     ecmwf: null,
   });
-  const [roiSaveStatus, setRoiSaveStatus] = useState<string | null>(null);
   // Lat/lon under the mouse — populated while the cursor is over the map,
   // cleared when it leaves. Used by the bottom-left cursor-position panel
   // (distance + bearing from the live boat fix when available).
@@ -192,35 +192,6 @@ function ChartPageInner() {
     }
   }, [settingsHydrated, windOn, windModel, windHours, displayModel, showIsochrones]);
 
-  const saveRoiFromView = async (): Promise<void> => {
-    const map = mapRef.current;
-    if (!map) return;
-    const b = map.getBounds();
-    const bbox = {
-      latMin: b.getSouth(),
-      latMax: b.getNorth(),
-      lonMin: b.getWest(),
-      lonMax: b.getEast(),
-    };
-    try {
-      const r = await fetch('/api/settings');
-      const prev = (await r.json())?.settings ?? {};
-      const next = { ...prev, forecastBbox: bbox };
-      const put = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(next),
-      });
-      if (!put.ok) throw new Error(`HTTP ${put.status}`);
-      setRoiSaveStatus(
-        `ROI saved: ${bbox.latMin.toFixed(1)}–${bbox.latMax.toFixed(1)}°N, ` +
-          `${Math.abs(bbox.lonMax).toFixed(1)}–${Math.abs(bbox.lonMin).toFixed(1)}°W`,
-      );
-    } catch (e) {
-      setRoiSaveStatus(`save failed: ${String(e)}`);
-    }
-    setTimeout(() => setRoiSaveStatus(null), 4000);
-  };
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
   const [waypoints, setWaypoints] = useState<Array<{ id: string; name: string; lat: number; lon: number }>>([]);
@@ -494,6 +465,19 @@ function ChartPageInner() {
           labelPrefix="WF"
         />
         <AisTargets map={mapInstance} cogExtensionMinutes={COG_EXTENSION_MINUTES} />
+        <ForecastRoi
+          map={mapInstance}
+          defaultBbox={
+            livePos
+              ? {
+                  latMin: livePos.lat - 2,
+                  latMax: livePos.lat + 2,
+                  lonMin: livePos.lon - 2,
+                  lonMax: livePos.lon + 2,
+                }
+              : undefined
+          }
+        />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
           map={mapInstance}
@@ -565,19 +549,6 @@ function ChartPageInner() {
             >
               ⊕ Center on boat
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void saveRoiFromView()}
-            className="px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
-            title="Save current map view as the forecast refresh ROI (picked up by the 3 h timer on the Pi)"
-          >
-            ▣ Save view as ROI
-          </button>
-          {roiSaveStatus && (
-            <div className="px-2 py-1 bg-slate-900/85 border border-slate-700 text-slate-300 text-xs rounded shadow font-mono">
-              {roiSaveStatus}
-            </div>
           )}
         </div>
         <CursorReadout cursor={cursorLatLon} boat={livePos} />

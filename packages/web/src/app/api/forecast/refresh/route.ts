@@ -1,6 +1,7 @@
 import {
   fetchWindGrid,
   fetchWindGridEcmwf,
+  windCache,
   type Bbox,
   type WindGrid,
   type WindModel,
@@ -114,5 +115,9 @@ export async function POST(req: Request): Promise<Response> {
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-  return Response.json({ ok: true, results });
+  // Opportunistic cleanup: now that we've added fresh entries, drop any
+  // whose forecast valid-time has passed. Keeps the cache footprint
+  // bounded as the user resizes the ROI over time.
+  const pruned = windCache.pruneStale();
+  return Response.json({ ok: true, results, pruned });
 }

@@ -76,7 +76,10 @@ class PersistentWindCache {
   get(key: string): CacheEntry | undefined { return this.mem.get(key); }
   has(key: string): boolean { return this.mem.has(key); }
   get size(): number { return this.mem.size; }
-  delete(key: string): boolean { return this.mem.delete(key); }
+  delete(key: string): boolean {
+    void this.removeFile(key);
+    return this.mem.delete(key);
+  }
   clear(): void { this.mem.clear(); }
   entries(): IterableIterator<[string, CacheEntry]> { return this.mem.entries(); }
   values(): IterableIterator<CacheEntry> { return this.mem.values(); }
@@ -89,14 +92,46 @@ class PersistentWindCache {
     return this;
   }
 
+  /**
+   * Delete entries whose validAt is older than `now - graceMs`. Returns the
+   * number of entries pruned. validAt is the canonical "this forecast covers
+   * time T" stamp — a forecast for noon UTC stops being useful a few hours
+   * after noon, regardless of how recently we fetched it. We default to a
+   * 6-hour grace so a freshly-arrived forecast hour isn't pruned the moment
+   * the wall clock crosses its validity.
+   */
+  pruneStale(now: number = Date.now(), graceMs: number = 6 * 60 * 60_000): number {
+    const cutoffSec = (now - graceMs) / 1000;
+    let pruned = 0;
+    for (const [key, entry] of this.mem) {
+      if (entry.grid.validAt < cutoffSec) {
+        this.mem.delete(key);
+        void this.removeFile(key);
+        pruned += 1;
+      }
+    }
+    return pruned;
+  }
+
+  private fileFor(key: string): string {
+    // Sanitise the key for the filesystem: pipes → underscores.
+    return join(WIND_CACHE_DIR, key.replace(/\|/g, '_').replace(/[^\w.\-_]/g, '_') + '.json');
+  }
+
   private async persist(key: string, entry: CacheEntry): Promise<void> {
     try {
       await mkdir(WIND_CACHE_DIR, { recursive: true });
-      // Sanitise the key for the filesystem: pipes → underscores.
-      const file = join(WIND_CACHE_DIR, key.replace(/\|/g, '_').replace(/[^\w.\-_]/g, '_') + '.json');
-      await writeFile(file, JSON.stringify(entry));
+      await writeFile(this.fileFor(key), JSON.stringify(entry));
     } catch {
       /* disk full or perm denied — in-memory still works */
+    }
+  }
+
+  private async removeFile(key: string): Promise<void> {
+    try {
+      await rm(this.fileFor(key), { force: true });
+    } catch {
+      /* file missing already — best-effort */
     }
   }
 
