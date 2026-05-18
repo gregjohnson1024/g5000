@@ -4,6 +4,7 @@ import { RaceTimer } from './RaceTimer';
 import { RaceAudible } from './RaceAudible';
 import { LinePingPanel } from './LinePingPanel';
 import { ActiveMarkSelector } from './ActiveMarkSelector';
+import { WindShiftPlot } from '../../components/WindShiftPlot';
 
 export default function RacePage(): React.ReactElement {
   return (
@@ -18,7 +19,9 @@ export default function RacePage(): React.ReactElement {
         </div>
         <LinePingPanel />
         <ActiveMarkSelector />
-        {/* WindShiftPlot will be mounted here in Task 24 once the component exists. */}
+        <div className="md:col-span-2">
+          <WindShiftPlot />
+        </div>
       </div>
     </main>
   );
