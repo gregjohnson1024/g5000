@@ -21,9 +21,12 @@ function useRecommendation(): Recommendation | null {
     const es = new EventSource('/api/stream');
     es.onmessage = (e) => {
       try {
-        const sample = JSON.parse(e.data) as { channel: string; value: unknown };
-        if (sample.channel === 'wardrobe.recommendation') {
-          setRec(sample.value as Recommendation);
+        const parsed = JSON.parse(e.data) as {
+          channel: string;
+          sample: { value: unknown };
+        };
+        if (parsed.channel === 'wardrobe.recommendation') {
+          setRec(parsed.sample.value as Recommendation);
         }
       } catch {
         /* ignore malformed lines */
