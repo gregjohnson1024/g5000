@@ -22,6 +22,8 @@ function formatValue(s: JsonSafeSample): string {
       return `${s.value.value.lat.toFixed(5)}, ${s.value.value.lon.toFixed(5)}`;
     case 'enum':
       return s.value.value;
+    case 'sail_recommendation':
+      return `rec=${s.value.recommendedConfigId ?? '-'} active=${s.value.activeConfigId} cell=${s.value.cellTwsIdx},${s.value.cellTwaIdx}`;
   }
 }
 
