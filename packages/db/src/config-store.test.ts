@@ -348,6 +348,32 @@ describe('ConfigStore', () => {
       await store.close();
     });
 
+    it('transaction primitive used by migration rolls back atomically on throw', async () => {
+      // Proves that the better-sqlite3 transactional primitive ConfigStore.open
+      // relies on (raw.transaction(fn)) rolls back ALL writes if the body
+      // throws partway through. The migration path wraps its
+      // polar_revisions inserts + sail_wardrobe upsert in such a transaction;
+      // this test exercises the rollback property directly so we don't have
+      // to monkey-patch ConfigStore to artificially fail mid-migration.
+      const tmp = `${tmpdir()}/g5000-cfg-tx-${Date.now()}.db`;
+      const Database = (await import('better-sqlite3')).default;
+      const raw = new Database(tmp);
+      raw.exec(`CREATE TABLE polar_revisions (id TEXT PRIMARY KEY, x TEXT)`);
+      const fn = raw.transaction((shouldFail: boolean) => {
+        raw.prepare('INSERT INTO polar_revisions (id, x) VALUES (?, ?)').run('a', 'one');
+        raw.prepare('INSERT INTO polar_revisions (id, x) VALUES (?, ?)').run('b', 'two');
+        if (shouldFail) throw new Error('simulated mid-tx failure');
+      });
+      expect(() => fn(true)).toThrow(/simulated mid-tx failure/);
+      const rows = raw.prepare('SELECT COUNT(*) as n FROM polar_revisions').get() as { n: number };
+      expect(rows.n).toBe(0);
+      // Sanity: the same transaction without a throw commits both rows.
+      fn(false);
+      const after = raw.prepare('SELECT COUNT(*) as n FROM polar_revisions').get() as { n: number };
+      expect(after.n).toBe(2);
+      raw.close();
+    });
+
     it('setActiveRevision swaps activePolar$ output within one tick', async () => {
       const tmp = `${tmpdir()}/g5000-cfg-swap-${Date.now()}.db`;
       const store = await ConfigStore.open(tmp);
