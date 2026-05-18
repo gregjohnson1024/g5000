@@ -1,6 +1,7 @@
 export * from './schema.js';
 export * from './defaults.js';
 export * from './config-store.js';
+export { validatePolarTable } from './polar-revisions.js';
 
 import { ConfigStore } from './config-store.js';
 
