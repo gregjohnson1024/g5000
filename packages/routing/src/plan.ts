@@ -13,6 +13,7 @@ import {
 import { decomposeWind, twaFromWindAndHeading } from './wind.js';
 import { generateHeadingFan } from './fan.js';
 import { pruneByBearingBucket, type FrontierNode } from './prune.js';
+import { computeSailTimeline } from './sail-timeline.js';
 
 const DEG = Math.PI / 180;
 
@@ -279,7 +280,7 @@ function assembleRoute(
     cur = cur.parent;
   }
   legs.reverse();
-  return {
+  const route: Route = {
     legs,
     start: legs[0]!.t,
     end: legs[legs.length - 1]!.t,
@@ -291,4 +292,8 @@ function assembleRoute(
     ...(reason ? { reason } : {}),
     ...(isochrones.length > 0 ? { isochrones } : {}),
   };
+  if (input.wardrobe) {
+    route.sailTimeline = computeSailTimeline(route.legs);
+  }
+  return route;
 }
