@@ -160,6 +160,49 @@ export interface SailWardrobe {
   configs: SailConfig[];
   /** ID of the active configuration. Must reference a configs[].id. */
   activeConfigId: string;
+  /** Optional — defaults applied via wardrobeSettingsOf(). Schema not migrated;
+   *  older records load with undefined and get defaults on read. */
+  settings?: WardrobeSettings;
+}
+
+/**
+ * Per-wardrobe user settings — only used for the sail-crossover chart and
+ * the live-recommendation hysteresis threshold. Stored alongside the
+ * wardrobe in the same DB row; defaults applied on read for older records
+ * that don't carry a `settings` field.
+ */
+export interface WardrobeSettings {
+  /** Live recommendation fires "change recommended" only when the winning
+   *  config is this much faster than the active config (relative %). */
+  hysteresisPercent: number;
+  /** Crossover chart X-axis (TWS) upper bound in knots. Lower is always 0. */
+  chartTwsMaxKn: number;
+  /** Crossover chart Y-axis (TWA) lower bound in degrees. */
+  chartTwaMinDeg: number;
+  /** Crossover chart Y-axis (TWA) upper bound in degrees. */
+  chartTwaMaxDeg: number;
+  /** Forecast-timeline sample interval (minutes). */
+  forecastIntervalMinutes: number;
+  /** Forecast-timeline duration along the route (hours). */
+  forecastDurationHours: number;
+}
+
+export const DEFAULT_WARDROBE_SETTINGS: WardrobeSettings = {
+  hysteresisPercent: 3,
+  chartTwsMaxKn: 30,
+  chartTwaMinDeg: 30,
+  chartTwaMaxDeg: 180,
+  forecastIntervalMinutes: 30,
+  forecastDurationHours: 12,
+};
+
+/**
+ * Read-side default-merger. `SailWardrobe.settings` is optional on disk;
+ * call this from every read path so consumers always see a complete
+ * `WardrobeSettings`.
+ */
+export function wardrobeSettingsOf(w: SailWardrobe): WardrobeSettings {
+  return { ...DEFAULT_WARDROBE_SETTINGS, ...(w.settings ?? {}) };
 }
 
 /**
