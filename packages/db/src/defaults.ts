@@ -335,6 +335,56 @@ export const DEFAULT_AIS_ALARM_CONFIG: AisAlarmConfig = {
 };
 
 /**
+ * Which sail configuration is recommended at each (TWS, TWA) cell of the
+ * polar grid. One row per (boatId, mode). Cells absent from the map are
+ * "no recommendation" — consumers render the chart cell uncoloured and
+ * the recommendation tile shows neutral.
+ *
+ * Cell keys are `${twsIdx},${twaIdx}` (zero-indexed into the active polar
+ * for the same (boatId, mode)). When the polar is re-binned with a
+ * different `twsBins`/`twaBins` length, the migrator clears the map (see
+ * ConfigStore.setActiveRevision).
+ */
+export interface CrossoverMap {
+  boatId: BoatId;
+  mode: PolarMode;
+  cells: Record<string, string>;
+  /** UNIX seconds; updated on every write. */
+  updatedAt: number;
+}
+
+export const DEFAULT_CROSSOVER_MAP: CrossoverMap = {
+  boatId: 'sula',
+  mode: 'default',
+  cells: {},
+  updatedAt: 0,
+};
+
+/**
+ * Per-boat settings for the sail-crossover feature. Mode-agnostic for now.
+ * Hysteresis is time-based (cell must be stable for N seconds) because
+ * Model A uses a single polar across all configs — there is no speed-delta
+ * to compare like the prior per-config-polar design.
+ */
+export interface CrossoverSettings {
+  recommendationStableSeconds: number;
+  chartTwsMaxKn: number;
+  chartTwaMinDeg: number;
+  chartTwaMaxDeg: number;
+  forecastIntervalMinutes: number;
+  forecastDurationHours: number;
+}
+
+export const DEFAULT_CROSSOVER_SETTINGS: CrossoverSettings = {
+  recommendationStableSeconds: 30,
+  chartTwsMaxKn: 30,
+  chartTwaMinDeg: 30,
+  chartTwaMaxDeg: 180,
+  forecastIntervalMinutes: 30,
+  forecastDurationHours: 12,
+};
+
+/**
  * Passage log — the maritime "log" (distance instrument). Persists a single
  * anchor timestamp; the /passage page sums over-ground distance from
  * `anchorAt` to now using the active track. The anchor is seeded on first
