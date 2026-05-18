@@ -1,6 +1,7 @@
 export * from './schema.js';
 export * from './defaults.js';
 export * from './config-store.js';
+export { validatePolarTable } from './polar-revisions.js';
 
 import { ConfigStore } from './config-store.js';
 
@@ -32,6 +33,7 @@ export function setSharedConfigStore(store: ConfigStore): void {
   globalThis[GLOBAL_KEY] = store;
 }
 
+/** Test-only: clears the singleton. Do not call from production code. */
 export function _resetSharedConfigStoreForTests(): void {
   globalThis[GLOBAL_KEY] = undefined;
 }

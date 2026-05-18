@@ -95,6 +95,68 @@ export interface PolarTable {
   twaBins: number[];
   /** Target boat speed in m/s, indexed [twsIdx][twaIdx]. */
   boatSpeed: number[][];
+  /**
+   * Optional heel grid, radians (signed; lee positive). Same shape as boatSpeed.
+   * Absent means "unknown" — consumers that don't need heel ignore this field.
+   */
+  heel?: number[][];
+  /**
+   * Optional leeway grid, radians. Same shape as boatSpeed. Absent means
+   * "unknown".
+   */
+  leeway?: number[][];
+}
+
+/** Stable per-boat identifier. Single active boat per process today. */
+export type BoatId = string;
+
+/**
+ * Operating regime for a polar. 'default' is the universal fallback when a
+ * boat has only one regime. High-performance boats may carry several (e.g.
+ * 'displacement', 'planing', 'foiling'). Unknown values are accepted at the
+ * type level — modes are configuration, not enum-policed.
+ */
+export type PolarMode = 'default' | 'displacement' | 'planing' | 'foiling' | string;
+
+/** Provenance kind for an individual polar revision. */
+export type PolarLineageKind =
+  | 'migrated'
+  | 'manual_edit'
+  | 'imported_csv'
+  | 'imported_pol'
+  | 'vpp'
+  | 'cfd'
+  | 'towing_tank'
+  | 'measured'
+  | 'regression'
+  | 'expert_judgment';
+
+/** Free-form provenance metadata attached to a revision. */
+export interface PolarLineage {
+  kind: PolarLineageKind;
+  /** Optional citation: designer name, file path, run-id, etc. */
+  source?: string;
+  notes?: string;
+}
+
+/**
+ * An immutable polar revision. One row in the `polar_revisions` table.
+ * The `table` field is JSON-encoded into `value_json` at the SQL layer.
+ */
+export interface PolarRevision {
+  /** ULID. Lexicographically sortable by createdAt. */
+  id: string;
+  boatId: BoatId;
+  sailConfigId: string;
+  mode: PolarMode;
+  /** Parent revision in the lineage chain, or null for a root. */
+  parentRevisionId: string | null;
+  /** UNIX seconds. */
+  createdAt: number;
+  lineage: PolarLineage;
+  /** Optional scalar uncertainty in m/s. Reserved for future fusion work. */
+  sigma?: number;
+  table: PolarTable;
 }
 
 /**
@@ -133,8 +195,12 @@ export const DEFAULT_POLARS: PolarTable = {
 };
 
 /**
- * One sail-configuration entry in the wardrobe. Carries its own polar table
- * plus metadata so the user knows which configuration they're picking.
+ * One sail-configuration entry in the wardrobe. Identity ("what sails are
+ * up", "what's the daggerboard doing") lives here; the polar that describes
+ * how the boat performs in this configuration lives in `polar_revisions`
+ * rows pointed at by `modes[mode].activeRevisionId`. The legacy `polar?`
+ * field is only present on pre-migration rows and is read once by the
+ * boot-time migrator.
  */
 export interface SailConfig {
   /** Stable unique ID (e.g. 'default', 'full-j1', 'reef1-a2'). */
@@ -145,21 +211,47 @@ export interface SailConfig {
   mainState?: string;
   headsail?: string;
   downwindSail?: string;
-  /** Daggerboard state: 'down' (upwind/reaching), 'half', 'up' (running). Optional. */
+  /** Daggerboard state: 'down' (upwind/reaching), 'half', 'up' (running). */
   daggerboard?: 'down' | 'half' | 'up';
+  /** Optional axes for high-performance boats. Carried but unused on Sula. */
+  foilMode?: 'displacement' | 'foiling' | 'transition' | string;
+  /** Mast rotation, radians. Rotating-rig boats only. */
+  mastRotation?: number;
+  /** Free-form rig-tension tag. */
+  rigTensionState?: string;
+  /** Displacement, kg. Used by crew-weight-sensitive classes. */
+  displacement?: number;
   notes?: string;
-  /** This config's polar table. */
-  polar: PolarTable;
+  /**
+   * v1 compatibility: legacy embedded polar. Present only on rows that have
+   * not yet been migrated to v2. Once migrated, this field is undefined and
+   * `modes[…].activeRevisionId` carries the truth. The migrator reads this
+   * to seed revision-0 rows.
+   */
+  polar?: PolarTable;
+  /**
+   * v2 pointer: per-mode active polar revision id. Always present on
+   * migrated rows. May be `{}` if no revision exists yet (resolver falls back
+   * to DEFAULT_POLARS in that case).
+   */
+  modes: Partial<Record<PolarMode, { activeRevisionId: string }>>;
 }
 
 /**
- * The sail wardrobe: list of configurations + which one is currently active.
- * The compute pipeline reads the active config's polar.
+ * The sail wardrobe: a list of configurations + which one (and which mode)
+ * is currently active. `ConfigStore.activePolar$` resolves the active
+ * config's active-mode revision and emits the resulting `PolarTable`; the
+ * compute and routing pipelines subscribe there. Scoped to one `boatId`
+ * (single-active-boat-per-process today).
  */
 export interface SailWardrobe {
+  /** Which boat this wardrobe belongs to. Defaults to 'sula' on existing installs. */
+  boatId: BoatId;
   configs: SailConfig[];
   /** ID of the active configuration. Must reference a configs[].id. */
   activeConfigId: string;
+  /** Active mode for the active config. Defaults to 'default'. */
+  activeMode: PolarMode;
 }
 
 /**
@@ -255,15 +347,22 @@ export interface PassageLog {
   anchorAt: number | null;
 }
 
-/** Default wardrobe: one config wrapping the existing DEFAULT_POLARS. */
+/**
+ * Default wardrobe: one slot, v2 shape, empty `modes`. The boot-time migrator
+ * inserts a `revision-0` polar row from DEFAULT_POLARS and rewrites
+ * `modes['default'].activeRevisionId` to point at it. Until that happens the
+ * `activePolar$` resolver falls back to DEFAULT_POLARS.
+ */
 export const DEFAULT_WARDROBE: SailWardrobe = {
+  boatId: 'sula',
   configs: [
     {
       id: 'default',
       name: 'Default',
       notes: 'Initial baseline polar. Replace with your boat-specific data.',
-      polar: DEFAULT_POLARS,
+      modes: {},
     },
   ],
   activeConfigId: 'default',
+  activeMode: 'default',
 };

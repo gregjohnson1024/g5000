@@ -1,5 +1,6 @@
 import { plan } from '@g5000/routing';
-import type { PolarTable } from '@g5000/db';
+import { firstValueFrom } from 'rxjs';
+import { getSharedConfigStore } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { loadWindFor, loadCurrentFor } from '../../../../lib/grib-context';
 import { loadDefaultCoastline } from '../../../../lib/coastline';
@@ -12,8 +13,6 @@ interface Body {
   end: { lat: number; lon: number };
   departure: number;
   model: 'GFS' | 'ECMWF';
-  polar: PolarTable;
-  polarId: string;
   useCurrents?: boolean;
   options?: Record<string, unknown>;
 }
@@ -33,7 +32,6 @@ function validate(b: unknown): b is Body {
   const o = b as Record<string, unknown>;
   if (!o.start || !o.end || typeof o.departure !== 'number') return false;
   if (typeof o.model !== 'string' || !['GFS', 'ECMWF'].includes(o.model)) return false;
-  if (!o.polar || !o.polarId) return false;
   return true;
 }
 
@@ -62,13 +60,25 @@ export async function POST(req: Request): Promise<Response> {
       currents = await loadCurrentFor(bbox, 120);
     }
     const coastline = await loadDefaultCoastline();
+    // v2 polar resolution: the polar table and its identity come from the
+    // ConfigStore — not the request body. polarId is the active revision id
+    // (a ULID), not the slot id. Falls back to 'default' only when the
+    // wardrobe has no active revision pointer at all.
+    const store = getSharedConfigStore();
+    const wardrobe = await firstValueFrom(store.sails$);
+    const cfg = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId);
+    const polarId =
+      cfg?.modes[wardrobe.activeMode]?.activeRevisionId ??
+      cfg?.modes.default?.activeRevisionId ??
+      'default';
+    const polar = await firstValueFrom(store.activePolar$);
     const route = plan({
       start: b.start,
       end: b.end,
       departure: b.departure,
       wind,
-      polar: b.polar,
-      polarId: b.polarId,
+      polar,
+      polarId,
       coastline,
       currents,
       options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents, captureIsochrones: true },

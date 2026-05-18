@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
  * All config rows are stored as JSON-serialized blobs in a `value` column.
@@ -28,6 +28,12 @@ export const compassDeviation = sqliteTable('compass_deviation', {
   value: text('value').notNull(), // JSON-encoded CompassDeviation
 });
 
+/**
+ * @deprecated Legacy v1 singleton polar. Read once on first boot by the v1→v2
+ * migrator (see `migrate-wardrobe-v2.ts`) and then untouched. Drop in a
+ * follow-up migration after all Pi installs have confirmed they're running
+ * v2 wardrobes.
+ */
 export const polars = sqliteTable('polars', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded PolarTable
@@ -56,4 +62,22 @@ export const aisAlarmConfig = sqliteTable('ais_alarm_config', {
 export const passageLog = sqliteTable('passage_log', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded PassageLog
+});
+
+export const polarRevisions = sqliteTable('polar_revisions', {
+  id: text('id').primaryKey(),
+  boatId: text('boat_id').notNull(),
+  sailConfigId: text('sail_config_id').notNull(),
+  mode: text('mode').notNull(),
+  /** Nullable: root revisions have no parent. */
+  parentRevisionId: text('parent_revision_id'),
+  /** UNIX seconds. */
+  createdAt: integer('created_at').notNull(),
+  lineageKind: text('lineage_kind').notNull(),
+  /** Nullable JSON: {source?, notes?}. */
+  lineageMeta: text('lineage_meta'),
+  /** Nullable real: m/s scalar uncertainty. */
+  sigma: real('sigma'),
+  /** JSON-encoded PolarTable. */
+  valueJson: text('value_json').notNull(),
 });

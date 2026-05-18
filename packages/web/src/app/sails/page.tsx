@@ -1,11 +1,39 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SailConfig, SailWardrobe, PolarTable } from '@g5000/db';
+import type {
+  PolarMode,
+  PolarRevision,
+  PolarTable,
+  SailConfig,
+  SailWardrobe,
+} from '@g5000/db';
 import { PolarHeatmap } from '../polars/PolarHeatmap';
+
+// Tiny client-safe fallback used only when no revision has been resolved yet.
+// In normal operation boot-time migration guarantees a revision-0 exists, so
+// `resolvePolar` returns the resolved table on the first render after fetch.
+// We avoid importing DEFAULT_POLARS from '@g5000/db' because that pulls
+// `config-store.js` (better-sqlite3) into the client bundle.
+const EMPTY_POLAR: PolarTable = {
+  twsBins: [],
+  twaBins: [],
+  boatSpeed: [],
+};
+
+function resolvePolar(
+  cfg: SailConfig,
+  mode: PolarMode,
+  revisions: Record<string, PolarRevision>,
+): PolarTable {
+  const refId = cfg.modes[mode]?.activeRevisionId ?? cfg.modes.default?.activeRevisionId;
+  if (!refId) return cfg.polar ?? EMPTY_POLAR;
+  return revisions[refId]?.table ?? cfg.polar ?? EMPTY_POLAR;
+}
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
+  const [revisionsById, setRevisionsById] = useState<Record<string, PolarRevision>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ twsIdx: number; twaIdx: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -14,10 +42,20 @@ export default function SailsPage() {
 
   const reload = useCallback(async () => {
     try {
-      const res = await fetch('/api/sails', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`GET /api/sails: ${res.status}`);
-      const body = (await res.json()) as SailWardrobe;
+      const [wardrobeRes, revisionsRes] = await Promise.all([
+        fetch('/api/sails', { cache: 'no-store' }),
+        fetch('/api/polar/revisions', { cache: 'no-store' }),
+      ]);
+      if (!wardrobeRes.ok) throw new Error(`GET /api/sails: ${wardrobeRes.status}`);
+      if (!revisionsRes.ok) {
+        throw new Error(`GET /api/polar/revisions: ${revisionsRes.status}`);
+      }
+      const body = (await wardrobeRes.json()) as SailWardrobe;
+      const revBody = (await revisionsRes.json()) as { revisions: PolarRevision[] };
+      const byId: Record<string, PolarRevision> = {};
+      for (const r of revBody.revisions) byId[r.id] = r;
       setWardrobe(body);
+      setRevisionsById(byId);
       setErr(null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -59,10 +97,13 @@ export default function SailsPage() {
     if (!wardrobe) return;
     const baseId = `config-${Date.now()}`;
     const base = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)!;
+    const baseRevId =
+      base.modes[wardrobe.activeMode]?.activeRevisionId ??
+      base.modes.default?.activeRevisionId;
     const newCfg: SailConfig = {
       id: baseId,
       name: `New config (${wardrobe.configs.length + 1})`,
-      polar: base.polar, // start from current active
+      modes: baseRevId ? { [wardrobe.activeMode]: { activeRevisionId: baseRevId } } : {},
     };
     try {
       await writeWardrobe({
@@ -109,8 +150,33 @@ export default function SailsPage() {
     }
   };
 
-  const applyPolarChange = async (id: string, polar: PolarTable) => {
-    await updateConfig(id, { polar });
+  const applyPolarChange = async (configId: string, polar: PolarTable) => {
+    const mode: PolarMode = wardrobe?.activeMode ?? 'default';
+    const createRes = await fetch('/api/polar/revisions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sailConfigId: configId,
+        mode,
+        lineage: { kind: 'manual_edit', source: 'sails-page' },
+        table: polar,
+      }),
+    });
+    if (!createRes.ok) {
+      setErr(`save polar failed: ${createRes.status} ${await createRes.text()}`);
+      return;
+    }
+    const { id: newRevId } = (await createRes.json()) as { id: string };
+    const activateRes = await fetch('/api/polar/active', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sailConfigId: configId, mode, revisionId: newRevId }),
+    });
+    if (!activateRes.ok) {
+      setErr(`activate polar failed: ${activateRes.status} ${await activateRes.text()}`);
+      return;
+    }
+    await reload();
   };
 
   const handleImport = async (file: File, configId: string) => {
@@ -286,7 +352,7 @@ export default function SailsPage() {
                         Polar grid
                       </h3>
                       <PolarHeatmap
-                        polar={c.polar}
+                        polar={resolvePolar(c, wardrobe.activeMode, revisionsById)}
                         selected={selectedCell ?? undefined}
                         onSelect={(cell) => setSelectedCell(cell)}
                         onChange={(updated) => applyPolarChange(c.id, updated)}

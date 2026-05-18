@@ -2,14 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { firstValueFrom } from 'rxjs';
 import {
   ConfigStore,
   setSharedConfigStore,
   _resetSharedConfigStoreForTests,
 } from '@g5000/db';
-import { GET } from './route.js';
+import { GET, POST } from './route.js';
 
-describe('GET /api/wardrobe/active', () => {
+describe('/api/wardrobe/active', () => {
   let dir: string;
   let store: ConfigStore;
 
@@ -25,14 +26,26 @@ describe('GET /api/wardrobe/active', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('returns the active SailConfig JSON', async () => {
+  it('GET returns the active SailConfig JSON (v2 shape)', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toHaveProperty('id');
-    expect(json).toHaveProperty('polar');
-    expect(json.polar).toHaveProperty('twsBins');
-    expect(json.polar).toHaveProperty('twaBins');
-    expect(json.polar).toHaveProperty('boatSpeed');
+    expect(json).toHaveProperty('name');
+    expect(json).toHaveProperty('modes');
+    expect(typeof json.modes).toBe('object');
+  });
+
+  it('accepts an optional activeMode and persists it', async () => {
+    const res = await POST(
+      new Request('http://x/api/wardrobe/active', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ activeConfigId: 'default', activeMode: 'foiling' }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    const wardrobe = await firstValueFrom(store.sails$);
+    expect(wardrobe.activeMode).toBe('foiling');
   });
 });

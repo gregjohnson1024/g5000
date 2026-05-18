@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Bus, type Sample } from '@g5000/core';
-import { ConfigStore } from '@g5000/db';
+import { ConfigStore, DEFAULT_POLARS } from '@g5000/db';
 import { startPolarPipeline } from './pipeline.js';
 
 const sample = (channel: string, value: number, t_ns = 1n): Sample => ({
@@ -108,3 +108,84 @@ describe('startPolarPipeline', () => {
 
 import { firstValueFrom } from 'rxjs';
 const firstValueFromBehavior = firstValueFrom;
+
+describe('startPolarPipeline + revision swap', () => {
+  it('publishes a new target boatspeed after setActiveRevision', async () => {
+    const dbPath = path.join(tmpdir(), `poly-pipe-swap-${Date.now()}-${Math.random()}.db`);
+    const store = await ConfigStore.open(dbPath);
+    const bus = new Bus();
+    const stop = await startPolarPipeline({ bus, configStore: store });
+
+    // Capture target boatspeed emissions.
+    const targets: number[] = [];
+    const unsub = bus.subscribe('performance.target.boatSpeed', (s) => {
+      if (s.value.kind === 'scalar') targets.push(s.value.value);
+    });
+
+    // Drive the pipeline with all three required inputs against the default polar.
+    const t0 = BigInt(Date.now()) * 1_000_000n;
+    bus.publish({
+      channel: 'wind.true.speed',
+      t_ns: t0,
+      value: { kind: 'scalar', value: 5, unit: 'm/s' },
+      source: 'test',
+    });
+    bus.publish({
+      channel: 'wind.true.angle',
+      t_ns: t0,
+      value: { kind: 'scalar', value: Math.PI / 2, unit: 'rad' },
+      source: 'test',
+    });
+    bus.publish({
+      channel: 'boat.speed.water',
+      t_ns: t0,
+      value: { kind: 'scalar', value: 3, unit: 'm/s' },
+      source: 'test',
+    });
+
+    await new Promise((r) => setImmediate(r));
+
+    const baselineTarget = targets[targets.length - 1];
+    expect(baselineTarget).toBeDefined();
+    expect(baselineTarget!).toBeGreaterThan(0);
+
+    // Create a 2× polar revision and make it active.
+    const wardrobe = await firstValueFrom(store.sails$);
+    const slotId = wardrobe.configs[0]!.id;
+    const twoX = {
+      ...DEFAULT_POLARS,
+      boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map((v) => v * 2)),
+    };
+    const revId = '01HABCDEFGHJKMNPQRSTVWXYZB';
+    await store.createRevision({
+      id: revId,
+      boatId: 'sula',
+      sailConfigId: slotId,
+      mode: 'default',
+      parentRevisionId: null,
+      createdAt: Math.floor(Date.now() / 1000),
+      lineage: { kind: 'manual_edit' },
+      table: twoX,
+    });
+    await store.setActiveRevision(slotId, 'default', revId);
+
+    // Re-publish a sample so the pipeline recomputes against the swapped polar.
+    const t1 = BigInt(Date.now()) * 1_000_000n;
+    bus.publish({
+      channel: 'boat.speed.water',
+      t_ns: t1,
+      value: { kind: 'scalar', value: 3, unit: 'm/s' },
+      source: 'test',
+    });
+    await new Promise((r) => setImmediate(r));
+
+    const swappedTarget = targets[targets.length - 1];
+    expect(swappedTarget).toBeDefined();
+    // Target should have ~doubled after the 2× polar swap.
+    expect(swappedTarget!).toBeCloseTo(baselineTarget! * 2, 5);
+
+    unsub();
+    await stop();
+    await store.close();
+  });
+});

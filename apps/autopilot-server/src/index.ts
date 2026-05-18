@@ -126,6 +126,8 @@ async function main(): Promise<void> {
   teardown.push(() => store.close());
   // eslint-disable-next-line no-console
   console.log(`[autopilot] config db: ${CONFIG_DB_PATH}`);
+  // eslint-disable-next-line no-console
+  console.log(`[g5000] active boat: ${process.env.G5000_BOAT_ID ?? 'sula'}`);
 
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });

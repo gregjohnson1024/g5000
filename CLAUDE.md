@@ -44,6 +44,7 @@ Common runtime knobs (set on the autopilot-server process):
 - `NGT1_PATH=/dev/ttyUSB0` / `NGT1_BAUD=115200` — NGT-1 serial.
 - `NMEA0183_PATHS=/dev/ttyUSB1,/dev/ttyUSB2` / `NMEA0183_BAUD=4800` — optional 0183 inputs.
 - `CONFIG_DB=./data/config.db` and `SESSION_LOG_DIR=./data/sessions` — persistence paths.
+- `G5000_BOAT_ID=sula` (default) — single active boat id for this process. Polar revisions and the wardrobe filter on this id. Multi-tenant migration of other config tables is a separate spec.
 - `G5000_ROUTER_ROOT=~/.g5000-router` — OSM tile + GRIB cache root.
 
 ## Architecture

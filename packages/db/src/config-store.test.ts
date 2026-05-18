@@ -74,13 +74,15 @@ describe('ConfigStore', () => {
   });
 
   it('emits a new polar when setPolars is called', async () => {
-    const next: Promise<PolarTable> = firstValueFrom(store.polars$.pipe(skip(1), take(1)));
     const updated: PolarTable = {
       ...DEFAULT_POLARS,
       boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map(() => 0)),
     };
     await store.setPolars(updated);
-    const v = await next;
+    // In v2, setPolars writes a new revision and flips the active pointer.
+    // The legacy polars$ alias is backed by activePolar$ (combineLatest of
+    // sails + revisions), so the post-write current value is what we assert.
+    const v = await firstValueFrom(store.polars$);
     expect(v.boatSpeed.flat().every((x) => x === 0)).toBe(true);
   });
 
@@ -103,6 +105,7 @@ describe('ConfigStore', () => {
           mainState: 'Reef 1',
           downwindSail: 'A2',
           polar: DEFAULT_WARDROBE.configs[0]!.polar,
+          modes: {},
         },
       ],
     };
@@ -124,16 +127,27 @@ describe('ConfigStore', () => {
     const initial = await firstValueFrom(store.activePolar$);
     expect(initial.twsBins.length).toBeGreaterThan(0);
 
-    // Add a config with a distinct polar (all zeros) and switch to it.
+    // In v2: read the active slot's active revision via the resolver, then
+    // create a distinct (all-zeros) revision under the same slot+mode and
+    // flip the active pointer. activePolar$ should track the swap.
     const wardrobe = await firstValueFrom(store.sails$);
-    const distinctPolar = {
-      ...wardrobe.configs[0]!.polar,
-      boatSpeed: wardrobe.configs[0]!.polar.boatSpeed.map((row) => row.map(() => 0)),
+    const slot = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)!;
+    const distinctPolar: PolarTable = {
+      ...initial,
+      boatSpeed: initial.boatSpeed.map((row) => row.map(() => 0)),
     };
-    await store.setSails({
-      configs: [...wardrobe.configs, { id: 'zeros', name: 'Zeros', polar: distinctPolar }],
-      activeConfigId: 'zeros',
+    const newId = 'zeros-rev';
+    await store.createRevision({
+      id: newId,
+      boatId: 'sula',
+      sailConfigId: slot.id,
+      mode: wardrobe.activeMode,
+      parentRevisionId: slot.modes[wardrobe.activeMode]?.activeRevisionId ?? null,
+      createdAt: Math.floor(Date.now() / 1000),
+      lineage: { kind: 'manual_edit' },
+      table: distinctPolar,
     });
+    await store.setActiveRevision(slot.id, wardrobe.activeMode, newId);
     const after = await firstValueFrom(store.activePolar$);
     expect(after.boatSpeed.flat().every((x) => x === 0)).toBe(true);
   });
@@ -256,5 +270,136 @@ describe('ConfigStore', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.setAisAlarmConfig({ enabled: 'no' as any, cpaMeters: 100, tcpaSeconds: 60 }),
     ).rejects.toThrow(/enabled/);
+  });
+
+  describe('v1→v2 wardrobe migration', () => {
+    it('seeds revision-0 from DEFAULT_POLARS on a fresh DB', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-fresh-${Date.now()}.db`;
+      const store = await ConfigStore.open(tmp);
+      const wardrobe = await firstValueFrom(store.sails$);
+      expect(wardrobe.boatId).toBe('sula');
+      expect(wardrobe.activeMode).toBe('default');
+      const slot = wardrobe.configs[0]!;
+      const revId = slot.modes.default?.activeRevisionId;
+      expect(revId).toBeDefined();
+      const rev = store.getRevision(revId!);
+      expect(rev?.lineage.kind).toBe('migrated');
+      expect(rev?.table).toEqual(DEFAULT_POLARS);
+      await store.close();
+    });
+
+    it('migrates an existing v1 wardrobe row on cold boot', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-v1-${Date.now()}.db`;
+      // Hand-craft a v1 wardrobe row first.
+      const Database = (await import('better-sqlite3')).default;
+      const raw = new Database(tmp);
+      raw.exec(`
+        CREATE TABLE polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      `);
+      const v1 = {
+        configs: [
+          { id: 'default', name: 'Default', polar: DEFAULT_POLARS },
+          { id: 'storm', name: 'Storm jib', polar: DEFAULT_POLARS },
+        ],
+        activeConfigId: 'storm',
+      };
+      raw
+        .prepare('INSERT INTO sail_wardrobe (id, value) VALUES (?, ?)')
+        .run('singleton', JSON.stringify(v1));
+      raw.close();
+
+      const store = await ConfigStore.open(tmp);
+      const wardrobe = await firstValueFrom(store.sails$);
+      expect(wardrobe.boatId).toBe('sula');
+      expect(wardrobe.activeConfigId).toBe('storm');
+      expect(wardrobe.configs).toHaveLength(2);
+      for (const c of wardrobe.configs) {
+        expect(c.modes.default?.activeRevisionId).toBeDefined();
+        expect((c as Record<string, unknown>).polar).toBeUndefined();
+      }
+      await store.close();
+    });
+
+    it('is idempotent: a second open does not create new revisions', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-idem-${Date.now()}.db`;
+      const a = await ConfigStore.open(tmp);
+      const revsA = a.listRevisions();
+      await a.close();
+      const b = await ConfigStore.open(tmp);
+      const revsB = b.listRevisions();
+      expect(revsB.map((r) => r.id).sort()).toEqual(revsA.map((r) => r.id).sort());
+      await b.close();
+    });
+
+    it('activePolar$ falls back to DEFAULT_POLARS when activeRevisionId is dangling', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-dangle-${Date.now()}.db`;
+      const store = await ConfigStore.open(tmp);
+      // Forge a wardrobe with a bad revisionId.
+      const wardrobe = await firstValueFrom(store.sails$);
+      const broken: SailWardrobe = {
+        ...wardrobe,
+        configs: [
+          { ...wardrobe.configs[0]!, modes: { default: { activeRevisionId: 'doesnotexist' } } },
+        ],
+      };
+      await store.setSails(broken);
+      const polar = await firstValueFrom(store.activePolar$);
+      expect(polar).toEqual(DEFAULT_POLARS);
+      await store.close();
+    });
+
+    it('transaction primitive used by migration rolls back atomically on throw', async () => {
+      // Proves that the better-sqlite3 transactional primitive ConfigStore.open
+      // relies on (raw.transaction(fn)) rolls back ALL writes if the body
+      // throws partway through. The migration path wraps its
+      // polar_revisions inserts + sail_wardrobe upsert in such a transaction;
+      // this test exercises the rollback property directly so we don't have
+      // to monkey-patch ConfigStore to artificially fail mid-migration.
+      const tmp = `${tmpdir()}/g5000-cfg-tx-${Date.now()}.db`;
+      const Database = (await import('better-sqlite3')).default;
+      const raw = new Database(tmp);
+      raw.exec(`CREATE TABLE polar_revisions (id TEXT PRIMARY KEY, x TEXT)`);
+      const fn = raw.transaction((shouldFail: boolean) => {
+        raw.prepare('INSERT INTO polar_revisions (id, x) VALUES (?, ?)').run('a', 'one');
+        raw.prepare('INSERT INTO polar_revisions (id, x) VALUES (?, ?)').run('b', 'two');
+        if (shouldFail) throw new Error('simulated mid-tx failure');
+      });
+      expect(() => fn(true)).toThrow(/simulated mid-tx failure/);
+      const rows = raw.prepare('SELECT COUNT(*) as n FROM polar_revisions').get() as { n: number };
+      expect(rows.n).toBe(0);
+      // Sanity: the same transaction without a throw commits both rows.
+      fn(false);
+      const after = raw.prepare('SELECT COUNT(*) as n FROM polar_revisions').get() as { n: number };
+      expect(after.n).toBe(2);
+      raw.close();
+    });
+
+    it('setActiveRevision swaps activePolar$ output within one tick', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-swap-${Date.now()}.db`;
+      const store = await ConfigStore.open(tmp);
+      const wardrobe = await firstValueFrom(store.sails$);
+      const slotId = wardrobe.configs[0]!.id;
+      // Create a clearly distinct polar.
+      const tweaked: PolarTable = {
+        ...DEFAULT_POLARS,
+        boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map((v) => v * 1.5)),
+      };
+      const newId = '01HZZZZZZZZZZZZZZZZZZZZZZZ';
+      await store.createRevision({
+        id: newId,
+        boatId: 'sula',
+        sailConfigId: slotId,
+        mode: 'default',
+        parentRevisionId: null,
+        createdAt: Math.floor(Date.now() / 1000),
+        lineage: { kind: 'manual_edit' },
+        table: tweaked,
+      });
+      await store.setActiveRevision(slotId, 'default', newId);
+      const polar = await firstValueFrom(store.activePolar$);
+      expect(polar.boatSpeed[0]![1]).toBeCloseTo(DEFAULT_POLARS.boatSpeed[0]![1]! * 1.5);
+      await store.close();
+    });
   });
 });
