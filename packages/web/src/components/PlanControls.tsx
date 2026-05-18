@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import type { SailWardrobe } from '@g5000/db';
 import {
   fmtTimestamp,
   parseDatetimeLocalInput,
@@ -14,6 +15,10 @@ export interface PlanRequest {
   model: 'GFS' | 'ECMWF';
   polarId: string;
   polar: unknown;
+  /** Full sail wardrobe. Server prefers this over `polar` when present,
+   *  enabling per-leg config selection and the ForecastTimeline on /sails.
+   *  `polar` is still sent alongside for backward compatibility. */
+  wardrobe?: SailWardrobe;
   useCurrents?: boolean;
   options?: Record<string, unknown>;
 }
@@ -68,9 +73,17 @@ export function PlanControls(props: {
     }
   }, [motor, motorKt, motorRestored]);
   const onSubmit = async () => {
-    const polarRes = await fetch('/api/wardrobe/active');
-    if (!polarRes.ok) return alert('No polar available (live or cached).');
-    const { polar } = await polarRes.json();
+    // Fetch the full wardrobe (not just the active config) so the server
+    // can run the wardrobe-aware planner — per-leg argmax across configs
+    // produces `route.sailTimeline`, which the /sails ForecastTimeline
+    // reads to show forecasted sail recommendations along the passage.
+    // We still send `polar` (the active config's polar) for backward
+    // compatibility; the server prefers `wardrobe` when both are present.
+    const wardrobeRes = await fetch('/api/sails');
+    if (!wardrobeRes.ok) return alert('No wardrobe available (live or cached).');
+    const wardrobe = (await wardrobeRes.json()) as SailWardrobe;
+    const active = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId);
+    if (!active) return alert('No active config in wardrobe.');
     const t = Math.floor(departureAnchor);
     if (!props.start || !props.end) return alert('Click start and end on the map first.');
     props.onPlan({
@@ -78,8 +91,9 @@ export function PlanControls(props: {
       end: props.end,
       departure: t,
       model,
-      polarId: polar.id ?? 'default',
-      polar: polar.polar ?? polar,
+      polarId: active.id,
+      polar: active.polar,
+      wardrobe,
       useCurrents,
       // Always capture isochrones — the chart draws them as a fan-out
       // visualisation behind the route polyline so the user can see the
