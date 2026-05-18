@@ -7,7 +7,15 @@ import next from 'next';
 import { SerialPort } from 'serialport';
 import { getSharedBus, createAlarmsRegistry, setSharedAlarms } from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
-import { ConfigStore, setSharedConfigStore, loadAlarmsConfig, type AlarmsConfig } from '@g5000/db';
+import {
+  ConfigStore,
+  setSharedConfigStore,
+  loadAlarmsConfig,
+  appendAlarmHistory,
+  updateAlarmHistoryClear,
+  updateAlarmHistoryAck,
+  type AlarmsConfig,
+} from '@g5000/db';
 import { startTrueWindPipeline, startPolarPipeline, startAlarmsPipeline } from '@g5000/compute';
 import {
   Ngt1Driver,
@@ -133,6 +141,52 @@ async function main(): Promise<void> {
   // shutdown handler below.
   const alarmsRegistry = createAlarmsRegistry();
   setSharedAlarms(alarmsRegistry);
+
+  // Wrap registry mutators so each fire/clear/ack transition also appends to
+  // the alarms_history table. Persistence is best-effort: a DB hiccup must
+  // NEVER fail the alarm itself, so the .then/.catch chains swallow errors.
+  // rowIdByAlarmId tracks the current history row per alarm id; cleared on
+  // ack so a re-fire opens a fresh row.
+  const rowIdByAlarmId = new Map<string, number>();
+
+  const rawFire = alarmsRegistry.fire.bind(alarmsRegistry);
+  alarmsRegistry.fire = (req) => {
+    rawFire(req);
+    // Only append a history row on a fresh fire (no current active entry).
+    const snapshot = alarmsRegistry.get(req.id);
+    if (snapshot && !rowIdByAlarmId.has(req.id)) {
+      appendAlarmHistory(store, {
+        alarmId: req.id,
+        severity: req.severity,
+        firedAt: snapshot.firedAt,
+        context: snapshot.context as Record<string, unknown> | undefined,
+      })
+        .then((rowId) => rowIdByAlarmId.set(req.id, rowId))
+        .catch(() => {
+          /* don't fail the alarm on a DB hiccup */
+        });
+    }
+  };
+
+  const rawClear = alarmsRegistry.clear.bind(alarmsRegistry);
+  alarmsRegistry.clear = (id) => {
+    rawClear(id);
+    const rowId = rowIdByAlarmId.get(id);
+    if (rowId !== undefined) {
+      updateAlarmHistoryClear(store, rowId, new Date().toISOString()).catch(() => {});
+    }
+  };
+
+  const rawAck = alarmsRegistry.ack.bind(alarmsRegistry);
+  alarmsRegistry.ack = (id) => {
+    rawAck(id);
+    const rowId = rowIdByAlarmId.get(id);
+    if (rowId !== undefined) {
+      updateAlarmHistoryAck(store, rowId, new Date().toISOString()).catch(() => {});
+      rowIdByAlarmId.delete(id);
+    }
+  };
+
   const initialAlarmsConfig = await loadAlarmsConfig(store);
   const alarmsConfigRef: { current: AlarmsConfig } = { current: initialAlarmsConfig };
   const alarmsPipelineHandle = startAlarmsPipeline(bus, alarmsRegistry, alarmsConfigRef);
