@@ -1,6 +1,7 @@
 import type { PlanInput, Route, RouteLeg, PlanOptions, LatLon, Isochrone } from './types.js';
 import { interpolateWind, interpolateCurrent } from '@g5000/grib';
 import { interpolatePolarSpeed } from '@g5000/compute';
+import type { PolarTable, SailWardrobe } from '@g5000/db';
 import { intersectsLand } from '@g5000/coastline';
 import {
   greatCircleBearing,
@@ -14,6 +15,37 @@ import { generateHeadingFan } from './fan.js';
 import { pruneByBearingBucket, type FrontierNode } from './prune.js';
 
 const DEG = Math.PI / 180;
+
+/** Pick the best config + polar at a given (TWS, TWA). Falls back to the
+ *  active config when no config produces a positive speed at this point. */
+function pickPolarAt(
+  input: PlanInput,
+  twsMs: number,
+  twaRad: number,
+): { polar: PolarTable; configId?: string; bsp: number } {
+  if (input.wardrobe) {
+    const w: SailWardrobe = input.wardrobe;
+    let best: { id: string; polar: PolarTable; bsp: number } | null = null;
+    for (const c of w.configs) {
+      const bsp = interpolatePolarSpeed(c.polar, twsMs, twaRad);
+      if (!Number.isFinite(bsp) || bsp <= 0) continue;
+      if (!best || bsp > best.bsp) best = { id: c.id, polar: c.polar, bsp };
+    }
+    if (!best) {
+      const active = w.configs.find((c) => c.id === w.activeConfigId);
+      if (!active) {
+        throw new Error('plan: wardrobe has no active config');
+      }
+      const bsp = interpolatePolarSpeed(active.polar, twsMs, twaRad);
+      return { polar: active.polar, configId: active.id, bsp };
+    }
+    return { polar: best.polar, configId: best.id, bsp: best.bsp };
+  }
+  if (input.polar) {
+    return { polar: input.polar, bsp: interpolatePolarSpeed(input.polar, twsMs, twaRad) };
+  }
+  throw new Error('plan: PlanInput must have either `polar` or `wardrobe`');
+}
 
 const DEFAULTS: Required<PlanOptions> = {
   stepMinutes: 30,
@@ -29,6 +61,10 @@ const DEFAULTS: Required<PlanOptions> = {
 };
 
 export function plan(input: PlanInput): Route {
+  if (input.wardrobe && input.polar) {
+    // eslint-disable-next-line no-console
+    console.warn('plan: both wardrobe and polar provided — using wardrobe');
+  }
   const o: Required<PlanOptions> = { ...DEFAULTS, ...(input.options ?? {}) };
   const stepSec = o.stepMinutes * 60;
   const maxSec = o.maxHours * 3600;
@@ -125,6 +161,7 @@ export function plan(input: PlanInput): Route {
           bsp: n.bsp,
           sogGround: n.sogGround,
           distFromStart: n.distFromStart + dGround,
+          ...(n.configId !== undefined ? { configId: n.configId } : {}),
         };
         return assembleRoute(finalLeg, input, isochrones, false);
       }
@@ -152,9 +189,15 @@ function propagate(
   // Motor mode bypasses the polar — engine doesn't care about TWA. Wind
   // data is still read above so legs carry tws/twa for display and the
   // wind-field bbox still gates the planner's reach.
-  const bsp = o.motor
-    ? o.motorSpeed
-    : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+  let bsp: number;
+  let configId: string | undefined;
+  if (o.motor) {
+    bsp = o.motorSpeed;
+  } else {
+    const picked = pickPolarAt(input, tws, Math.abs(twa));
+    bsp = picked.bsp;
+    configId = picked.configId;
+  }
   if (bsp < 0.1) return null; // in-irons / no progress
 
   let vGroundX = Math.sin(heading) * bsp;
@@ -183,6 +226,7 @@ function propagate(
     bsp,
     sogGround,
     distFromStart: n.distFromStart + distance,
+    ...(configId !== undefined ? { configId } : {}),
   };
 }
 
@@ -230,6 +274,7 @@ function assembleRoute(
       tws: cur.tws,
       bsp: cur.bsp,
       sogGround: cur.sogGround,
+      ...(cur.configId !== undefined ? { configId: cur.configId } : {}),
     });
     cur = cur.parent;
   }

@@ -1,5 +1,5 @@
 export type {
-  LatLon, RouteLeg, Route, PlanOptions, PlanInput,
+  LatLon, RouteLeg, Route, PlanOptions, PlanInput, SailTimelineSegment, Isochrone,
 } from './types.js';
 export {
   greatCircleBearing,

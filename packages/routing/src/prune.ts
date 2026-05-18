@@ -15,6 +15,9 @@ export interface FrontierNode {
   bsp: number;
   sogGround: number;
   distFromStart: number;
+  /** Present only in wardrobe-aware routes. Identifies the wardrobe config
+   *  selected (argmax-fastest) for the leg that produced this node. */
+  configId?: string;
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { LatLon, WindField, CurrentField } from '@g5000/grib';
 import type { Coastline } from '@g5000/coastline';
-import type { PolarTable } from '@g5000/db';
+import type { PolarTable, SailWardrobe } from '@g5000/db';
 
 export type { LatLon };
 
@@ -19,6 +19,9 @@ export interface RouteLeg {
   bsp: number;
   /** Over-ground speed (m/s). With currents off, equals bsp. */
   sogGround: number;
+  /** Present only in wardrobe-aware routes. Identifies which wardrobe
+   *  config was selected (argmax-fastest) for this leg. */
+  configId?: string;
 }
 
 export interface Isochrone {
@@ -27,6 +30,15 @@ export interface Isochrone {
   /** Points on the frontier, sorted by bearing from the start so polyline
    *  rendering joins them in a sensible order. */
   points: LatLon[];
+}
+
+export interface SailTimelineSegment {
+  fromLegIdx: number;
+  toLegIdx: number;
+  configId: string;
+  startTime: number;
+  endTime: number;
+  durationHours: number;
 }
 
 export interface Route {
@@ -43,6 +55,9 @@ export interface Route {
   /** Captured frontier at each planner step. Present only when
    *  `options.captureIsochrones` is true. */
   isochrones?: Isochrone[];
+  /** Present only in wardrobe-aware routes. Populated by computeSailTimeline
+   *  in Task 12. Task 11 only records per-leg configIds. */
+  sailTimeline?: SailTimelineSegment[];
 }
 
 export interface PlanOptions {
@@ -73,9 +88,12 @@ export interface PlanInput {
   /** Unix seconds. */
   departure: number;
   wind: WindField;
-  polar: PolarTable;
+  /** Single-polar mode. Mutually exclusive with `wardrobe`. */
+  polar?: PolarTable;
   polarId: string;
   coastline: Coastline;
   currents?: CurrentField;
   options?: PlanOptions;
+  /** Wardrobe-aware mode: per-node argmax over the wardrobe's configs. */
+  wardrobe?: SailWardrobe;
 }
