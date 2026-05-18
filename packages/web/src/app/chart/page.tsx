@@ -18,6 +18,8 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 // pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid, type WindModel } from '../../components/WindOverlay';
 import { CurrentOverlay } from '../../components/CurrentOverlay';
+import { StartLineLayer } from '../../components/StartLineLayer';
+import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { CogExtension } from '../../components/CogExtension';
 import { RangeRings } from '../../components/RangeRings';
 import { TzToggle } from '../../components/TzToggle';
@@ -531,6 +533,8 @@ function ChartPageInner() {
             }
           }}
         />
+        <LaylinesLayer map={mapInstance} />
+        <StartLineLayer map={mapInstance} />
         <div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
           {livePos && (
             <button
