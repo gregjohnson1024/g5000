@@ -34,7 +34,17 @@ export function ActiveList() {
         ]);
         if (stopped) return;
         setAlarms(a.active ?? []);
-        setAlerts(b.alerts ?? []);
+        // Filter out resolved/disabled/stale N2K alerts. Navico proprietary
+        // alerts have no clear PGN — the issuer just stops sending 130850
+        // frames when the operator silences the alarm at the MFD. So we
+        // treat alerts not seen in the last 5s as cleared (same predicate
+        // as the helm AlertsPanel).
+        const now = Date.now();
+        const filteredAlerts = (b.alerts ?? []).filter(
+          (alert: AlertRow) =>
+            alert.state !== 'Normal' && alert.state !== 'Disabled' && now - alert.lastSeenMs < 5000,
+        );
+        setAlerts(filteredAlerts);
       } catch {
         // ignore transient
       }
@@ -58,7 +68,15 @@ export function ActiveList() {
     ...alarms.map((r) => ({ kind: 'alarm' as const, severity: r.severity, row: r })),
     ...alerts.map((r) => ({ kind: 'alert' as const, severity: r.type, row: r })),
   ];
-  const severityRank: Record<string, number> = { CRITICAL: 3, 'Emergency Alarm': 3, Alarm: 3, WARN: 2, Warning: 2, Caution: 1, INFO: 0 };
+  const severityRank: Record<string, number> = {
+    CRITICAL: 3,
+    'Emergency Alarm': 3,
+    Alarm: 3,
+    WARN: 2,
+    Warning: 2,
+    Caution: 1,
+    INFO: 0,
+  };
   allRows.sort((a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0));
 
   if (allRows.length === 0) {
@@ -69,13 +87,19 @@ export function ActiveList() {
     <ul className="space-y-2">
       {allRows.map((entry) => (
         <li
-          key={entry.kind === 'alarm' ? `alarm-${(entry.row as AlarmRow).id}` : `alert-${(entry.row as AlertRow).key}`}
+          key={
+            entry.kind === 'alarm'
+              ? `alarm-${(entry.row as AlarmRow).id}`
+              : `alert-${(entry.row as AlertRow).key}`
+          }
           className={`p-3 rounded border ${(severityRank[entry.severity] ?? 0) >= 3 ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'}`}
         >
           <div className="flex justify-between items-center">
             <div>
               <span className="font-semibold">
-                {entry.kind === 'alarm' ? (entry.row as AlarmRow).label : (entry.row as AlertRow).text ?? 'N2K alert'}
+                {entry.kind === 'alarm'
+                  ? (entry.row as AlarmRow).label
+                  : ((entry.row as AlertRow).text ?? 'N2K alert')}
               </span>
               <span className="ml-2 text-sm text-gray-600">{entry.severity}</span>
             </div>
