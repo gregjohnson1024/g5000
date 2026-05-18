@@ -81,3 +81,18 @@ export const polarRevisions = sqliteTable('polar_revisions', {
   /** JSON-encoded PolarTable. */
   valueJson: text('value_json').notNull(),
 });
+
+export const alarmsConfig = sqliteTable('alarms_config', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded AlarmsConfig
+});
+
+export const alarmsHistory = sqliteTable('alarms_history', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  alarmId: text('alarm_id').notNull(),
+  severity: text('severity').notNull(),
+  firedAt: text('fired_at').notNull(),
+  clearedAt: text('cleared_at'),
+  ackedAt: text('acked_at'),
+  context: text('context'), // JSON-encoded Record<string, unknown> or null
+});

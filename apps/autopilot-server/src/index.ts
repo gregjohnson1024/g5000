@@ -5,10 +5,18 @@ import { homedir } from 'node:os';
 import { mkdir, readFile } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus } from '@g5000/core';
+import { getSharedBus, createAlarmsRegistry, setSharedAlarms } from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
-import { ConfigStore, setSharedConfigStore } from '@g5000/db';
-import { startTrueWindPipeline, startPolarPipeline } from '@g5000/compute';
+import {
+  ConfigStore,
+  setSharedConfigStore,
+  loadAlarmsConfig,
+  appendAlarmHistory,
+  updateAlarmHistoryClear,
+  updateAlarmHistoryAck,
+  type AlarmsConfig,
+} from '@g5000/db';
+import { startTrueWindPipeline, startPolarPipeline, startAlarmsPipeline } from '@g5000/compute';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -94,9 +102,8 @@ async function readSocketCanSettings(): Promise<SocketCanSettings> {
     if (sc && typeof sc === 'object') {
       return {
         enabled: sc.enabled === true,
-        interface: typeof sc.interface === 'string' && sc.interface.length > 0
-          ? sc.interface
-          : 'can0',
+        interface:
+          typeof sc.interface === 'string' && sc.interface.length > 0 ? sc.interface : 'can0',
       };
     }
   } catch {
@@ -128,6 +135,78 @@ async function main(): Promise<void> {
   console.log(`[autopilot] config db: ${CONFIG_DB_PATH}`);
   // eslint-disable-next-line no-console
   console.log(`[g5000] active boat: ${process.env.G5000_BOAT_ID ?? 'sula'}`);
+
+  // --- Safety alarms (g5000-derived) ---
+  // Built right after ConfigStore so API routes that touch the registry or
+  // its config (e.g. /api/alarms/*) always find both wired. Disposed in the
+  // shutdown handler below.
+  const alarmsRegistry = createAlarmsRegistry();
+  setSharedAlarms(alarmsRegistry);
+
+  // Wrap registry mutators so each fire/clear/ack transition also appends to
+  // the alarms_history table. Persistence is best-effort: a DB hiccup must
+  // NEVER fail the alarm itself, so the .then/.catch chains swallow errors.
+  // rowIdByAlarmId tracks the current history row per alarm id; cleared on
+  // ack so a re-fire opens a fresh row.
+  const rowIdByAlarmId = new Map<string, number>();
+
+  const rawFire = alarmsRegistry.fire.bind(alarmsRegistry);
+  alarmsRegistry.fire = (req) => {
+    rawFire(req);
+    // Only append a history row on a fresh fire (no current active entry).
+    const snapshot = alarmsRegistry.get(req.id);
+    if (snapshot && !rowIdByAlarmId.has(req.id)) {
+      appendAlarmHistory(store, {
+        alarmId: req.id,
+        severity: req.severity,
+        firedAt: snapshot.firedAt,
+        context: snapshot.context as Record<string, unknown> | undefined,
+      })
+        .then((rowId) => rowIdByAlarmId.set(req.id, rowId))
+        .catch(() => {
+          /* don't fail the alarm on a DB hiccup */
+        });
+    }
+  };
+
+  const rawClear = alarmsRegistry.clear.bind(alarmsRegistry);
+  alarmsRegistry.clear = (id) => {
+    rawClear(id);
+    const rowId = rowIdByAlarmId.get(id);
+    if (rowId !== undefined) {
+      updateAlarmHistoryClear(store, rowId, new Date().toISOString()).catch(() => {});
+      // For non-sticky alarms, re-fires should open a NEW history row, so drop
+      // the mapping here. For sticky alarms (mob, anchor-watch), the alarm
+      // stays active until ack — the ack wrapper still needs the rowId to
+      // close out ackedAt, so we leave the mapping intact until ack.
+      const snapshot = alarmsRegistry.get(id);
+      if (snapshot && !snapshot.sticky) {
+        rowIdByAlarmId.delete(id);
+      }
+    }
+  };
+
+  const rawAck = alarmsRegistry.ack.bind(alarmsRegistry);
+  alarmsRegistry.ack = (id) => {
+    rawAck(id);
+    const rowId = rowIdByAlarmId.get(id);
+    if (rowId !== undefined) {
+      updateAlarmHistoryAck(store, rowId, new Date().toISOString()).catch(() => {});
+      rowIdByAlarmId.delete(id);
+    }
+  };
+
+  const initialAlarmsConfig = await loadAlarmsConfig(store);
+  const alarmsConfigRef: { current: AlarmsConfig } = { current: initialAlarmsConfig };
+  const alarmsPipelineHandle = startAlarmsPipeline(bus, alarmsRegistry, alarmsConfigRef);
+  // Expose the ref so API routes that update config (e.g. PUT /api/alarms/config)
+  // can swap it without restarting the predicates.
+  (
+    globalThis as { __g5000_alarms_config_ref__?: typeof alarmsConfigRef }
+  ).__g5000_alarms_config_ref__ = alarmsConfigRef;
+  teardown.push(async () => alarmsPipelineHandle.dispose());
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] alarms pipeline online');
 
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });
@@ -261,9 +340,7 @@ async function main(): Promise<void> {
       const hub = getSharedDriverHub();
       if (!hub) {
         // eslint-disable-next-line no-console
-        console.warn(
-          '[autopilot] SocketCAN requested but no DriverHub — was runBridge called?',
-        );
+        console.warn('[autopilot] SocketCAN requested but no DriverHub — was runBridge called?');
       } else {
         try {
           await hub.addDriver(

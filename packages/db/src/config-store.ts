@@ -141,6 +141,17 @@ export class ConfigStore {
       );
       CREATE INDEX IF NOT EXISTS polar_revisions_lookup
         ON polar_revisions(boat_id, sail_config_id, mode, created_at DESC);
+      CREATE TABLE IF NOT EXISTS alarms_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS alarms_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        alarm_id TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        fired_at TEXT NOT NULL,
+        cleared_at TEXT,
+        acked_at TEXT,
+        context TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_alarms_history_fired_at ON alarms_history (fired_at DESC);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -307,6 +318,14 @@ export class ConfigStore {
   /** Synchronous read of the current passage log anchor. */
   getPassageLog(): PassageLog {
     return this.subjects.passageLog.value;
+  }
+  /**
+   * Direct access to the underlying Drizzle instance for modules that need
+   * to query tables not exposed through ConfigStore's BehaviorSubject API
+   * (e.g. alarms-config, alarms-history). Treat as a power-user escape hatch.
+   */
+  get drizzle(): BetterSQLite3Database {
+    return this.db;
   }
   /** Derived from sails$ + polarRevisions$ — resolves the active config's
    *  active-mode revision to its `PolarTable`. Falls back to DEFAULT_POLARS
