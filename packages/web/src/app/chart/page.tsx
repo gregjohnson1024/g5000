@@ -21,7 +21,6 @@ import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { CogExtension } from '../../components/CogExtension';
-import { RangeRings } from '../../components/RangeRings';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
@@ -35,16 +34,6 @@ type Pos = { lat: number; lon: number };
  * the next N minutes?" with a single time horizon.
  */
 const COG_EXTENSION_MINUTES = 360;
-
-/**
- * West Falmouth Harbor, Cape Cod MA — second origin for range rings on
- * this chart. ~41°36.5'N 070°38.6'W (West Falmouth, near Wild Harbor /
- * Old Silver Beach). Edit if a more precise dock fix is wanted.
- */
-const WEST_FALMOUTH = { lat: 41.6079, lon: -70.6437 };
-
-/** Range-ring radii (NM) shared by the Sula and West Falmouth instances. */
-const RANGE_RING_RADII_NM = [100, 150, 200];
 
 export default function ChartPage() {
   // Next.js requires useSearchParams() to be wrapped in a Suspense boundary
@@ -444,27 +433,6 @@ function ChartPageInner() {
           // reads as a single comparable forecast.
           totalNm={100}
           hidden={false}
-        />
-        <RangeRings
-          id="sula"
-          map={mapInstance}
-          origin={livePos}
-          radiiNm={RANGE_RING_RADII_NM}
-          // Pink-500 — distinct from CogExtension's violet, AIS's orange,
-          // and the WF rings' amber, and crucially high-contrast against
-          // both water (light blue) and land (light green) basemap tiles.
-          // The earlier sky-300 (#7dd3fc) was the right vibe for "Sula"
-          // but invisible against the OSM ocean. Lesson re-learned.
-          color="#ec4899"
-          labelPrefix="Sula"
-        />
-        <RangeRings
-          id="west-falmouth"
-          map={mapInstance}
-          origin={WEST_FALMOUTH}
-          radiiNm={RANGE_RING_RADII_NM}
-          color="#fbbf24"
-          labelPrefix="WF"
         />
         <AisTargets map={mapInstance} cogExtensionMinutes={COG_EXTENSION_MINUTES} />
         <ForecastRoi
