@@ -36,3 +36,8 @@ export function setSharedConfigStore(store: ConfigStore): void {
 export function _resetSharedConfigStoreForTests(): void {
   globalThis[GLOBAL_KEY] = undefined;
 }
+
+/** Test-only: clears the singleton. Do not call from production code. */
+export function __resetSharedConfigStoreForTests(): void {
+  globalThis[GLOBAL_KEY] = undefined;
+}
