@@ -12,6 +12,7 @@ import {
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
+  wardrobeSettingsOf,
   type AisAlarmConfig,
   type AwsAwaCalTable,
   type BoatConfig,
@@ -22,6 +23,7 @@ import {
   type PolarTable,
   type SailWardrobe,
   type SourcePriorityConfig,
+  type WardrobeSettings,
 } from './defaults.js';
 import {
   aisAlarmConfig as aisAlarmConfigTable,
@@ -249,6 +251,10 @@ export class ConfigStore {
   /** Legacy alias — backed by activePolar$ for backward compatibility. */
   get polars$(): Observable<PolarTable> {
     return this.activePolar$;
+  }
+  /** Derived from sails$ — returns the wardrobe settings merged with defaults. */
+  get wardrobeSettings$(): Observable<WardrobeSettings> {
+    return this.subjects.sails.pipe(map(wardrobeSettingsOf));
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {

@@ -12,6 +12,7 @@ import {
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
+  DEFAULT_WARDROBE_SETTINGS,
   type AisAlarmConfig,
   type BoatConfig,
   type DampingConfig,
@@ -256,5 +257,27 @@ describe('ConfigStore', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.setAisAlarmConfig({ enabled: 'no' as any, cpaMeters: 100, tcpaSeconds: 60 }),
     ).rejects.toThrow(/enabled/);
+  });
+});
+
+describe('ConfigStore.wardrobeSettings$', () => {
+  it('emits defaults when the wardrobe has no settings field', async () => {
+    const store = await ConfigStore.open(':memory:');
+    const got = await firstValueFrom(store.wardrobeSettings$);
+    expect(got).toEqual(DEFAULT_WARDROBE_SETTINGS);
+    await store.close();
+  });
+
+  it('emits merged settings when partial settings are persisted', async () => {
+    const store = await ConfigStore.open(':memory:');
+    const w = await firstValueFrom(store.sails$);
+    await store.setSails({
+      ...w,
+      settings: { ...DEFAULT_WARDROBE_SETTINGS, hysteresisPercent: 10 },
+    });
+    const got = await firstValueFrom(store.wardrobeSettings$);
+    expect(got.hysteresisPercent).toBe(10);
+    expect(got.chartTwsMaxKn).toBe(DEFAULT_WARDROBE_SETTINGS.chartTwsMaxKn);
+    await store.close();
   });
 });
