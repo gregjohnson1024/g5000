@@ -1,7 +1,7 @@
 # Safety Alarms — Design
 
 **Date:** 2026-05-18
-**Status:** Approved (brainstorming complete; ready for implementation plan)
+**Status:** Implemented (see `docs/superpowers/plans/2026-05-18-safety-alarms.md`)
 **Scope:** A centralized, predicate-driven alarm system for safety-critical conditions that g5000 itself can detect from Bus channels (anchor drift, MOB, shallow water, over-speed, low battery). Separate from the existing N2K-derived `AlertsRegistry`; unified in the UI.
 
 ## 1. Context & goal
