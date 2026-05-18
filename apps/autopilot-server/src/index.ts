@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { mkdir, readFile } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus, createAlarmsRegistry, setSharedAlarms, createRaceState, setSharedRaceState } from '@g5000/core';
+import { getSharedBus, createAlarmsRegistry, setSharedAlarms, createRaceState, setSharedRaceState, getSharedCogStats } from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
 import {
   ConfigStore,
@@ -585,7 +585,19 @@ async function main(): Promise<void> {
   // Waypoints ref: v1 starts empty; populated by a follow-up issue.
   const waypointsRef: { current: Map<string, LatLon> } = { current: new Map() };
 
-  const raceHandle = startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef, waypointsRef);
+  // COG concentration ref: initialised to 0 (conservative — OCS predictor
+  // will return null until the COG stats window has enough data). Updated at
+  // 200 ms from the shared COG stats singleton that startCogStats registers.
+  // Using a lightweight poll here (inside autopilot-server where I/O is
+  // allowed) avoids HTTP self-calls and keeps @g5000/compute boundary-clean.
+  const cogConcentrationRef: { current: number } = { current: 0 };
+  const cogConcentrationPoll = setInterval(() => {
+    const stats = getSharedCogStats();
+    if (stats) cogConcentrationRef.current = stats.snapshot().concentration;
+  }, 200);
+  teardown.push(async () => clearInterval(cogConcentrationPoll));
+
+  const raceHandle = startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef, waypointsRef, cogConcentrationRef);
   teardown.push(async () => raceHandle.dispose());
 
   // Persist on every mutation (debounced 500 ms).

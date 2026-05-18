@@ -30,7 +30,6 @@ interface Latest {
   pos?: LatLon;
   cog?: number;
   sog?: number;
-  cogConcentration?: number;
   twd?: number;
   tws?: number;
   twa?: number;
@@ -49,6 +48,7 @@ export function startRaceComputePipeline(
   polarRef: { current: PolarTable | null },
   currentFieldRef: { current: CurrentField | null },
   waypointsRef: { current: Map<string, LatLon> },
+  cogConcentrationRef: { current: number },
 ): RacePipelineHandles {
   const latest: Latest = {};
   const unsubs: Array<() => void> = [];
@@ -149,21 +149,6 @@ export function startRaceComputePipeline(
       if (s.value.kind === 'scalar') latest.hdg = s.value.value;
     }),
   );
-
-  // COG concentration: poll /api/stats/cog every 2 s and cache the
-  // mean-resultant length. Inside the autopilot-server we could subscribe
-  // directly to the COG stats subject, but inside compute we'd have to
-  // import from apps/. Cheaper to just poll the public endpoint.
-  const cogPollInterval = setInterval(async () => {
-    try {
-      const r = await fetch('http://127.0.0.1:3000/api/stats/cog', { cache: 'no-store' });
-      if (!r.ok) return;
-      const j = (await r.json()) as { ok: boolean; stats?: { concentration: number } };
-      if (j.ok && j.stats) latest.cogConcentration = j.stats.concentration;
-    } catch {
-      /* tick again */
-    }
-  }, 2000);
 
   // --- Layline recomputation, throttled to 1 Hz ---
   let lastLaylineMs = 0;
@@ -299,7 +284,7 @@ export function startRaceComputePipeline(
       pos: latest.pos,
       cogRad: latest.cog,
       sogMs: latest.sog,
-      cogConcentration: latest.cogConcentration ?? 1,
+      cogConcentration: cogConcentrationRef.current,
       line: { port: line.port, stbd: line.stbd },
       startMs: timer.startMs,
       lookAheadSec: settings.ocsLookAheadSec,
@@ -356,7 +341,6 @@ export function startRaceComputePipeline(
     dispose: () => {
       polarTargets.dispose();
       for (const u of unsubs) u();
-      clearInterval(cogPollInterval);
       clearInterval(timerTick);
     },
   };

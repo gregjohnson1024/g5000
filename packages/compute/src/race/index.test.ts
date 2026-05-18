@@ -9,7 +9,8 @@ describe('startRaceComputePipeline', () => {
     const polarRef = { current: null };
     const currRef = { current: null };
     const wpRef = { current: new Map() };
-    const handle = startRaceComputePipeline(bus, rs, polarRef, currRef, wpRef);
+    const cogConcentrationRef = { current: 1 };
+    const handle = startRaceComputePipeline(bus, rs, polarRef, currRef, wpRef, cogConcentrationRef);
     expect(handle.dispose).toBeTypeOf('function');
     handle.dispose();
   });
