@@ -51,4 +51,40 @@ export const Channels = {
      *  lowest-instance battery. Future: instance-disambiguation. */
     BatteryVoltage: 'electrical.battery.voltage',
   },
+  Race: {
+    /** Signed perpendicular distance from boat to start line, meters.
+     *  Positive = boat is on the pre-start side. Sign flips on crossing.
+     *  Published only when both line ends are pinged. */
+    LineDistanceToLine: 'race.line.distanceToLine',
+    /** Haversine distance to the port end of the line, meters. */
+    LineDistancePort: 'race.line.distancePort',
+    /** Haversine distance to the starboard end of the line, meters. */
+    LineDistanceStbd: 'race.line.distanceStbd',
+    /** Seconds to cross the line at current SOG·cos(angle). Null when
+     *  closing speed is non-positive (boat moving away or parallel). */
+    LineTimeToLine: 'race.line.timeToLine',
+    /** Line bias, radians. Positive = port end favored upwind. Requires
+     *  wind.true.direction. */
+    LineBias: 'race.line.bias',
+    /** Predicted on-course-side (over-early) flag. True if boat would
+     *  cross line before startMs at current vector, projected over
+     *  settings.ocsLookAheadSec. */
+    LineOcsPredicted: 'race.line.ocsPredicted',
+    /** Velocity-Made-good toward the active mark, m/s. Wind-free. */
+    Vmc: 'race.vmc',
+    /** Target boat speed (polar-interpolated) at current TWS, |TWA|, m/s. */
+    TargetSpeed: 'race.targetSpeed',
+    /** Target TWA (optimal-VMG) at current TWS, radians. */
+    TargetTwa: 'race.targetTwa',
+    /** Percent of polar = BSP / TBS · 100. */
+    PercentPolar: 'race.percentPolar',
+    /** Signed wind shift vs 5-min baseline, radians. */
+    WindShiftBias: 'race.windShift.bias',
+    /** One-shot event channel: emits when shift persists > 60s above threshold. */
+    WindShiftEvent: 'race.windShift.event',
+    /** Polyline projection of the port-tack layline, array of {lat,lon}. */
+    LaylinePort: 'race.laylines.port',
+    /** Polyline projection of the starboard-tack layline. */
+    LaylineStbd: 'race.laylines.stbd',
+  },
 } as const;
