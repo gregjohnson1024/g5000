@@ -5,6 +5,7 @@ import type { SailConfig, SailWardrobe, PolarTable } from '@g5000/db';
 import { PolarHeatmap } from '../polars/PolarHeatmap';
 import { RecommendationPanel } from './RecommendationPanel';
 import { CrossoverChart } from './CrossoverChart';
+import { SettingsDrawer } from './SettingsDrawer';
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
@@ -153,6 +154,15 @@ export default function SailsPage() {
       {!wardrobe && !err && <p className="text-slate-400">Loading…</p>}
 
       {wardrobe && <RecommendationPanel wardrobe={wardrobe} />}
+
+      {wardrobe && (
+        <SettingsDrawer
+          wardrobe={wardrobe}
+          onSave={async (settings) => {
+            await writeWardrobe({ ...wardrobe, settings });
+          }}
+        />
+      )}
 
       {wardrobe && <CrossoverChart wardrobe={wardrobe} />}
 
