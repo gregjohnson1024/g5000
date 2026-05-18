@@ -10,6 +10,7 @@ import {
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_CROSSOVER_MAP,
+  DEFAULT_CROSSOVER_SETTINGS,
   DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
@@ -20,6 +21,7 @@ import {
   type BspCal,
   type CompassDeviation,
   type CrossoverMap,
+  type CrossoverSettings,
   type DampingConfig,
   type PassageLog,
   type PolarMode,
@@ -35,6 +37,7 @@ import {
   boatConfig as boatConfigTable,
   compassDeviation,
   crossoverMap as crossoverMapTable,
+  crossoverSettings as crossoverSettingsTable,
   dampingConfig as dampingConfigTable,
   passageLog as passageLogTable,
   polars,
@@ -72,6 +75,7 @@ export class ConfigStore {
     passageLog: BehaviorSubject<PassageLog>;
     polarRevisions: BehaviorSubject<Map<string, PolarRevision>>;
     crossoverMap: BehaviorSubject<CrossoverMap>;
+    crossoverSettings: BehaviorSubject<CrossoverSettings>;
   };
 
   private readonly __activeBoatId: BoatId;
@@ -96,6 +100,7 @@ export class ConfigStore {
       passageLog: PassageLog;
       polarRevisions: Map<string, PolarRevision>;
       crossoverMap: CrossoverMap;
+      crossoverSettings: CrossoverSettings;
     },
     activeBoatId: BoatId,
   ) {
@@ -112,6 +117,7 @@ export class ConfigStore {
       passageLog: new BehaviorSubject(initial.passageLog),
       polarRevisions: new BehaviorSubject(initial.polarRevisions),
       crossoverMap: new BehaviorSubject(initial.crossoverMap),
+      crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
     };
   }
 
@@ -302,6 +308,21 @@ export class ConfigStore {
         }
       : { ...DEFAULT_CROSSOVER_MAP, boatId: activeBoatId, mode: wardrobeValue.activeMode };
 
+    // Load the crossover_settings row for the active boat. Single-row table
+    // keyed by boatId — no mode component. Stored value is merged with
+    // DEFAULT_CROSSOVER_SETTINGS so partial writes get sensible fallbacks.
+    const xsRows = db
+      .select()
+      .from(crossoverSettingsTable)
+      .where(eq(crossoverSettingsTable.boatId, activeBoatId))
+      .all() as Array<{ boatId: string; value: string }>;
+    const crossoverSettingsValue: CrossoverSettings = xsRows[0]
+      ? {
+          ...DEFAULT_CROSSOVER_SETTINGS,
+          ...(JSON.parse(xsRows[0].value) as Partial<CrossoverSettings>),
+        }
+      : DEFAULT_CROSSOVER_SETTINGS;
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
@@ -317,6 +338,7 @@ export class ConfigStore {
       passageLog: passageLogValue,
       polarRevisions: revisionsMap,
       crossoverMap: crossoverMapValue,
+      crossoverSettings: crossoverSettingsValue,
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -444,6 +466,26 @@ export class ConfigStore {
       )
       .run(stored.boatId, stored.mode, JSON.stringify(stored));
     this.subjects.crossoverMap.next(stored);
+  }
+
+  /**
+   * Crossover settings (recommendation hysteresis, chart bounds, forecast
+   * cadence) for the active boat. Seeded at open() from the
+   * crossover_settings row for `activeBoatId`, merged over
+   * DEFAULT_CROSSOVER_SETTINGS so missing keys fall back. Single-row table
+   * keyed on `boatId` — there is no per-mode component.
+   */
+  get crossoverSettings$(): Observable<CrossoverSettings> {
+    return this.subjects.crossoverSettings.asObservable();
+  }
+
+  async setCrossoverSettings(value: CrossoverSettings): Promise<void> {
+    this.raw
+      .prepare(
+        'INSERT INTO crossover_settings (boat_id, value) VALUES (?, ?) ON CONFLICT (boat_id) DO UPDATE SET value = excluded.value',
+      )
+      .run(this.__activeBoatId, JSON.stringify(value));
+    this.subjects.crossoverSettings.next(value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
@@ -618,6 +660,7 @@ export class ConfigStore {
     this.subjects.passageLog.complete();
     this.subjects.polarRevisions.complete();
     this.subjects.crossoverMap.complete();
+    this.subjects.crossoverSettings.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
