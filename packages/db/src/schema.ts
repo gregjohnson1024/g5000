@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 /**
  * All config rows are stored as JSON-serialized blobs in a `value` column.
@@ -56,4 +56,19 @@ export const aisAlarmConfig = sqliteTable('ais_alarm_config', {
 export const passageLog = sqliteTable('passage_log', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded PassageLog
+});
+
+export const alarmsConfig = sqliteTable('alarms_config', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded AlarmsConfig
+});
+
+export const alarmsHistory = sqliteTable('alarms_history', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  alarmId: text('alarm_id').notNull(),
+  severity: text('severity').notNull(),
+  firedAt: text('fired_at').notNull(),
+  clearedAt: text('cleared_at'),
+  ackedAt: text('acked_at'),
+  context: text('context'), // JSON-encoded Record<string, unknown> or null
 });

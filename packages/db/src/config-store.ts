@@ -108,6 +108,17 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS source_priority_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ais_alarm_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS passage_log (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS alarms_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS alarms_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        alarm_id TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        fired_at TEXT NOT NULL,
+        cleared_at TEXT,
+        acked_at TEXT,
+        context TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_alarms_history_fired_at ON alarms_history (fired_at DESC);
     `);
 
     // Helper: load JSON value for the singleton row, or insert default.
@@ -241,6 +252,14 @@ export class ConfigStore {
   /** Synchronous read of the current passage log anchor. */
   getPassageLog(): PassageLog {
     return this.subjects.passageLog.value;
+  }
+  /**
+   * Direct access to the underlying Drizzle instance for modules that need
+   * to query tables not exposed through ConfigStore's BehaviorSubject API
+   * (e.g. alarms-config, alarms-history). Treat as a power-user escape hatch.
+   */
+  get drizzle(): BetterSQLite3Database {
+    return this.db;
   }
   /** Derived from sails$ — returns the active config's polar. */
   get activePolar$(): Observable<PolarTable> {

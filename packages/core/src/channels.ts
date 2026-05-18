@@ -46,4 +46,9 @@ export const Channels = {
     /** Track-to-steer in radians when in Track Control mode. */
     TargetTrack: 'autopilot.target.track',
   },
+  Electrical: {
+    /** Battery bank DC voltage in volts. Currently mapped from PGN 127508,
+     *  lowest-instance battery. Future: instance-disambiguation. */
+    BatteryVoltage: 'electrical.battery.voltage',
+  },
 } as const;
