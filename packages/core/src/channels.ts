@@ -10,6 +10,8 @@ export const Channels = {
     TrueSpeed: 'wind.true.speed',
     TrueDirection: 'wind.true.direction',
   },
+  /** Active sail-crossover recommendation (current config + suggested config + stability). */
+  SAIL_RECOMMENDATION: 'sail.recommendation',
   Boat: {
     SpeedWater: 'boat.speed.water',
     HeadingMagnetic: 'boat.heading.magnetic',
