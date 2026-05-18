@@ -7,7 +7,7 @@ import {
   snapToFixedGrid,
   cellKey,
   parseCellKey,
-} from './sail-grid';
+} from './sail-grid.js';
 
 const MPS_PER_KN = 0.514444;
 
