@@ -8,8 +8,18 @@ import type {
   SailConfig,
   SailWardrobe,
 } from '@g5000/db';
-import { DEFAULT_POLARS } from '@g5000/db';
 import { PolarHeatmap } from '../polars/PolarHeatmap';
+
+// Tiny client-safe fallback used only when no revision has been resolved yet.
+// In normal operation boot-time migration guarantees a revision-0 exists, so
+// `resolvePolar` returns the resolved table on the first render after fetch.
+// We avoid importing DEFAULT_POLARS from '@g5000/db' because that pulls
+// `config-store.js` (better-sqlite3) into the client bundle.
+const EMPTY_POLAR: PolarTable = {
+  twsBins: [],
+  twaBins: [],
+  boatSpeed: [],
+};
 
 function resolvePolar(
   cfg: SailConfig,
@@ -17,8 +27,8 @@ function resolvePolar(
   revisions: Record<string, PolarRevision>,
 ): PolarTable {
   const refId = cfg.modes[mode]?.activeRevisionId ?? cfg.modes.default?.activeRevisionId;
-  if (!refId) return cfg.polar ?? DEFAULT_POLARS;
-  return revisions[refId]?.table ?? cfg.polar ?? DEFAULT_POLARS;
+  if (!refId) return cfg.polar ?? EMPTY_POLAR;
+  return revisions[refId]?.table ?? cfg.polar ?? EMPTY_POLAR;
 }
 
 export default function SailsPage() {
