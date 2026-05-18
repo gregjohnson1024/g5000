@@ -5,6 +5,7 @@ import type { JsonSafeSample } from '@g5000/core';
 import type { SailWardrobe } from '@g5000/db';
 import { useSse } from '../../hooks/use-sse';
 import { HelmTile } from './HelmTile';
+import { MobButton } from './MobButton';
 
 const MS_TO_KNOTS = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -404,6 +405,7 @@ export default function HelmPage() {
           positionLon={positionLon}
         />
       </div>
+      <MobButton />
     </main>
   );
 }
