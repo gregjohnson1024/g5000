@@ -55,8 +55,7 @@ export function RaceTimer(): React.ReactElement {
     });
   }, []);
 
-  const secsToGun =
-    timer.startMs === null ? null : Math.round((timer.startMs - nowMs) / 1000);
+  const secsToGun = timer.startMs === null ? null : Math.round((timer.startMs - nowMs) / 1000);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded p-6 flex flex-col items-center gap-4">

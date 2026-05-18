@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 
 const MUTE_KEY = 'g5000.race-audible.muted';
 
-interface Beep { freq: number; durMs: number; type: OscillatorType }
+interface Beep {
+  freq: number;
+  durMs: number;
+  type: OscillatorType;
+}
 const TONE_MINUTE: Beep = { freq: 660, durMs: 200, type: 'square' };
 const TONE_MINUTE_LAST: Beep = { freq: 660, durMs: 400, type: 'square' };
 const TONE_SECOND: Beep = { freq: 880, durMs: 100, type: 'sine' };
@@ -17,16 +21,16 @@ const SCHEDULE: Array<{ atSec: number; tone: Beep }> = [
   { atSec: 240, tone: TONE_MINUTE },
   { atSec: 180, tone: TONE_MINUTE },
   { atSec: 120, tone: TONE_MINUTE },
-  { atSec: 60,  tone: TONE_MINUTE_LAST },
-  { atSec: 30,  tone: TONE_SECOND },
-  { atSec: 20,  tone: TONE_SECOND },
-  { atSec: 10,  tone: TONE_SECOND },
-  { atSec: 5,   tone: TONE_LAST5 },
-  { atSec: 4,   tone: TONE_LAST5 },
-  { atSec: 3,   tone: TONE_LAST5 },
-  { atSec: 2,   tone: TONE_LAST5 },
-  { atSec: 1,   tone: TONE_LAST5 },
-  { atSec: 0,   tone: TONE_GUN },
+  { atSec: 60, tone: TONE_MINUTE_LAST },
+  { atSec: 30, tone: TONE_SECOND },
+  { atSec: 20, tone: TONE_SECOND },
+  { atSec: 10, tone: TONE_SECOND },
+  { atSec: 5, tone: TONE_LAST5 },
+  { atSec: 4, tone: TONE_LAST5 },
+  { atSec: 3, tone: TONE_LAST5 },
+  { atSec: 2, tone: TONE_LAST5 },
+  { atSec: 1, tone: TONE_LAST5 },
+  { atSec: 0, tone: TONE_GUN },
 ];
 
 export function RaceAudible(): React.ReactElement {
@@ -69,11 +73,16 @@ export function RaceAudible(): React.ReactElement {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setStartMs(j.timer.startMs);
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
   // 100 ms tick — check schedule and fire any thresholds we just crossed.
@@ -131,7 +140,11 @@ function fire(ctx: AudioContext, t: Beep): void {
   gain.gain.value = 0.15;
   osc.start();
   setTimeout(() => {
-    try { osc.stop(); } catch { /* ignored */ }
+    try {
+      osc.stop();
+    } catch {
+      /* ignored */
+    }
     osc.disconnect();
     gain.disconnect();
   }, t.durMs);

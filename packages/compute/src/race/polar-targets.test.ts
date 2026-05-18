@@ -25,9 +25,24 @@ describe('startPolarTargetsPredicate', () => {
       if (s.value.kind === 'scalar') published[s.channel] = s.value.value;
     });
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: Channels.Wind.TrueSpeed, t_ns: now, value: { kind: 'scalar', value: 8 }, source: 'test' });
-    bus.publish({ channel: Channels.Wind.TrueAngle, t_ns: now, value: { kind: 'scalar', value: 0.7 }, source: 'test' });
-    bus.publish({ channel: Channels.Boat.SpeedWater, t_ns: now, value: { kind: 'scalar', value: 3 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Wind.TrueSpeed,
+      t_ns: now,
+      value: { kind: 'scalar', value: 8 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueAngle,
+      t_ns: now,
+      value: { kind: 'scalar', value: 0.7 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'test',
+    });
     // Allow the pipeline to react.
     await new Promise((r) => setTimeout(r, 5));
     expect(published[Channels.Race.TargetSpeed]).toBeGreaterThan(0);
@@ -44,7 +59,12 @@ describe('startPolarTargetsPredicate', () => {
     bus.subscribe('race.**', (s) => published.push(s.channel));
     const now = BigInt(Date.now()) * 1_000_000n;
     // Only BSP, no wind.
-    bus.publish({ channel: Channels.Boat.SpeedWater, t_ns: now, value: { kind: 'scalar', value: 3 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'test',
+    });
     await new Promise((r) => setTimeout(r, 5));
     expect(published).toEqual([]);
     dispose.dispose();
@@ -57,9 +77,24 @@ describe('startPolarTargetsPredicate', () => {
     const published: string[] = [];
     bus.subscribe('race.**', (s) => published.push(s.channel));
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: Channels.Wind.TrueSpeed, t_ns: now, value: { kind: 'scalar', value: 8 }, source: 'test' });
-    bus.publish({ channel: Channels.Wind.TrueAngle, t_ns: now, value: { kind: 'scalar', value: 0.7 }, source: 'test' });
-    bus.publish({ channel: Channels.Boat.SpeedWater, t_ns: now, value: { kind: 'scalar', value: 3 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Wind.TrueSpeed,
+      t_ns: now,
+      value: { kind: 'scalar', value: 8 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueAngle,
+      t_ns: now,
+      value: { kind: 'scalar', value: 0.7 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'test',
+    });
     await new Promise((r) => setTimeout(r, 5));
     expect(published).toEqual([]);
     dispose.dispose();

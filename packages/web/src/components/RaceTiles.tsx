@@ -33,16 +33,20 @@ export function RaceTiles(): React.ReactElement {
         unit="m"
         sub={dtl === null ? undefined : dtl >= 0 ? 'pre-start' : 'past line'}
       />
-      <HelmTile
-        label="TTL"
-        value={ttl === null ? '—' : Math.round(ttl).toString()}
-        unit="s"
-      />
+      <HelmTile label="TTL" value={ttl === null ? '—' : Math.round(ttl).toString()} unit="s" />
       <HelmTile
         label="Bias"
         value={bias === null ? '—' : `${bias >= 0 ? '+' : ''}${(bias * RAD_TO_DEG).toFixed(0)}`}
         unit="°"
-        sub={bias === null ? undefined : bias > 0 ? 'port favored' : bias < 0 ? 'stbd favored' : 'square'}
+        sub={
+          bias === null
+            ? undefined
+            : bias > 0
+              ? 'port favored'
+              : bias < 0
+                ? 'stbd favored'
+                : 'square'
+        }
       />
       <HelmTile
         label="OCS"

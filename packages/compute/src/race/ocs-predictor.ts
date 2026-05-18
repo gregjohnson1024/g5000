@@ -16,7 +16,7 @@ export interface OcsInput {
   lookAheadSec: number;
 }
 
-const MIN_SOG_MS = 0.5 * 0.514444;       // 0.5 kn → m/s
+const MIN_SOG_MS = 0.5 * 0.514444; // 0.5 kn → m/s
 const MIN_COG_CONCENTRATION = 0.7;
 
 export function predictOcs(input: OcsInput): boolean | null {
@@ -27,7 +27,7 @@ export function predictOcs(input: OcsInput): boolean | null {
   if (!line.port || !line.stbd) return null;
 
   const secsUntilStart = (startMs - Date.now()) / 1000;
-  if (secsUntilStart <= 0) return false;        // race is on; not OCS
+  if (secsUntilStart <= 0) return false; // race is on; not OCS
   if (secsUntilStart > lookAheadSec) return false;
 
   const projected = projectGreatCircle(pos, cogRad, sogMs * lookAheadSec);
@@ -61,7 +61,7 @@ function segmentsIntersect(p1: LatLon, p2: LatLon, p3: LatLon, p4: LatLon): bool
   const d2x = p4.lon - p3.lon;
   const d2y = p4.lat - p3.lat;
   const denom = d1x * d2y - d1y * d2x;
-  if (Math.abs(denom) < 1e-12) return false;  // parallel
+  if (Math.abs(denom) < 1e-12) return false; // parallel
   const sx = p3.lon - p1.lon;
   const sy = p3.lat - p1.lat;
   const t = (sx * d2y - sy * d2x) / denom;

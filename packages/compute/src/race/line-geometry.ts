@@ -15,8 +15,7 @@ export function haversineMeters(a: LatLon, b: LatLon): number {
   const φ2 = toRad(b.lat);
   const dφ = toRad(b.lat - a.lat);
   const dλ = toRad(b.lon - a.lon);
-  const x =
-    Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
+  const x = Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
   return 2 * EARTH_R_M * Math.asin(Math.min(1, Math.sqrt(x)));
 }
 
@@ -70,14 +69,9 @@ export function distanceToLineMeters(
  * Returns 'stbd' when the boat is to the RIGHT of the port→stbd direction
  * (i.e. the starboard side, δ > 0 from distanceToLineMeters), 'port' otherwise.
  */
-export function sideOfLine(
-  boat: LatLon,
-  port: LatLon,
-  stbd: LatLon,
-): 'port' | 'stbd' {
+export function sideOfLine(boat: LatLon, port: LatLon, stbd: LatLon): 'port' | 'stbd' {
   const cross =
-    (stbd.lon - port.lon) * (boat.lat - port.lat) -
-    (stbd.lat - port.lat) * (boat.lon - port.lon);
+    (stbd.lon - port.lon) * (boat.lat - port.lat) - (stbd.lat - port.lat) * (boat.lon - port.lon);
   return cross > 0 ? 'port' : 'stbd';
 }
 
@@ -109,11 +103,11 @@ export function timeToLineSeconds(
  *   bias   = circularDiff(twd, normal + π)  (toward the wind = bias 0 if line is square)
  */
 export function lineBiasRad(lineBearingRad: number, twdRad: number): number {
-  const normalToward = lineBearingRad - Math.PI / 2;  // perpendicular off port end
+  const normalToward = lineBearingRad - Math.PI / 2; // perpendicular off port end
   // We want bias = 0 when wind comes from the line normal direction
   // (i.e. wind blows perpendicular through the line). Positive bias means
   // wind is rotated toward port end → port is favored.
-  let d = twdRad - (normalToward + Math.PI);  // from-wind vs the upwind side
+  let d = twdRad - (normalToward + Math.PI); // from-wind vs the upwind side
   while (d > Math.PI) d -= 2 * Math.PI;
   while (d < -Math.PI) d += 2 * Math.PI;
   return d;

@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { POST } from './route.js';
-import {
-  createRaceState,
-  setSharedRaceState,
-  _resetSharedRaceStateForTests,
-} from '@g5000/core';
+import { createRaceState, setSharedRaceState, _resetSharedRaceStateForTests } from '@g5000/core';
 
 beforeEach(() => _resetSharedRaceStateForTests());
 

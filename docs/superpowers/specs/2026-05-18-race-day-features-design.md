@@ -14,7 +14,7 @@ Where g5000 can credibly beat H5000 is layline accuracy: B&G derives set/drift f
 
 ### 1.1 Wind sensor caveat
 
-As of 2026-05-18, Sula has **no operational wind sensor** — the `/helm` page intentionally hides TWS/TWA/AWA/VMG/%-polar tiles with the comment *"Re-add when masthead is wired"* (`packages/web/src/app/helm/page.tsx:94`). All wind-dependent surfaces in this spec (laylines, line bias, TWA-target, TBS, %-polar, wind-shift plot) will publish nothing on the live boat until the masthead returns. They are verifiable end-to-end via:
+As of 2026-05-18, Sula has **no operational wind sensor** — the `/helm` page intentionally hides TWS/TWA/AWA/VMG/%-polar tiles with the comment _"Re-add when masthead is wired"_ (`packages/web/src/app/helm/page.tsx:94`). All wind-dependent surfaces in this spec (laylines, line bias, TWA-target, TBS, %-polar, wind-shift plot) will publish nothing on the live boat until the masthead returns. They are verifiable end-to-end via:
 
 - `DEMO_MODE=1` (demo source injects synthetic `wind.true.*` directly), and
 - `REPLAY=path/to/session.jsonl.gz` against any pre-2026 session captured when the masthead was alive.
@@ -41,51 +41,51 @@ The pipeline degrades gracefully: predicates check for the presence of their inp
 
 ### Create
 
-| File | Purpose |
-|---|---|
-| `packages/core/src/race-state.ts` | `RaceState` interface + `RaceStateConfig` shape + `setSharedRaceState` / `getSharedRaceState` globalThis-singleton accessors. Mirrors the AlertsRegistry / AlarmsRegistry pattern. |
-| `packages/core/src/race-state.test.ts` | Unit tests for state transitions (idle → pre-start → started → finished), line-ping mutations, settings merge. |
-| `packages/compute/src/race/index.ts` | `startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef)` — boots all predicates, returns disposer. |
-| `packages/compute/src/race/line-geometry.ts` | DTL (signed perp m), TTL (s at current SOG component), line bearing, line bias vs TWD. Pure functions. |
-| `packages/compute/src/race/line-geometry.test.ts` | Fixture inputs → expected outputs. Property tests via fast-check: DTL = 0 when on line; sign flips on crossing; TTL = DTL / (SOG · cos(α)). |
-| `packages/compute/src/race/laylines.ts` | `projectLayline(pos, twa, tws, polar, currentField, distanceNm, integrateCurrent)` → polyline. Subdivide projection into N segments (cap = 20); at each midpoint sample current via `interpolateCurrentField`, compose with through-water vector, accumulate. |
-| `packages/compute/src/race/laylines.test.ts` | Tests with constant-current and zero-current fixtures; verify projection length ≈ requested NM; verify current bends the polyline as expected. |
-| `packages/compute/src/race/vmc.ts` | `vmc(sog, cog, bearingToMark) = sog · cos(cog − bearing)`. Pure scalar; no wind input. |
-| `packages/compute/src/race/vmc.test.ts` | Cases: heading directly at mark (vmc = sog), perpendicular (vmc = 0), reverse course (vmc = -sog), negative bearing wraparound. |
-| `packages/compute/src/race/ocs-predictor.ts` | `predictOcs(pos, cog, sog, line, startMs, lookAheadSec)` → boolean. Project boat forward by `lookAheadSec` along COG/SOG vector; return true if projected segment crosses the line before `startMs`. Degrade (return null) when SOG < 0.5 kn or COG-concentration < 0.7. |
-| `packages/compute/src/race/ocs-predictor.test.ts` | Crossing geometries, degradation thresholds. |
-| `packages/compute/src/race/wind-shift.ts` | Maintains two rolling-median TWD windows (5 min baseline, 30 s current). Publishes signed shift each sample; flags `windShift.event` channel when persistent (>60 s) shift exceeds `shiftThresholdDeg`. Rolling-median impl uses an indexed deque (existing `rolling-window` lib pattern from SOG/COG stats). |
-| `packages/compute/src/race/wind-shift.test.ts` | Fed scripted TWD streams; assert median values + event firing. |
-| `packages/compute/src/race/polar-targets.ts` | Subscribes to `wind.true.{angle,speed}` and the active polar; publishes `race.targetSpeed` (TBS), `race.targetTwa` (via `optimalTwaForVmg`), `race.percentPolar` (BSP / TBS · 100). |
-| `packages/compute/src/race/polar-targets.test.ts` | Fixture polar + wind → expected channel values. |
-| `packages/db/src/race-state.ts` | `RaceStateConfig` type + `loadRaceState` / `saveRaceState` / `mutateRaceState(fn)` ConfigStore helpers. Defaults file lives here. |
-| `packages/db/src/race-state.test.ts` | Round-trip persistence; default merge for missing settings keys. |
-| `packages/web/src/app/race/page.tsx` | New `/race` page. Layout: countdown clock (top), line-ping panel (middle), active-mark selector + settings (bottom). |
-| `packages/web/src/app/race/RaceTimer.tsx` | Countdown clock client component. Big mm:ss display; **Sync to gun** / **+1 min** / **-1 min** / **Reset** buttons. State sourced from `RaceState.timer`. |
-| `packages/web/src/app/race/RaceAudible.tsx` | Drives Web Audio API beeps off a local high-resolution timer keyed on `RaceState.timer.startMs`. Pattern: minute-boundary beep at -5/-4/-3/-2/-1 min, short beep at -30/-20/-10 s, sub-second 100 ms beeps at -5/-4/-3/-2/-1 s, longer GO beep at 0. Mute toggle local to this component, separate from the AudibleAlarm mute. |
-| `packages/web/src/app/race/LinePingPanel.tsx` | Two big buttons (Ping Port, Ping Stbd) + Clear Line (destructive, confirm modal). Shows current ping coords below each button. |
-| `packages/web/src/app/race/ActiveMarkSelector.tsx` | Dropdown of waypoints from `/api/waypoints` + clear option. Writes to `RaceState.activeMarkWaypointId`. |
-| `packages/web/src/app/api/race/state/route.ts` | `GET` (full RaceStateConfig) / `PUT` (settings only — line + timer have dedicated endpoints to keep audit clean). |
-| `packages/web/src/app/api/race/line/route.ts` | `POST {action: 'ping', end: 'port' \| 'stbd'}` (grabs current `nav.gps.position`) / `POST {action: 'clear'}`. |
-| `packages/web/src/app/api/race/timer/route.ts` | `POST {action: 'start', offsetSec?: number}` (sets startMs = now + offsetSec, default 300) / `POST {action: 'sync', adjustSec: number}` (shifts startMs by ±sec) / `POST {action: 'reset'}`. |
-| `packages/web/src/app/api/race/state/route.test.ts` | Endpoint smoke tests with a stub ConfigStore. |
-| `packages/web/src/components/StartLineLayer.tsx` | Chart layer: renders the start line as a segment between port and stbd pings; bias triangle from line midpoint pointing at favored end if `race.line.bias` is known. |
-| `packages/web/src/components/LaylinesLayer.tsx` | Chart layer: polyline overlays for port and starboard laylines from the boat position. SSE-driven. |
-| `packages/web/src/components/RaceTiles.tsx` | Compound helm tile: DTL / TTL / Bias / OCS / VMC. SSE-driven. Greys individual fields whose source channels haven't published. |
-| `packages/web/src/app/helm/RaceMiniTimer.tsx` | Small countdown chip mounted on `/helm`. Read-only — no buttons. Polls the same `/api/race/state` GET endpoint at 1 Hz. |
-| `packages/web/src/components/WindShiftPlot.tsx` | Rolling 30-min sparkline of signed shift vs baseline. Mounted on `/race` page initially; can be added to `/helm` later if useful. |
-| `packages/web/src/components/WindShiftPlot.test.ts` | Renders with fixture data; verifies axis range. |
+| File                                                | Purpose                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/core/src/race-state.ts`                   | `RaceState` interface + `RaceStateConfig` shape + `setSharedRaceState` / `getSharedRaceState` globalThis-singleton accessors. Mirrors the AlertsRegistry / AlarmsRegistry pattern.                                                                                                                                             |
+| `packages/core/src/race-state.test.ts`              | Unit tests for state transitions (idle → pre-start → started → finished), line-ping mutations, settings merge.                                                                                                                                                                                                                 |
+| `packages/compute/src/race/index.ts`                | `startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef)` — boots all predicates, returns disposer.                                                                                                                                                                                                                |
+| `packages/compute/src/race/line-geometry.ts`        | DTL (signed perp m), TTL (s at current SOG component), line bearing, line bias vs TWD. Pure functions.                                                                                                                                                                                                                         |
+| `packages/compute/src/race/line-geometry.test.ts`   | Fixture inputs → expected outputs. Property tests via fast-check: DTL = 0 when on line; sign flips on crossing; TTL = DTL / (SOG · cos(α)).                                                                                                                                                                                    |
+| `packages/compute/src/race/laylines.ts`             | `projectLayline(pos, twa, tws, polar, currentField, distanceNm, integrateCurrent)` → polyline. Subdivide projection into N segments (cap = 20); at each midpoint sample current via `interpolateCurrentField`, compose with through-water vector, accumulate.                                                                  |
+| `packages/compute/src/race/laylines.test.ts`        | Tests with constant-current and zero-current fixtures; verify projection length ≈ requested NM; verify current bends the polyline as expected.                                                                                                                                                                                 |
+| `packages/compute/src/race/vmc.ts`                  | `vmc(sog, cog, bearingToMark) = sog · cos(cog − bearing)`. Pure scalar; no wind input.                                                                                                                                                                                                                                         |
+| `packages/compute/src/race/vmc.test.ts`             | Cases: heading directly at mark (vmc = sog), perpendicular (vmc = 0), reverse course (vmc = -sog), negative bearing wraparound.                                                                                                                                                                                                |
+| `packages/compute/src/race/ocs-predictor.ts`        | `predictOcs(pos, cog, sog, line, startMs, lookAheadSec)` → boolean. Project boat forward by `lookAheadSec` along COG/SOG vector; return true if projected segment crosses the line before `startMs`. Degrade (return null) when SOG < 0.5 kn or COG-concentration < 0.7.                                                       |
+| `packages/compute/src/race/ocs-predictor.test.ts`   | Crossing geometries, degradation thresholds.                                                                                                                                                                                                                                                                                   |
+| `packages/compute/src/race/wind-shift.ts`           | Maintains two rolling-median TWD windows (5 min baseline, 30 s current). Publishes signed shift each sample; flags `windShift.event` channel when persistent (>60 s) shift exceeds `shiftThresholdDeg`. Rolling-median impl uses an indexed deque (existing `rolling-window` lib pattern from SOG/COG stats).                  |
+| `packages/compute/src/race/wind-shift.test.ts`      | Fed scripted TWD streams; assert median values + event firing.                                                                                                                                                                                                                                                                 |
+| `packages/compute/src/race/polar-targets.ts`        | Subscribes to `wind.true.{angle,speed}` and the active polar; publishes `race.targetSpeed` (TBS), `race.targetTwa` (via `optimalTwaForVmg`), `race.percentPolar` (BSP / TBS · 100).                                                                                                                                            |
+| `packages/compute/src/race/polar-targets.test.ts`   | Fixture polar + wind → expected channel values.                                                                                                                                                                                                                                                                                |
+| `packages/db/src/race-state.ts`                     | `RaceStateConfig` type + `loadRaceState` / `saveRaceState` / `mutateRaceState(fn)` ConfigStore helpers. Defaults file lives here.                                                                                                                                                                                              |
+| `packages/db/src/race-state.test.ts`                | Round-trip persistence; default merge for missing settings keys.                                                                                                                                                                                                                                                               |
+| `packages/web/src/app/race/page.tsx`                | New `/race` page. Layout: countdown clock (top), line-ping panel (middle), active-mark selector + settings (bottom).                                                                                                                                                                                                           |
+| `packages/web/src/app/race/RaceTimer.tsx`           | Countdown clock client component. Big mm:ss display; **Sync to gun** / **+1 min** / **-1 min** / **Reset** buttons. State sourced from `RaceState.timer`.                                                                                                                                                                      |
+| `packages/web/src/app/race/RaceAudible.tsx`         | Drives Web Audio API beeps off a local high-resolution timer keyed on `RaceState.timer.startMs`. Pattern: minute-boundary beep at -5/-4/-3/-2/-1 min, short beep at -30/-20/-10 s, sub-second 100 ms beeps at -5/-4/-3/-2/-1 s, longer GO beep at 0. Mute toggle local to this component, separate from the AudibleAlarm mute. |
+| `packages/web/src/app/race/LinePingPanel.tsx`       | Two big buttons (Ping Port, Ping Stbd) + Clear Line (destructive, confirm modal). Shows current ping coords below each button.                                                                                                                                                                                                 |
+| `packages/web/src/app/race/ActiveMarkSelector.tsx`  | Dropdown of waypoints from `/api/waypoints` + clear option. Writes to `RaceState.activeMarkWaypointId`.                                                                                                                                                                                                                        |
+| `packages/web/src/app/api/race/state/route.ts`      | `GET` (full RaceStateConfig) / `PUT` (settings only — line + timer have dedicated endpoints to keep audit clean).                                                                                                                                                                                                              |
+| `packages/web/src/app/api/race/line/route.ts`       | `POST {action: 'ping', end: 'port' \| 'stbd'}` (grabs current `nav.gps.position`) / `POST {action: 'clear'}`.                                                                                                                                                                                                                  |
+| `packages/web/src/app/api/race/timer/route.ts`      | `POST {action: 'start', offsetSec?: number}` (sets startMs = now + offsetSec, default 300) / `POST {action: 'sync', adjustSec: number}` (shifts startMs by ±sec) / `POST {action: 'reset'}`.                                                                                                                                   |
+| `packages/web/src/app/api/race/state/route.test.ts` | Endpoint smoke tests with a stub ConfigStore.                                                                                                                                                                                                                                                                                  |
+| `packages/web/src/components/StartLineLayer.tsx`    | Chart layer: renders the start line as a segment between port and stbd pings; bias triangle from line midpoint pointing at favored end if `race.line.bias` is known.                                                                                                                                                           |
+| `packages/web/src/components/LaylinesLayer.tsx`     | Chart layer: polyline overlays for port and starboard laylines from the boat position. SSE-driven.                                                                                                                                                                                                                             |
+| `packages/web/src/components/RaceTiles.tsx`         | Compound helm tile: DTL / TTL / Bias / OCS / VMC. SSE-driven. Greys individual fields whose source channels haven't published.                                                                                                                                                                                                 |
+| `packages/web/src/app/helm/RaceMiniTimer.tsx`       | Small countdown chip mounted on `/helm`. Read-only — no buttons. Polls the same `/api/race/state` GET endpoint at 1 Hz.                                                                                                                                                                                                        |
+| `packages/web/src/components/WindShiftPlot.tsx`     | Rolling 30-min sparkline of signed shift vs baseline. Mounted on `/race` page initially; can be added to `/helm` later if useful.                                                                                                                                                                                              |
+| `packages/web/src/components/WindShiftPlot.test.ts` | Renders with fixture data; verifies axis range.                                                                                                                                                                                                                                                                                |
 
 ### Modify
 
-| File | Change |
-|---|---|
-| `packages/core/src/channels.ts` | Add `Race` group with `LineDistancePort`, `LineDistanceStbd`, `LineDistanceToLine`, `LineTimeToLine`, `LineBias`, `LineOcsPredicted`, `Vmc`, `TargetSpeed`, `TargetTwa`, `PercentPolar`, `WindShiftBias`, `WindShiftEvent`, `LaylinePort`, `LaylineStbd`. |
-| `packages/db/src/schema.ts` | Add `race_state` JSON-blob table (single row, id = `'singleton'`). |
-| `apps/autopilot-server/src/index.ts` | After polar pipeline starts: instantiate `RaceState` singleton from `loadRaceState()`, register on globalThis, call `startRaceComputePipeline(...)`, stash disposer for graceful shutdown. |
-| `packages/web/src/app/helm/page.tsx` | (a) Re-enable the hidden wind tile block (TWS, TWA, AWA, VMG) — but only render each tile when its channel publishes; the existing scalar/sample helpers already return `null` when absent so this is a removal of the conditional, not new rendering logic. (b) Mount `<RaceMiniTimer>` in the page header. (c) Mount `<RaceTiles>` near the bottom of the grid. |
-| `packages/web/src/app/chart/page.tsx` | Mount `<StartLineLayer>` and `<LaylinesLayer>` between the existing `<CurrentOverlay>` and `<WaypointsLayer>` (so they render above current contours but under waypoints). |
-| `packages/web/src/app/Navbar.tsx` | Add `/race` link. |
+| File                                  | Change                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/channels.ts`       | Add `Race` group with `LineDistancePort`, `LineDistanceStbd`, `LineDistanceToLine`, `LineTimeToLine`, `LineBias`, `LineOcsPredicted`, `Vmc`, `TargetSpeed`, `TargetTwa`, `PercentPolar`, `WindShiftBias`, `WindShiftEvent`, `LaylinePort`, `LaylineStbd`.                                                                                                         |
+| `packages/db/src/schema.ts`           | Add `race_state` JSON-blob table (single row, id = `'singleton'`).                                                                                                                                                                                                                                                                                                |
+| `apps/autopilot-server/src/index.ts`  | After polar pipeline starts: instantiate `RaceState` singleton from `loadRaceState()`, register on globalThis, call `startRaceComputePipeline(...)`, stash disposer for graceful shutdown.                                                                                                                                                                        |
+| `packages/web/src/app/helm/page.tsx`  | (a) Re-enable the hidden wind tile block (TWS, TWA, AWA, VMG) — but only render each tile when its channel publishes; the existing scalar/sample helpers already return `null` when absent so this is a removal of the conditional, not new rendering logic. (b) Mount `<RaceMiniTimer>` in the page header. (c) Mount `<RaceTiles>` near the bottom of the grid. |
+| `packages/web/src/app/chart/page.tsx` | Mount `<StartLineLayer>` and `<LaylinesLayer>` between the existing `<CurrentOverlay>` and `<WaypointsLayer>` (so they render above current contours but under waypoints).                                                                                                                                                                                        |
+| `packages/web/src/app/Navbar.tsx`     | Add `/race` link.                                                                                                                                                                                                                                                                                                                                                 |
 
 ### No change
 
@@ -165,11 +165,11 @@ type TimerState = 'idle' | 'pre-start' | 'started' | 'finished';
 
 interface RaceStateConfig {
   timer: {
-    startMs: number | null;   // epoch ms of the gun
+    startMs: number | null; // epoch ms of the gun
     state: TimerState;
   };
   line: {
-    port?: { lat: number; lon: number; pingedAt: string };  // ISO
+    port?: { lat: number; lon: number; pingedAt: string }; // ISO
     stbd?: { lat: number; lon: number; pingedAt: string };
     /** 'port' or 'stbd' — which side of the line was the boat on when the
      *  second ping was taken; defines the sign of DTL going forward.
@@ -178,10 +178,10 @@ interface RaceStateConfig {
   };
   activeMarkWaypointId?: string;
   settings: {
-    shiftThresholdDeg: number;        // default 7
-    ocsLookAheadSec: number;          // default 10
-    laylineDistanceNm: number;        // default 5
-    integrateCurrent: boolean;        // default true
+    shiftThresholdDeg: number; // default 7
+    ocsLookAheadSec: number; // default 10
+    laylineDistanceNm: number; // default 5
+    integrateCurrent: boolean; // default true
   };
 }
 ```
@@ -229,21 +229,21 @@ Recomputation rate: subscribe to `wind.true.*` and `nav.gps.position` and pass t
 ```ts
 function predictOcs(
   pos: Position,
-  cog: number,           // radians
-  sog: number,           // m/s
-  cogConcentration: number,  // 0-1 from cog-stats
+  cog: number, // radians
+  sog: number, // m/s
+  cogConcentration: number, // 0-1 from cog-stats
   line: LineConfig,
   startMs: number | null,
   lookAheadSec: number,
 ): boolean | null {
   if (startMs === null) return null;
-  if (sog < 0.514) return null;       // < 0.5 kn — too slow to predict
-  if (cogConcentration < 0.7) return null;  // COG too noisy
+  if (sog < 0.514) return null; // < 0.5 kn — too slow to predict
+  if (cogConcentration < 0.7) return null; // COG too noisy
   if (!line.port || !line.stbd) return null;
 
   const secsUntilStart = (startMs - Date.now()) / 1000;
-  if (secsUntilStart <= 0) return false;    // race is on; not "OCS"
-  if (secsUntilStart > lookAheadSec) return false;  // can't predict that far
+  if (secsUntilStart <= 0) return false; // race is on; not "OCS"
+  if (secsUntilStart > lookAheadSec) return false; // can't predict that far
 
   // Project boat position forward by lookAheadSec at current vector.
   const projectedPos = projectGreatCircle(pos, cog, sog * lookAheadSec);
@@ -257,10 +257,12 @@ Published as `race.line.ocsPredicted: boolean | null`. UI tile renders "OCS" in 
 ### Wind-shift detector
 
 Maintains two rolling-median windows over `wind.true.direction`:
+
 - **Baseline:** 5-minute window. Updates on every sample. Slow-moving reference for "the wind we've been getting".
 - **Current:** 30-second window. Fast follower.
 
 On each `wind.true.direction` sample:
+
 1. Insert into both windows.
 2. Compute `shift = circularDiff(currentMedian, baselineMedian)`, normalised to `[-180, +180]` degrees. Signed: positive = TWD has shifted clockwise relative to baseline.
 3. Publish `race.windShift.bias` = `shift` (continuous channel).
@@ -279,22 +281,23 @@ Rolling-median impl uses the same indexed-deque pattern as `apps/autopilot-serve
 
 Trigger schedule:
 
-| Threshold | Tone |
-|---|---|
-| 300 s (-5 min) | 200 ms, 660 Hz square |
-| 240 s (-4 min) | 200 ms, 660 Hz square |
-| 180 s (-3 min) | 200 ms, 660 Hz square |
-| 120 s (-2 min) | 200 ms, 660 Hz square |
-| 60 s (-1 min) | 400 ms, 660 Hz square |
-| 30 s | 100 ms, 880 Hz sine |
-| 20 s | 100 ms, 880 Hz sine |
-| 10 s | 100 ms, 880 Hz sine |
-| 5 s, 4 s, 3 s, 2 s, 1 s | 80 ms, 880 Hz sine |
-| 0 s | 600 ms, 1320 Hz sine (the gun) |
+| Threshold               | Tone                           |
+| ----------------------- | ------------------------------ |
+| 300 s (-5 min)          | 200 ms, 660 Hz square          |
+| 240 s (-4 min)          | 200 ms, 660 Hz square          |
+| 180 s (-3 min)          | 200 ms, 660 Hz square          |
+| 120 s (-2 min)          | 200 ms, 660 Hz square          |
+| 60 s (-1 min)           | 400 ms, 660 Hz square          |
+| 30 s                    | 100 ms, 880 Hz sine            |
+| 20 s                    | 100 ms, 880 Hz sine            |
+| 10 s                    | 100 ms, 880 Hz sine            |
+| 5 s, 4 s, 3 s, 2 s, 1 s | 80 ms, 880 Hz sine             |
+| 0 s                     | 600 ms, 1320 Hz sine (the gun) |
 
 Sub-second precision is achieved by running the timer at 100 ms cadence and recording last-fired thresholds — even if a tick skips slightly, we'll catch any threshold within ±100 ms (acceptable for race timing).
 
 This is **separate from `<AudibleAlarm>`**:
+
 - `<AudibleAlarm>` is mounted on `/helm`, polls `/api/alarms` every 1.5 s, beeps on safety alarms (MOB, anchor, shallow). Sub-second precision is irrelevant for safety alarms; polling is fine.
 - `<RaceAudible>` is mounted on `/race`, runs from a local timer with no server polling, beeps on countdown thresholds. Sub-second precision is essential.
 
@@ -324,6 +327,7 @@ Single new table:
 `loadRaceState()` returns a `RaceStateConfig` with defaults merged in for missing fields (so adding settings keys later doesn't break old persisted state).
 
 On autopilot-server boot:
+
 1. `loadRaceState()` from ConfigStore.
 2. Check: if `timer.startMs !== null && now - startMs > 3600_000` (more than 1 h ago), reset `timer.state = 'idle'` and `timer.startMs = null`. Saves user from a stale race timer surviving from yesterday.
 3. Construct `RaceState` singleton, register on globalThis.

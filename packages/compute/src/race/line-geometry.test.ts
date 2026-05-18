@@ -9,8 +9,8 @@ import {
   sideOfLine,
 } from './line-geometry.js';
 
-const port = { lat: 41.5000, lon: -71.3000 };
-const stbd = { lat: 41.5000, lon: -71.2900 };  // ~830 m east of port
+const port = { lat: 41.5, lon: -71.3 };
+const stbd = { lat: 41.5, lon: -71.29 }; // ~830 m east of port
 
 describe('haversineMeters', () => {
   it('returns ~0 for identical points', () => {
@@ -40,14 +40,14 @@ describe('distanceToLineMeters', () => {
   it('returns a positive distance when boat is on the declared pre-start side', () => {
     // Boat south of east-pointing line. sideOfLine() returns 'stbd' for south
     // (south is to the RIGHT of port→stbd, which is the stbd side).
-    const south = { lat: 41.4900, lon: -71.2950 };
+    const south = { lat: 41.49, lon: -71.295 };
     const r = distanceToLineMeters(south, port, stbd, 'stbd'); // pre-start = stbd (south)
     expect(r).toBeGreaterThan(0);
-    expect(r).toBeGreaterThan(1000);  // ~1.1 km south
+    expect(r).toBeGreaterThan(1000); // ~1.1 km south
     expect(r).toBeLessThan(1200);
   });
   it('returns a negative distance after the boat crosses to the other side', () => {
-    const north = { lat: 41.5100, lon: -71.2950 };
+    const north = { lat: 41.51, lon: -71.295 };
     // Pre-start side is stbd (south). Crossing to north (port side) is past-line.
     const r = distanceToLineMeters(north, port, stbd, 'stbd');
     expect(r).toBeLessThan(0);
@@ -60,7 +60,7 @@ describe('timeToLineSeconds', () => {
     // Closing speed = 5 m/s · cos(0) = 5 m/s. TTL = 1000/5 = 200 s.
     const dtl = 1000;
     const sog = 5;
-    const closingAngleRad = 0;  // perpendicular to line
+    const closingAngleRad = 0; // perpendicular to line
     const t = timeToLineSeconds(dtl, sog, closingAngleRad);
     expect(t).toBeCloseTo(200, 1);
   });
@@ -76,7 +76,7 @@ describe('lineBiasRad', () => {
     // (north), TWD = 180°. Angle between normal and from-wind = 180°,
     // bias = angle between (line-bearing) and (perp-to-TWD) → 0.
     const lineBearing = Math.PI / 2;
-    const twd = Math.PI;  // from south
+    const twd = Math.PI; // from south
     expect(lineBiasRad(lineBearing, twd)).toBeCloseTo(0, 3);
   });
   it('positive bias means port end favored (closer to wind)', () => {

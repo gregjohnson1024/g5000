@@ -30,7 +30,9 @@ describe('race pipeline integration', () => {
     });
     const polarRef = { current: POLAR as PolarTable | null };
     const wpRef = { current: new Map() };
-    const handle = startRaceComputePipeline(bus, rs, polarRef, { current: null }, wpRef, { current: 1 });
+    const handle = startRaceComputePipeline(bus, rs, polarRef, { current: null }, wpRef, {
+      current: 1,
+    });
 
     const seen: Record<string, number> = {};
     bus.subscribe('race.**', (s) => {
@@ -61,7 +63,9 @@ describe('race pipeline integration', () => {
       d.activeMarkWaypointId = 'wp-1';
     });
     const wpRef = { current: new Map([['wp-1', { lat: 41.6, lon: -71.295 }]]) };
-    const handle = startRaceComputePipeline(bus, rs, { current: null }, { current: null }, wpRef, { current: 1 });
+    const handle = startRaceComputePipeline(bus, rs, { current: null }, { current: null }, wpRef, {
+      current: 1,
+    });
     const seen: Record<string, number> = {};
     bus.subscribe('race.**', (s) => {
       if (s.value.kind === 'scalar') seen[s.channel] = s.value.value;
@@ -73,7 +77,12 @@ describe('race pipeline integration', () => {
       value: { kind: 'geo', value: { lat: 41.5, lon: -71.3 } },
       source: 'test',
     });
-    bus.publish({ channel: Channels.Nav.Cog, t_ns: t, value: { kind: 'scalar', value: 0 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Nav.Cog,
+      t_ns: t,
+      value: { kind: 'scalar', value: 0 },
+      source: 'test',
+    });
     bus.publish({
       channel: Channels.Nav.Sog,
       t_ns: t,
@@ -89,9 +98,16 @@ describe('race pipeline integration', () => {
     vi.setSystemTime(new Date('2026-05-18T12:00:00Z'));
     const bus = new Bus();
     const rs = createRaceState();
-    const handle = startRaceComputePipeline(bus, rs, { current: null }, { current: null }, {
-      current: new Map(),
-    }, { current: 1 });
+    const handle = startRaceComputePipeline(
+      bus,
+      rs,
+      { current: null },
+      { current: null },
+      {
+        current: new Map(),
+      },
+      { current: 1 },
+    );
     const seen: string[] = [];
     bus.subscribe('race.**', (s) => seen.push(s.channel));
     const t = BigInt(Date.now()) * 1_000_000n;

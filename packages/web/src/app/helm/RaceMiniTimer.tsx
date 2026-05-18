@@ -22,11 +22,16 @@ export function RaceMiniTimer(): React.ReactElement | null {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setStartMs(j.timer.startMs);
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {

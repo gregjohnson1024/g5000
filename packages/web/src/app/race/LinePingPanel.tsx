@@ -3,8 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSse } from '../../hooks/use-sse';
 
-interface LineEnd { lat: number; lon: number; pingedAt: string }
-interface LineSnap { port?: LineEnd; stbd?: LineEnd; preStartSide?: 'port' | 'stbd' }
+interface LineEnd {
+  lat: number;
+  lon: number;
+  pingedAt: string;
+}
+interface LineSnap {
+  port?: LineEnd;
+  stbd?: LineEnd;
+  preStartSide?: 'port' | 'stbd';
+}
 
 function fmtCoord(lat: number, lon: number): string {
   const fL = (v: number, pos: string, neg: string) => {
@@ -29,34 +37,42 @@ export function LinePingPanel(): React.ReactElement {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setLine(j.line ?? {});
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
-  const ping = useCallback(async (end: 'port' | 'stbd') => {
-    const pos = channels.get('nav.gps.position');
-    if (!pos || pos.value.kind !== 'geo') {
-      alert('No GPS position available');
-      return;
-    }
-    const position = pos.value.value;
-    // Boat position at ping time matches the ping position itself for the
-    // common case (you're standing at the end). The /api/race/line handler
-    // uses boatPos to determine preStartSide on the second ping.
-    await fetch('/api/race/line', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'ping', end, position, boatPos: position }),
-    });
-    const r = await fetch('/api/race/state', { cache: 'no-store' });
-    if (r.ok) {
-      const j = await r.json();
-      setLine(j.line ?? {});
-    }
-  }, [channels]);
+  const ping = useCallback(
+    async (end: 'port' | 'stbd') => {
+      const pos = channels.get('nav.gps.position');
+      if (!pos || pos.value.kind !== 'geo') {
+        alert('No GPS position available');
+        return;
+      }
+      const position = pos.value.value;
+      // Boat position at ping time matches the ping position itself for the
+      // common case (you're standing at the end). The /api/race/line handler
+      // uses boatPos to determine preStartSide on the second ping.
+      await fetch('/api/race/line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ping', end, position, boatPos: position }),
+      });
+      const r = await fetch('/api/race/state', { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        setLine(j.line ?? {});
+      }
+    },
+    [channels],
+  );
 
   const clear = useCallback(async () => {
     await fetch('/api/race/line', {
@@ -103,9 +119,7 @@ export function LinePingPanel(): React.ReactElement {
         </div>
       )}
       {line.preStartSide && (
-        <div className="text-xs text-slate-400 font-mono">
-          pre-start side: {line.preStartSide}
-        </div>
+        <div className="text-xs text-slate-400 font-mono">pre-start side: {line.preStartSide}</div>
       )}
       {(line.port || line.stbd) && (
         <>

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-interface Waypoint { id: string; name: string; lat: number; lon: number }
+interface Waypoint {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+}
 
 export function ActiveMarkSelector(): React.ReactElement {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
@@ -23,7 +28,9 @@ export function ActiveMarkSelector(): React.ReactElement {
           const j = await stR.json();
           setActiveId(j.activeMarkWaypointId ?? null);
         }
-      } catch { /* retry on next mount */ }
+      } catch {
+        /* retry on next mount */
+      }
     }
     void load();
   }, []);

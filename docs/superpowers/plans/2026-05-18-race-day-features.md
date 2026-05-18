@@ -15,6 +15,7 @@
 ## Task 1: Add Race channels to channels.ts
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts`
 
 - [ ] **Step 1: Add Race namespace to Channels constant**
@@ -77,6 +78,7 @@ git commit -m "feat(core): add Race channel constants for cluster A"
 ## Task 2: Define RaceState types and globalThis accessors
 
 **Files:**
+
 - Create: `packages/core/src/race-state.ts`
 - Create: `packages/core/src/race-state.test.ts`
 - Modify: `packages/core/src/index.ts`
@@ -330,6 +332,7 @@ git commit -m "feat(core): RaceState singleton, types, and globalThis accessors"
 ## Task 3: Add `race_state` table to DB schema
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 
 - [ ] **Step 1: Add the table**
@@ -350,7 +353,7 @@ Expected: clean exit.
 
 - [ ] **Step 3: Verify migration runs at runtime**
 
-ConfigStore creates tables via `db.run(sql\`CREATE TABLE IF NOT EXISTS ...\`)` lazily on first access. Open `packages/db/src/config-store.ts` and confirm there is a corresponding `CREATE TABLE IF NOT EXISTS race_state` near the other table-init statements — if not, add one alongside the existing `alarms_*` creates so the table exists when load/save are first called.
+ConfigStore creates tables via `db.run(sql\`CREATE TABLE IF NOT EXISTS ...\`)`lazily on first access. Open`packages/db/src/config-store.ts`and confirm there is a corresponding`CREATE TABLE IF NOT EXISTS race*state`near the other table-init statements — if not, add one alongside the existing`alarms*\*` creates so the table exists when load/save are first called.
 
 Search for the alarms_config CREATE in `packages/db/src/config-store.ts`:
 
@@ -385,6 +388,7 @@ git commit -m "feat(db): add race_state JSON-blob table"
 ## Task 4: RaceState persistence helpers
 
 **Files:**
+
 - Create: `packages/db/src/race-state.ts`
 - Create: `packages/db/src/race-state.test.ts`
 - Modify: `packages/db/src/index.ts`
@@ -429,14 +433,17 @@ describe('race-state persistence', () => {
     // Simulate an older persisted row that has no `integrateCurrent`.
     const drizzle = store.drizzle;
     const { raceState } = await import('./schema.js');
-    await drizzle.insert(raceState).values({
-      id: 'singleton',
-      value: JSON.stringify({
-        timer: { startMs: null, state: 'idle' },
-        line: {},
-        settings: { shiftThresholdDeg: 9, ocsLookAheadSec: 5, laylineDistanceNm: 8 },
-      }),
-    }).run();
+    await drizzle
+      .insert(raceState)
+      .values({
+        id: 'singleton',
+        value: JSON.stringify({
+          timer: { startMs: null, state: 'idle' },
+          line: {},
+          settings: { shiftThresholdDeg: 9, ocsLookAheadSec: 5, laylineDistanceNm: 8 },
+        }),
+      })
+      .run();
     const out = await loadRaceState(store);
     expect(out.settings.shiftThresholdDeg).toBe(9);
     expect(out.settings.ocsLookAheadSec).toBe(5);
@@ -537,6 +544,7 @@ git commit -m "feat(db): loadRaceState/saveRaceState with default-merge"
 ## Task 5: Line geometry math
 
 **Files:**
+
 - Create: `packages/compute/src/race/line-geometry.ts`
 - Create: `packages/compute/src/race/line-geometry.test.ts`
 
@@ -555,8 +563,8 @@ import {
   lineBiasRad,
 } from './line-geometry.js';
 
-const port = { lat: 41.5000, lon: -71.3000 };
-const stbd = { lat: 41.5000, lon: -71.2900 };  // ~830 m east of port
+const port = { lat: 41.5, lon: -71.3 };
+const stbd = { lat: 41.5, lon: -71.29 }; // ~830 m east of port
 
 describe('haversineMeters', () => {
   it('returns ~0 for identical points', () => {
@@ -585,14 +593,14 @@ describe('distanceToLineMeters', () => {
   });
   it('returns a positive distance when boat is on the declared pre-start side', () => {
     // Boat south of the line (line runs east-west) → south is the pre-start side.
-    const south = { lat: 41.4900, lon: -71.2950 };
+    const south = { lat: 41.49, lon: -71.295 };
     const r = distanceToLineMeters(south, port, stbd, 'port'); // pre-start = south
     expect(r).toBeGreaterThan(0);
-    expect(r).toBeGreaterThan(1000);  // ~1.1 km south
+    expect(r).toBeGreaterThan(1000); // ~1.1 km south
     expect(r).toBeLessThan(1200);
   });
   it('returns a negative distance after the boat crosses to the other side', () => {
-    const north = { lat: 41.5100, lon: -71.2950 };
+    const north = { lat: 41.51, lon: -71.295 };
     // Boat south is pre-start side → crossing north is past-line.
     const r = distanceToLineMeters(north, port, stbd, 'port');
     expect(r).toBeLessThan(0);
@@ -605,7 +613,7 @@ describe('timeToLineSeconds', () => {
     // Closing speed = 5 m/s · cos(0) = 5 m/s. TTL = 1000/5 = 200 s.
     const dtl = 1000;
     const sog = 5;
-    const closingAngleRad = 0;  // perpendicular to line
+    const closingAngleRad = 0; // perpendicular to line
     const t = timeToLineSeconds(dtl, sog, closingAngleRad);
     expect(t).toBeCloseTo(200, 1);
   });
@@ -621,7 +629,7 @@ describe('lineBiasRad', () => {
     // (north), TWD = 180°. Angle between normal and from-wind = 180°,
     // bias = angle between (line-bearing) and (perp-to-TWD) → 0.
     const lineBearing = Math.PI / 2;
-    const twd = Math.PI;  // from south
+    const twd = Math.PI; // from south
     expect(lineBiasRad(lineBearing, twd)).toBeCloseTo(0, 3);
   });
   it('positive bias means port end favored (closer to wind)', () => {
@@ -662,8 +670,7 @@ export function haversineMeters(a: LatLon, b: LatLon): number {
   const φ2 = toRad(b.lat);
   const dφ = toRad(b.lat - a.lat);
   const dλ = toRad(b.lon - a.lon);
-  const x =
-    Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
+  const x = Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
   return 2 * EARTH_R_M * Math.asin(Math.min(1, Math.sqrt(x)));
 }
 
@@ -735,11 +742,11 @@ export function timeToLineSeconds(
  *   bias   = circularDiff(twd, normal + π)  (toward the wind = bias 0 if line is square)
  */
 export function lineBiasRad(lineBearingRad: number, twdRad: number): number {
-  const normalToward = lineBearingRad - Math.PI / 2;  // perpendicular off port end
+  const normalToward = lineBearingRad - Math.PI / 2; // perpendicular off port end
   // We want bias = 0 when wind comes from the line normal direction
   // (i.e. wind blows perpendicular through the line). Positive bias means
   // wind is rotated toward port end → port is favored.
-  let d = twdRad - (normalToward + Math.PI);  // from-wind vs the upwind side
+  let d = twdRad - (normalToward + Math.PI); // from-wind vs the upwind side
   while (d > Math.PI) d -= 2 * Math.PI;
   while (d < -Math.PI) d += 2 * Math.PI;
   return d;
@@ -768,6 +775,7 @@ git commit -m "feat(compute): race line geometry (DTL, TTL, bias, bearing)"
 ## Task 6: VMC math
 
 **Files:**
+
 - Create: `packages/compute/src/race/vmc.ts`
 - Create: `packages/compute/src/race/vmc.test.ts`
 
@@ -842,6 +850,7 @@ git commit -m "feat(compute): VMC scalar (current-aware via COG)"
 ## Task 7: OCS predictor
 
 **Files:**
+
 - Create: `packages/compute/src/race/ocs-predictor.ts`
 - Create: `packages/compute/src/race/ocs-predictor.test.ts`
 
@@ -853,9 +862,9 @@ Create `packages/compute/src/race/ocs-predictor.test.ts`:
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { predictOcs } from './ocs-predictor.js';
 
-const port = { lat: 41.5000, lon: -71.3000 };
-const stbd = { lat: 41.5000, lon: -71.2900 };
-const south = { lat: 41.4910, lon: -71.2950 };  // ~1 km south of mid
+const port = { lat: 41.5, lon: -71.3 };
+const stbd = { lat: 41.5, lon: -71.29 };
+const south = { lat: 41.491, lon: -71.295 }; // ~1 km south of mid
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -962,7 +971,7 @@ describe('predictOcs', () => {
     expect(
       predictOcs({
         pos: south,
-        cogRad: Math.PI,  // due south
+        cogRad: Math.PI, // due south
         sogMs: 5,
         cogConcentration: 0.9,
         line: { port, stbd },
@@ -1002,7 +1011,7 @@ export interface OcsInput {
   lookAheadSec: number;
 }
 
-const MIN_SOG_MS = 0.5 * 0.514444;       // 0.5 kn → m/s
+const MIN_SOG_MS = 0.5 * 0.514444; // 0.5 kn → m/s
 const MIN_COG_CONCENTRATION = 0.7;
 
 export function predictOcs(input: OcsInput): boolean | null {
@@ -1013,7 +1022,7 @@ export function predictOcs(input: OcsInput): boolean | null {
   if (!line.port || !line.stbd) return null;
 
   const secsUntilStart = (startMs - Date.now()) / 1000;
-  if (secsUntilStart <= 0) return false;        // race is on; not OCS
+  if (secsUntilStart <= 0) return false; // race is on; not OCS
   if (secsUntilStart > lookAheadSec) return false;
 
   const projected = projectGreatCircle(pos, cogRad, sogMs * lookAheadSec);
@@ -1047,7 +1056,7 @@ function segmentsIntersect(p1: LatLon, p2: LatLon, p3: LatLon, p4: LatLon): bool
   const d2x = p4.lon - p3.lon;
   const d2y = p4.lat - p3.lat;
   const denom = d1x * d2y - d1y * d2x;
-  if (Math.abs(denom) < 1e-12) return false;  // parallel
+  if (Math.abs(denom) < 1e-12) return false; // parallel
   const sx = p3.lon - p1.lon;
   const sy = p3.lat - p1.lat;
   const t = (sx * d2y - sy * d2x) / denom;
@@ -1076,6 +1085,7 @@ git commit -m "feat(compute): OCS predictor with SOG/COG-concentration gating"
 ## Task 8: Wind-shift rolling-median detector
 
 **Files:**
+
 - Create: `packages/compute/src/race/wind-shift.ts`
 - Create: `packages/compute/src/race/wind-shift.test.ts`
 
@@ -1328,6 +1338,7 @@ git commit -m "feat(compute): wind-shift detector with rolling circular median"
 ## Task 9: Layline projection (without and with current integration)
 
 **Files:**
+
 - Create: `packages/compute/src/race/laylines.ts`
 - Create: `packages/compute/src/race/laylines.test.ts`
 
@@ -1349,15 +1360,25 @@ const easterlyCurrent: CurrentField = {
   lats: [41.0, 42.0],
   lons: [-72.0, -71.0],
   times: [new Date('2026-05-18T12:00:00Z')],
-  u: [[[1.029, 1.029], [1.029, 1.029]]],
-  v: [[[0, 0], [0, 0]]],
+  u: [
+    [
+      [1.029, 1.029],
+      [1.029, 1.029],
+    ],
+  ],
+  v: [
+    [
+      [0, 0],
+      [0, 0],
+    ],
+  ],
 };
 
 describe('projectLayline (no current)', () => {
   it('returns a 2-point polyline when integrateCurrent=false', () => {
     const poly = projectLayline({
       pos: startPos,
-      headingRad: 0,        // due north
+      headingRad: 0, // due north
       throughWaterSpeedMs: 5,
       currentField: null,
       distanceNm: 2,
@@ -1413,11 +1434,11 @@ describe('projectLayline (with current)', () => {
   it('falls back to no-current behaviour when currentField is null', () => {
     const poly = projectLayline({
       pos: startPos,
-      headingRad: Math.PI / 2,  // east
+      headingRad: Math.PI / 2, // east
       throughWaterSpeedMs: 5,
       currentField: null,
       distanceNm: 1,
-      integrateCurrent: true,    // requested but no field → ignored
+      integrateCurrent: true, // requested but no field → ignored
       timeAtSampleMs: Date.now(),
     });
     expect(poly).toHaveLength(2);
@@ -1499,7 +1520,7 @@ export function projectLayline(input: LaylineInput): LatLon[] {
   }
   const segCount = Math.min(
     MAX_SEGMENTS,
-    Math.max(1, Math.ceil(input.distanceNm / 0.25)),  // ~0.25 NM segments preferred
+    Math.max(1, Math.ceil(input.distanceNm / 0.25)), // ~0.25 NM segments preferred
   );
   const segM = totalM / segCount;
   const segHours = segM / input.throughWaterSpeedMs / 3600;
@@ -1522,7 +1543,7 @@ export function projectLayline(input: LaylineInput): LatLon[] {
     // Convert (currEast, currNorth) into bearing+distance and apply to twEnd.
     const currDistM = Math.hypot(currEastM, currNorthM);
     if (currDistM > 1e-3) {
-      const currBearingRad = Math.atan2(currEastM, currNorthM);  // east=π/2, north=0
+      const currBearingRad = Math.atan2(currEastM, currNorthM); // east=π/2, north=0
       cursor = project(twEnd, currBearingRad, currDistM);
     } else {
       cursor = twEnd;
@@ -1550,6 +1571,7 @@ git commit -m "feat(compute): layline projection with optional current integrati
 ## Task 10: Polar targets predicate
 
 **Files:**
+
 - Create: `packages/compute/src/race/polar-targets.ts`
 - Create: `packages/compute/src/race/polar-targets.test.ts`
 
@@ -1585,9 +1607,24 @@ describe('startPolarTargetsPredicate', () => {
       if (s.value.kind === 'scalar') published[s.channel] = s.value.value;
     });
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: Channels.Wind.TrueSpeed, t_ns: now, value: { kind: 'scalar', value: 8 }, source: 'test' });
-    bus.publish({ channel: Channels.Wind.TrueAngle, t_ns: now, value: { kind: 'scalar', value: 0.7 }, source: 'test' });
-    bus.publish({ channel: Channels.Boat.SpeedWater, t_ns: now, value: { kind: 'scalar', value: 3 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Wind.TrueSpeed,
+      t_ns: now,
+      value: { kind: 'scalar', value: 8 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueAngle,
+      t_ns: now,
+      value: { kind: 'scalar', value: 0.7 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'test',
+    });
     // Allow the pipeline to react.
     await new Promise((r) => setTimeout(r, 5));
     expect(published[Channels.Race.TargetSpeed]).toBeGreaterThan(0);
@@ -1604,7 +1641,12 @@ describe('startPolarTargetsPredicate', () => {
     bus.subscribe('race.**', (s) => published.push(s.channel));
     const now = BigInt(Date.now()) * 1_000_000n;
     // Only BSP, no wind.
-    bus.publish({ channel: Channels.Boat.SpeedWater, t_ns: now, value: { kind: 'scalar', value: 3 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'test',
+    });
     await new Promise((r) => setTimeout(r, 5));
     expect(published).toEqual([]);
     dispose.dispose();
@@ -1617,9 +1659,24 @@ describe('startPolarTargetsPredicate', () => {
     const published: string[] = [];
     bus.subscribe('race.**', (s) => published.push(s.channel));
     const now = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: Channels.Wind.TrueSpeed, t_ns: now, value: { kind: 'scalar', value: 8 }, source: 'test' });
-    bus.publish({ channel: Channels.Wind.TrueAngle, t_ns: now, value: { kind: 'scalar', value: 0.7 }, source: 'test' });
-    bus.publish({ channel: Channels.Boat.SpeedWater, t_ns: now, value: { kind: 'scalar', value: 3 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Wind.TrueSpeed,
+      t_ns: now,
+      value: { kind: 'scalar', value: 8 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueAngle,
+      t_ns: now,
+      value: { kind: 'scalar', value: 0.7 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'test',
+    });
     await new Promise((r) => setTimeout(r, 5));
     expect(published).toEqual([]);
     dispose.dispose();
@@ -1734,6 +1791,7 @@ git commit -m "feat(compute): polar-targets predicate (TBS, TWA-target, %-polar)
 ## Task 11: Race compute pipeline
 
 **Files:**
+
 - Create: `packages/compute/src/race/index.ts`
 - Modify: `packages/compute/src/index.ts`
 
@@ -1744,11 +1802,7 @@ This task wires line-geometry / OCS / VMC / wind-shift / laylines into RxJS subs
 Create `packages/compute/src/race/index.ts`:
 
 ```ts
-import {
-  Bus,
-  Channels,
-  type RaceState,
-} from '@g5000/core';
+import { Bus, Channels, type RaceState } from '@g5000/core';
 import type { PolarTable } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { startPolarTargetsPredicate } from './polar-targets.js';
@@ -1767,13 +1821,7 @@ import { vmc } from './vmc.js';
 import { predictOcs } from './ocs-predictor.js';
 import { interpolatePolarSpeed, optimalTwaForVmg } from '../polars/math.js';
 
-export {
-  startPolarTargetsPredicate,
-  createWindShiftDetector,
-  projectLayline,
-  vmc,
-  predictOcs,
-};
+export { startPolarTargetsPredicate, createWindShiftDetector, projectLayline, vmc, predictOcs };
 
 interface Latest {
   pos?: LatLon;
@@ -1928,8 +1976,8 @@ export function startRaceComputePipeline(
     lastLaylineMs = tMs;
     const cfg = raceState.get().settings;
     const upwindTwa = optimalTwaForVmg(polar, latest.tws, 'upwind');
-    const portHeading = ((latest.twd + Math.PI) - upwindTwa + 2 * Math.PI) % (2 * Math.PI);
-    const stbdHeading = ((latest.twd + Math.PI) + upwindTwa) % (2 * Math.PI);
+    const portHeading = (latest.twd + Math.PI - upwindTwa + 2 * Math.PI) % (2 * Math.PI);
+    const stbdHeading = (latest.twd + Math.PI + upwindTwa) % (2 * Math.PI);
     const tws = latest.tws;
     // Through-water speed for layline projection — TBS at the optimal-VMG TWA.
     const tbs = interpolatePolarSpeed(polar, tws, upwindTwa);
@@ -1974,9 +2022,24 @@ export function startRaceComputePipeline(
     const dPort = haversineMeters(latest.pos, line.port);
     const dStbd = haversineMeters(latest.pos, line.stbd);
     const dtl = distanceToLineMeters(latest.pos, line.port, line.stbd, line.preStartSide);
-    bus.publish({ channel: Channels.Race.LineDistancePort, t_ns, value: { kind: 'scalar', value: dPort, unit: 'm' }, source: 'race/line' });
-    bus.publish({ channel: Channels.Race.LineDistanceStbd, t_ns, value: { kind: 'scalar', value: dStbd, unit: 'm' }, source: 'race/line' });
-    bus.publish({ channel: Channels.Race.LineDistanceToLine, t_ns, value: { kind: 'scalar', value: dtl, unit: 'm' }, source: 'race/line' });
+    bus.publish({
+      channel: Channels.Race.LineDistancePort,
+      t_ns,
+      value: { kind: 'scalar', value: dPort, unit: 'm' },
+      source: 'race/line',
+    });
+    bus.publish({
+      channel: Channels.Race.LineDistanceStbd,
+      t_ns,
+      value: { kind: 'scalar', value: dStbd, unit: 'm' },
+      source: 'race/line',
+    });
+    bus.publish({
+      channel: Channels.Race.LineDistanceToLine,
+      t_ns,
+      value: { kind: 'scalar', value: dtl, unit: 'm' },
+      source: 'race/line',
+    });
     if (latest.cog !== undefined && latest.sog !== undefined) {
       // Closing angle = abs(cog − lineNormal); lineNormal = bearing − π/2 if preStartSide='port',
       // else bearing + π/2. Pick the one that points TOWARD the line (sign of dtl > 0 means
@@ -2131,6 +2194,7 @@ git commit -m "feat(compute): startRaceComputePipeline wires all race predicates
 ## Task 12: GET/PUT /api/race/state
 
 **Files:**
+
 - Create: `packages/web/src/app/api/race/state/route.ts`
 - Create: `packages/web/src/app/api/race/state/route.test.ts`
 
@@ -2141,11 +2205,7 @@ Create `packages/web/src/app/api/race/state/route.test.ts`:
 ```ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GET, PUT } from './route.js';
-import {
-  createRaceState,
-  setSharedRaceState,
-  _resetSharedRaceStateForTests,
-} from '@g5000/core';
+import { createRaceState, setSharedRaceState, _resetSharedRaceStateForTests } from '@g5000/core';
 
 beforeEach(() => _resetSharedRaceStateForTests());
 
@@ -2174,7 +2234,7 @@ describe('/api/race/state', () => {
     expect(r.status).toBe(200);
     expect(rs.get().settings.shiftThresholdDeg).toBe(12);
     expect(rs.get().settings.laylineDistanceNm).toBe(8);
-    expect(rs.get().settings.integrateCurrent).toBe(true);  // not touched
+    expect(rs.get().settings.integrateCurrent).toBe(true); // not touched
   });
 
   it('GET returns 503 when no shared raceState', async () => {
@@ -2265,6 +2325,7 @@ git commit -m "feat(web): GET/PUT /api/race/state"
 ## Task 13: POST /api/race/timer
 
 **Files:**
+
 - Create: `packages/web/src/app/api/race/timer/route.ts`
 - Create: `packages/web/src/app/api/race/timer/route.test.ts`
 
@@ -2275,11 +2336,7 @@ Create `packages/web/src/app/api/race/timer/route.test.ts`:
 ```ts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { POST } from './route.js';
-import {
-  createRaceState,
-  setSharedRaceState,
-  _resetSharedRaceStateForTests,
-} from '@g5000/core';
+import { createRaceState, setSharedRaceState, _resetSharedRaceStateForTests } from '@g5000/core';
 
 beforeEach(() => _resetSharedRaceStateForTests());
 
@@ -2318,7 +2375,10 @@ describe('/api/race/timer', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-18T12:00:00Z'));
     const rs = createRaceState();
-    rs.mutate((d) => { d.timer.startMs = Date.now() + 100_000; d.timer.state = 'pre-start'; });
+    rs.mutate((d) => {
+      d.timer.startMs = Date.now() + 100_000;
+      d.timer.state = 'pre-start';
+    });
     setSharedRaceState(rs);
     await POST(req({ action: 'sync', adjustSec: -30 }));
     expect(rs.get().timer.startMs).toBe(Date.now() + 70_000);
@@ -2327,7 +2387,10 @@ describe('/api/race/timer', () => {
 
   it('reset clears the timer', async () => {
     const rs = createRaceState();
-    rs.mutate((d) => { d.timer.startMs = 9999; d.timer.state = 'pre-start'; });
+    rs.mutate((d) => {
+      d.timer.startMs = 9999;
+      d.timer.state = 'pre-start';
+    });
     setSharedRaceState(rs);
     await POST(req({ action: 'reset' }));
     expect(rs.get().timer.startMs).toBeNull();
@@ -2425,6 +2488,7 @@ git commit -m "feat(web): POST /api/race/timer (start/sync/reset)"
 ## Task 14: POST /api/race/line
 
 **Files:**
+
 - Create: `packages/web/src/app/api/race/line/route.ts`
 - Create: `packages/web/src/app/api/race/line/route.test.ts`
 
@@ -2435,11 +2499,7 @@ Create `packages/web/src/app/api/race/line/route.test.ts`:
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { POST } from './route.js';
-import {
-  createRaceState,
-  setSharedRaceState,
-  _resetSharedRaceStateForTests,
-} from '@g5000/core';
+import { createRaceState, setSharedRaceState, _resetSharedRaceStateForTests } from '@g5000/core';
 
 beforeEach(() => _resetSharedRaceStateForTests());
 
@@ -2468,10 +2528,14 @@ describe('/api/race/line', () => {
     // Port end pinged first.
     await POST(req({ action: 'ping', end: 'port', position: { lat: 41.5, lon: -71.3 } }));
     // Stbd end pinged second, with boatPos south of the line.
-    await POST(req({
-      action: 'ping', end: 'stbd', position: { lat: 41.5, lon: -71.29 },
-      boatPos: { lat: 41.49, lon: -71.295 },
-    }));
+    await POST(
+      req({
+        action: 'ping',
+        end: 'stbd',
+        position: { lat: 41.5, lon: -71.29 },
+        boatPos: { lat: 41.49, lon: -71.295 },
+      }),
+    );
     expect(rs.get().line.preStartSide).toBeDefined();
     expect(['port', 'stbd']).toContain(rs.get().line.preStartSide);
   });
@@ -2541,8 +2605,7 @@ function sideOfLine(
   // the port→stbd direction (which is the boat's port side if you stand
   // at port looking at stbd). Return 'port' when boat is to port-side, etc.
   const cross =
-    (stbd.lon - port.lon) * (boat.lat - port.lat) -
-    (stbd.lat - port.lat) * (boat.lon - port.lon);
+    (stbd.lon - port.lon) * (boat.lat - port.lat) - (stbd.lat - port.lat) * (boat.lon - port.lon);
   return cross > 0 ? 'port' : 'stbd';
 }
 
@@ -2564,7 +2627,11 @@ export async function POST(req: Request): Promise<NextResponse> {
       d.line.preStartSide = undefined;
     });
   } else if (body.action === 'ping') {
-    if (!body.position || typeof body.position.lat !== 'number' || typeof body.position.lon !== 'number') {
+    if (
+      !body.position ||
+      typeof body.position.lat !== 'number' ||
+      typeof body.position.lon !== 'number'
+    ) {
       return NextResponse.json({ ok: false, error: 'position required' }, { status: 400 });
     }
     const now = new Date().toISOString();
@@ -2605,6 +2672,7 @@ git commit -m "feat(web): POST /api/race/line (ping/clear)"
 ## Task 15: RaceTimer component
 
 **Files:**
+
 - Create: `packages/web/src/app/race/RaceTimer.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -2648,7 +2716,10 @@ export function RaceTimer(): React.ReactElement {
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
   // Sub-second display: re-render every 100 ms while a startMs is set.
@@ -2666,8 +2737,7 @@ export function RaceTimer(): React.ReactElement {
     });
   }, []);
 
-  const secsToGun =
-    timer.startMs === null ? null : Math.round((timer.startMs - nowMs) / 1000);
+  const secsToGun = timer.startMs === null ? null : Math.round((timer.startMs - nowMs) / 1000);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded p-6 flex flex-col items-center gap-4">
@@ -2753,6 +2823,7 @@ git commit -m "feat(web): RaceTimer countdown clock component"
 ## Task 16: RaceAudible component
 
 **Files:**
+
 - Create: `packages/web/src/app/race/RaceAudible.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -2766,7 +2837,11 @@ import { useEffect, useRef, useState } from 'react';
 
 const MUTE_KEY = 'g5000.race-audible.muted';
 
-interface Beep { freq: number; durMs: number; type: OscillatorType }
+interface Beep {
+  freq: number;
+  durMs: number;
+  type: OscillatorType;
+}
 const TONE_MINUTE: Beep = { freq: 660, durMs: 200, type: 'square' };
 const TONE_MINUTE_LAST: Beep = { freq: 660, durMs: 400, type: 'square' };
 const TONE_SECOND: Beep = { freq: 880, durMs: 100, type: 'sine' };
@@ -2779,16 +2854,16 @@ const SCHEDULE: Array<{ atSec: number; tone: Beep }> = [
   { atSec: 240, tone: TONE_MINUTE },
   { atSec: 180, tone: TONE_MINUTE },
   { atSec: 120, tone: TONE_MINUTE },
-  { atSec: 60,  tone: TONE_MINUTE_LAST },
-  { atSec: 30,  tone: TONE_SECOND },
-  { atSec: 20,  tone: TONE_SECOND },
-  { atSec: 10,  tone: TONE_SECOND },
-  { atSec: 5,   tone: TONE_LAST5 },
-  { atSec: 4,   tone: TONE_LAST5 },
-  { atSec: 3,   tone: TONE_LAST5 },
-  { atSec: 2,   tone: TONE_LAST5 },
-  { atSec: 1,   tone: TONE_LAST5 },
-  { atSec: 0,   tone: TONE_GUN },
+  { atSec: 60, tone: TONE_MINUTE_LAST },
+  { atSec: 30, tone: TONE_SECOND },
+  { atSec: 20, tone: TONE_SECOND },
+  { atSec: 10, tone: TONE_SECOND },
+  { atSec: 5, tone: TONE_LAST5 },
+  { atSec: 4, tone: TONE_LAST5 },
+  { atSec: 3, tone: TONE_LAST5 },
+  { atSec: 2, tone: TONE_LAST5 },
+  { atSec: 1, tone: TONE_LAST5 },
+  { atSec: 0, tone: TONE_GUN },
 ];
 
 export function RaceAudible(): React.ReactElement {
@@ -2831,11 +2906,16 @@ export function RaceAudible(): React.ReactElement {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setStartMs(j.timer.startMs);
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
   // 100 ms tick — check schedule and fire any thresholds we just crossed.
@@ -2893,7 +2973,11 @@ function fire(ctx: AudioContext, t: Beep): void {
   gain.gain.value = 0.15;
   osc.start();
   setTimeout(() => {
-    try { osc.stop(); } catch { /* ignored */ }
+    try {
+      osc.stop();
+    } catch {
+      /* ignored */
+    }
     osc.disconnect();
     gain.disconnect();
   }, t.durMs);
@@ -2912,6 +2996,7 @@ git commit -m "feat(web): RaceAudible countdown beep loop with 100ms tick"
 ## Task 17: LinePingPanel component
 
 **Files:**
+
 - Create: `packages/web/src/app/race/LinePingPanel.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -2924,8 +3009,16 @@ Create `packages/web/src/app/race/LinePingPanel.tsx`:
 import { useCallback, useEffect, useState } from 'react';
 import { useSse } from '../../hooks/use-sse';
 
-interface LineEnd { lat: number; lon: number; pingedAt: string }
-interface LineSnap { port?: LineEnd; stbd?: LineEnd; preStartSide?: 'port' | 'stbd' }
+interface LineEnd {
+  lat: number;
+  lon: number;
+  pingedAt: string;
+}
+interface LineSnap {
+  port?: LineEnd;
+  stbd?: LineEnd;
+  preStartSide?: 'port' | 'stbd';
+}
 
 function fmtCoord(lat: number, lon: number): string {
   const fL = (v: number, pos: string, neg: string) => {
@@ -2950,34 +3043,42 @@ export function LinePingPanel(): React.ReactElement {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setLine(j.line ?? {});
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
-  const ping = useCallback(async (end: 'port' | 'stbd') => {
-    const pos = channels.get('nav.gps.position');
-    if (!pos || pos.value.kind !== 'geo') {
-      alert('No GPS position available');
-      return;
-    }
-    const position = pos.value.value;
-    // Boat position at ping time matches the ping position itself for the
-    // common case (you're standing at the end). The /api/race/line handler
-    // uses boatPos to determine preStartSide on the second ping.
-    await fetch('/api/race/line', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'ping', end, position, boatPos: position }),
-    });
-    const r = await fetch('/api/race/state', { cache: 'no-store' });
-    if (r.ok) {
-      const j = await r.json();
-      setLine(j.line ?? {});
-    }
-  }, [channels]);
+  const ping = useCallback(
+    async (end: 'port' | 'stbd') => {
+      const pos = channels.get('nav.gps.position');
+      if (!pos || pos.value.kind !== 'geo') {
+        alert('No GPS position available');
+        return;
+      }
+      const position = pos.value.value;
+      // Boat position at ping time matches the ping position itself for the
+      // common case (you're standing at the end). The /api/race/line handler
+      // uses boatPos to determine preStartSide on the second ping.
+      await fetch('/api/race/line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ping', end, position, boatPos: position }),
+      });
+      const r = await fetch('/api/race/state', { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        setLine(j.line ?? {});
+      }
+    },
+    [channels],
+  );
 
   const clear = useCallback(async () => {
     await fetch('/api/race/line', {
@@ -3019,9 +3120,7 @@ export function LinePingPanel(): React.ReactElement {
         </button>
       </div>
       {line.preStartSide && (
-        <div className="text-xs text-slate-400 font-mono">
-          pre-start side: {line.preStartSide}
-        </div>
+        <div className="text-xs text-slate-400 font-mono">pre-start side: {line.preStartSide}</div>
       )}
       {(line.port || line.stbd) && (
         <>
@@ -3071,6 +3170,7 @@ git commit -m "feat(web): LinePingPanel — port/stbd ping + clear with confirm"
 ## Task 18: ActiveMarkSelector component
 
 **Files:**
+
 - Create: `packages/web/src/app/race/ActiveMarkSelector.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -3082,7 +3182,12 @@ Create `packages/web/src/app/race/ActiveMarkSelector.tsx`:
 
 import { useCallback, useEffect, useState } from 'react';
 
-interface Waypoint { id: string; name: string; lat: number; lon: number }
+interface Waypoint {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+}
 
 export function ActiveMarkSelector(): React.ReactElement {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
@@ -3103,7 +3208,9 @@ export function ActiveMarkSelector(): React.ReactElement {
           const j = await stR.json();
           setActiveId(j.activeMarkWaypointId ?? null);
         }
-      } catch { /* retry on next mount */ }
+      } catch {
+        /* retry on next mount */
+      }
     }
     void load();
   }, []);
@@ -3149,6 +3256,7 @@ git commit -m "feat(web): ActiveMarkSelector dropdown for VMC target"
 ## Task 19: /race page
 
 **Files:**
+
 - Create: `packages/web/src/app/race/page.tsx`
 
 - [ ] **Step 1: Assemble the page**
@@ -3198,6 +3306,7 @@ git commit -m "feat(web): /race page wiring timer + line + active mark"
 ## Task 20: RaceTiles helm tile group
 
 **Files:**
+
 - Create: `packages/web/src/components/RaceTiles.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -3239,16 +3348,20 @@ export function RaceTiles(): React.ReactElement {
         unit="m"
         sub={dtl === null ? undefined : dtl >= 0 ? 'pre-start' : 'past line'}
       />
-      <HelmTile
-        label="TTL"
-        value={ttl === null ? '—' : Math.round(ttl).toString()}
-        unit="s"
-      />
+      <HelmTile label="TTL" value={ttl === null ? '—' : Math.round(ttl).toString()} unit="s" />
       <HelmTile
         label="Bias"
         value={bias === null ? '—' : `${bias >= 0 ? '+' : ''}${(bias * RAD_TO_DEG).toFixed(0)}`}
         unit="°"
-        sub={bias === null ? undefined : bias > 0 ? 'port favored' : bias < 0 ? 'stbd favored' : 'square'}
+        sub={
+          bias === null
+            ? undefined
+            : bias > 0
+              ? 'port favored'
+              : bias < 0
+                ? 'stbd favored'
+                : 'square'
+        }
       />
       <HelmTile
         label="OCS"
@@ -3279,6 +3392,7 @@ git commit -m "feat(web): RaceTiles compound helm tile (DTL/TTL/Bias/OCS/VMC)"
 ## Task 21: RaceMiniTimer helm chip
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/RaceMiniTimer.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -3310,11 +3424,16 @@ export function RaceMiniTimer(): React.ReactElement | null {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setStartMs(j.timer.startMs);
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 1000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {
@@ -3350,6 +3469,7 @@ git commit -m "feat(web): RaceMiniTimer chip for /helm"
 ## Task 22: StartLineLayer chart layer
 
 **Files:**
+
 - Create: `packages/web/src/components/StartLineLayer.tsx`
 
 - [ ] **Step 1: Implement the layer**
@@ -3362,8 +3482,14 @@ Create `packages/web/src/components/StartLineLayer.tsx`:
 import { useEffect, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 
-interface LineEnd { lat: number; lon: number }
-interface LineSnap { port?: LineEnd; stbd?: LineEnd }
+interface LineEnd {
+  lat: number;
+  lon: number;
+}
+interface LineSnap {
+  port?: LineEnd;
+  stbd?: LineEnd;
+}
 
 const LINE_SOURCE = 'race-start-line';
 const LINE_LAYER = 'race-start-line-layer';
@@ -3379,11 +3505,16 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
         if (stopped || !r.ok) return;
         const j = await r.json();
         setLine(j.line ?? {});
-      } catch { /* retry */ }
+      } catch {
+        /* retry */
+      }
     }
     void poll();
     const id = setInterval(poll, 2000);
-    return () => { stopped = true; clearInterval(id); };
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
   }, []);
 
   useEffect(() => {
@@ -3419,8 +3550,7 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
         },
       ],
     };
-    const src = map.getSource(LINE_SOURCE) as
-      | { setData: (d: unknown) => void } | undefined;
+    const src = map.getSource(LINE_SOURCE) as { setData: (d: unknown) => void } | undefined;
     if (src) {
       src.setData(fc);
     } else {
@@ -3443,9 +3573,12 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
         paint: {
           'circle-radius': 6,
           'circle-color': [
-            'match', ['get', 'end'],
-            'port', '#10b981',
-            'stbd', '#ef4444',
+            'match',
+            ['get', 'end'],
+            'port',
+            '#10b981',
+            'stbd',
+            '#ef4444',
             '#ffffff',
           ],
           'circle-stroke-color': '#000',
@@ -3474,6 +3607,7 @@ git commit -m "feat(web): StartLineLayer chart overlay (line + ends)"
 ## Task 23: LaylinesLayer chart layer
 
 **Files:**
+
 - Create: `packages/web/src/components/LaylinesLayer.tsx`
 
 - [ ] **Step 1: Implement the layer**
@@ -3531,8 +3665,7 @@ export function LaylinesLayer({ map }: { map: maplibregl.Map | null }): null {
         },
       ].filter(Boolean),
     };
-    const src = map.getSource(LAYLINE_SOURCE) as
-      | { setData: (d: unknown) => void } | undefined;
+    const src = map.getSource(LAYLINE_SOURCE) as { setData: (d: unknown) => void } | undefined;
     if (src) {
       src.setData(fc);
     } else {
@@ -3542,12 +3675,7 @@ export function LaylinesLayer({ map }: { map: maplibregl.Map | null }): null {
         type: 'line',
         source: LAYLINE_SOURCE,
         paint: {
-          'line-color': [
-            'match', ['get', 'tack'],
-            'port', '#10b981',
-            'stbd', '#ef4444',
-            '#ffffff',
-          ],
+          'line-color': ['match', ['get', 'tack'], 'port', '#10b981', 'stbd', '#ef4444', '#ffffff'],
           'line-width': 2,
           'line-opacity': 0.7,
         },
@@ -3571,6 +3699,7 @@ git commit -m "feat(web): LaylinesLayer chart overlay (port + stbd polylines)"
 ## Task 24: WindShiftPlot sparkline
 
 **Files:**
+
 - Create: `packages/web/src/components/WindShiftPlot.tsx`
 
 - [ ] **Step 1: Implement the component**
@@ -3588,7 +3717,10 @@ const RAD_TO_DEG = 180 / Math.PI;
 const WIDTH = 600;
 const HEIGHT = 80;
 
-interface Point { tMs: number; deg: number }
+interface Point {
+  tMs: number;
+  deg: number;
+}
 
 export function WindShiftPlot(): React.ReactElement {
   const { channels } = useSse();
@@ -3659,6 +3791,7 @@ git commit -m "feat(web): WindShiftPlot 30-min sparkline of race.windShift.bias"
 ## Task 25: Re-enable wind tiles and mount race surfaces on /helm
 
 **Files:**
+
 - Modify: `packages/web/src/app/helm/page.tsx`
 
 - [ ] **Step 1: Replace the hidden-wind block with conditional tiles**
@@ -3685,25 +3818,41 @@ const pctPolarSample = channels.get('race.percentPolar');
 And in the tile grid section, REPLACE the hidden-tiles comment with:
 
 ```tsx
-{/* Wind tiles — render only when the corresponding channel publishes,
-    so a missing masthead leaves the grid clean instead of showing dashes. */}
-{tws && <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" />}
-{twa && <HelmTile label="TWA" value={fmtAngleSigned(twa)} unit="°" />}
-{aws && <HelmTile label="AWS" value={fmtSpeed(aws)} unit="kn" small />}
-{awa && <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />}
-{tbsSample && <HelmTile label="TBS" value={fmtSpeed(tbsSample)} unit="kn" small />}
-{tTwaSample && <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />}
-{pctPolarSample && (
-  <HelmTile
-    label="% polar"
-    value={(() => {
-      const v = scalar(pctPolarSample);
-      return v === null ? '—' : v.toFixed(0);
-    })()}
-    unit="%"
-    small
-  />
-)}
+{
+  /* Wind tiles — render only when the corresponding channel publishes,
+    so a missing masthead leaves the grid clean instead of showing dashes. */
+}
+{
+  tws && <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" />;
+}
+{
+  twa && <HelmTile label="TWA" value={fmtAngleSigned(twa)} unit="°" />;
+}
+{
+  aws && <HelmTile label="AWS" value={fmtSpeed(aws)} unit="kn" small />;
+}
+{
+  awa && <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />;
+}
+{
+  tbsSample && <HelmTile label="TBS" value={fmtSpeed(tbsSample)} unit="kn" small />;
+}
+{
+  tTwaSample && <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />;
+}
+{
+  pctPolarSample && (
+    <HelmTile
+      label="% polar"
+      value={(() => {
+        const v = scalar(pctPolarSample);
+        return v === null ? '—' : v.toFixed(0);
+      })()}
+      unit="%"
+      small
+    />
+  );
+}
 ```
 
 - [ ] **Step 2: Add RaceMiniTimer + RaceTiles**
@@ -3749,6 +3898,7 @@ git commit -m "feat(web): helm — re-enable wind tiles + mount race mini-timer 
 ## Task 26: Mount StartLineLayer + LaylinesLayer on /chart
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 - [ ] **Step 1: Add imports**
@@ -3786,6 +3936,7 @@ git commit -m "feat(web): chart — mount StartLineLayer + LaylinesLayer"
 ## Task 27: Add /race link to Navbar
 
 **Files:**
+
 - Modify: `packages/web/src/app/Navbar.tsx`
 
 - [ ] **Step 1: Add the link**
@@ -3817,6 +3968,7 @@ git commit -m "feat(web): navbar — add Race link"
 ## Task 28: Boot race pipeline in autopilot-server
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 
 - [ ] **Step 1: Add imports**
@@ -3824,14 +3976,8 @@ git commit -m "feat(web): navbar — add Race link"
 Add to the top of `apps/autopilot-server/src/index.ts` alongside the existing `@g5000/*` imports:
 
 ```ts
-import {
-  createRaceState,
-  setSharedRaceState,
-} from '@g5000/core';
-import {
-  loadRaceState,
-  saveRaceState,
-} from '@g5000/db';
+import { createRaceState, setSharedRaceState } from '@g5000/core';
+import { loadRaceState, saveRaceState } from '@g5000/db';
 import { startRaceComputePipeline } from '@g5000/compute';
 import type { CurrentField } from '@g5000/grib';
 import type { LatLon } from '@g5000/compute';
@@ -3860,7 +4006,9 @@ setSharedRaceState(raceState);
 
 // Polar ref: peek the most-recently-published polar.
 const polarRef: { current: import('@g5000/db').PolarTable | null } = { current: null };
-configStore.activePolar$.subscribe((p) => { polarRef.current = p; });
+configStore.activePolar$.subscribe((p) => {
+  polarRef.current = p;
+});
 
 // Current field ref: v1 leaves this null — the pipeline degrades to
 // "no current integration" for laylines. A follow-up issue can subscribe
@@ -3872,7 +4020,13 @@ const currentFieldRef: { current: CurrentField | null } = { current: null };
 // to "no VMC"; a follow-up hooks ConfigStore.waypoints$ in here.
 const waypointsRef: { current: Map<string, LatLon> } = { current: new Map() };
 
-const raceHandle = startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef, waypointsRef);
+const raceHandle = startRaceComputePipeline(
+  bus,
+  raceState,
+  polarRef,
+  currentFieldRef,
+  waypointsRef,
+);
 teardown.push(async () => raceHandle.dispose());
 
 // Persist on every mutation (debounced 500 ms).
@@ -3905,6 +4059,7 @@ git commit -m "feat(autopilot-server): boot RaceState + race compute pipeline"
 ## Task 29: Replay integration test
 
 **Files:**
+
 - Create: `packages/compute/src/race/integration.test.ts`
 
 This task exercises the full pipeline end-to-end against a synthetic input sequence. It does NOT require a real session.jsonl.gz — it drives the bus directly with timed publishes, which is closer to the spec's "replay-driven" intent while staying hermetic.
@@ -3973,7 +4128,9 @@ describe('race pipeline integration', () => {
     vi.setSystemTime(new Date('2026-05-18T12:00:00Z'));
     const bus = new Bus();
     const rs = createRaceState();
-    rs.mutate((d) => { d.activeMarkWaypointId = 'wp-1'; });
+    rs.mutate((d) => {
+      d.activeMarkWaypointId = 'wp-1';
+    });
     const wpRef = { current: new Map([['wp-1', { lat: 41.6, lon: -71.295 }]]) };
     const handle = startRaceComputePipeline(bus, rs, { current: null }, { current: null }, wpRef);
     const seen: Record<string, number> = {};
@@ -3981,9 +4138,24 @@ describe('race pipeline integration', () => {
       if (s.value.kind === 'scalar') seen[s.channel] = s.value.value;
     });
     const t = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: Channels.Nav.Position, t_ns: t, value: { kind: 'geo', value: { lat: 41.5, lon: -71.3 } }, source: 'test' });
-    bus.publish({ channel: Channels.Nav.Cog, t_ns: t, value: { kind: 'scalar', value: 0 }, source: 'test' });
-    bus.publish({ channel: Channels.Nav.Sog, t_ns: t, value: { kind: 'scalar', value: 5 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Nav.Position,
+      t_ns: t,
+      value: { kind: 'geo', value: { lat: 41.5, lon: -71.3 } },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Nav.Cog,
+      t_ns: t,
+      value: { kind: 'scalar', value: 0 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Nav.Sog,
+      t_ns: t,
+      value: { kind: 'scalar', value: 5 },
+      source: 'test',
+    });
     await vi.advanceTimersByTimeAsync(20);
     expect(seen[Channels.Race.Vmc]).toBeDefined();
     handle.dispose();
@@ -3993,13 +4165,34 @@ describe('race pipeline integration', () => {
     vi.setSystemTime(new Date('2026-05-18T12:00:00Z'));
     const bus = new Bus();
     const rs = createRaceState();
-    const handle = startRaceComputePipeline(bus, rs, { current: null }, { current: null }, { current: new Map() });
+    const handle = startRaceComputePipeline(
+      bus,
+      rs,
+      { current: null },
+      { current: null },
+      { current: new Map() },
+    );
     const seen: string[] = [];
     bus.subscribe('race.**', (s) => seen.push(s.channel));
     const t = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: Channels.Nav.Position, t_ns: t, value: { kind: 'geo', value: { lat: 41.5, lon: -71.3 } }, source: 'test' });
-    bus.publish({ channel: Channels.Nav.Sog, t_ns: t, value: { kind: 'scalar', value: 5 }, source: 'test' });
-    bus.publish({ channel: Channels.Nav.Cog, t_ns: t, value: { kind: 'scalar', value: 0 }, source: 'test' });
+    bus.publish({
+      channel: Channels.Nav.Position,
+      t_ns: t,
+      value: { kind: 'geo', value: { lat: 41.5, lon: -71.3 } },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Nav.Sog,
+      t_ns: t,
+      value: { kind: 'scalar', value: 5 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Nav.Cog,
+      t_ns: t,
+      value: { kind: 'scalar', value: 0 },
+      source: 'test',
+    });
     await vi.advanceTimersByTimeAsync(20);
     // No wind, no bias / targets / laylines / wind-shift.
     expect(seen).not.toContain(Channels.Race.LineBias);

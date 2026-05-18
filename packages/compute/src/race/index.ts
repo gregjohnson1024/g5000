@@ -18,13 +18,7 @@ import { vmc } from './vmc.js';
 import { predictOcs } from './ocs-predictor.js';
 import { interpolatePolarSpeed, optimalTwaForVmg } from '../polars/math.js';
 
-export {
-  startPolarTargetsPredicate,
-  createWindShiftDetector,
-  projectLayline,
-  vmc,
-  predictOcs,
-};
+export { startPolarTargetsPredicate, createWindShiftDetector, projectLayline, vmc, predictOcs };
 
 interface Latest {
   pos?: LatLon;
@@ -161,8 +155,8 @@ export function startRaceComputePipeline(
     lastLaylineMs = tMs;
     const cfg = raceState.get().settings;
     const upwindTwa = optimalTwaForVmg(polar, latest.tws, 'upwind');
-    const portHeading = ((latest.twd + Math.PI) - upwindTwa + 2 * Math.PI) % (2 * Math.PI);
-    const stbdHeading = ((latest.twd + Math.PI) + upwindTwa) % (2 * Math.PI);
+    const portHeading = (latest.twd + Math.PI - upwindTwa + 2 * Math.PI) % (2 * Math.PI);
+    const stbdHeading = (latest.twd + Math.PI + upwindTwa) % (2 * Math.PI);
     const tws = latest.tws;
     // Through-water speed for layline projection — TBS at the optimal-VMG TWA.
     const tbs = interpolatePolarSpeed(polar, tws, upwindTwa);
@@ -212,7 +206,7 @@ export function startRaceComputePipeline(
     if (!line.preStartSide) {
       const crossMag = Math.abs(
         (line.stbd.lon - line.port.lon) * (latest.pos.lat - line.port.lat) -
-        (line.stbd.lat - line.port.lat) * (latest.pos.lon - line.port.lon),
+          (line.stbd.lat - line.port.lat) * (latest.pos.lon - line.port.lon),
       );
       if (crossMag > 1e-7) {
         raceState.mutate((d) => {
@@ -230,7 +224,12 @@ export function startRaceComputePipeline(
     const bearing = lineBearingRad(freshLine.port, freshLine.stbd);
     const dPort = haversineMeters(latest.pos, freshLine.port);
     const dStbd = haversineMeters(latest.pos, freshLine.stbd);
-    const dtl = distanceToLineMeters(latest.pos, freshLine.port, freshLine.stbd, freshLine.preStartSide);
+    const dtl = distanceToLineMeters(
+      latest.pos,
+      freshLine.port,
+      freshLine.stbd,
+      freshLine.preStartSide,
+    );
     bus.publish({
       channel: Channels.Race.LineDistancePort,
       t_ns,

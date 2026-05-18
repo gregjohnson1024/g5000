@@ -34,8 +34,7 @@ function crossMagnitude(
   stbd: { lat: number; lon: number },
 ): number {
   return Math.abs(
-    (stbd.lon - port.lon) * (boat.lat - port.lat) -
-    (stbd.lat - port.lat) * (boat.lon - port.lon),
+    (stbd.lon - port.lon) * (boat.lat - port.lat) - (stbd.lat - port.lat) * (boat.lon - port.lon),
   );
 }
 
