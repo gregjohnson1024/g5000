@@ -71,6 +71,15 @@ export interface PlanOptions {
   motorSpeed?: number;             // default 2.572 (5 kn)
 }
 
+export interface SailTimelineSegment {
+  fromLegIdx: number;
+  toLegIdx: number;
+  configId: string;
+  startTime: number;
+  endTime: number;
+  durationHours: number;
+}
+
 export interface PlanInput {
   start: LatLon;
   end: LatLon;
