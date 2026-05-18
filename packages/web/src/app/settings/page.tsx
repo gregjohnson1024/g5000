@@ -1,6 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 
+type SourceMode = 'live' | 'demo' | 'replay';
+interface SourceModeStatus {
+  mode: SourceMode;
+  sessionId?: string;
+  paceMode?: 'realtime' | 'asap';
+  phase?: 'running' | 'finished' | 'error';
+  startedAt?: string;
+  errorMessage?: string;
+}
+
 interface Bbox {
   latMin: number;
   latMax: number;
@@ -50,6 +60,13 @@ export default function SettingsPage() {
   const [status, setStatus] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
 
+  // Source-mode state — separate from the persisted settings above because
+  // it's a runtime-only switch (lives in the SourceModeController, not
+  // settings.json). Polled so the UI reflects any out-of-band switch.
+  const [sourceMode, setSourceMode] = useState<SourceModeStatus | null>(null);
+  const [sourceModeBusy, setSourceModeBusy] = useState<boolean>(false);
+  const [sourceModeError, setSourceModeError] = useState<string | undefined>();
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -81,6 +98,52 @@ export default function SettingsPage() {
       cancelled = true;
     };
   }, []);
+
+  // Poll source mode so the radio reflects out-of-band switches (e.g.,
+  // someone hit /api/source-mode from curl or another tab).
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/source-mode', { cache: 'no-store' });
+        const j = (await res.json()) as SourceModeStatus | { error: string };
+        if (cancelled) return;
+        if ('error' in j) setSourceModeError(j.error);
+        else {
+          setSourceMode(j);
+          setSourceModeError(undefined);
+        }
+      } catch (e) {
+        if (!cancelled) setSourceModeError(String(e));
+      }
+    };
+    void tick();
+    const id = setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const onSetSourceMode = async (mode: 'live' | 'demo'): Promise<void> => {
+    if (sourceMode?.mode === mode) return;
+    setSourceModeBusy(true);
+    setSourceModeError(undefined);
+    try {
+      const res = await fetch('/api/source-mode', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+      const j = (await res.json()) as SourceModeStatus | { error: string };
+      if ('error' in j) setSourceModeError(j.error);
+      else setSourceMode(j);
+    } catch (e) {
+      setSourceModeError(String(e));
+    } finally {
+      setSourceModeBusy(false);
+    }
+  };
 
   const onSave = async () => {
     setError(undefined);
@@ -127,9 +190,72 @@ export default function SettingsPage() {
   return (
     <main className="p-8 max-w-2xl space-y-4 text-slate-200">
       <h1 className="text-2xl">Settings</h1>
+
+      <fieldset
+        className={`border rounded p-3 space-y-2 ${
+          sourceMode?.mode === 'demo'
+            ? 'border-amber-600 bg-amber-900/10'
+            : sourceMode?.mode === 'replay'
+              ? 'border-violet-600 bg-violet-900/10'
+              : 'border-slate-700'
+        }`}
+      >
+        <legend className="px-2 text-sm text-slate-300">Source mode</legend>
+        <p className="text-[11px] text-slate-500">
+          Switches the data source feeding the bus and pipelines.{' '}
+          <strong>Live</strong> ingests from the real NMEA hardware
+          (NGT-1 / YDWG / 0183). <strong>Demo</strong> swaps in a synthetic
+          injector — useful on the dock or for UI work without a boat.{' '}
+          <strong>Replay</strong> mode (not switchable here) is started via the
+          Sessions page.
+        </p>
+        <div className="flex items-center gap-4 flex-wrap text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="source-mode"
+              value="live"
+              checked={sourceMode?.mode === 'live'}
+              disabled={sourceModeBusy || sourceMode === null}
+              onChange={() => void onSetSourceMode('live')}
+            />
+            <span>Live</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="source-mode"
+              value="demo"
+              checked={sourceMode?.mode === 'demo'}
+              disabled={sourceModeBusy || sourceMode === null}
+              onChange={() => void onSetSourceMode('demo')}
+            />
+            <span>Demo</span>
+          </label>
+          {sourceMode?.mode === 'replay' && (
+            <span className="text-violet-300 font-mono text-xs">
+              replay · {sourceMode.sessionId ?? 'unknown'} · {sourceMode.phase ?? '—'}
+            </span>
+          )}
+          {sourceModeBusy && (
+            <span className="text-slate-500 text-xs">Switching…</span>
+          )}
+        </div>
+        {sourceMode?.mode === 'demo' && (
+          <div className="text-amber-300 text-xs">
+            ⚠ Demo data is synthetic — anything plotted on /chart or /helm is
+            fake. Switch back to <strong>Live</strong> before relying on
+            navigation data.
+          </div>
+        )}
+        {sourceModeError && (
+          <div className="text-rose-400 text-xs">{sourceModeError}</div>
+        )}
+      </fieldset>
+
       <p className="text-xs text-slate-400">
-        Stored in <code>~/.g5000-router/settings.json</code>. Leave a field blank
-        to fall back to the env-derived default shown below it.
+        The fields below are persisted to <code>~/.g5000-router/settings.json</code>.
+        Leave a field blank to fall back to the env-derived default shown below it.
       </p>
       {loading ? (
         <div className="text-slate-400 text-sm">Loading…</div>
