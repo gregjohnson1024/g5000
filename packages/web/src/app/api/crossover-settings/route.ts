@@ -31,7 +31,9 @@ export async function POST(req: Request) {
   const merged: CrossoverSettings = { ...DEFAULT_CROSSOVER_SETTINGS };
   for (const k of NUMERIC_KEYS) {
     const v = body[k];
-    if (typeof v === 'number' && Number.isFinite(v)) (merged as Record<string, number>)[k] = v;
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      merged[k] = v as never;
+    }
   }
   const store = getSharedConfigStore();
   await store.setCrossoverSettings(merged);
