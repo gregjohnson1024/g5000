@@ -17,6 +17,7 @@ import {
   createYdwgTcpSocketFactory,
   SocketCanDriver,
   createSocketCanRawChannelFactory,
+  getSharedDriverHub,
   runBridge,
   startSessionLogger,
   startTrueWindTx,
@@ -206,28 +207,12 @@ async function main(): Promise<void> {
         }
       }
 
-      // SocketCAN ingest (PiCAN-M HAT) — opt-in via Settings UI or env var.
-      // Runs alongside YDWG/NGT-1 when both are configured, which is fine
-      // for verification (the bridge dedupes by source addr + PGN). Once
-      // PiCAN-M is proven, the operator can disable YDWG via env var.
-      const socketCan = await readSocketCanSettings();
-      if (socketCan.enabled) {
-        try {
-          const can = new SocketCanDriver({
-            channelFactory: createSocketCanRawChannelFactory(socketCan.interface),
-          });
-          await can.start();
-          drivers.push(can);
-          stops.push(() => can.stop());
-          // eslint-disable-next-line no-console
-          console.log(`[autopilot] SocketCAN online on ${socketCan.interface}`);
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[autopilot] SocketCAN offline on ${socketCan.interface} (${err instanceof Error ? err.message : String(err)})`,
-          );
-        }
-      }
+      // SocketCAN (PiCAN-M) is added AFTER runBridge() below, via the
+      // DriverHub with label 'socketcan', so the /api/socketcan endpoint
+      // can hot-add or hot-remove it later without restarting the server.
+      // (See the post-runBridge block.) Adding it here in the boot array
+      // would give it an opaque "boot-N" label and the API endpoint
+      // couldn't find it for removal.
 
       for (const [i, p183] of NMEA0183_PATHS.entries()) {
         try {
@@ -263,6 +248,37 @@ async function main(): Promise<void> {
     let stopBridgeFn: (() => Promise<void>) | null = null;
     if (drivers.length > 0) {
       stopBridgeFn = await runBridge({ bus, drivers });
+    }
+
+    // SocketCAN (PiCAN-M) — opt-in via /settings UI or env var. We add it
+    // through the shared DriverHub (set up by runBridge above) under the
+    // label 'socketcan' so the /api/socketcan endpoint can hot-toggle it
+    // later. Failure to start is non-fatal: log it like an offline NGT-1.
+    const socketCan = await readSocketCanSettings();
+    if (socketCan.enabled) {
+      const hub = getSharedDriverHub();
+      if (!hub) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[autopilot] SocketCAN requested but no DriverHub — was runBridge called?',
+        );
+      } else {
+        try {
+          await hub.addDriver(
+            'socketcan',
+            new SocketCanDriver({
+              channelFactory: createSocketCanRawChannelFactory(socketCan.interface),
+            }),
+          );
+          // eslint-disable-next-line no-console
+          console.log(`[autopilot] SocketCAN online on ${socketCan.interface}`);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[autopilot] SocketCAN offline on ${socketCan.interface} (${err instanceof Error ? err.message : String(err)})`,
+          );
+        }
+      }
     }
 
     // Optional session logger — only when a log dir was configured.

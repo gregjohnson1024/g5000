@@ -5,6 +5,13 @@ export * from './socket-can-driver.js';
 export * from './decoder.js';
 export * from './channel-mapper.js';
 export * from './bridge.js';
+export {
+  createDriverHub,
+  getSharedDriverHub,
+  setSharedDriverHub,
+  _resetSharedDriverHubForTests,
+  type DriverHub,
+} from './driver-hub.js';
 export * from './nmea0183/sentence-parser.js';
 export * from './nmea0183/serial-driver.js';
 export * from './nmea0183/channel-mapper.js';

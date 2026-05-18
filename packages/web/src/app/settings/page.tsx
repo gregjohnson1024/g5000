@@ -79,10 +79,15 @@ export default function SettingsPage() {
   const [sourceModeBusy, setSourceModeBusy] = useState<boolean>(false);
   const [sourceModeError, setSourceModeError] = useState<string | undefined>();
 
-  // SocketCAN (PiCAN-M) config. Persisted via /api/settings; takes effect
-  // on next autopilot-server restart.
+  // SocketCAN (PiCAN-M) config. Hot-applied via /api/socketcan — the
+  // POST both persists and toggles the live DriverHub, so the UI shows
+  // immediate feedback. Polled so an out-of-band change (curl, restart
+  // applying a stale settings.json, etc.) reflects here.
   const [socketCanEnabled, setSocketCanEnabled] = useState<boolean>(false);
   const [socketCanInterface, setSocketCanInterface] = useState<string>('can0');
+  const [socketCanRunning, setSocketCanRunning] = useState<boolean>(false);
+  const [socketCanBusy, setSocketCanBusy] = useState<boolean>(false);
+  const [socketCanError, setSocketCanError] = useState<string | undefined>();
 
   useEffect(() => {
     let cancelled = false;
@@ -105,12 +110,9 @@ export default function SettingsPage() {
           setBboxLonMin(String(s.forecastBbox.lonMin));
           setBboxLonMax(String(s.forecastBbox.lonMax));
         }
-        if (s.socketCan) {
-          setSocketCanEnabled(s.socketCan.enabled === true);
-          if (typeof s.socketCan.interface === 'string' && s.socketCan.interface.length > 0) {
-            setSocketCanInterface(s.socketCan.interface);
-          }
-        }
+        // SocketCAN state is fetched from its dedicated endpoint (which
+        // also reports the live `running` flag) — see the separate
+        // useEffect below.
       } catch (e) {
         if (!cancelled) setError(String(e));
       } finally {
@@ -147,6 +149,83 @@ export default function SettingsPage() {
       clearInterval(id);
     };
   }, []);
+
+  // Poll SocketCAN state so the UI reflects the live DriverHub plus the
+  // persisted settings flag — these can diverge briefly if the driver
+  // failed to start (persisted: enabled=true, running=false).
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/socketcan', { cache: 'no-store' });
+        const j = (await res.json()) as
+          | {
+              ok: true;
+              state: { enabled: boolean; interface: string; running: boolean };
+            }
+          | { ok: false; error?: { message?: string } };
+        if (cancelled) return;
+        if (j.ok) {
+          setSocketCanEnabled(j.state.enabled);
+          setSocketCanInterface(j.state.interface);
+          setSocketCanRunning(j.state.running);
+          setSocketCanError(undefined);
+        }
+      } catch (e) {
+        if (!cancelled) setSocketCanError(String(e));
+      }
+    };
+    void tick();
+    const id = setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const onApplySocketCan = async (
+    enabled: boolean,
+    iface: string,
+  ): Promise<void> => {
+    setSocketCanBusy(true);
+    setSocketCanError(undefined);
+    try {
+      const res = await fetch('/api/socketcan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled, interface: iface }),
+      });
+      const j = (await res.json()) as
+        | {
+            ok: true;
+            state: { enabled: boolean; interface: string; running: boolean };
+          }
+        | {
+            ok: false;
+            error?: { message?: string };
+            state?: { enabled: boolean; interface: string; running: boolean };
+          };
+      if (j.ok) {
+        setSocketCanEnabled(j.state.enabled);
+        setSocketCanInterface(j.state.interface);
+        setSocketCanRunning(j.state.running);
+      } else {
+        // Even on driver_failed, the persisted state is now `enabled:true`
+        // and `running:false` — surface the error but reflect the
+        // returned state if present.
+        if (j.state) {
+          setSocketCanEnabled(j.state.enabled);
+          setSocketCanInterface(j.state.interface);
+          setSocketCanRunning(j.state.running);
+        }
+        setSocketCanError(j.error?.message ?? 'SocketCAN toggle failed');
+      }
+    } catch (e) {
+      setSocketCanError(String(e));
+    } finally {
+      setSocketCanBusy(false);
+    }
+  };
 
   const onSetSourceMode = async (mode: 'live' | 'demo'): Promise<void> => {
     if (sourceMode?.mode === mode) return;
@@ -192,13 +271,9 @@ export default function SettingsPage() {
       };
       const bbox = parseBbox();
       if (bbox) body.forecastBbox = bbox;
-      // Always include socketCan: this is a discrete on/off toggle and
-      // we want the persisted file to reflect the current UI state
-      // unambiguously (vs "leave blank to inherit default").
-      body.socketCan = {
-        enabled: socketCanEnabled,
-        interface: socketCanInterface.trim() || 'can0',
-      };
+      // SocketCAN is NOT included in this body — it has its own endpoint
+      // (/api/socketcan) that hot-applies + persists in one call, so the
+      // Save button below doesn't need to touch it.
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
@@ -285,26 +360,43 @@ export default function SettingsPage() {
 
       <fieldset
         className={`border rounded p-3 space-y-2 ${
-          socketCanEnabled ? 'border-sky-700 bg-sky-900/10' : 'border-slate-700'
+          socketCanRunning
+            ? 'border-sky-600 bg-sky-900/10'
+            : socketCanEnabled
+              ? 'border-amber-600 bg-amber-900/10'
+              : 'border-slate-700'
         }`}
       >
         <legend className="px-2 text-sm text-slate-300">
           Live ingest — SocketCAN (PiCAN-M)
         </legend>
         <p className="text-[11px] text-slate-500">
-          Reads N2K frames directly from a Linux SocketCAN interface (i.e. the
-          PiCAN-M HAT on the boat Pi). Runs <em>alongside</em> the YDWG-02 and
-          NGT-1 drivers — the bridge dedupes by source address + PGN, so
-          turning this on while YDWG stays connected is safe for verification.
-          Default off; the boat is on YDWG.
+          Reads N2K frames directly from a Linux SocketCAN interface (e.g. the
+          PiCAN-M HAT on the boat Pi). Runs <em>alongside</em> YDWG-02 and
+          NGT-1 — the bridge dedupes by source address + PGN, so toggling
+          this on while YDWG stays connected is safe for verification.
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={socketCanEnabled}
-            onChange={(e) => setSocketCanEnabled(e.target.checked)}
+            disabled={socketCanBusy}
+            onChange={(e) =>
+              void onApplySocketCan(e.target.checked, socketCanInterface.trim() || 'can0')
+            }
           />
           <span>Enable SocketCAN ingest</span>
+          {socketCanBusy && (
+            <span className="text-xs text-slate-500">Applying…</span>
+          )}
+          {!socketCanBusy && socketCanEnabled && socketCanRunning && (
+            <span className="text-xs text-sky-300 font-mono">running</span>
+          )}
+          {!socketCanBusy && socketCanEnabled && !socketCanRunning && (
+            <span className="text-xs text-amber-300 font-mono">
+              not running (driver failed to start)
+            </span>
+          )}
         </label>
         <label className="block text-sm">
           CAN interface name
@@ -312,20 +404,36 @@ export default function SettingsPage() {
             type="text"
             value={socketCanInterface}
             onChange={(e) => setSocketCanInterface(e.target.value)}
+            onBlur={() => {
+              // Apply only if the value actually changed AND the toggle is
+              // on — otherwise we'd thrash the driver for no reason.
+              if (
+                socketCanEnabled &&
+                socketCanInterface.trim().length > 0 &&
+                socketCanInterface.trim() !== 'can0'
+              ) {
+                void onApplySocketCan(true, socketCanInterface.trim());
+              }
+            }}
             placeholder="can0"
-            disabled={!socketCanEnabled}
+            disabled={socketCanBusy}
             className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-48 font-mono disabled:opacity-40"
           />
           <span className="text-[10px] text-slate-500 ml-2">
             usually <code>can0</code>; <code>vcan0</code> for virtual-CAN testing
           </span>
         </label>
-        <p className="text-[11px] text-amber-400">
-          Takes effect on next <code>systemctl restart g5000-autopilot</code>.
-          Requires the <code>socketcan</code> npm package on the Pi and the
-          <code>mcp2515-can0</code> dt-overlay loaded with the interface up at
-          250 kbit/s.
+        <p className="text-[11px] text-slate-500">
+          Takes effect immediately — the driver is added to or removed from the
+          live bridge via <code>/api/socketcan</code> without a service restart.
+          Persisted to <code>~/.g5000-router/settings.json</code> so it also
+          survives the next reboot. Requires <code>socketcan</code> npm package
+          on the Pi and the <code>mcp2515-can0</code> dt-overlay loaded with
+          the interface up at 250 kbit/s.
         </p>
+        {socketCanError && (
+          <div className="text-rose-400 text-xs">{socketCanError}</div>
+        )}
       </fieldset>
 
       <p className="text-xs text-slate-400">
