@@ -116,9 +116,35 @@ Tests sit next to source as `*.test.ts(x)` in `packages/*/src/**`, `packages/*/t
 - Lat/lon display format is compact DMM: `33 42.232n 66 25.240w` (lowercase hemisphere glued to the minute, no symbols).
 - Discovery/audit docs use Verified / Reported / Unidentified tiers — don't overstate properties (see `docs/ops/network-map.md` for the rule and tone).
 
+## Branching model
+
+Two long-lived branches:
+
+- **`develop`** — active work lands here. All new commits go on `develop` first. This is the default working branch on the Mac and what feature work is committed against.
+- **`main`** — production. Tracks **what is running on the Pi**. Only updated via a "promote" step (fast-forward merge of `develop`) when work is ready to deploy.
+
+Pi's `~/autopilot` is pinned to `main`. The Pi never sees `develop`. To deploy, promote `develop` → `main` on the Mac, then run the Pi rebuild (see *Deployment* below).
+
+Promote workflow (Mac):
+
+```sh
+# When develop is ahead of main and ready to ship:
+git checkout main
+git merge --ff-only develop   # fast-forward; abort if it would create a merge commit
+git push origin main
+git checkout develop          # go back to the working branch
+# Then run the Pi rebuild — see below
+```
+
+The `--ff-only` guard ensures `main` is always a strict prefix of `develop`. If develop has been rebased or branches have diverged, the merge will refuse and you investigate before deploying. Don't `--no-ff` to "make the deploy visible in main's history" — promotion is intended to be invisible; the develop-side commits ARE the record.
+
+For experimental work that shouldn't land on `develop` yet, branch off `develop` (`git checkout -b experiment-x develop`), iterate, then merge back when ready.
+
 ## Deployment
 
 Production runs on RPi5 `sula-bassana` reachable via Tailscale (`100.64.0.117`), boat ethernet (`192.168.2.2`), boat wifi (`192.168.1.232`), or `https://g5000.sulabassana.net` (cloudflared). Systemd unit is `scripts/g5000-autopilot.service` (`Type=notify`, `WatchdogSec=60`). A separate `g5000-forecast-refresh.timer` pokes `/api/forecast/refresh` every ~3h on a curated bbox read live from `/api/settings`.
+
+The Pi pulls from `origin/main` only — see *Branching model* above for the promote step that gets work from `develop` onto `main` before deploying. Skipping the promote step and trying to `git pull` on the Pi will silently no-op (Pi is already at main's tip) and your "deploy" won't actually ship the develop-side changes.
 
 Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge grib` → build `autopilot-server` → build `web` → `systemctl restart g5000-autopilot`.
 
