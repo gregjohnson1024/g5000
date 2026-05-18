@@ -56,7 +56,7 @@ export function SailRecommendationTile() {
 
   return (
     <Link
-      href="/sails"
+      href="/sails/crossover"
       className={`block rounded border ${border} bg-slate-900 p-3 hover:bg-slate-800`}
     >
       <div className="text-xs uppercase tracking-wider text-slate-500">Sail</div>
