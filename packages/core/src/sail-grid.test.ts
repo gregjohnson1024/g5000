@@ -45,9 +45,16 @@ describe('snapToFixedGrid', () => {
     const r = snapToFixedGrid({ twsMs: 0, twaRad: Math.PI + 0.1 });
     expect(r.twaIdx).toBe(36);
   });
-  it('clamps negative TWA to bin 0', () => {
+  it('folds negative TWA to its absolute magnitude (port/starboard symmetric)', () => {
+    // −0.5 rad ≈ 28.6° → bin 6 (28.6/5 rounds to 6)
     const r = snapToFixedGrid({ twsMs: 0, twaRad: -0.5 });
-    expect(r.twaIdx).toBe(0);
+    expect(r.twaIdx).toBe(6);
+  });
+  it('snaps -45° (negative π/4 rad) to the same bin as +45° (bin 9)', () => {
+    const a = snapToFixedGrid({ twsMs: 0, twaRad: -Math.PI / 4 });
+    const b = snapToFixedGrid({ twsMs: 0, twaRad: Math.PI / 4 });
+    expect(a.twaIdx).toBe(9);
+    expect(a.twaIdx).toBe(b.twaIdx);
   });
   it('round-trips through cellKey', () => {
     expect(cellKey({ twsIdx: 12, twaIdx: 9 })).toBe('12,9');

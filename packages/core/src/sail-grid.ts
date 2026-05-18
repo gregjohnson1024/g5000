@@ -19,9 +19,10 @@ export interface Cell {
   twaIdx: number;
 }
 
+// Folds signed TWA to unsigned magnitude before binning.
 export function snapToFixedGrid(input: { twsMs: number; twaRad: number }): Cell {
   const twsKn = input.twsMs / MPS_PER_KN;
-  const twaDeg = input.twaRad * RAD_TO_DEG;
+  const twaDeg = Math.abs(input.twaRad) * RAD_TO_DEG;
   const twsIdx = clamp(Math.round(twsKn / SAIL_GRID_TWS_STEP_KN), 0, SAIL_GRID_TWS_BINS - 1);
   const twaIdx = clamp(Math.round(twaDeg / SAIL_GRID_TWA_STEP_DEG), 0, SAIL_GRID_TWA_BINS - 1);
   return { twsIdx, twaIdx };
