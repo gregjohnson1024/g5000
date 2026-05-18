@@ -8,7 +8,11 @@ import { SerialPort } from 'serialport';
 import { getSharedBus } from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
 import { ConfigStore, setSharedConfigStore } from '@g5000/db';
-import { startTrueWindPipeline, startPolarPipeline } from '@g5000/compute';
+import {
+  startTrueWindPipeline,
+  startPolarPipeline,
+  startSailRecommendationPipeline,
+} from '@g5000/compute';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -407,6 +411,10 @@ async function main(): Promise<void> {
     teardown.push(stopPolarPipeline);
     // eslint-disable-next-line no-console
     console.log('[autopilot] polar pipeline online');
+    const stopSailRec = await startSailRecommendationPipeline({ bus, configStore: store });
+    teardown.push(stopSailRec);
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] sail-recommendation pipeline online');
   } else {
     // 2. Register factories with the controller and boot into the requested mode.
     sourceModeController.setBaseSourceFactories({ live: liveFactory, demo: demoFactory });
@@ -427,6 +435,14 @@ async function main(): Promise<void> {
     teardown.push(stopPolarPipeline);
     // eslint-disable-next-line no-console
     console.log('[autopilot] polar pipeline online');
+
+    // Sail-recommendation pipeline — also always on. Consumes the same
+    // calibrated wind, argmax's over the wardrobe, publishes to
+    // `wardrobe.recommendation`.
+    const stopSailRec = await startSailRecommendationPipeline({ bus, configStore: store });
+    teardown.push(stopSailRec);
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] sail-recommendation pipeline online');
 
     // Tear down whatever base source the controller currently owns on shutdown.
     teardown.push(async () => {
