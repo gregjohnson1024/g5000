@@ -1,6 +1,6 @@
-import { ActiveList } from './active-list.js';
-import { HistoryList } from './history-list.js';
-import { SettingsForm } from './settings-form.js';
+import { ActiveList } from './active-list';
+import { HistoryList } from './history-list';
+import { SettingsForm } from './settings-form';
 
 export default function AlertsPage({
   searchParams,
