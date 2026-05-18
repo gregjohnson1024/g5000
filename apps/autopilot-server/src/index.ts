@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { mkdir, readFile } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus, createAlarmsRegistry, setSharedAlarms } from '@g5000/core';
+import { getSharedBus, createAlarmsRegistry, setSharedAlarms, createRaceState, setSharedRaceState } from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
 import {
   ConfigStore,
@@ -14,9 +14,14 @@ import {
   appendAlarmHistory,
   updateAlarmHistoryClear,
   updateAlarmHistoryAck,
+  loadRaceState,
+  saveRaceState,
   type AlarmsConfig,
+  type PolarTable,
 } from '@g5000/db';
-import { startTrueWindPipeline, startPolarPipeline, startAlarmsPipeline } from '@g5000/compute';
+import { startTrueWindPipeline, startPolarPipeline, startAlarmsPipeline, startRaceComputePipeline } from '@g5000/compute';
+import type { LatLon } from '@g5000/compute';
+import type { CurrentField } from '@g5000/grib';
 import {
   Ngt1Driver,
   SerialPort0183Driver,
@@ -527,6 +532,48 @@ async function main(): Promise<void> {
     teardown.push(stopPolarPipeline);
     // eslint-disable-next-line no-console
     console.log('[autopilot] polar pipeline online');
+
+    // --- Race state + pipeline ---
+    const raceStateConfig = await loadRaceState(store);
+    // Boot-time staleness reset: clear timer if startMs is >1h in the past.
+    if (
+      raceStateConfig.timer.startMs !== null &&
+      Date.now() - raceStateConfig.timer.startMs > 3_600_000
+    ) {
+      raceStateConfig.timer.startMs = null;
+      raceStateConfig.timer.state = 'idle';
+      await saveRaceState(store, raceStateConfig);
+    }
+    const raceState = createRaceState(raceStateConfig);
+    setSharedRaceState(raceState);
+
+    // Polar ref: peek the most-recently-published polar.
+    const polarRef: { current: PolarTable | null } = { current: null };
+    store.activePolar$.subscribe((p) => {
+      polarRef.current = p;
+    });
+
+    // Current field ref: v1 leaves this null — the pipeline degrades to
+    // "no current integration" for laylines. A follow-up issue can subscribe
+    // to the in-process current-field cache once one is exposed.
+    const currentFieldRef: { current: CurrentField | null } = { current: null };
+
+    // Waypoints ref: v1 starts empty; populated by a follow-up issue.
+    const waypointsRef: { current: Map<string, LatLon> } = { current: new Map() };
+
+    const raceHandle = startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef, waypointsRef);
+    teardown.push(async () => raceHandle.dispose());
+
+    // Persist on every mutation (debounced 500 ms).
+    let raceSaveTimer: ReturnType<typeof setTimeout> | null = null;
+    raceState.subscribe(() => {
+      if (raceSaveTimer) clearTimeout(raceSaveTimer);
+      raceSaveTimer = setTimeout(() => {
+        void saveRaceState(store, raceState.get()).catch(() => undefined);
+      }, 500);
+    });
+    // eslint-disable-next-line no-console
+    console.log('[autopilot] race compute pipeline online');
 
     // Tear down whatever base source the controller currently owns on shutdown.
     teardown.push(async () => {
