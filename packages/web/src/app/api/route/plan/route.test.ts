@@ -1,4 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { tmpdir } from 'node:os';
+import {
+  ConfigStore,
+  setSharedConfigStore,
+  _resetSharedConfigStoreForTests,
+} from '@g5000/db';
 
 vi.mock('@g5000/routing', async () => ({
   ...(await vi.importActual('@g5000/routing')),
@@ -23,6 +29,17 @@ vi.mock('../../../../lib/coastline.js', () => ({
 
 import { POST } from './route';
 
+let store: ConfigStore;
+
+beforeEach(async () => {
+  store = await ConfigStore.open(`${tmpdir()}/route-plan-${Date.now()}-${Math.random()}.db`);
+  setSharedConfigStore(store);
+});
+afterEach(async () => {
+  await store.close();
+  _resetSharedConfigStoreForTests();
+});
+
 describe('POST /api/route/plan', () => {
   it('returns a Route for a well-formed body', async () => {
     const req = new Request('http://localhost/api/route/plan', {
@@ -32,8 +49,6 @@ describe('POST /api/route/plan', () => {
         end: { lat: 30, lon: -65 },
         departure: 0,
         model: 'GFS',
-        polar: { twsBins: [], twaBins: [], boatSpeed: [] },
-        polarId: 'test',
       }),
     });
     const res = await POST(req);
