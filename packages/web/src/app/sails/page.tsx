@@ -6,6 +6,7 @@ import { PolarHeatmap } from '../polars/PolarHeatmap';
 import { RecommendationPanel } from './RecommendationPanel';
 import { CrossoverChart } from './CrossoverChart';
 import { SettingsDrawer } from './SettingsDrawer';
+import { ForecastTimeline } from './ForecastTimeline';
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
@@ -165,6 +166,8 @@ export default function SailsPage() {
       )}
 
       {wardrobe && <CrossoverChart wardrobe={wardrobe} />}
+
+      {wardrobe && <ForecastTimeline wardrobe={wardrobe} />}
 
       {wardrobe && (
         <div className="space-y-2">
