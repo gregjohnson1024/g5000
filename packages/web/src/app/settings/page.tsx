@@ -18,6 +18,11 @@ interface Bbox {
   lonMax: number;
 }
 
+interface SocketCanConfig {
+  enabled: boolean;
+  interface: string;
+}
+
 interface Settings {
   g5000Host?: string;
   wgrib2Path?: string;
@@ -29,6 +34,13 @@ interface Settings {
    * on the next 3 h tick.
    */
   forecastBbox?: Bbox;
+  /**
+   * Opt-in SocketCAN ingest for the PiCAN-M HAT. Default: disabled (current
+   * fleet uses YDWG/NGT-1). When enabled, the autopilot-server boots an
+   * additional SocketCanDriver alongside YDWG. Takes effect on next service
+   * restart — the bridge wires drivers at boot.
+   */
+  socketCan?: SocketCanConfig;
 }
 
 const DEFAULT_FORECAST_BBOX: Bbox = {
@@ -67,6 +79,11 @@ export default function SettingsPage() {
   const [sourceModeBusy, setSourceModeBusy] = useState<boolean>(false);
   const [sourceModeError, setSourceModeError] = useState<string | undefined>();
 
+  // SocketCAN (PiCAN-M) config. Persisted via /api/settings; takes effect
+  // on next autopilot-server restart.
+  const [socketCanEnabled, setSocketCanEnabled] = useState<boolean>(false);
+  const [socketCanInterface, setSocketCanInterface] = useState<string>('can0');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -87,6 +104,12 @@ export default function SettingsPage() {
           setBboxLatMax(String(s.forecastBbox.latMax));
           setBboxLonMin(String(s.forecastBbox.lonMin));
           setBboxLonMax(String(s.forecastBbox.lonMax));
+        }
+        if (s.socketCan) {
+          setSocketCanEnabled(s.socketCan.enabled === true);
+          if (typeof s.socketCan.interface === 'string' && s.socketCan.interface.length > 0) {
+            setSocketCanInterface(s.socketCan.interface);
+          }
         }
       } catch (e) {
         if (!cancelled) setError(String(e));
@@ -169,6 +192,13 @@ export default function SettingsPage() {
       };
       const bbox = parseBbox();
       if (bbox) body.forecastBbox = bbox;
+      // Always include socketCan: this is a discrete on/off toggle and
+      // we want the persisted file to reflect the current UI state
+      // unambiguously (vs "leave blank to inherit default").
+      body.socketCan = {
+        enabled: socketCanEnabled,
+        interface: socketCanInterface.trim() || 'can0',
+      };
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
@@ -251,6 +281,51 @@ export default function SettingsPage() {
         {sourceModeError && (
           <div className="text-rose-400 text-xs">{sourceModeError}</div>
         )}
+      </fieldset>
+
+      <fieldset
+        className={`border rounded p-3 space-y-2 ${
+          socketCanEnabled ? 'border-sky-700 bg-sky-900/10' : 'border-slate-700'
+        }`}
+      >
+        <legend className="px-2 text-sm text-slate-300">
+          Live ingest — SocketCAN (PiCAN-M)
+        </legend>
+        <p className="text-[11px] text-slate-500">
+          Reads N2K frames directly from a Linux SocketCAN interface (i.e. the
+          PiCAN-M HAT on the boat Pi). Runs <em>alongside</em> the YDWG-02 and
+          NGT-1 drivers — the bridge dedupes by source address + PGN, so
+          turning this on while YDWG stays connected is safe for verification.
+          Default off; the boat is on YDWG.
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={socketCanEnabled}
+            onChange={(e) => setSocketCanEnabled(e.target.checked)}
+          />
+          <span>Enable SocketCAN ingest</span>
+        </label>
+        <label className="block text-sm">
+          CAN interface name
+          <input
+            type="text"
+            value={socketCanInterface}
+            onChange={(e) => setSocketCanInterface(e.target.value)}
+            placeholder="can0"
+            disabled={!socketCanEnabled}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-48 font-mono disabled:opacity-40"
+          />
+          <span className="text-[10px] text-slate-500 ml-2">
+            usually <code>can0</code>; <code>vcan0</code> for virtual-CAN testing
+          </span>
+        </label>
+        <p className="text-[11px] text-amber-400">
+          Takes effect on next <code>systemctl restart g5000-autopilot</code>.
+          Requires the <code>socketcan</code> npm package on the Pi and the
+          <code>mcp2515-can0</code> dt-overlay loaded with the interface up at
+          250 kbit/s.
+        </p>
       </fieldset>
 
       <p className="text-xs text-slate-400">

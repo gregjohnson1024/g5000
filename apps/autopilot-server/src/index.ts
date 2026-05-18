@@ -1,7 +1,8 @@
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { mkdir, readFile } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
 import { getSharedBus } from '@g5000/core';
@@ -14,6 +15,8 @@ import {
   ReplayDriver,
   YdwgRawTcpDriver,
   createYdwgTcpSocketFactory,
+  SocketCanDriver,
+  createSocketCanRawChannelFactory,
   runBridge,
   startSessionLogger,
   startTrueWindTx,
@@ -58,6 +61,48 @@ const DEMO_MODE = process.env.DEMO_MODE === '1';
 const SKIP_BRIDGE = process.env.SKIP_BRIDGE === '1';
 const HLINK_ENABLED = process.env.HLINK_ENABLED !== '0';
 const HLINK_PORT = Number(process.env.HLINK_PORT ?? 5050);
+
+// SocketCAN ingest is opt-in. Default off so existing Pi installs keep
+// running on YDWG/NGT-1 with zero behaviour change. Enabled via the /settings
+// UI (writes to ~/.g5000-router/settings.json) OR via env-var override
+// (handy for testing): SOCKETCAN_ENABLED=1 SOCKETCAN_INTERFACE=can0.
+const SOCKETCAN_ROOT = process.env.G5000_ROUTER_ROOT ?? path.join(homedir(), '.g5000-router');
+const SOCKETCAN_SETTINGS_PATH = path.join(SOCKETCAN_ROOT, 'settings.json');
+
+interface SocketCanSettings {
+  enabled: boolean;
+  interface: string;
+}
+
+async function readSocketCanSettings(): Promise<SocketCanSettings> {
+  // Env-var override wins, since it's the operator's emergency knob.
+  if (process.env.SOCKETCAN_ENABLED === '1') {
+    return {
+      enabled: true,
+      interface: process.env.SOCKETCAN_INTERFACE ?? 'can0',
+    };
+  }
+  if (process.env.SOCKETCAN_ENABLED === '0') {
+    return { enabled: false, interface: 'can0' };
+  }
+  // Otherwise read the persisted settings.json (Settings UI writes here).
+  try {
+    const buf = await readFile(SOCKETCAN_SETTINGS_PATH, 'utf8');
+    const parsed = JSON.parse(buf) as { socketCan?: Partial<SocketCanSettings> };
+    const sc = parsed.socketCan;
+    if (sc && typeof sc === 'object') {
+      return {
+        enabled: sc.enabled === true,
+        interface: typeof sc.interface === 'string' && sc.interface.length > 0
+          ? sc.interface
+          : 'can0',
+      };
+    }
+  } catch {
+    /* file missing / malformed — default to disabled */
+  }
+  return { enabled: false, interface: 'can0' };
+}
 
 async function main(): Promise<void> {
   const bus = getSharedBus();
@@ -157,6 +202,29 @@ async function main(): Promise<void> {
           // eslint-disable-next-line no-console
           console.warn(
             `[autopilot] YDWG offline (${err instanceof Error ? err.message : String(err)})`,
+          );
+        }
+      }
+
+      // SocketCAN ingest (PiCAN-M HAT) — opt-in via Settings UI or env var.
+      // Runs alongside YDWG/NGT-1 when both are configured, which is fine
+      // for verification (the bridge dedupes by source addr + PGN). Once
+      // PiCAN-M is proven, the operator can disable YDWG via env var.
+      const socketCan = await readSocketCanSettings();
+      if (socketCan.enabled) {
+        try {
+          const can = new SocketCanDriver({
+            channelFactory: createSocketCanRawChannelFactory(socketCan.interface),
+          });
+          await can.start();
+          drivers.push(can);
+          stops.push(() => can.stop());
+          // eslint-disable-next-line no-console
+          console.log(`[autopilot] SocketCAN online on ${socketCan.interface}`);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[autopilot] SocketCAN offline on ${socketCan.interface} (${err instanceof Error ? err.message : String(err)})`,
           );
         }
       }
