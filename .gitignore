@@ -8,6 +8,7 @@ build/
 .remember/
 .code-review-graph/
 .claude/
+.worktrees/
 
 # Environment
 .env
