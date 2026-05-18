@@ -253,6 +253,14 @@ export class ConfigStore {
   getPassageLog(): PassageLog {
     return this.subjects.passageLog.value;
   }
+  /**
+   * Direct access to the underlying Drizzle instance for modules that need
+   * to query tables not exposed through ConfigStore's BehaviorSubject API
+   * (e.g. alarms-config, alarms-history). Treat as a power-user escape hatch.
+   */
+  get drizzle(): BetterSQLite3Database {
+    return this.db;
+  }
   /** Derived from sails$ — returns the active config's polar. */
   get activePolar$(): Observable<PolarTable> {
     return this.subjects.sails.pipe(map(activeConfigPolar));
