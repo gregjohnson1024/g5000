@@ -25,21 +25,32 @@ function project(
 export interface CogExtensionProps {
   map: maplibregl.Map | null;
   p: LivePos | null;
-  /** Minutes ahead to extend the line. Default 360 (6 h). */
+  /** Minutes ahead to extend the line. Default 360 (6 h). Ignored if totalNm is set. */
   totalMinutes?: number;
+  /**
+   * Fixed extension length in nautical miles. If provided, takes precedence
+   * over `totalMinutes` — useful for "show me 100 NM ahead" on a passage
+   * chart where the user wants a distance-based horizon, not a time one.
+   */
+  totalNm?: number;
   /** When true, hide the line. */
   hidden?: boolean;
 }
 
 /**
- * Renders a dashed line from the boat extending along COG for
- * `totalMinutes` of travel at the current SOG, with a single circle
- * at the tip showing where the boat will be at that time.
+ * Renders a dashed line from the boat extending along COG, with a single
+ * circle at the tip. Two horizon modes:
+ *
+ * - `totalNm` (preferred when set): fixed distance ahead.
+ * - `totalMinutes` (fallback): SOG × time horizon — extension grows and
+ *   shrinks with speed. Used by AIS targets for "where will everyone be
+ *   in N minutes" type rendering.
  */
 export function CogExtension({
   map,
   p,
   totalMinutes = 360,
+  totalNm,
   hidden = false,
 }: CogExtensionProps) {
   useEffect(() => {
@@ -88,7 +99,9 @@ export function CogExtension({
       src.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
-    const totalM = p.sog * (totalMinutes * 60); // SOG in m/s × seconds
+    // Distance-based mode wins if set; otherwise time-based (SOG × time).
+    const totalM =
+      totalNm !== undefined ? totalNm * 1852 : p.sog * (totalMinutes * 60);
     if (totalM < 200) {
       src.setData({ type: 'FeatureCollection', features: [] });
       return;
@@ -107,7 +120,7 @@ export function CogExtension({
       },
     ];
     src.setData({ type: 'FeatureCollection', features });
-  }, [map, p, totalMinutes, hidden]);
+  }, [map, p, totalMinutes, totalNm, hidden]);
   // Layer cleanup intentionally not registered — the parent Map component
   // calls `map.remove()` on unmount which discards every layer. A separate
   // cleanup effect would race against StrictMode's double-mount and leave

@@ -465,7 +465,11 @@ function ChartPageInner() {
         <CogExtension
           map={mapInstance}
           p={livePos}
-          totalMinutes={COG_EXTENSION_MINUTES}
+          // Own-boat extension is distance-based (100 NM ahead),
+          // regardless of SOG. AIS targets keep the time-based 6 h
+          // horizon below so "where will everyone be in 6 h" still
+          // reads as a single comparable forecast.
+          totalNm={100}
           hidden={false}
         />
         <RangeRings
