@@ -1,5 +1,5 @@
 import { plan } from '@g5000/routing';
-import type { PolarTable } from '@g5000/db';
+import type { PolarTable, SailWardrobe } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { loadWindFor, loadCurrentFor } from '../../../../lib/grib-context';
 import { loadDefaultCoastline } from '../../../../lib/coastline';
@@ -12,10 +12,13 @@ interface Body {
   end: { lat: number; lon: number };
   departure: number;
   model: 'GFS' | 'ECMWF';
-  polar: PolarTable;
+  /** Single-polar mode. Mutually exclusive with `wardrobe`. */
+  polar?: PolarTable;
   polarId: string;
   useCurrents?: boolean;
   options?: Record<string, unknown>;
+  /** Wardrobe mode: server runs the wardrobe-aware planner. */
+  wardrobe?: SailWardrobe;
 }
 
 function bboxAround(a: Body['start'], b: Body['end']) {
@@ -33,7 +36,10 @@ function validate(b: unknown): b is Body {
   const o = b as Record<string, unknown>;
   if (!o.start || !o.end || typeof o.departure !== 'number') return false;
   if (typeof o.model !== 'string' || !['GFS', 'ECMWF'].includes(o.model)) return false;
-  if (!o.polar || !o.polarId) return false;
+  if (!o.polarId) return false;
+  const hasPolar = !!o.polar;
+  const hasWardrobe = !!o.wardrobe;
+  if (!hasPolar && !hasWardrobe) return false;
   return true;
 }
 
@@ -71,6 +77,7 @@ export async function POST(req: Request): Promise<Response> {
       polarId: b.polarId,
       coastline,
       currents,
+      wardrobe: b.wardrobe,
       options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents, captureIsochrones: true },
     });
     return Response.json({ ok: true, route });
