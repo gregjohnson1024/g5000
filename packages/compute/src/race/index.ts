@@ -19,6 +19,7 @@ import { predictOcs } from './ocs-predictor.js';
 import { interpolatePolarSpeed, optimalTwaForVmg } from '../polars/math.js';
 
 export { startPolarTargetsPredicate, createWindShiftDetector, projectLayline, vmc, predictOcs };
+export { sideOfLine, type LatLon };
 
 interface Latest {
   pos?: LatLon;

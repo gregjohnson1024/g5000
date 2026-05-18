@@ -9,7 +9,9 @@ export * from './polars/pipeline.js';
 export * from './ais/cpa.js';
 export * from './current/math.js';
 export * from './alarms/index.js';
-export * from './race/index.js';
-export type { LatLon } from './race/line-geometry.js';
-export { sideOfLine } from './race/line-geometry.js';
+// Race exports live at the `@g5000/compute/race` subpath. They are NOT
+// re-exported here because race/laylines.js statically imports @g5000/grib
+// (for current-field interpolation), and grib uses node:path. Bundling
+// that chain into client components breaks `next build --webpack`. Server
+// consumers (autopilot-server, /api/race/* routes) import via the subpath.
 export * from './sail-crossover/index.js';

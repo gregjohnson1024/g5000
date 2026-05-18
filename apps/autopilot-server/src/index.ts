@@ -23,10 +23,9 @@ import {
   startTrueWindPipeline,
   startPolarPipeline,
   startAlarmsPipeline,
-  startRaceComputePipeline,
   startSailCrossoverPipeline,
 } from '@g5000/compute';
-import type { LatLon } from '@g5000/compute';
+import { startRaceComputePipeline, type LatLon } from '@g5000/compute/race';
 import type { CurrentField } from '@g5000/grib';
 import {
   Ngt1Driver,
