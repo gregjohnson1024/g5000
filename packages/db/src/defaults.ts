@@ -194,6 +194,14 @@ export const DEFAULT_POLARS: PolarTable = {
   ],
 };
 
+/**
+ * One sail-configuration entry in the wardrobe. Identity ("what sails are
+ * up", "what's the daggerboard doing") lives here; the polar that describes
+ * how the boat performs in this configuration lives in `polar_revisions`
+ * rows pointed at by `modes[mode].activeRevisionId`. The legacy `polar?`
+ * field is only present on pre-migration rows and is read once by the
+ * boot-time migrator.
+ */
 export interface SailConfig {
   /** Stable unique ID (e.g. 'default', 'full-j1', 'reef1-a2'). */
   id: string;
@@ -229,6 +237,13 @@ export interface SailConfig {
   modes: Partial<Record<PolarMode, { activeRevisionId: string }>>;
 }
 
+/**
+ * The sail wardrobe: a list of configurations + which one (and which mode)
+ * is currently active. `ConfigStore.activePolar$` resolves the active
+ * config's active-mode revision and emits the resulting `PolarTable`; the
+ * compute and routing pipelines subscribe there. Scoped to one `boatId`
+ * (single-active-boat-per-process today).
+ */
 export interface SailWardrobe {
   /** Which boat this wardrobe belongs to. Defaults to 'sula' on existing installs. */
   boatId: BoatId;
