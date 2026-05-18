@@ -28,6 +28,12 @@ export const compassDeviation = sqliteTable('compass_deviation', {
   value: text('value').notNull(), // JSON-encoded CompassDeviation
 });
 
+/**
+ * @deprecated Legacy v1 singleton polar. Read once on first boot by the v1→v2
+ * migrator (see `migrate-wardrobe-v2.ts`) and then untouched. Drop in a
+ * follow-up migration after all Pi installs have confirmed they're running
+ * v2 wardrobes.
+ */
 export const polars = sqliteTable('polars', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded PolarTable

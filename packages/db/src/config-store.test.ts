@@ -105,6 +105,7 @@ describe('ConfigStore', () => {
           mainState: 'Reef 1',
           downwindSail: 'A2',
           polar: DEFAULT_WARDROBE.configs[0]!.polar,
+          modes: {},
         },
       ],
     };

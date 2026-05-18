@@ -120,6 +120,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS aws_awa_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS bsp_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS compass_deviation (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      -- DEPRECATED: legacy v1 singleton polar; read by migrator, then unused. Drop after v2 migration confirmed on Pi.
       CREATE TABLE IF NOT EXISTS polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS damping_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -164,6 +165,7 @@ export class ConfigStore {
     // 2. Read the wardrobe row (may be missing, v1, or v2).
     // 3. If v1 (or synthesized from legacy polar), run the pure migrator and
     //    persist wardrobe + new revisions in a single SQLite transaction.
+    // DEPRECATED: legacy v1 read path; only the migrator consumes this. Drop after v2 confirmed on Pi.
     const legacyPolar = loadOrInsert<PolarTable>(polars, DEFAULT_POLARS);
 
     const wardrobeRows = db.select().from(sailWardrobe).where(eq(sailWardrobe.id, SINGLETON)).all();
@@ -358,6 +360,13 @@ export class ConfigStore {
     this.subjects.compassDeviation.next(value);
   }
   async setSails(value: SailWardrobe): Promise<void> {
+    for (const cfg of value.configs) {
+      if (!cfg.modes || typeof cfg.modes !== 'object') {
+        throw new Error(
+          `sailConfig "${cfg.id}" missing required v2 'modes' field`,
+        );
+      }
+    }
     const slot = value.configs.find((c) => c.id === value.activeConfigId);
     if (!slot) {
       throw new Error(
