@@ -102,6 +102,20 @@ describe('mapPgnToSamples', () => {
     expect(mapPgnToSamples(make(129025, { Latitude: 32.7 }))).toEqual([]);
   });
 
+  it('maps PGN 127508 (DC Battery Status) to electrical.battery.voltage for instance 0', () => {
+    const decoded = make(127508, { Instance: 0, Voltage: 12.6 });
+    const samples = mapPgnToSamples(decoded);
+    const batt = samples.find((s) => s.channel === Channels.Electrical.BatteryVoltage);
+    expect(batt).toBeDefined();
+    expect(batt?.value).toEqual({ kind: 'scalar', value: 12.6, unit: 'V' });
+  });
+
+  it('ignores PGN 127508 frames for non-zero instances (v1 lowest-only)', () => {
+    const decoded = make(127508, { Instance: 1, Voltage: 13.1 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.find((s) => s.channel === Channels.Electrical.BatteryVoltage)).toBeUndefined();
+  });
+
   it('maps PGN 129026 True reference to nav.gps.cog and nav.gps.sog', () => {
     const decoded = make(129026, { 'COG Reference': 'True', COG: 5.27, SOG: 3.6 });
     const samples = mapPgnToSamples(decoded);

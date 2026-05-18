@@ -198,6 +198,24 @@ const mappers: Record<number, MapperFn> = {
     ];
   },
 
+  // PGN 127508 — DC Battery Status. Multi-instance (house bank vs. start, etc.).
+  // V1: pick instance 0 only and ignore the rest. A future spec will disambiguate
+  // multiple banks once we have a UI for it.
+  127508: (pgn) => {
+    const instance = pgn.fields['Instance'];
+    const voltage = pgn.fields['Voltage'];
+    if (instance !== 0) return [];
+    if (typeof voltage !== 'number') return [];
+    return [
+      {
+        channel: Channels.Electrical.BatteryVoltage,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(voltage, 'V'),
+        source: sourceTag(pgn),
+      },
+    ];
+  },
+
   // PGN 127257 — attitude (yaw/pitch/roll, all in radians).
   // Sailing convention: roll = heel.
   127257: (pgn) => {
