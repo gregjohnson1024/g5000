@@ -58,6 +58,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     items: [
       { href: '/boat', label: 'Boat' },
       { href: '/sails', label: 'Sails' },
+      { href: '/sails/crossover', label: 'Crossover' },
     ],
   },
   {
@@ -73,15 +74,30 @@ const SETTINGS_HREFS: ReadonlySet<string> = new Set(
   SETTINGS_GROUPS.flatMap((g) => g.items.map((i) => i.href)),
 );
 
-function isActive(pathname: string | null, href: string): boolean {
-  return pathname === href || (pathname?.startsWith(href + '/') ?? false);
+const ALL_HREFS: readonly string[] = [
+  ...TOP_LEVEL.map((it) => it.href),
+  ...SETTINGS_GROUPS.flatMap((g) => g.items.map((it) => it.href)),
+  ALERTS_HREF,
+];
+
+/**
+ * Longest-prefix match: the menu item whose href is the longest prefix of the
+ * current pathname is "active". This lets `/sails` and `/sails/crossover`
+ * coexist without `/sails` lighting up when the user is on the child route.
+ */
+function bestMatchHref(pathname: string | null): string | null {
+  if (!pathname) return null;
+  let best: string | null = null;
+  for (const href of ALL_HREFS) {
+    if (pathname === href || pathname.startsWith(href + '/')) {
+      if (best === null || href.length > best.length) best = href;
+    }
+  }
+  return best;
 }
 
-function isAnySettingsActive(pathname: string | null): boolean {
-  for (const href of SETTINGS_HREFS) {
-    if (isActive(pathname, href)) return true;
-  }
-  return false;
+function isAnySettingsActive(activeHref: string | null): boolean {
+  return activeHref !== null && SETTINGS_HREFS.has(activeHref);
 }
 
 export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
@@ -142,7 +158,8 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
     };
   }, [open]);
 
-  const settingsActive = isAnySettingsActive(pathname);
+  const activeHref = bestMatchHref(pathname);
+  const settingsActive = isAnySettingsActive(activeHref);
 
   return (
     <nav className="bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center gap-1 flex-wrap text-sm">
@@ -150,7 +167,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
         G5000
       </a>
       {topItems.map((it) => {
-        const active = isActive(pathname, it.href);
+        const active = activeHref === it.href;
         return (
           <a
             key={it.href}
@@ -197,7 +214,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
                   </div>
                   <ul className="flex flex-col">
                     {group.items.map((it) => {
-                      const active = isActive(pathname, it.href);
+                      const active = activeHref === it.href;
                       return (
                         <li key={it.href}>
                           <a
@@ -236,7 +253,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
                 ? 'text-yellow-300 hover:bg-slate-800'
                 : topSeverity === 'INFO'
                   ? 'text-blue-300 hover:bg-slate-800'
-                  : isActive(pathname, ALERTS_HREF)
+                  : activeHref === ALERTS_HREF
                     ? 'bg-amber-600 text-slate-900'
                     : 'text-slate-300 hover:bg-slate-800'
           }`}

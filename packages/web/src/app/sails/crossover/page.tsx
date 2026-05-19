@@ -41,11 +41,11 @@ export default function CrossoverPage() {
   }
 
   return (
-    <div className="grid grid-cols-[260px_1fr_220px] gap-4 p-4">
-      <aside>
+    <div className="grid grid-cols-[260px_minmax(0,1fr)_220px] gap-4 p-4">
+      <aside className="min-w-0">
         <CategoryRecommendation wardrobe={wardrobe} />
       </aside>
-      <main>
+      <main className="min-w-0">
         <div className="flex gap-2 mb-2 text-sm">
           <button
             onClick={() => setMode('view')}
@@ -80,29 +80,44 @@ export default function CrossoverPage() {
           <div className="text-sm text-gray-500">Pick a sail to edit →</div>
         )}
       </main>
-      <aside>
+      <aside className="min-w-0">
         <h3 className="text-sm font-medium">Sails</h3>
-        {(['headsail', 'main', 'downwind'] as SailCategory[]).map((cat) => (
-          <div key={cat} className="mt-2">
-            <div className="text-xs text-gray-500">{cat}</div>
-            {wardrobe.sails
-              .filter((s) => s.category === cat)
-              .map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    setMode('edit');
-                    setEditSailId(s.id);
-                  }}
-                  className={`block w-full text-left px-1 ${
-                    s.id === editSailId ? 'bg-blue-100' : ''
-                  }`}
-                >
-                  {s.name} <span className="text-xs text-gray-400">({s.region.cells.length})</span>
-                </button>
-              ))}
-          </div>
-        ))}
+        {wardrobe.sails.length === 0 && (
+          <p className="mt-2 text-xs text-gray-500">
+            No sails yet. Add them on the{' '}
+            <a href="/sails" className="underline">
+              Wardrobe page
+            </a>{' '}
+            first.
+          </p>
+        )}
+        {(['headsail', 'main', 'downwind'] as SailCategory[]).map((cat) => {
+          const sailsInCat = wardrobe.sails.filter((s) => s.category === cat);
+          return (
+            <div key={cat} className="mt-2">
+              <div className="text-xs uppercase tracking-wide text-gray-500">{cat}</div>
+              {sailsInCat.length === 0 ? (
+                <div className="text-xs text-gray-400 italic">—</div>
+              ) : (
+                sailsInCat.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setMode('edit');
+                      setEditSailId(s.id);
+                    }}
+                    className={`block w-full text-left px-1 ${
+                      s.id === editSailId ? 'bg-blue-100' : ''
+                    }`}
+                  >
+                    {s.name}{' '}
+                    <span className="text-xs text-gray-400">({s.region.cells.length})</span>
+                  </button>
+                ))
+              )}
+            </div>
+          );
+        })}
       </aside>
     </div>
   );
