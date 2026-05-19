@@ -314,13 +314,7 @@ export function LogClientView() {
   );
 }
 
-function EntryRow({
-  entry,
-  onDelete,
-}: {
-  entry: LogEntry;
-  onDelete: () => void;
-}) {
+function EntryRow({ entry, onDelete }: { entry: LogEntry; onDelete: () => void }) {
   const { hms } = fmtUtc(entry.tsMs);
   const chip = KIND_BG[entry.kind] ?? 'bg-slate-700 text-slate-100';
   const isAuto = entry.source === 'auto';

@@ -78,9 +78,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: 'text required' }, { status: 400 });
   }
   const kind: ShipLogKind =
-    body.kind && VALID_KINDS.has(body.kind as ShipLogKind)
-      ? (body.kind as ShipLogKind)
-      : 'note';
+    body.kind && VALID_KINDS.has(body.kind as ShipLogKind) ? (body.kind as ShipLogKind) : 'note';
 
   const numOrNull = (v: unknown): number | null =>
     typeof v === 'number' && Number.isFinite(v) ? v : null;

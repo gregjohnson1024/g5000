@@ -10,17 +10,22 @@ const R_NM = 3440.065; // earth radius in nautical miles (spherical)
  * `[latDeg, lonDeg]` at the destination. ~0.5% accuracy at 1000 NM —
  * far tighter than navigation-aid range rings need.
  */
-function destPoint(latDeg: number, lonDeg: number, distNm: number, brgRad: number): [number, number] {
+function destPoint(
+  latDeg: number,
+  lonDeg: number,
+  distNm: number,
+  brgRad: number,
+): [number, number] {
   const φ1 = (latDeg * Math.PI) / 180;
   const λ1 = (lonDeg * Math.PI) / 180;
   const δ = distNm / R_NM;
-  const φ2 = Math.asin(
-    Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(brgRad),
-  );
-  const λ2 = λ1 + Math.atan2(
-    Math.sin(brgRad) * Math.sin(δ) * Math.cos(φ1),
-    Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2),
-  );
+  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(brgRad));
+  const λ2 =
+    λ1 +
+    Math.atan2(
+      Math.sin(brgRad) * Math.sin(δ) * Math.cos(φ1),
+      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2),
+    );
   return [(φ2 * 180) / Math.PI, (((λ2 * 180) / Math.PI + 540) % 360) - 180];
 }
 
@@ -114,7 +119,11 @@ export function RangeRings({
       if (hidden || !origin || !Number.isFinite(origin.lat) || !Number.isFinite(origin.lon)) {
         src.setData({ type: 'FeatureCollection', features: [] });
         for (const mk of labels.values()) {
-          try { mk.remove(); } catch { /* map gone */ }
+          try {
+            mk.remove();
+          } catch {
+            /* map gone */
+          }
         }
         labels.clear();
         return;
@@ -156,7 +165,11 @@ export function RangeRings({
       }
       for (const [k, mk] of labels) {
         if (!live.has(k)) {
-          try { mk.remove(); } catch { /* map gone */ }
+          try {
+            mk.remove();
+          } catch {
+            /* map gone */
+          }
           labels.delete(k);
         }
       }

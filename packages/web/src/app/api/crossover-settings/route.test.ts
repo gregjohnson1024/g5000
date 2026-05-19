@@ -1,16 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import {
-  ConfigStore,
-  setSharedConfigStore,
-  _resetSharedConfigStoreForTests,
-} from '@g5000/db';
+import { ConfigStore, setSharedConfigStore, _resetSharedConfigStoreForTests } from '@g5000/db';
 import { GET, POST } from './route.js';
 
 let store: ConfigStore;
 
 beforeEach(async () => {
-  store = await ConfigStore.open(`${tmpdir()}/crossover-settings-${Date.now()}-${Math.random()}.db`);
+  store = await ConfigStore.open(
+    `${tmpdir()}/crossover-settings-${Date.now()}-${Math.random()}.db`,
+  );
   setSharedConfigStore(store);
 });
 

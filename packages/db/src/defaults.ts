@@ -200,11 +200,7 @@ export const DEFAULT_POLARS: PolarTable = {
  * sail plan by picking one sail per category (headsail / main / downwind).
  */
 export type SailCategory = 'headsail' | 'main' | 'downwind';
-export const SAIL_CATEGORIES: readonly SailCategory[] = [
-  'headsail',
-  'main',
-  'downwind',
-] as const;
+export const SAIL_CATEGORIES: readonly SailCategory[] = ['headsail', 'main', 'downwind'] as const;
 
 export interface SailRegion {
   /** Grid cell keys "twsIdx,twaIdx" against the fixed grid in @g5000/core. */

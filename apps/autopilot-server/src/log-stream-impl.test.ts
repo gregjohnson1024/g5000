@@ -80,7 +80,7 @@ describe('installLogStream', () => {
     installed = installLogStream() as TestImpl;
     console.log({ a: 1, b: 'x' });
     const [entry] = installed.getRecent();
-    expect(entry.message).toContain("a: 1");
+    expect(entry.message).toContain('a: 1');
     expect(entry.message).toContain("b: 'x'");
   });
 });

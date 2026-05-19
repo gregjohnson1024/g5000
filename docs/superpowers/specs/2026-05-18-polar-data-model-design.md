@@ -9,9 +9,10 @@
 
 Today's polar storage is a single global wardrobe of `SailConfig` slots, each embedding one `PolarTable`. `ConfigStore` exposes `activePolar$` which resolves to "the polar of the active slot". One global wardrobe, one polar per slot, no boat scoping, no history.
 
-Issue #1 asks: *"To handle polars in G5000, we want a multi-boat multi-slot capable data model. For a high-performance yacht, what is the correct data model to handle the polars?"*
+Issue #1 asks: _"To handle polars in G5000, we want a multi-boat multi-slot capable data model. For a high-performance yacht, what is the correct data model to handle the polars?"_
 
 Goal: a data model that supports
+
 - Per-boat scoping (single active boat per process today; ready for a multi-tenant cal/wardrobe migration tomorrow).
 - Multiple operating modes per sail config (e.g. `displacement` / `planing` / `foiling`; `default` for boats with a single regime).
 - Immutable polar revisions with lineage metadata (`migrated`, `manual_edit`, `imported_csv`, `imported_pol`, `vpp`, `cfd`, `towing_tank`, `measured`, `regression`, `expert_judgment`).
@@ -35,11 +36,13 @@ Goal: a data model that supports
 **Approach B (Hybrid):** Keep the `(id, value JSON)` convention for wardrobe snapshots; add one new SQLite table — `polar_revisions` — for immutable history rows. Wardrobe slots stop embedding polars and instead carry per-mode pointers to revision ids. The `ConfigStore` resolver joins wardrobe + revisions to return the same `PolarTable` shape the existing consumers already expect.
 
 **Rejected alternatives:**
-- *Pure JSON convention* (Approach A): immutable history as an array inside the wardrobe blob — wardrobe rows grow without bound, immutability is by convention not structure, no SQL queryability.
-- *Fully normalized polar cells* (Approach C): one row per `(revisionId, twsIdx, twaIdx)` — wrong shape for the bilinear hot loop, massive convention departure, not faster for this access pattern (the router reads whole polars into RAM).
+
+- _Pure JSON convention_ (Approach A): immutable history as an array inside the wardrobe blob — wardrobe rows grow without bound, immutability is by convention not structure, no SQL queryability.
+- _Fully normalized polar cells_ (Approach C): one row per `(revisionId, twsIdx, twaIdx)` — wrong shape for the bilinear hot loop, massive convention departure, not faster for this access pattern (the router reads whole polars into RAM).
 
 Sibling-spec proposals also explicitly **out of scope** here (a `Related work` section at the bottom lists them, each linked when written):
-1. Multi-tenant migration of *other* config tables (`boat_config`, `aws_awa_cal`, `bsp_cal`, `compass_deviation`, `damping_config`, `source_priority_config`, `ais_alarm_config`, `passage_log`).
+
+1. Multi-tenant migration of _other_ config tables (`boat_config`, `aws_awa_cal`, `bsp_cal`, `compass_deviation`, `damping_config`, `source_priority_config`, `ais_alarm_config`, `passage_log`).
 2. Mode-switching runtime — what flips `activeMode` from `displacement` to `planing` (sensor threshold? manual button? SOG hysteresis?).
 3. Sea-state derate table + how a derate composes with polar lookup.
 4. Crossover / sail-recommendation surface (driving wardrobe suggestions from current wind state).
@@ -50,30 +53,30 @@ Sibling-spec proposals also explicitly **out of scope** here (a `Related work` s
 
 ### Create
 
-| File | Purpose |
-|---|---|
-| `packages/db/src/polar-revisions.ts` | Repo functions over the new table: `listRevisions`, `getRevision`, `createRevision`, `setActiveRevision`. ULID generation (library choice — see §9). Grid-shape validator. |
-| `packages/db/src/polar-revisions.test.ts` | CRUD round-trip, ULID monotonicity, parent-chain integrity, validator rejects mismatched dimensions / non-monotonic bins / non-finite cells, dangling-revisionId fallback to `DEFAULT_POLARS`. |
-| `packages/db/src/migrate-wardrobe-v2.ts` | One-shot migration helper: detect v1 wardrobe shape, generate `revision-0` rows with `lineageKind='migrated'`, rewrite wardrobe to v2 shape, all in one SQLite transaction. |
-| `packages/db/src/migrate-wardrobe-v2.test.ts` | Migration on a v1 fixture produces a valid v2 wardrobe + one revision row per slot. Injected transaction failure rolls back cleanly. v2 input is a no-op. |
-| `packages/web/src/app/api/polar/revisions/route.ts` | GET (list), POST (create). Optional query params `boatId`, `sailConfigId`, `mode`. 400 on invalid grid. |
-| `packages/web/src/app/api/polar/revisions/[id]/route.ts` | GET single revision; 404 on miss. |
-| `packages/web/src/app/api/polar/active/route.ts` | POST `{sailConfigId, mode, revisionId}` → `setActiveRevision`. 404 on unknown revision. |
-| `packages/web/src/app/api/polar/revisions/route.test.ts` | Happy-path list/get/create + 400 invalid grid + 404 unknown. |
+| File                                                     | Purpose                                                                                                                                                                                        |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/db/src/polar-revisions.ts`                     | Repo functions over the new table: `listRevisions`, `getRevision`, `createRevision`, `setActiveRevision`. ULID generation (library choice — see §9). Grid-shape validator.                     |
+| `packages/db/src/polar-revisions.test.ts`                | CRUD round-trip, ULID monotonicity, parent-chain integrity, validator rejects mismatched dimensions / non-monotonic bins / non-finite cells, dangling-revisionId fallback to `DEFAULT_POLARS`. |
+| `packages/db/src/migrate-wardrobe-v2.ts`                 | One-shot migration helper: detect v1 wardrobe shape, generate `revision-0` rows with `lineageKind='migrated'`, rewrite wardrobe to v2 shape, all in one SQLite transaction.                    |
+| `packages/db/src/migrate-wardrobe-v2.test.ts`            | Migration on a v1 fixture produces a valid v2 wardrobe + one revision row per slot. Injected transaction failure rolls back cleanly. v2 input is a no-op.                                      |
+| `packages/web/src/app/api/polar/revisions/route.ts`      | GET (list), POST (create). Optional query params `boatId`, `sailConfigId`, `mode`. 400 on invalid grid.                                                                                        |
+| `packages/web/src/app/api/polar/revisions/[id]/route.ts` | GET single revision; 404 on miss.                                                                                                                                                              |
+| `packages/web/src/app/api/polar/active/route.ts`         | POST `{sailConfigId, mode, revisionId}` → `setActiveRevision`. 404 on unknown revision.                                                                                                        |
+| `packages/web/src/app/api/polar/revisions/route.test.ts` | Happy-path list/get/create + 400 invalid grid + 404 unknown.                                                                                                                                   |
 
 ### Modify
 
-| File | Change |
-|---|---|
-| `packages/db/src/defaults.ts` | Add `BoatId`, `PolarMode`, `PolarLineageKind`, `PolarLineage`, `PolarRevision` types. Extend `PolarTable` with optional `heel?: number[][]`, `leeway?: number[][]`. Replace `SailConfig.polar` with `modes: Partial<Record<PolarMode, { activeRevisionId: string }>>`. Add optional `SailConfig` fields: `foilMode`, `mastRotation`, `rigTensionState`, `displacement`. Add `boatId` and `activeMode: PolarMode` to `SailWardrobe`. Update `DEFAULT_WARDROBE` to v2 shape (will be paired with `DEFAULT_POLARS` becoming the revision-0 seed at first boot). |
-| `packages/db/src/schema.ts` | Add `polarRevisions` Drizzle table definition: `id PK`, `boat_id`, `sail_config_id`, `mode`, `parent_revision_id` (nullable), `created_at`, `lineage_kind`, `lineage_meta` (nullable JSON), `sigma` (nullable real), `value_json`. Index on `(boat_id, sail_config_id, mode, created_at DESC)`. Keep the legacy `polars` table; mark with a `// DEPRECATED — drop after v2 migration confirmed on Pi` comment. |
-| `packages/db/src/config-store.ts` | At boot: read `G5000_BOAT_ID` env (default `"sula"`), store as `this.__activeBoatId`. Run `migrate-wardrobe-v2` after the existing legacy→wardrobe step. Add a `polarRevisions$` observable (BehaviorSubject of `Map<id, PolarRevision>` for the active boat). Rewrite `activePolar$` to `combineLatest([sailWardrobe$, polarRevisions$]).pipe(map(resolve))`. Resolver falls back to `DEFAULT_POLARS` and logs a one-line warning if the active revisionId is missing. Expose `listRevisions`, `getRevision`, `createRevision`, `setActiveRevision` as methods that delegate to `polar-revisions.ts` repo functions. `polars$` alias preserved (still `activePolar$`). |
-| `packages/db/src/config-store.test.ts` | Add: v1→v2 migration cases (wardrobe with N slots; legacy-only no-wardrobe case); transaction rollback on injected DB error mid-migration; `activePolar$` dangling-revisionId fallback; `setActiveRevision` switches `activePolar$` output. |
-| `packages/web/src/app/api/wardrobe/active/route.ts` | Accept optional `activeMode` in the POST body (defaults to `'default'`). Existing callers without the field unchanged. |
-| `packages/web/src/app/api/route/plan/route.ts` | Wire `polarId` to the resolved active-revision id (today it's the slot id). No type change. |
-| `packages/compute/src/polars/pipeline.test.ts` | Add: `setActiveRevision` on the underlying store causes the pipeline to publish updated target boatspeed within one tick. |
-| `apps/autopilot-server/src/index.ts` | No code change beyond surfacing the new env var in startup logging (one line: "active boat: <boatId>"). |
-| `CLAUDE.md` | Add `G5000_BOAT_ID` to the env-var gates section (default `"sula"`). |
+| File                                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/db/src/defaults.ts`                       | Add `BoatId`, `PolarMode`, `PolarLineageKind`, `PolarLineage`, `PolarRevision` types. Extend `PolarTable` with optional `heel?: number[][]`, `leeway?: number[][]`. Replace `SailConfig.polar` with `modes: Partial<Record<PolarMode, { activeRevisionId: string }>>`. Add optional `SailConfig` fields: `foilMode`, `mastRotation`, `rigTensionState`, `displacement`. Add `boatId` and `activeMode: PolarMode` to `SailWardrobe`. Update `DEFAULT_WARDROBE` to v2 shape (will be paired with `DEFAULT_POLARS` becoming the revision-0 seed at first boot).                                                                                                            |
+| `packages/db/src/schema.ts`                         | Add `polarRevisions` Drizzle table definition: `id PK`, `boat_id`, `sail_config_id`, `mode`, `parent_revision_id` (nullable), `created_at`, `lineage_kind`, `lineage_meta` (nullable JSON), `sigma` (nullable real), `value_json`. Index on `(boat_id, sail_config_id, mode, created_at DESC)`. Keep the legacy `polars` table; mark with a `// DEPRECATED — drop after v2 migration confirmed on Pi` comment.                                                                                                                                                                                                                                                          |
+| `packages/db/src/config-store.ts`                   | At boot: read `G5000_BOAT_ID` env (default `"sula"`), store as `this.__activeBoatId`. Run `migrate-wardrobe-v2` after the existing legacy→wardrobe step. Add a `polarRevisions$` observable (BehaviorSubject of `Map<id, PolarRevision>` for the active boat). Rewrite `activePolar$` to `combineLatest([sailWardrobe$, polarRevisions$]).pipe(map(resolve))`. Resolver falls back to `DEFAULT_POLARS` and logs a one-line warning if the active revisionId is missing. Expose `listRevisions`, `getRevision`, `createRevision`, `setActiveRevision` as methods that delegate to `polar-revisions.ts` repo functions. `polars$` alias preserved (still `activePolar$`). |
+| `packages/db/src/config-store.test.ts`              | Add: v1→v2 migration cases (wardrobe with N slots; legacy-only no-wardrobe case); transaction rollback on injected DB error mid-migration; `activePolar$` dangling-revisionId fallback; `setActiveRevision` switches `activePolar$` output.                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `packages/web/src/app/api/wardrobe/active/route.ts` | Accept optional `activeMode` in the POST body (defaults to `'default'`). Existing callers without the field unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `packages/web/src/app/api/route/plan/route.ts`      | Wire `polarId` to the resolved active-revision id (today it's the slot id). No type change.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `packages/compute/src/polars/pipeline.test.ts`      | Add: `setActiveRevision` on the underlying store causes the pipeline to publish updated target boatspeed within one tick.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `apps/autopilot-server/src/index.ts`                | No code change beyond surfacing the new env var in startup logging (one line: "active boat: <boatId>").                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `CLAUDE.md`                                         | Add `G5000_BOAT_ID` to the env-var gates section (default `"sula"`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ### No change
 
@@ -87,32 +90,40 @@ Sibling-spec proposals also explicitly **out of scope** here (a `Related work` s
 export type BoatId = string;
 export type PolarMode = 'default' | 'displacement' | 'planing' | 'foiling' | string;
 export type PolarLineageKind =
-  | 'migrated' | 'manual_edit' | 'imported_csv' | 'imported_pol'
-  | 'vpp' | 'cfd' | 'towing_tank' | 'measured' | 'regression' | 'expert_judgment';
+  | 'migrated'
+  | 'manual_edit'
+  | 'imported_csv'
+  | 'imported_pol'
+  | 'vpp'
+  | 'cfd'
+  | 'towing_tank'
+  | 'measured'
+  | 'regression'
+  | 'expert_judgment';
 
 export interface PolarLineage {
   kind: PolarLineageKind;
-  source?: string;            // e.g. designer name, file path, run-id
+  source?: string; // e.g. designer name, file path, run-id
   notes?: string;
 }
 
 export interface PolarTable {
-  twsBins: number[];          // m/s, strictly increasing
-  twaBins: number[];          // radians, strictly increasing, span ⊆ [0, π]
-  boatSpeed: number[][];      // [twsIdx][twaIdx], m/s, finite, ≥ 0
-  heel?: number[][];          // radians, signed (lee positive); same shape as boatSpeed
-  leeway?: number[][];        // radians; same shape as boatSpeed
+  twsBins: number[]; // m/s, strictly increasing
+  twaBins: number[]; // radians, strictly increasing, span ⊆ [0, π]
+  boatSpeed: number[][]; // [twsIdx][twaIdx], m/s, finite, ≥ 0
+  heel?: number[][]; // radians, signed (lee positive); same shape as boatSpeed
+  leeway?: number[][]; // radians; same shape as boatSpeed
 }
 
 export interface PolarRevision {
-  id: string;                 // ULID
+  id: string; // ULID
   boatId: BoatId;
   sailConfigId: string;
   mode: PolarMode;
   parentRevisionId: string | null;
-  createdAt: number;          // unix seconds
+  createdAt: number; // unix seconds
   lineage: PolarLineage;
-  sigma?: number;             // m/s scalar uncertainty
+  sigma?: number; // m/s scalar uncertainty
   table: PolarTable;
 }
 
@@ -124,9 +135,9 @@ export interface SailConfig {
   downwindSail?: string;
   daggerboard?: 'down' | 'half' | 'up';
   foilMode?: 'displacement' | 'foiling' | 'transition' | string;
-  mastRotation?: number;      // radians; rotating-rig only
+  mastRotation?: number; // radians; rotating-rig only
   rigTensionState?: string;
-  displacement?: number;      // kg
+  displacement?: number; // kg
   notes?: string;
   modes: Partial<Record<PolarMode, { activeRevisionId: string }>>;
 }
@@ -135,7 +146,7 @@ export interface SailWardrobe {
   boatId: BoatId;
   configs: SailConfig[];
   activeConfigId: string;
-  activeMode: PolarMode;      // defaults to 'default'
+  activeMode: PolarMode; // defaults to 'default'
 }
 ```
 
@@ -150,9 +161,9 @@ export const polarRevisions = sqliteTable('polar_revisions', {
   parentRevisionId: text('parent_revision_id'),
   createdAt: integer('created_at').notNull(),
   lineageKind: text('lineage_kind').notNull(),
-  lineageMeta: text('lineage_meta'),          // JSON {source?, notes?}
+  lineageMeta: text('lineage_meta'), // JSON {source?, notes?}
   sigma: real('sigma'),
-  valueJson: text('value_json').notNull(),    // JSON-encoded PolarTable
+  valueJson: text('value_json').notNull(), // JSON-encoded PolarTable
 });
 // Index: (boat_id, sail_config_id, mode, created_at DESC) for "newest active revision" lookup.
 ```
@@ -208,13 +219,13 @@ Routing / compute / H-LINK
 
 ## 6. Error handling
 
-| Failure | Behavior |
-|---|---|
-| Dangling `activeRevisionId` (revisions row deleted out-of-band) | `activePolar$` resolves to `DEFAULT_POLARS`; warning logged once per boot. Wardrobe is not auto-repaired (UI surface). |
-| Invalid grid passed to `createRevision` (mismatched dims, non-monotonic bins, non-finite cells, negative speeds, TWA outside `[0, π]`) | Validator throws before INSERT. `/api/polar/revisions` returns 400. |
-| Migration error mid-transaction | SQLite transaction aborts; `ConfigStore` open fails with a descriptive error; next boot retries from the v1 shape. No half-migrated state on disk. |
-| `activeMode` missing from the active slot's `modes` map | Resolver falls through to `'default'` mode; if that's also missing, fall back to `DEFAULT_POLARS` and log. |
-| Concurrent writes to the same wardrobe row | SQLite's default journaling serializes them; last write wins. Acceptable: writes come only from the single Next.js process. |
+| Failure                                                                                                                                | Behavior                                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dangling `activeRevisionId` (revisions row deleted out-of-band)                                                                        | `activePolar$` resolves to `DEFAULT_POLARS`; warning logged once per boot. Wardrobe is not auto-repaired (UI surface).                             |
+| Invalid grid passed to `createRevision` (mismatched dims, non-monotonic bins, non-finite cells, negative speeds, TWA outside `[0, π]`) | Validator throws before INSERT. `/api/polar/revisions` returns 400.                                                                                |
+| Migration error mid-transaction                                                                                                        | SQLite transaction aborts; `ConfigStore` open fails with a descriptive error; next boot retries from the v1 shape. No half-migrated state on disk. |
+| `activeMode` missing from the active slot's `modes` map                                                                                | Resolver falls through to `'default'` mode; if that's also missing, fall back to `DEFAULT_POLARS` and log.                                         |
+| Concurrent writes to the same wardrobe row                                                                                             | SQLite's default journaling serializes them; last write wins. Acceptable: writes come only from the single Next.js process.                        |
 
 ## 7. Testing
 
@@ -238,6 +249,7 @@ Routing / compute / H-LINK
 ## 9. Open questions
 
 None blocking. Items marked for the implementation plan to lock down:
+
 - ULID library choice (`ulid` npm package vs. hand-rolled). The plan picks one.
 - Exact `lineage_meta` JSON shape (free-form `{source?, notes?}` for now; can grow without migration since it's JSON).
 - Whether `polarRevisions$` emits a `Map` or an `Array` (`Map` keeps O(1) lookup in the resolver; existing config observables emit primitives, so `Map` is the small new pattern).

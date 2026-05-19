@@ -224,7 +224,9 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
         <a
           href={ALERTS_HREF}
           aria-label={alarmCount > 0 ? `Alerts (${alarmCount} active)` : 'Alerts'}
-          title={alarmCount > 0 ? `${alarmCount} active alarm${alarmCount === 1 ? '' : 's'}` : 'Alerts'}
+          title={
+            alarmCount > 0 ? `${alarmCount} active alarm${alarmCount === 1 ? '' : 's'}` : 'Alerts'
+          }
           className={`ml-auto relative p-1.5 rounded ${
             topSeverity === 'CRITICAL'
               ? 'text-red-400 animate-pulse hover:bg-slate-800'

@@ -46,25 +46,25 @@ export interface Route {
 }
 
 export interface PlanOptions {
-  stepMinutes?: number;            // default 30
-  headingFanDeg?: number;          // default 90 (±)
-  headingResolutionDeg?: number;   // default 5
-  maxHours?: number;               // default 168
-  avoidLand?: boolean;             // default true
-  useCurrents?: boolean;           // default false
-  pruneBucketDeg?: number;         // default 2
+  stepMinutes?: number; // default 30
+  headingFanDeg?: number; // default 90 (±)
+  headingResolutionDeg?: number; // default 5
+  maxHours?: number; // default 168
+  avoidLand?: boolean; // default true
+  useCurrents?: boolean; // default false
+  pruneBucketDeg?: number; // default 2
   /** When true, plan() attaches `isochrones` to the returned Route — one
    *  entry per step, holding the pruned frontier at that step's time. */
-  captureIsochrones?: boolean;     // default false
+  captureIsochrones?: boolean; // default false
   /** When true, propagate uses a constant `motorSpeed` for boat speed
    *  through the water instead of looking up the polar. Wind data is still
    *  read (so legs carry tws/twa annotations and we honour the
    *  wind-field bbox), but the polar's wind dependence is bypassed —
    *  matches what a powerboat or a sailboat under engine actually does. */
-  motor?: boolean;                 // default false
+  motor?: boolean; // default false
   /** Through-water boat speed in m/s when `motor` is true. Ignored
    *  otherwise. */
-  motorSpeed?: number;             // default 2.572 (5 kn)
+  motorSpeed?: number; // default 2.572 (5 kn)
 }
 
 export interface PlanInput {

@@ -1,8 +1,4 @@
-import {
-  listWaypoints,
-  createWaypoint,
-  type Waypoint,
-} from '../../../lib/waypoints';
+import { listWaypoints, createWaypoint, type Waypoint } from '../../../lib/waypoints';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -31,10 +27,16 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ ok: false, error: { message: 'name required' } }, { status: 422 });
   }
   if (typeof body.lat !== 'number' || !Number.isFinite(body.lat) || Math.abs(body.lat) > 90) {
-    return Response.json({ ok: false, error: { message: 'lat must be a number in [-90,90]' } }, { status: 422 });
+    return Response.json(
+      { ok: false, error: { message: 'lat must be a number in [-90,90]' } },
+      { status: 422 },
+    );
   }
   if (typeof body.lon !== 'number' || !Number.isFinite(body.lon) || Math.abs(body.lon) > 180) {
-    return Response.json({ ok: false, error: { message: 'lon must be a number in [-180,180]' } }, { status: 422 });
+    return Response.json(
+      { ok: false, error: { message: 'lon must be a number in [-180,180]' } },
+      { status: 422 },
+    );
   }
   try {
     const created: Waypoint = await createWaypoint({

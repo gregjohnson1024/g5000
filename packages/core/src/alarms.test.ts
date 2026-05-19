@@ -20,7 +20,12 @@ describe('AlarmsRegistry', () => {
   });
 
   it('fires an alarm and reports it as active', () => {
-    registry.fire({ id: 'shallow-water', severity: 'CRITICAL', label: 'Shallow Water', sticky: false });
+    registry.fire({
+      id: 'shallow-water',
+      severity: 'CRITICAL',
+      label: 'Shallow Water',
+      sticky: false,
+    });
     const active = registry.active();
     expect(active).toHaveLength(1);
     expect(active[0]?.id).toBe('shallow-water');
@@ -30,7 +35,12 @@ describe('AlarmsRegistry', () => {
   });
 
   it('non-sticky alarms drop out of active when cleared', () => {
-    registry.fire({ id: 'shallow-water', severity: 'CRITICAL', label: 'Shallow Water', sticky: false });
+    registry.fire({
+      id: 'shallow-water',
+      severity: 'CRITICAL',
+      label: 'Shallow Water',
+      sticky: false,
+    });
     registry.clear('shallow-water');
     expect(registry.active()).toHaveLength(0);
     const all = registry.all();

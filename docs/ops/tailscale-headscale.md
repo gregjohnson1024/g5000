@@ -8,12 +8,12 @@ machines in Ottawa also on the tailnet can reach it by hostname.
 
 ## Why this and not something else
 
-| Option | Verdict |
-|---|---|
-| **Tailscale + Headscale** | ✅ Self-hosted coordinator (no Tailscale Inc. dependency), zero NAT/firewall config, works over any internet the boat finds, encrypted by default, free. |
-| Cellular modem + static IP + port forward | Hardware + monthly cost + public attack surface. |
-| Marina WiFi + DynDNS + port forward | Depends on marina NAT; usually fragile. |
-| Reverse SSH to a jump host | Works but requires keeping a long-lived tunnel and dealing with reconnects manually. |
+| Option                                    | Verdict                                                                                                                                                  |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tailscale + Headscale**                 | ✅ Self-hosted coordinator (no Tailscale Inc. dependency), zero NAT/firewall config, works over any internet the boat finds, encrypted by default, free. |
+| Cellular modem + static IP + port forward | Hardware + monthly cost + public attack surface.                                                                                                         |
+| Marina WiFi + DynDNS + port forward       | Depends on marina NAT; usually fragile.                                                                                                                  |
+| Reverse SSH to a jump host                | Works but requires keeping a long-lived tunnel and dealing with reconnects manually.                                                                     |
 
 ## Confirming the server is alive
 

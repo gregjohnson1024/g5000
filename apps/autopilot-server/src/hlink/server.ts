@@ -2,11 +2,7 @@ import net from 'node:net';
 import type { AddressInfo } from 'node:net';
 import type { Bus, Sample, ChannelValue } from '@g5000/core';
 import { createDamper } from '@g5000/core';
-import {
-  CHANNEL_TO_FUNCTIONS,
-  FUNCTION_TABLE,
-  hlinkFormat,
-} from './function-table.js';
+import { CHANNEL_TO_FUNCTIONS, FUNCTION_TABLE, hlinkFormat } from './function-table.js';
 import { formatP, formatV, parseHlinkLine } from './protocol.js';
 
 /** Minimum gap between successive emissions of the same function to one client. */
@@ -279,7 +275,6 @@ export function startHlinkServer(opts: HlinkServerOptions): HlinkServerHandle {
       }
     }
   }
-
 
   // ─── Listen ──────────────────────────────────────────────────────────
   let resolveListening!: () => void;

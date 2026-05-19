@@ -72,9 +72,12 @@ export default function ForecastPage() {
   const [boatLon, setBoatLon] = useState<number | null>(null);
 
   // ROI state — defaults to a box around the boat once we have a fix.
-  const [roi, setRoi] = useState<{ latMin: number; latMax: number; lonMin: number; lonMax: number }>(
-    { latMin: 30, latMax: 40, lonMin: -75, lonMax: -65 },
-  );
+  const [roi, setRoi] = useState<{
+    latMin: number;
+    latMax: number;
+    lonMin: number;
+    lonMax: number;
+  }>({ latMin: 30, latMax: 40, lonMin: -75, lonMax: -65 });
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<FetchResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -139,7 +142,11 @@ export default function ForecastPage() {
           hours: FORECAST_HOURS,
         }),
       });
-      const j = (await r.json()) as { ok: boolean; results: FetchResult[]; error?: { message: string } };
+      const j = (await r.json()) as {
+        ok: boolean;
+        results: FetchResult[];
+        error?: { message: string };
+      };
       if (!j.ok) {
         setErr(j.error?.message ?? 'fetch failed');
       } else {
@@ -234,36 +241,32 @@ export default function ForecastPage() {
                 type="number"
                 step={0.25}
                 value={roi[k]}
-                onChange={(e) =>
-                  setRoi((prev) => ({ ...prev, [k]: Number(e.target.value) }))
-                }
+                onChange={(e) => setRoi((prev) => ({ ...prev, [k]: Number(e.target.value) }))}
                 className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
               />
             </label>
           ))}
         </div>
         <p className="text-xs text-slate-500">
-          ECMWF Open Data is global per request; the response is cropped to this box client-side after decode. GFS is fetched as a NOMADS subset (native bbox support, smaller transfer).
+          ECMWF Open Data is global per request; the response is cropped to this box client-side
+          after decode. GFS is fetched as a NOMADS subset (native bbox support, smaller transfer).
         </p>
       </section>
 
       <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
         <h2 className="text-base font-semibold">Refresh forecast cache</h2>
         <p className="text-xs text-slate-500">
-          Fetches GFS + ECMWF for the ROI above, every 3 h out to +168 h
-          (57 snapshots/model). The Pi runs the same refresh on a 3 h timer
-          in the background; this button just lets you trigger one out of
-          band. Partial 404s (ECMWF when its run hasn&apos;t published yet)
-          are normal.
+          Fetches GFS + ECMWF for the ROI above, every 3 h out to +168 h (57 snapshots/model). The
+          Pi runs the same refresh on a 3 h timer in the background; this button just lets you
+          trigger one out of band. Partial 404s (ECMWF when its run hasn&apos;t published yet) are
+          normal.
         </p>
         <button
           onClick={() => void runFetch()}
           disabled={busy}
           className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded text-sm font-medium disabled:opacity-50"
         >
-          {busy
-            ? `Fetching 2 models × ${FORECAST_HOURS.length} hours…`
-            : 'Refresh now'}
+          {busy ? `Fetching 2 models × ${FORECAST_HOURS.length} hours…` : 'Refresh now'}
         </button>
       </section>
 
@@ -287,7 +290,7 @@ export default function ForecastPage() {
                   <td className="p-2 font-mono">{r.model.toUpperCase()}</td>
                   <td className="p-2 font-mono">+{r.hour}h</td>
                   <td className={`p-2 ${r.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
-                    {r.ok ? 'OK' : r.error ?? 'failed'}
+                    {r.ok ? 'OK' : (r.error ?? 'failed')}
                   </td>
                   <td className="p-2 font-mono">{r.runAt ? fmtUtc(r.runAt) : '—'}</td>
                   <td className="p-2 font-mono">{r.validAt ? fmtUtc(r.validAt) : '—'}</td>
@@ -300,11 +303,11 @@ export default function ForecastPage() {
       )}
 
       <section className="space-y-2">
-        <h2 className="text-base font-semibold">
-          Cached grids ({manifest?.entries.length ?? 0})
-        </h2>
+        <h2 className="text-base font-semibold">Cached grids ({manifest?.entries.length ?? 0})</h2>
         {(!manifest || manifest.entries.length === 0) && (
-          <p className="text-sm text-slate-500">Nothing cached yet. Pick an ROI and click Fetch all.</p>
+          <p className="text-sm text-slate-500">
+            Nothing cached yet. Pick an ROI and click Fetch all.
+          </p>
         )}
         {manifest && manifest.entries.length > 0 && (
           <table className="text-sm border-collapse">
@@ -326,9 +329,12 @@ export default function ForecastPage() {
                   <td className="p-2 font-mono">{fmtUtc(e.runAt)}</td>
                   <td className="p-2 font-mono">{fmtUtc(e.validAt)}</td>
                   <td className="p-2 font-mono text-xs text-slate-400">
-                    {e.bbox.latMin.toFixed(1)}…{e.bbox.latMax.toFixed(1)} N · {e.bbox.lonMin.toFixed(1)}…{e.bbox.lonMax.toFixed(1)} E
+                    {e.bbox.latMin.toFixed(1)}…{e.bbox.latMax.toFixed(1)} N ·{' '}
+                    {e.bbox.lonMin.toFixed(1)}…{e.bbox.lonMax.toFixed(1)} E
                   </td>
-                  <td className="p-2 text-slate-300">{fmtAge(now - Math.floor(e.fetchedAt / 1000))}</td>
+                  <td className="p-2 text-slate-300">
+                    {fmtAge(now - Math.floor(e.fetchedAt / 1000))}
+                  </td>
                 </tr>
               ))}
             </tbody>

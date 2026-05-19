@@ -23,10 +23,7 @@ export async function GET(
   }
   const record = await readJson(join(PLANS_DIR, `${id}.json`));
   if (!record) {
-    return Response.json(
-      { ok: false, error: { kind: 'not_found' } },
-      { status: 404 },
-    );
+    return Response.json({ ok: false, error: { kind: 'not_found' } }, { status: 404 });
   }
   return Response.json({ ok: true, plan: record });
 }
@@ -47,10 +44,7 @@ export async function DELETE(
     return Response.json({ ok: true });
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return Response.json(
-        { ok: false, error: { kind: 'not_found' } },
-        { status: 404 },
-      );
+      return Response.json({ ok: false, error: { kind: 'not_found' } }, { status: 404 });
     }
     return Response.json(
       {

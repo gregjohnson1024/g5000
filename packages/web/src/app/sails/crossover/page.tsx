@@ -98,8 +98,7 @@ export default function CrossoverPage() {
                     s.id === editSailId ? 'bg-blue-100' : ''
                   }`}
                 >
-                  {s.name}{' '}
-                  <span className="text-xs text-gray-400">({s.region.cells.length})</span>
+                  {s.name} <span className="text-xs text-gray-400">({s.region.cells.length})</span>
                 </button>
               ))}
           </div>

@@ -99,21 +99,21 @@ See [CLAUDE.md → Deployment](./CLAUDE.md#deployment) for the full procedure an
 
 The boat-side wiring is documented in [`docs/ops/network-map.md`](./docs/ops/network-map.md). The supported ingest paths:
 
-| Path | How it connects | Latency | When to use |
-|---|---|---|---|
+| Path                    | How it connects      | Latency   | When to use                                                |
+| ----------------------- | -------------------- | --------- | ---------------------------------------------------------- |
 | **YDWG-02** TCP gateway | Boat WiFi, port 1457 | ~10–30 ms | Current default; works from any device on the boat network |
-| **NGT-1** USB | USB serial on the Pi | ~5 ms | Backup / dev |
-| **PiCAN-M** SocketCAN | GPIO HAT, native CAN | <1 ms | Opt-in; enables direct bus participation (in progress) |
-| **NMEA 0183** serial | RS-422 to USB | n/a | Legacy sentences only |
+| **NGT-1** USB           | USB serial on the Pi | ~5 ms     | Backup / dev                                               |
+| **PiCAN-M** SocketCAN   | GPIO HAT, native CAN | <1 ms     | Opt-in; enables direct bus participation (in progress)     |
+| **NMEA 0183** serial    | RS-422 to USB        | n/a       | Legacy sentences only                                      |
 
 All four are designed to coexist — the bridge dedupes by source address + PGN.
 
 ## What's notable
 
-- **One process, many roles** — the autopilot-server is the *only* runtime artifact in production. Next.js, the N2K bridge, the routing engine, the H-LINK TCP server, and the SQLite store all live in the same Node process. The "custom Next server + `globalThis` singletons" pattern is what keeps this coherent — explicitly defended in `next.config.ts` and `CLAUDE.md`.
+- **One process, many roles** — the autopilot-server is the _only_ runtime artifact in production. Next.js, the N2K bridge, the routing engine, the H-LINK TCP server, and the SQLite store all live in the same Node process. The "custom Next server + `globalThis` singletons" pattern is what keeps this coherent — explicitly defended in `next.config.ts` and `CLAUDE.md`.
 - **Replay parity** — any `.jsonl.gz` session file plays back end-to-end through the same compute pipelines and decoders, so bugs reproduce against historical wire-level captures.
 - **Disk-persistent caches** for OSM tiles and GRIB grids under `~/.g5000-router/`, so offshore-without-internet routes still plan against the last-fetched wind field.
-- **Memory and `docs/superpowers/`** capture not just the code but the *reasoning* — design specs, executable implementation plans, post-mortems of hard-won lessons (e.g., the autopilot's "Performance level" silently swapping algorithms behind the user's dial — a UX anti-pattern to avoid replicating).
+- **Memory and `docs/superpowers/`** capture not just the code but the _reasoning_ — design specs, executable implementation plans, post-mortems of hard-won lessons (e.g., the autopilot's "Performance level" silently swapping algorithms behind the user's dial — a UX anti-pattern to avoid replicating).
 
 ## License
 

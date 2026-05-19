@@ -37,9 +37,8 @@ async function autoFetch(model: WindModel, bbox: Bbox): Promise<void> {
       if (idx >= ON_DEMAND_HOURS.length) return;
       const h = ON_DEMAND_HOURS[idx]!;
       try {
-        const grid = model === 'ecmwf'
-          ? await fetchWindGridEcmwf(bbox, h)
-          : await fetchWindGrid(bbox, h);
+        const grid =
+          model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, h) : await fetchWindGrid(bbox, h);
         windCache.set(bboxKey(model, bbox, grid.forecastHour), {
           at: Date.now(),
           grid,
@@ -50,9 +49,7 @@ async function autoFetch(model: WindModel, bbox: Bbox): Promise<void> {
       }
     }
   };
-  await Promise.all(
-    Array.from({ length: ON_DEMAND_CONCURRENCY }, () => worker()),
-  );
+  await Promise.all(Array.from({ length: ON_DEMAND_CONCURRENCY }, () => worker()));
 }
 
 export async function loadWindFor(
@@ -68,7 +65,9 @@ export async function loadWindFor(
     // Cache miss for this bbox. Auto-fetch on the planner's behalf —
     // 1–2 min wall-clock, but cheaper than asking the user to refresh.
     // eslint-disable-next-line no-console
-    console.log(`[autopilot] route plan: on-demand ${m.toUpperCase()} fetch for bbox [${bbox.latMin.toFixed(1)}..${bbox.latMax.toFixed(1)}, ${bbox.lonMin.toFixed(1)}..${bbox.lonMax.toFixed(1)}] (${e instanceof Error ? e.message : String(e)})`);
+    console.log(
+      `[autopilot] route plan: on-demand ${m.toUpperCase()} fetch for bbox [${bbox.latMin.toFixed(1)}..${bbox.latMax.toFixed(1)}, ${bbox.lonMin.toFixed(1)}..${bbox.lonMax.toFixed(1)}] (${e instanceof Error ? e.message : String(e)})`,
+    );
     await autoFetch(m, bbox);
     // Retry the lookup; if it still fails, surface the original-style
     // error to the caller so the UI can show a meaningful message.

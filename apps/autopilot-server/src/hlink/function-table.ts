@@ -107,9 +107,7 @@ const ROWS: FunctionMapping[] = [
 ];
 
 /** Lookup by function number. */
-export const FUNCTION_TABLE: Map<number, FunctionMapping> = new Map(
-  ROWS.map((r) => [r.fn, r]),
-);
+export const FUNCTION_TABLE: Map<number, FunctionMapping> = new Map(ROWS.map((r) => [r.fn, r]));
 
 /**
  * Reverse lookup: bus channel → all function numbers that map to it.

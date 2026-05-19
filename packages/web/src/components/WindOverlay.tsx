@@ -333,11 +333,20 @@ export function WindOverlay({
       .then((j) => {
         if (cancelled) return;
         if (!j.ok) {
-          onLoadedRef.current?.({ grid: null, identical: false, error: j.error?.message ?? 'fetch failed' });
+          onLoadedRef.current?.({
+            grid: null,
+            identical: false,
+            error: j.error?.message ?? 'fetch failed',
+          });
         } else {
           const newGrid = j.grid as WindGrid;
           let identical = false;
-          if (grid && grid.runAt === newGrid.runAt && grid.forecastHour === newGrid.forecastHour && grid.model === newGrid.model) {
+          if (
+            grid &&
+            grid.runAt === newGrid.runAt &&
+            grid.forecastHour === newGrid.forecastHour &&
+            grid.model === newGrid.model
+          ) {
             identical = true;
           }
           setGrid(newGrid);
@@ -346,12 +355,16 @@ export function WindOverlay({
       })
       .catch((e) => {
         if (cancelled) return;
-        onLoadedRef.current?.({ grid: null, identical: false, error: e instanceof Error ? e.message : String(e) });
+        onLoadedRef.current?.({
+          grid: null,
+          identical: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
       });
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
   // Render
@@ -383,57 +396,70 @@ export function WindOverlay({
           FILL_STOPS[0]![1],
           ...stepArgs,
         ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>;
-        map.addLayer({
-          id: LAYER_FILL,
-          type: 'fill',
-          source: SRC_FILL,
-          paint: {
-            'fill-color': stepExpr,
-            'fill-opacity': opacity,
-            'fill-antialias': true,
+        map.addLayer(
+          {
+            id: LAYER_FILL,
+            type: 'fill',
+            source: SRC_FILL,
+            paint: {
+              'fill-color': stepExpr,
+              'fill-opacity': opacity,
+              'fill-antialias': true,
+            },
           },
-        }, beforeId());
+          beforeId(),
+        );
       }
       if (!map.getSource(SRC_BARBS)) {
         map.addSource(SRC_BARBS, {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: LAYER_BARB_LINE,
-          type: 'line',
-          source: SRC_BARBS,
-          filter: ['in', ['get', 'kind'], ['literal', ['shaft', 'barb']]],
-          paint: { 'line-color': '#000000', 'line-width': 1.4 },
-        }, beforeId());
-        map.addLayer({
-          id: LAYER_BARB_PENNANT,
-          type: 'fill',
-          source: SRC_BARBS,
-          filter: ['==', ['get', 'kind'], 'pennant'],
-          paint: { 'fill-color': '#000000' },
-        }, beforeId());
+        map.addLayer(
+          {
+            id: LAYER_BARB_LINE,
+            type: 'line',
+            source: SRC_BARBS,
+            filter: ['in', ['get', 'kind'], ['literal', ['shaft', 'barb']]],
+            paint: { 'line-color': '#000000', 'line-width': 1.4 },
+          },
+          beforeId(),
+        );
+        map.addLayer(
+          {
+            id: LAYER_BARB_PENNANT,
+            type: 'fill',
+            source: SRC_BARBS,
+            filter: ['==', ['get', 'kind'], 'pennant'],
+            paint: { 'fill-color': '#000000' },
+          },
+          beforeId(),
+        );
       }
       if (!map.getSource(SRC_ISOBARS)) {
         map.addSource(SRC_ISOBARS, {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         });
-        map.addLayer({
-          id: LAYER_ISOBAR_LINE,
-          type: 'line',
-          source: SRC_ISOBARS,
-          paint: {
-            'line-color': '#1f2937', // slate-800
-            'line-width': [
-              'case',
-              // Bold every 10 hPa
-              ['==', ['%', ['get', 'value'], 10], 0], 1.8,
-              0.8,
-            ],
-            'line-opacity': 0.85,
+        map.addLayer(
+          {
+            id: LAYER_ISOBAR_LINE,
+            type: 'line',
+            source: SRC_ISOBARS,
+            paint: {
+              'line-color': '#1f2937', // slate-800
+              'line-width': [
+                'case',
+                // Bold every 10 hPa
+                ['==', ['%', ['get', 'value'], 10], 0],
+                1.8,
+                0.8,
+              ],
+              'line-opacity': 0.85,
+            },
           },
-        }, beforeId());
+          beforeId(),
+        );
       }
     };
     // Closure-staleness recap: ensure() + setData must run AS A PAIR
@@ -475,42 +501,41 @@ export function WindOverlay({
       isoSrc: maplibregl.GeoJSONSource | undefined,
       grid: WindGrid,
     ): void {
-    if (showIsobars && isoSrc) {
-      isoSrc.setData(buildIsobars(grid));
-    } else if (isoSrc) {
-      isoSrc.setData({ type: 'FeatureCollection', features: [] });
-    }
-    if (showFill && fillSrc) {
-      fillSrc.setData(buildSpeedContours(grid));
-    } else if (fillSrc) {
-      fillSrc.setData({ type: 'FeatureCollection', features: [] });
-    }
-    if (showBarbs && barbSrc) {
-      const features: GeoJSON.Feature[] = [];
-      // Shaft length scales with grid spacing so barbs fit one cell.
-      const dLat =
-        grid.lats.length > 1 ? Math.abs(grid.lats[1]! - grid.lats[0]!) : 0.25;
-      const shaftLenM = dLat * M_PER_DEG_LAT * 0.75 * stride;
-      for (let yi = 0; yi < grid.lats.length; yi += stride) {
-        for (let xi = 0; xi < grid.lons.length; xi += stride) {
-          const lat = grid.lats[yi]!;
-          const lon = grid.lons[xi]!;
-          const uu = grid.u[yi]?.[xi];
-          const vv = grid.v[yi]?.[xi];
-          if (typeof uu !== 'number' || typeof vv !== 'number') continue;
-          const speedMps = Math.hypot(uu, vv);
-          const speedKn = speedMps * MS_TO_KN;
-          // Wind FROM bearing (compass) is direction from which wind blows:
-          // = bearing of -V vector (since V is northward).
-          let windFrom = Math.atan2(-uu, -vv);
-          if (windFrom < 0) windFrom += 2 * Math.PI;
-          features.push(...makeBarb(lat, lon, speedKn, windFrom, shaftLenM));
-        }
+      if (showIsobars && isoSrc) {
+        isoSrc.setData(buildIsobars(grid));
+      } else if (isoSrc) {
+        isoSrc.setData({ type: 'FeatureCollection', features: [] });
       }
-      barbSrc.setData({ type: 'FeatureCollection', features });
-    } else if (barbSrc) {
-      barbSrc.setData({ type: 'FeatureCollection', features: [] });
-    }
+      if (showFill && fillSrc) {
+        fillSrc.setData(buildSpeedContours(grid));
+      } else if (fillSrc) {
+        fillSrc.setData({ type: 'FeatureCollection', features: [] });
+      }
+      if (showBarbs && barbSrc) {
+        const features: GeoJSON.Feature[] = [];
+        // Shaft length scales with grid spacing so barbs fit one cell.
+        const dLat = grid.lats.length > 1 ? Math.abs(grid.lats[1]! - grid.lats[0]!) : 0.25;
+        const shaftLenM = dLat * M_PER_DEG_LAT * 0.75 * stride;
+        for (let yi = 0; yi < grid.lats.length; yi += stride) {
+          for (let xi = 0; xi < grid.lons.length; xi += stride) {
+            const lat = grid.lats[yi]!;
+            const lon = grid.lons[xi]!;
+            const uu = grid.u[yi]?.[xi];
+            const vv = grid.v[yi]?.[xi];
+            if (typeof uu !== 'number' || typeof vv !== 'number') continue;
+            const speedMps = Math.hypot(uu, vv);
+            const speedKn = speedMps * MS_TO_KN;
+            // Wind FROM bearing (compass) is direction from which wind blows:
+            // = bearing of -V vector (since V is northward).
+            let windFrom = Math.atan2(-uu, -vv);
+            if (windFrom < 0) windFrom += 2 * Math.PI;
+            features.push(...makeBarb(lat, lon, speedKn, windFrom, shaftLenM));
+          }
+        }
+        barbSrc.setData({ type: 'FeatureCollection', features });
+      } else if (barbSrc) {
+        barbSrc.setData({ type: 'FeatureCollection', features: [] });
+      }
     } // renderBody
   }, [map, grid, hidden, stride, showFill, showBarbs, showIsobars]);
 

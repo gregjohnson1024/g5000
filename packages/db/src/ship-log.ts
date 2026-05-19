@@ -4,13 +4,7 @@ import { shipLogEntries } from './schema.js';
 
 export type ShipLogSource = 'manual' | 'auto';
 
-export type ShipLogKind =
-  | 'note'
-  | 'position'
-  | 'weather'
-  | 'equipment'
-  | 'incident'
-  | 'crew';
+export type ShipLogKind = 'note' | 'position' | 'weather' | 'equipment' | 'incident' | 'crew';
 
 export interface ShipLogEntry {
   id: number;
@@ -96,10 +90,7 @@ export async function listShipLogEntries(
   if (args.kind) conds.push(eq(shipLogEntries.kind, args.kind));
   if (args.q && args.q.trim().length > 0) {
     const pat = `%${args.q.trim()}%`;
-    const searchCond = or(
-      like(shipLogEntries.text, pat),
-      like(shipLogEntries.author, pat),
-    );
+    const searchCond = or(like(shipLogEntries.text, pat), like(shipLogEntries.author, pat));
     if (searchCond) conds.push(searchCond);
   }
   const rows = await db

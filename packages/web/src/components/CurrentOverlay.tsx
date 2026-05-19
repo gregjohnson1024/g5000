@@ -200,7 +200,8 @@ export function CurrentOverlay({
     fetch(url)
       .then(async (r) => {
         if (r.status === 404) {
-          if (!cancelled) onLoadedRef.current?.({ grid: null, identical: false, error: 'not cached' });
+          if (!cancelled)
+            onLoadedRef.current?.({ grid: null, identical: false, error: 'not cached' });
           return;
         }
         const j = (await r.json()) as
@@ -218,9 +219,7 @@ export function CurrentOverlay({
         const newGrid = j.grid;
         const prev = gridRef.current;
         const identical =
-          !!prev &&
-          prev.runAt === newGrid.runAt &&
-          prev.forecastDay === newGrid.forecastDay;
+          !!prev && prev.runAt === newGrid.runAt && prev.forecastDay === newGrid.forecastDay;
         setGrid(newGrid);
         onLoadedRef.current?.({ grid: newGrid, identical, error: null });
       })
@@ -311,8 +310,7 @@ export function CurrentOverlay({
       }
       if (showArrows && arrowSrc) {
         const features: GeoJSON.Feature[] = [];
-        const dLat =
-          grid.lats.length > 1 ? Math.abs(grid.lats[1]! - grid.lats[0]!) : 0.25;
+        const dLat = grid.lats.length > 1 ? Math.abs(grid.lats[1]! - grid.lats[0]!) : 0.25;
         // Cap arrow length to one stride-cell so neighbours don't overlap.
         const cellLenM = dLat * M_PER_DEG_LAT * stride;
         for (let yi = 0; yi < grid.lats.length; yi += stride) {

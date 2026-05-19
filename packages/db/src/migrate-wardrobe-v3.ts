@@ -1,9 +1,4 @@
-import {
-  SAIL_GRID_TWS_BINS,
-  SAIL_GRID_TWA_BINS,
-  snapToFixedGrid,
-  cellKey,
-} from '@g5000/core';
+import { SAIL_GRID_TWS_BINS, SAIL_GRID_TWA_BINS, snapToFixedGrid, cellKey } from '@g5000/core';
 import type { PolarMode, BoatId, PolarTable } from './defaults.js';
 import type { Sail, SailWardrobe } from './defaults.js';
 

@@ -38,7 +38,10 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ ok: false, error: { message: 'hours must be 0–240' } }, { status: 400 });
   }
   if (!Number.isFinite(radius) || radius <= 0 || radius > 20) {
-    return Response.json({ ok: false, error: { message: 'radius must be 0–20°' } }, { status: 400 });
+    return Response.json(
+      { ok: false, error: { message: 'radius must be 0–20°' } },
+      { status: 400 },
+    );
   }
   const fh = Math.max(0, Math.round(hours));
   const bbox: Bbox = {

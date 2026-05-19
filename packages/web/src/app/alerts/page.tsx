@@ -2,15 +2,15 @@ import { ActiveList } from './active-list';
 import { HistoryList } from './history-list';
 import { SettingsForm } from './settings-form';
 
-export default function AlertsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>;
-}) {
+export default function AlertsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   return <AlertsPageInner searchParamsPromise={searchParams} />;
 }
 
-async function AlertsPageInner({ searchParamsPromise }: { searchParamsPromise: Promise<{ tab?: string }> }) {
+async function AlertsPageInner({
+  searchParamsPromise,
+}: {
+  searchParamsPromise: Promise<{ tab?: string }>;
+}) {
   const { tab = 'active' } = await searchParamsPromise;
 
   return (

@@ -158,9 +158,7 @@ export default function TracksPage() {
             </div>
             <div>
               Active track:{' '}
-              <span className="font-mono text-slate-200">
-                {rec.activeTrackId ?? '—'}
-              </span>
+              <span className="font-mono text-slate-200">{rec.activeTrackId ?? '—'}</span>
             </div>
             <div>
               Points appended this session:{' '}
@@ -223,7 +221,9 @@ export default function TracksPage() {
                           className="px-2 py-1 bg-slate-900 border border-slate-700 rounded w-48"
                         />
                       ) : (
-                        <span className="text-slate-300">{t.label || <span className="text-slate-600 italic">(no label)</span>}</span>
+                        <span className="text-slate-300">
+                          {t.label || <span className="text-slate-600 italic">(no label)</span>}
+                        </span>
                       )}
                     </td>
                     <td className="p-2 font-mono text-xs">{fmtUtc(t.startedAt)}</td>

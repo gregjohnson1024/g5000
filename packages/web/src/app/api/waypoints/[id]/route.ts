@@ -30,7 +30,8 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     patch.lon = body.lon;
   if (typeof body.notes === 'string') patch.notes = body.notes;
   const updated = await updateWaypoint(id, patch);
-  if (!updated) return Response.json({ ok: false, error: { message: 'not found' } }, { status: 404 });
+  if (!updated)
+    return Response.json({ ok: false, error: { message: 'not found' } }, { status: 404 });
   return Response.json({ ok: true, waypoint: updated });
 }
 

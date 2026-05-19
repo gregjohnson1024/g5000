@@ -99,22 +99,22 @@ on the dev machine.
 
 ### 4.3 Sessions REST API
 
-| Method | Path | Body | Returns |
-|---|---|---|---|
-| GET | `/api/sessions` | — | `{ sessions: SessionInfo[] }` |
-| GET | `/api/sessions/[id]` | — | `SessionSummary` |
-| GET | `/api/sessions/[id]/download` | — | binary stream of the .jsonl.gz |
-| DELETE | `/api/sessions/[id]` | — | `{ ok: true }` |
-| POST | `/api/replay/start` | `{ sessionId, paceMode }` | `ReplayStatus` |
-| POST | `/api/replay/stop` | — | `ReplayStatus` |
-| GET | `/api/replay/status` | — | `ReplayStatus` |
+| Method | Path                          | Body                      | Returns                        |
+| ------ | ----------------------------- | ------------------------- | ------------------------------ |
+| GET    | `/api/sessions`               | —                         | `{ sessions: SessionInfo[] }`  |
+| GET    | `/api/sessions/[id]`          | —                         | `SessionSummary`               |
+| GET    | `/api/sessions/[id]/download` | —                         | binary stream of the .jsonl.gz |
+| DELETE | `/api/sessions/[id]`          | —                         | `{ ok: true }`                 |
+| POST   | `/api/replay/start`           | `{ sessionId, paceMode }` | `ReplayStatus`                 |
+| POST   | `/api/replay/stop`            | —                         | `ReplayStatus`                 |
+| GET    | `/api/replay/status`          | —                         | `ReplayStatus`                 |
 
 ```ts
 type SessionInfo = {
-  id: string;          // filename without .jsonl.gz
+  id: string; // filename without .jsonl.gz
   sizeBytes: number;
-  mtime: string;       // ISO
-  startedAt?: string;  // from header line
+  mtime: string; // ISO
+  startedAt?: string; // from header line
 };
 
 type SessionSummary = SessionInfo & {
@@ -139,7 +139,7 @@ A new page under `packages/web/src/app/sessions/`:
   `[Session ID, Started At, Size, Sample counts (lazy), Actions]`.
 - Per-row actions: `[Download] [Replay 1×] [Replay fast] [Delete]`.
 - Clicking a row expands the row to show counts + duration once `GET
-  /api/sessions/[id]` returns.
+/api/sessions/[id]` returns.
 - During an active replay, the action buttons are disabled on all rows except
   the active one (which shows `[Stop]`).
 
@@ -153,8 +153,8 @@ indicator.
 Replace the current `DEMO` chip (which is binary: visible iff `DEMO_MODE=1`)
 with a tri-state chip backed by `GET /api/source-mode`:
 
-- `LIVE`  — green
-- `DEMO`  — amber
+- `LIVE` — green
+- `DEMO` — amber
 - `REPLAY: <session-id>` — purple, also acts as a link to `/sessions`
 
 The existing `/api/dev/demo` endpoint is replaced by `/api/source-mode`.
@@ -172,12 +172,12 @@ Update the navbar's fetch site.
 
 ## 6. Risks & mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Replay drives the bus *and* the live NGT-1 simultaneously, doubling values | Make mode exclusive; tear down the live driver before starting replay |
-| TX to a real N2K bus during replay re-broadcasts stale values | TX short-circuit gated on `mode === 'replay'` |
-| Large session files block the API thread when we count lines | Cache summaries on `(id, mtime)`; do the scan once per file lifetime |
-| `globalThis` controller diverges across Turbopack module copies (same bug we hit with Bus) | Use the same `globalThis.__g5000_sourceMode__` pattern |
+| Risk                                                                                       | Mitigation                                                            |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Replay drives the bus _and_ the live NGT-1 simultaneously, doubling values                 | Make mode exclusive; tear down the live driver before starting replay |
+| TX to a real N2K bus during replay re-broadcasts stale values                              | TX short-circuit gated on `mode === 'replay'`                         |
+| Large session files block the API thread when we count lines                               | Cache summaries on `(id, mtime)`; do the scan once per file lifetime  |
+| `globalThis` controller diverges across Turbopack module copies (same bug we hit with Bus) | Use the same `globalThis.__g5000_sourceMode__` pattern                |
 
 ## 7. Testing strategy
 
@@ -186,7 +186,7 @@ Update the navbar's fetch site.
 - Unit tests for the session-summary scanner against a tiny fixture log
   generated in-test by `startSessionLogger`.
 - API route tests for `/api/sessions` + `/api/replay/start/stop` using vitest
-  + a temp directory.
+  - a temp directory.
 - Manual: browser-test the `/sessions` page in DEMO_MODE — record a short
   session via the existing logger (already running), then replay it and watch
   the helm dashboard repeat.

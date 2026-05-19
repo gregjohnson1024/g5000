@@ -70,9 +70,7 @@ export function parseCoordinate(raw: string, axis?: 'lat' | 'lon'): ParsedCoord 
   } else if (parsedNums.length === 3) {
     // DMS: degrees + minutes + seconds
     magnitude =
-      Math.abs(parsedNums[0]!) +
-      Math.abs(parsedNums[1]!) / 60 +
-      Math.abs(parsedNums[2]!) / 3600;
+      Math.abs(parsedNums[0]!) + Math.abs(parsedNums[1]!) / 60 + Math.abs(parsedNums[2]!) / 3600;
   } else {
     throw new Error(`expected 1–3 numeric tokens, got ${parsedNums.length} in "${raw}"`);
   }
@@ -139,8 +137,7 @@ export function formatCoordinate(value: number, axis: 'lat' | 'lon', opts: Forma
   if (opts.format === 'dec') {
     return value.toFixed(opts.precision ?? 5);
   }
-  const hemi =
-    axis === 'lat' ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W';
+  const hemi = axis === 'lat' ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W';
   const abs = Math.abs(value);
   const deg = Math.floor(abs);
   const minFloat = (abs - deg) * 60;

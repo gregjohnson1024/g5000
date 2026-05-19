@@ -22,11 +22,7 @@ export const CORNERS: Corner[] = ['sw', 'se', 'ne', 'nw'];
  * silently snapped the dragged corner back. After writing, we normalise
  * so a cross-the-opposite-corner drag flips cleanly to a valid bbox.
  */
-export function updateCorner(
-  b: Bbox,
-  c: Corner,
-  lngLat: { lat: number; lng: number },
-): Bbox {
+export function updateCorner(b: Bbox, c: Corner, lngLat: { lat: number; lng: number }): Bbox {
   let { latMin, latMax, lonMin, lonMax } = b;
   switch (c) {
     case 'sw':

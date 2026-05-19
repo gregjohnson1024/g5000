@@ -61,10 +61,7 @@ export function pickGfsRunForDeparture(atUnixSec: number): {
  * GFS publishes f000…f120 hourly and f120…f384 every 3 hours.
  * Returns the forecast hour list spanning [startHour, endHour] (inclusive).
  */
-export function gfsForecastHoursForRange(o: {
-  startHour: number;
-  endHour: number;
-}): number[] {
+export function gfsForecastHoursForRange(o: { startHour: number; endHour: number }): number[] {
   const out: number[] = [];
   for (let h = o.startHour; h <= Math.min(120, o.endHour); h++) out.push(h);
   for (let h = 123; h <= o.endHour; h += 3) out.push(h);
@@ -95,12 +92,13 @@ export async function fetchGfsBlobs(o: FetchGfsOpts): Promise<{
   const now = Math.floor(Date.now() / 1000);
   const run = pickGfsRunForDeparture(now);
   const hours = gfsForecastHoursForRange({ startHour: 0, endHour: o.hours });
-  const runTime = Date.UTC(
-    Number(run.runDateUtc.slice(0, 4)),
-    Number(run.runDateUtc.slice(5, 7)) - 1,
-    Number(run.runDateUtc.slice(8, 10)),
-    run.runHourUtc,
-  ) / 1000;
+  const runTime =
+    Date.UTC(
+      Number(run.runDateUtc.slice(0, 4)),
+      Number(run.runDateUtc.slice(5, 7)) - 1,
+      Number(run.runDateUtc.slice(8, 10)),
+      run.runHourUtc,
+    ) / 1000;
 
   const cachedPaths: string[] = [];
   for (const h of hours) {

@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { pointInRing, segmentsIntersect, segmentCrossesRing } from './geometry.js';
 
 const SQUARE: Array<[number, number]> = [
-  [-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1],
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+  [-1, -1],
 ];
 
 describe('pointInRing', () => {

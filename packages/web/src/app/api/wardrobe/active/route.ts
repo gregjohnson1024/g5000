@@ -1,27 +1,31 @@
 import { firstValueFrom } from 'rxjs';
 import { getSharedConfigStore } from '@g5000/db';
-import type { PolarMode, SailWardrobe } from '@g5000/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 /**
- * Read-only JSON endpoint that returns the active SailConfig (sail wardrobe
- * entry whose id matches the wardrobe's activeConfigId). Consumed by the
- * Mac router app so it can mirror the running boat's active polar.
+ * Read-only JSON endpoint that returns the currently-active polar table and
+ * the wardrobe's `activeMode`. In v3 (atomic sails) there is no
+ * `activeConfigId` — `activePolar$` resolves to the newest PolarRevision for
+ * `(activeBoatId, activeMode)`. Consumers (chart route planner, status badge)
+ * only need the polar table + a stable id-ish tag for caching.
+ *
+ * Response shape:
+ *   { id: <activeMode>, polar: PolarTable, activeMode: <PolarMode> }
  */
 export async function GET(): Promise<Response> {
   try {
     const store = getSharedConfigStore();
-    const wardrobe = await firstValueFrom(store.sails$);
-    const active = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId);
-    if (!active) {
-      return Response.json(
-        { error: { kind: 'not_found', message: 'No active wardrobe entry' } },
-        { status: 404 },
-      );
-    }
-    return Response.json(active);
+    const [polar, wardrobe] = await Promise.all([
+      firstValueFrom(store.activePolar$),
+      firstValueFrom(store.sails$),
+    ]);
+    return Response.json({
+      id: wardrobe.activeMode,
+      polar,
+      activeMode: wardrobe.activeMode,
+    });
   } catch (err) {
     return Response.json(
       { error: { kind: 'internal', message: err instanceof Error ? err.message : String(err) } },
@@ -31,31 +35,20 @@ export async function GET(): Promise<Response> {
 }
 
 /**
- * Update the wardrobe's active pointer. Accepts `activeConfigId` (required)
- * and an optional `activeMode`. When `activeMode` is absent, the existing
- * wardrobe's `activeMode` is preserved (and falls back to `'default'` if
- * unset).
+ * In v2 this endpoint flipped the wardrobe's `activeConfigId` pointer. v3
+ * has no per-sail-config polar — the active polar is the newest revision for
+ * the boat's `activeMode`. There is no clean v3 equivalent, so this returns
+ * 501 to surface the change to any stale clients.
  */
-export async function POST(req: Request): Promise<Response> {
-  const store = getSharedConfigStore();
-  let body: { activeConfigId?: string; activeMode?: string };
-  try {
-    body = (await req.json()) as { activeConfigId?: string; activeMode?: string };
-  } catch {
-    return Response.json({ error: 'invalid JSON' }, { status: 400 });
-  }
-  if (typeof body.activeConfigId !== 'string') {
-    return Response.json({ error: 'activeConfigId required (string)' }, { status: 422 });
-  }
-  const wardrobe = await firstValueFrom(store.sails$);
-  if (!wardrobe.configs.find((c) => c.id === body.activeConfigId)) {
-    return Response.json({ error: 'unknown activeConfigId' }, { status: 422 });
-  }
-  const next: SailWardrobe = {
-    ...wardrobe,
-    activeConfigId: body.activeConfigId,
-    activeMode: (body.activeMode as PolarMode) ?? wardrobe.activeMode ?? 'default',
-  };
-  await store.setSails(next);
-  return Response.json({ ok: true, activeConfigId: next.activeConfigId, activeMode: next.activeMode });
+export async function POST(): Promise<Response> {
+  return Response.json(
+    {
+      error: {
+        kind: 'not_implemented',
+        message:
+          "POST /api/wardrobe/active is not implemented in v3. There is no per-sail-config polar; the active polar is the newest revision for the boat's activeMode.",
+      },
+    },
+    { status: 501 },
+  );
 }

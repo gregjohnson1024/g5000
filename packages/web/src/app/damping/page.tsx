@@ -240,9 +240,9 @@ export default function DampingPage() {
       <p className="text-xs text-slate-500 pt-4 border-t border-slate-800">
         Damping is applied as an exponential moving average:{' '}
         <span className="font-mono">damped[t] = α·damped[t−1] + (1−α)·raw[t]</span>, with{' '}
-        <span className="font-mono">α = exp(−Δt/τ)</span>. Angle channels (heading, wind angle,
-        COG, heel/pitch/yaw, …) are damped via atan2(sin, cos) to handle ±π wraparound. After a
-        gap longer than 10·τ the filter resets — no smoothing across long pauses.
+        <span className="font-mono">α = exp(−Δt/τ)</span>. Angle channels (heading, wind angle, COG,
+        heel/pitch/yaw, …) are damped via atan2(sin, cos) to handle ±π wraparound. After a gap
+        longer than 10·τ the filter resets — no smoothing across long pauses.
       </p>
     </main>
   );

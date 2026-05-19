@@ -125,10 +125,7 @@ class PersistentCurrentCache {
    * useful through "today" because the boat may still be using it for
    * interpolation against today's grid.
    */
-  async pruneStale(
-    now: number = Date.now(),
-    graceMs: number = 36 * 60 * 60_000,
-  ): Promise<number> {
+  async pruneStale(now: number = Date.now(), graceMs: number = 36 * 60 * 60_000): Promise<number> {
     const cutoffSec = (now - graceMs) / 1000;
     let pruned = 0;
     for (const [key, entry] of this.mem) {
@@ -225,10 +222,7 @@ function spawnFetcher(
  * and forecastDay (0 = today UTC, 1 = tomorrow, ...). Returns the cropped
  * CurrentGrid ready to ship to the chart overlay.
  */
-export async function fetchCurrentGrid(
-  bbox: Bbox,
-  forecastDay = 0,
-): Promise<CurrentGrid> {
+export async function fetchCurrentGrid(bbox: Bbox, forecastDay = 0): Promise<CurrentGrid> {
   await currentCache.hydrate();
   const base = new Date();
   base.setUTCDate(base.getUTCDate() + forecastDay);

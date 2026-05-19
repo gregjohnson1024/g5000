@@ -220,16 +220,14 @@ export default function SniffPage() {
       <div className="bg-amber-900/30 border border-amber-700 rounded p-3 text-amber-100 text-sm space-y-2">
         <div className="font-semibold">Triton-keypad event capture</div>
         <p>
-          Watching command-carrier PGNs only: 130850 (Simnet AP command /
-          Alarm), 130845 (Simnet Key Value — keypad), 126208 (NMEA Group
-          Function — standard Request/Command/Ack), 126720 (Proprietary
-          Fast Packet — vendor stuff), 65302/65340 (unmapped Simnet AP).
-          Status PGNs (65305, 65341, 127237) are deliberately omitted to
-          cut noise; add them via the input above if you need to see Mode
-          / Steer change confirmations. Press one key at a time, then drop
-          a marker labeling it — markers arrive AFTER the press by however
-          long typing takes, so frames appear above the marker that names
-          them. Watch the helm display to confirm the AP responded.
+          Watching command-carrier PGNs only: 130850 (Simnet AP command / Alarm), 130845 (Simnet Key
+          Value — keypad), 126208 (NMEA Group Function — standard Request/Command/Ack), 126720
+          (Proprietary Fast Packet — vendor stuff), 65302/65340 (unmapped Simnet AP). Status PGNs
+          (65305, 65341, 127237) are deliberately omitted to cut noise; add them via the input above
+          if you need to see Mode / Steer change confirmations. Press one key at a time, then drop a
+          marker labeling it — markers arrive AFTER the press by however long typing takes, so
+          frames appear above the marker that names them. Watch the helm display to confirm the AP
+          responded.
         </p>
         <div className="flex gap-2 items-center">
           <input

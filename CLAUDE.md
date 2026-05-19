@@ -26,7 +26,7 @@ npm run bench --workspace @g5000/routing          # routing benchmarks
 
 Node ≥22, ESM-only, strict TypeScript (`noUncheckedIndexedAccess`, composite project refs).
 
-`autopilot-server`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under *Deployment* is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
+`autopilot-server`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under _Deployment_ is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
 
 **Known gotcha:** the top-level `tsconfig.json` still lists `apps/router` in its `references`. That dir was merged into `packages/web` and `tsc -b` reports `TS5083 Cannot read file …/apps/router/tsconfig.json`. Individual workspace builds (`npm run build`, `npm test`) work; only the orchestrated `tsc -b` stops at the missing ref. Remove the ref when convenient.
 
@@ -98,7 +98,7 @@ Channels are dotted strings (e.g. `wind.true.angle`, `nav.gps.position`). Subscr
 
 ### Source mode
 
-`SourceModeController` (`apps/autopilot-server/src/source-mode-controller.ts`) is the single switch between **live** (real hardware), **demo** (synthetic injector — note: demo publishes calibrated wind directly, so the true-wind pipeline is *not* started in demo mode), and **replay** (a session `.jsonl.gz` from `data/sessions/`). The web UI flips it via `/api/source-mode`. Code that needs to gate behaviour on mode should consult the controller, not poll the bus.
+`SourceModeController` (`apps/autopilot-server/src/source-mode-controller.ts`) is the single switch between **live** (real hardware), **demo** (synthetic injector — note: demo publishes calibrated wind directly, so the true-wind pipeline is _not_ started in demo mode), and **replay** (a session `.jsonl.gz` from `data/sessions/`). The web UI flips it via `/api/source-mode`. Code that needs to gate behaviour on mode should consult the controller, not poll the bus.
 
 ### Persistence
 
@@ -124,7 +124,7 @@ Two long-lived branches:
 - **`develop`** — active work lands here. All new commits go on `develop` first. This is the default working branch on the Mac and what feature work is committed against.
 - **`main`** — production. Tracks **what is running on the Pi**. Only updated via a "promote" step (fast-forward merge of `develop`) when work is ready to deploy.
 
-Pi's `~/autopilot` is pinned to `main`. The Pi never sees `develop`. To deploy, promote `develop` → `main` on the Mac, then run the Pi rebuild (see *Deployment* below).
+Pi's `~/autopilot` is pinned to `main`. The Pi never sees `develop`. To deploy, promote `develop` → `main` on the Mac, then run the Pi rebuild (see _Deployment_ below).
 
 Promote workflow (Mac):
 
@@ -145,7 +145,7 @@ For experimental work that shouldn't land on `develop` yet, branch off `develop`
 
 Production runs on RPi5 `sula-bassana` reachable via Tailscale (`100.64.0.117`), boat ethernet (`192.168.2.2`), boat wifi (`192.168.1.232`), or `https://g5000.sulabassana.net` (cloudflared). Systemd unit is `scripts/g5000-autopilot.service` (`Type=notify`, `WatchdogSec=60`). A separate `g5000-forecast-refresh.timer` pokes `/api/forecast/refresh` every ~3h on a curated bbox read live from `/api/settings`.
 
-The Pi pulls from `origin/main` only — see *Branching model* above for the promote step that gets work from `develop` onto `main` before deploying. Skipping the promote step and trying to `git pull` on the Pi will silently no-op (Pi is already at main's tip) and your "deploy" won't actually ship the develop-side changes.
+The Pi pulls from `origin/main` only — see _Branching model_ above for the promote step that gets work from `develop` onto `main` before deploying. Skipping the promote step and trying to `git pull` on the Pi will silently no-op (Pi is already at main's tip) and your "deploy" won't actually ship the develop-side changes.
 
 Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge grib routing coastline` → build `autopilot-server` → build `web` → `systemctl restart g5000-autopilot`.
 

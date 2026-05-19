@@ -34,16 +34,9 @@ export function createSourceModeController(opts: CreateOptions): SourceModeContr
 
   const doSetLiveOrDemo = async (mode: 'live' | 'demo'): Promise<void> => {
     if (status.mode === 'replay') {
-      throw new Error(
-        'cannot swap base mode while replay is active — stop the replay first',
-      );
+      throw new Error('cannot swap base mode while replay is active — stop the replay first');
     }
-    if (
-      baseMode === mode &&
-      status.mode === mode &&
-      !status.errorMessage &&
-      baseHandle !== null
-    ) {
+    if (baseMode === mode && status.mode === mode && !status.errorMessage && baseHandle !== null) {
       // No-op: already in the target mode with a running base source
       // and no error to clear. We still must proceed when baseHandle is
       // null (initial cold-boot into the default mode) so the factory

@@ -24,7 +24,10 @@ export async function POST(req: Request): Promise<Response> {
   try {
     body = (await req.json()) as Body;
   } catch {
-    return Response.json({ ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } }, { status: 400 });
+    return Response.json(
+      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
+      { status: 400 },
+    );
   }
   if (!body || typeof body.key !== 'string' || !body.key) {
     return Response.json(

@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  buildGfsUrl,
-  pickGfsRunForDeparture,
-  gfsForecastHoursForRange,
-} from './fetch-gfs.js';
+import { buildGfsUrl, pickGfsRunForDeparture, gfsForecastHoursForRange } from './fetch-gfs.js';
 import type { Bbox } from './types.js';
 
 const BBOX: Bbox = { latMin: 30, latMax: 40, lonMin: -75, lonMax: -65 };
@@ -28,8 +24,11 @@ describe('buildGfsUrl', () => {
 
   it('zero-pads forecast hour to 3 digits', () => {
     const u = buildGfsUrl({
-      runDateUtc: '2026-05-12', runHourUtc: 0,
-      forecastHour: 96, variables: ['UGRD'], bbox: BBOX,
+      runDateUtc: '2026-05-12',
+      runHourUtc: 0,
+      forecastHour: 96,
+      variables: ['UGRD'],
+      bbox: BBOX,
     });
     expect(u).toContain('f096');
   });

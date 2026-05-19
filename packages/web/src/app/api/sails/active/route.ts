@@ -14,10 +14,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: 'invalid JSON' }, { status: 400 });
   }
   if (!SAIL_CATEGORIES.includes(body.category)) {
-    return NextResponse.json(
-      { error: `unknown category "${body.category}"` },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: `unknown category "${body.category}"` }, { status: 400 });
   }
   const store = getSharedConfigStore();
   const w = await firstValueFrom(store.sails$);

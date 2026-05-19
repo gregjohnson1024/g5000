@@ -15,7 +15,10 @@ export async function GET(req: Request): Promise<Response> {
   const model = (url.searchParams.get('model') ?? '').toLowerCase();
   const hour = Number(url.searchParams.get('hour'));
   if (model !== 'gfs' && model !== 'ecmwf') {
-    return Response.json({ ok: false, error: { message: 'model must be gfs or ecmwf' } }, { status: 400 });
+    return Response.json(
+      { ok: false, error: { message: 'model must be gfs or ecmwf' } },
+      { status: 400 },
+    );
   }
   if (!Number.isFinite(hour) || hour < 0) {
     return Response.json({ ok: false, error: { message: 'hour required' } }, { status: 400 });
@@ -29,10 +32,7 @@ export async function GET(req: Request): Promise<Response> {
     if (!best || v.at > best.at) best = v;
   }
   if (!best) {
-    return Response.json(
-      { ok: false, error: { message: 'not cached' } },
-      { status: 404 },
-    );
+    return Response.json({ ok: false, error: { message: 'not cached' } }, { status: 404 });
   }
   return Response.json({ ok: true, grid: best.grid });
 }

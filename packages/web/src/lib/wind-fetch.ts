@@ -68,23 +68,42 @@ const WIND_CACHE_DIR = join(
   'wind-cache',
 );
 
-interface CacheEntry { at: number; grid: WindGrid }
+interface CacheEntry {
+  at: number;
+  grid: WindGrid;
+}
 
 class PersistentWindCache {
   private mem = new Map<string, CacheEntry>();
 
-  get(key: string): CacheEntry | undefined { return this.mem.get(key); }
-  has(key: string): boolean { return this.mem.has(key); }
-  get size(): number { return this.mem.size; }
+  get(key: string): CacheEntry | undefined {
+    return this.mem.get(key);
+  }
+  has(key: string): boolean {
+    return this.mem.has(key);
+  }
+  get size(): number {
+    return this.mem.size;
+  }
   delete(key: string): boolean {
     void this.removeFile(key);
     return this.mem.delete(key);
   }
-  clear(): void { this.mem.clear(); }
-  entries(): IterableIterator<[string, CacheEntry]> { return this.mem.entries(); }
-  values(): IterableIterator<CacheEntry> { return this.mem.values(); }
-  keys(): IterableIterator<string> { return this.mem.keys(); }
-  [Symbol.iterator](): IterableIterator<[string, CacheEntry]> { return this.mem[Symbol.iterator](); }
+  clear(): void {
+    this.mem.clear();
+  }
+  entries(): IterableIterator<[string, CacheEntry]> {
+    return this.mem.entries();
+  }
+  values(): IterableIterator<CacheEntry> {
+    return this.mem.values();
+  }
+  keys(): IterableIterator<string> {
+    return this.mem.keys();
+  }
+  [Symbol.iterator](): IterableIterator<[string, CacheEntry]> {
+    return this.mem[Symbol.iterator]();
+  }
 
   set(key: string, entry: CacheEntry): this {
     this.mem.set(key, entry);
@@ -149,7 +168,7 @@ class PersistentWindCache {
           // multi-char escape we did; everything else was already
           // filename-safe.
           const g = entry.grid;
-          const k = `${g.model}|${g.forecastHour}|${g.lats[0]!.toFixed(2)}|${g.lats[g.lats.length-1]!.toFixed(2)}|${g.lons[0]!.toFixed(2)}|${g.lons[g.lons.length-1]!.toFixed(2)}`;
+          const k = `${g.model}|${g.forecastHour}|${g.lats[0]!.toFixed(2)}|${g.lats[g.lats.length - 1]!.toFixed(2)}|${g.lons[0]!.toFixed(2)}|${g.lons[g.lons.length - 1]!.toFixed(2)}`;
           this.mem.set(k, entry);
           loaded++;
         } catch {
@@ -305,15 +324,17 @@ export function runAvailability(
   else if (h >= 12) hh = 12;
   else if (h >= 6) hh = 6;
   else hh = 0;
-  const latestRunUnix =
-    Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), hh) / 1000;
+  const latestRunUnix = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), hh) / 1000;
   // Next nominal run after `latestRunUnix` is +6h; it becomes available `lag` h later.
   const nextRunNominal = latestRunUnix + 6 * 3600;
   const nextRunAvailableUnix = nextRunNominal + lag * 3600;
   return { latestRunUnix, nextRunAvailableUnix };
 }
 
-export function pickRun(at: Date, leadSafetyHours = 4): { runDateUtc: string; runHourUtc: 0 | 6 | 12 | 18; runUnix: number } {
+export function pickRun(
+  at: Date,
+  leadSafetyHours = 4,
+): { runDateUtc: string; runHourUtc: 0 | 6 | 12 | 18; runUnix: number } {
   // Subtract the publication-lag safety so we don't try to fetch a run that
   // hasn't been published yet.
   const t = new Date(at.getTime() - leadSafetyHours * 3600 * 1000);
@@ -366,7 +387,10 @@ function spawnText(cmd: string, args: string[]): Promise<string> {
     p.on('error', rejectP);
     p.on('close', (code) => {
       if (code === 0) resolveP(out);
-      else rejectP(new Error(`${cmd} ${args.slice(0, 3).join(' ')}…: exit ${code}: ${err.slice(0, 200)}`));
+      else
+        rejectP(
+          new Error(`${cmd} ${args.slice(0, 3).join(' ')}…: exit ${code}: ${err.slice(0, 200)}`),
+        );
     });
   });
 }
@@ -493,7 +517,12 @@ export async function fetchWindGrid(
  * paired by shortName, not order, so the ordering of input messages
  * doesn't matter.
  */
-async function decodeUVGrib(rawGrib: Buffer, model: WindModel, runAt: number, fh: number): Promise<WindGrid> {
+async function decodeUVGrib(
+  rawGrib: Buffer,
+  model: WindModel,
+  runAt: number,
+  fh: number,
+): Promise<WindGrid> {
   const dir = await mkdtemp(join(tmpdir(), 'g5000-grib-'));
   try {
     const gribPath = join(dir, 'in.grib2');
@@ -515,7 +544,8 @@ async function decodeUVGrib(rawGrib: Buffer, model: WindModel, runAt: number, fh
     const uRecs = parseGridData(uTxt);
     const vRecs = parseGridData(vTxt);
     const pRecs = pTxt ? parseGridData(pTxt) : [];
-    if (uRecs.length === 0 || vRecs.length === 0) throw new Error('eccodes returned no grid points');
+    if (uRecs.length === 0 || vRecs.length === 0)
+      throw new Error('eccodes returned no grid points');
     const latsSet = new Set<number>();
     const lonsSet = new Set<number>();
     for (const r of uRecs) {
@@ -600,12 +630,13 @@ export async function fetchWindGridEcmwf(
   now: Date = new Date(),
 ): Promise<WindGrid> {
   const run = pickEcmwfRun(now.getTime() / 1000);
-  const runUnix = Date.UTC(
-    Number(run.runDateUtc.slice(0, 4)),
-    Number(run.runDateUtc.slice(5, 7)) - 1,
-    Number(run.runDateUtc.slice(8, 10)),
-    run.runHourUtc,
-  ) / 1000;
+  const runUnix =
+    Date.UTC(
+      Number(run.runDateUtc.slice(0, 4)),
+      Number(run.runDateUtc.slice(5, 7)) - 1,
+      Number(run.runDateUtc.slice(8, 10)),
+      run.runHourUtc,
+    ) / 1000;
   const fh = Math.max(0, Math.round(forecastHour / 3) * 3);
 
   const messages = await fetchEcmwfMessagesS3({

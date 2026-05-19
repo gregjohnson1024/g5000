@@ -67,7 +67,7 @@ describeOrSkip('Bermuda → Newport regression', () => {
     // same reason.
     const r = plan({
       start: { lat: 32.45, lon: -64.65 }, // ~5 NM NE of Bermuda
-      end: { lat: 41.30, lon: -71.20 },   // ~12 NM S of Newport, RI
+      end: { lat: 41.3, lon: -71.2 }, // ~12 NM S of Newport, RI
       departure,
       wind,
       polar: DEFAULT_POLARS,

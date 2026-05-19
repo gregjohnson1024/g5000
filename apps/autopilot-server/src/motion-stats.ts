@@ -51,7 +51,7 @@ export function startMotionStats(
       const combined =
         heelRms !== null && pitchRms !== null
           ? Math.hypot(heelRms, pitchRms)
-          : heelRms ?? pitchRms;
+          : (heelRms ?? pitchRms);
       const allBuf = [...heelBuf, ...pitchBuf];
       const head = allBuf.reduce<BufferEntry | null>(
         (a, b) => (a === null || b.t < a.t ? b : a),

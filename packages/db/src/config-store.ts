@@ -47,10 +47,7 @@ import {
   getRevision as getRevisionRepo,
   type ListFilter,
 } from './polar-revisions.js';
-import {
-  migrateWardrobeV2toV3,
-  type V2Wardrobe,
-} from './migrate-wardrobe-v3.js';
+import { migrateWardrobeV2toV3, type V2Wardrobe } from './migrate-wardrobe-v3.js';
 
 const SINGLETON = 'singleton';
 
@@ -235,9 +232,12 @@ export class ConfigStore {
       // Read legacy crossover_map row for the active (boat, mode) so the v2→v3
       // migrator can remap painted cells. Use a raw prepared statement so we
       // don't need to keep the drizzle table import around just for this read.
-      let v2MapForMigrator:
-        | { boatId: BoatId; mode: PolarMode; cells: Record<string, string>; updatedAt: number }
-        | null = null;
+      let v2MapForMigrator: {
+        boatId: BoatId;
+        mode: PolarMode;
+        cells: Record<string, string>;
+        updatedAt: number;
+      } | null = null;
       const activeMode: PolarMode =
         (rawWardrobe as { activeMode?: PolarMode })?.activeMode ?? 'default';
       try {
@@ -512,9 +512,12 @@ export class ConfigStore {
       if (!rule || typeof rule !== 'object') continue;
       if (typeof rule.channelPattern !== 'string' || rule.channelPattern.length === 0) continue;
       if (!Array.isArray(rule.sources)) continue;
-      const sources = rule.sources.filter((s): s is string => typeof s === 'string' && s.length > 0);
+      const sources = rule.sources.filter(
+        (s): s is string => typeof s === 'string' && s.length > 0,
+      );
       if (sources.length === 0) continue;
-      if (typeof rule.freshnessSeconds !== 'number' || !Number.isFinite(rule.freshnessSeconds)) continue;
+      if (typeof rule.freshnessSeconds !== 'number' || !Number.isFinite(rule.freshnessSeconds))
+        continue;
       if (rule.freshnessSeconds <= 0) continue;
       const blocked = Array.isArray(rule.blocked)
         ? rule.blocked.filter((s): s is string => typeof s === 'string' && s.length > 0)

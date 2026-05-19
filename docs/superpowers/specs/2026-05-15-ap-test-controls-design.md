@@ -24,23 +24,23 @@ This work is a precursor to broader integrated autopilot control (route-driven h
 
 ### Create
 
-| File | Purpose |
-|---|---|
-| `packages/core/src/autopilot-tx.ts` | Defines `AutopilotTx` interface (`sendCommand(req): Promise<{ok, error?}>`) + `setSharedAutopilotTx` / `getSharedAutopilotTx`. Mirrors `alerts.ts` pattern. |
-| `packages/bridge/src/tx/fast-packet.ts` | Pure helper `encodePgnToCanFrames(pgn: OutgoingPgn): RawCanFrame[]`. Wraps canboatjs `pgnToYdgwRawFormat`, parses each YDWG-RAW line into a RawCanFrame, asserts frame# strictly ascending. |
-| `packages/bridge/src/tx/fast-packet.test.ts` | Unit tests: round-trip for PGN 130850 → 2 ordered frames; single-frame regression for PGN 60928; canboatjs failure throws. |
-| `packages/web/src/app/autopilot/control-panel.tsx` | Client component: buttons, confirmation modal, recent-command log. Reads capture-codes via `/api/autopilot/capture-codes`. |
-| `packages/web/src/app/api/autopilot/command/route.ts` | POST endpoint. Layer-2 env-var gate, calls `getSharedAutopilotTx().sendCommand(...)`. Single-in-flight serialization. |
-| `packages/web/src/app/api/autopilot/capture-codes/route.ts` | GET endpoint returns the contents of `~/.g5000-router/ap-tx-codes.json` (or empty `{captures:{}}` if missing). Used by control-panel to gate increment buttons. |
+| File                                                        | Purpose                                                                                                                                                                                     |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/autopilot-tx.ts`                         | Defines `AutopilotTx` interface (`sendCommand(req): Promise<{ok, error?}>`) + `setSharedAutopilotTx` / `getSharedAutopilotTx`. Mirrors `alerts.ts` pattern.                                 |
+| `packages/bridge/src/tx/fast-packet.ts`                     | Pure helper `encodePgnToCanFrames(pgn: OutgoingPgn): RawCanFrame[]`. Wraps canboatjs `pgnToYdgwRawFormat`, parses each YDWG-RAW line into a RawCanFrame, asserts frame# strictly ascending. |
+| `packages/bridge/src/tx/fast-packet.test.ts`                | Unit tests: round-trip for PGN 130850 → 2 ordered frames; single-frame regression for PGN 60928; canboatjs failure throws.                                                                  |
+| `packages/web/src/app/autopilot/control-panel.tsx`          | Client component: buttons, confirmation modal, recent-command log. Reads capture-codes via `/api/autopilot/capture-codes`.                                                                  |
+| `packages/web/src/app/api/autopilot/command/route.ts`       | POST endpoint. Layer-2 env-var gate, calls `getSharedAutopilotTx().sendCommand(...)`. Single-in-flight serialization.                                                                       |
+| `packages/web/src/app/api/autopilot/capture-codes/route.ts` | GET endpoint returns the contents of `~/.g5000-router/ap-tx-codes.json` (or empty `{captures:{}}` if missing). Used by control-panel to gate increment buttons.                             |
 
 ### Modify
 
-| File | Change |
-|---|---|
-| `packages/bridge/src/ydwg-raw-tcp-driver.ts` | Rewrite the `lines.length !== 1` branch in `txPgn`: instead of throwing, parse all lines via `encodePgnToCanFrames`, await `txCan(frame)` for each in order. Drop the `frame.data.length > 8` throw (no longer reachable post-split). |
-| `packages/bridge/src/ydwg-raw-tcp-driver.test.ts` | Replace the existing "Fast Packet split not implemented" rejection test with a positive test: send PGN 130850 → assert N CAN frames written, each ending `\n`, frame counters strictly ascending. |
-| `packages/bridge/src/bridge.ts` | At boot, if `process.env.G5000_ENABLE_AP_TX === '1'`, construct the AutopilotTx implementation (closes over the driver + a serialization mutex) and call `setSharedAutopilotTx(...)`. Otherwise log a one-line disabled message and skip registration. |
-| `packages/web/src/app/autopilot/page.tsx` | Convert to a Server Component shell that reads `process.env.G5000_ENABLE_AP_TX`, then renders the existing read-only content (split into a client component) followed by `<ControlPanel />` only when the flag is set. Rewrite the trailing footnote conditionally. |
+| File                                              | Change                                                                                                                                                                                                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/bridge/src/ydwg-raw-tcp-driver.ts`      | Rewrite the `lines.length !== 1` branch in `txPgn`: instead of throwing, parse all lines via `encodePgnToCanFrames`, await `txCan(frame)` for each in order. Drop the `frame.data.length > 8` throw (no longer reachable post-split).                               |
+| `packages/bridge/src/ydwg-raw-tcp-driver.test.ts` | Replace the existing "Fast Packet split not implemented" rejection test with a positive test: send PGN 130850 → assert N CAN frames written, each ending `\n`, frame counters strictly ascending.                                                                   |
+| `packages/bridge/src/bridge.ts`                   | At boot, if `process.env.G5000_ENABLE_AP_TX === '1'`, construct the AutopilotTx implementation (closes over the driver + a serialization mutex) and call `setSharedAutopilotTx(...)`. Otherwise log a one-line disabled message and skip registration.              |
+| `packages/web/src/app/autopilot/page.tsx`         | Convert to a Server Component shell that reads `process.env.G5000_ENABLE_AP_TX`, then renders the existing read-only content (split into a client component) followed by `<ControlPanel />` only when the flag is set. Rewrite the trailing footnote conditionally. |
 
 ### No change
 
@@ -95,10 +95,34 @@ Sequence number is managed internally by canboatjs; we trust it but add a regres
 {
   "version": 1,
   "captures": {
-    "course_+1":  { "propId": 255, "commandType": 10, "event": 26, "direction": "Starboard", "angle_deg": 1 },
-    "course_-1":  { "propId": 255, "commandType": 10, "event": 26, "direction": "Port",      "angle_deg": 1 },
-    "course_+10": { "propId": 255, "commandType": 10, "event": 26, "direction": "Starboard", "angle_deg": 10 },
-    "course_-10": { "propId": 255, "commandType": 10, "event": 26, "direction": "Port",      "angle_deg": 10 }
+    "course_+1": {
+      "propId": 255,
+      "commandType": 10,
+      "event": 26,
+      "direction": "Starboard",
+      "angle_deg": 1
+    },
+    "course_-1": {
+      "propId": 255,
+      "commandType": 10,
+      "event": 26,
+      "direction": "Port",
+      "angle_deg": 1
+    },
+    "course_+10": {
+      "propId": 255,
+      "commandType": 10,
+      "event": 26,
+      "direction": "Starboard",
+      "angle_deg": 10
+    },
+    "course_-10": {
+      "propId": 255,
+      "commandType": 10,
+      "event": 26,
+      "direction": "Port",
+      "angle_deg": 10
+    }
   }
 }
 ```
@@ -124,14 +148,14 @@ Every press shows a confirmation modal with command-specific text describing the
 
 ## 6. Safety
 
-| Risk | Mitigation |
-|---|---|
-| Accidental TX on the Pi | Three-layer gating; Pi's systemd unit has no `G5000_ENABLE_AP_TX`; post-deploy assertion |
-| Sending while bus is down (YDWG half-open) | API returns 503 if driver's RX count is zero in last 30 s |
-| Interleaved fast-packet sequences | Single-in-flight serialization mutex in `AutopilotTx.sendCommand` |
-| Incorrect captured-code clobbers the AP | Capture buttons are disabled until JSON entry exists; user hand-edits with the values they saw at `/sniff`; modal still confirms |
-| Unintended retries | API does not auto-retry on `txPgn` failure; error surfaces to user; resend is a deliberate second click |
-| User confusion about ack | Recent-command log clearly labels the result as "mode change observed", not a true ack; +1 / −1 / +10 / −10 specifically may show "no mode change within 2 s" even on success because they shift target heading without leaving Heading mode |
+| Risk                                       | Mitigation                                                                                                                                                                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accidental TX on the Pi                    | Three-layer gating; Pi's systemd unit has no `G5000_ENABLE_AP_TX`; post-deploy assertion                                                                                                                                                     |
+| Sending while bus is down (YDWG half-open) | API returns 503 if driver's RX count is zero in last 30 s                                                                                                                                                                                    |
+| Interleaved fast-packet sequences          | Single-in-flight serialization mutex in `AutopilotTx.sendCommand`                                                                                                                                                                            |
+| Incorrect captured-code clobbers the AP    | Capture buttons are disabled until JSON entry exists; user hand-edits with the values they saw at `/sniff`; modal still confirms                                                                                                             |
+| Unintended retries                         | API does not auto-retry on `txPgn` failure; error surfaces to user; resend is a deliberate second click                                                                                                                                      |
+| User confusion about ack                   | Recent-command log clearly labels the result as "mode change observed", not a true ack; +1 / −1 / +10 / −10 specifically may show "no mode change within 2 s" even on success because they shift target heading without leaving Heading mode |
 
 ## 7. Test plan
 

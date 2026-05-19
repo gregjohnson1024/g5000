@@ -15,10 +15,10 @@ reviews.
 
 The single most important architectural finding from this sweep:
 
-> *"The Pixel sur Mer Exocet Essential exemplifies this approach—it
+> _"The Pixel sur Mer Exocet Essential exemplifies this approach—it
 > functions as an expert system sitting between the user and the B&G
 > H5000 controller, changing the requested heading based on sensor
-> inputs."* — Yachting World, "Everything you need to know about high
+> inputs."_ — Yachting World, "Everything you need to know about high
 > performance autopilots"
 
 **Exocet does NOT replace the H5000 CPU/course computer. It overlays on
@@ -30,15 +30,15 @@ choice — see §4 below.
 The release-notes PDF logs 106 versions but never describes the products.
 The marketing pages do:
 
-| Product | Role |
-|---|---|
-| **Exocet Essential** | Entry-level all-in-one: navigation + data logger + autopilot (overlay). Targets Class 40 / IRC / multihulls / Mini 6.50. Marketed as "offshore racing tech for a wider community". |
-| **Exocet Silver** | Mid-tier (specs not public). |
-| **Exocet Blue** | Multi-protocol data logger + monitoring + web visual programming interface (i.e. Manta) with real-time viewing. The data-recording side of the stack. |
-| **Exocet Gold** | Foiling flight controller. 350 g aluminum IP67 box, 9–51 V / 4 W, -10 to +50 °C, CE EN 60945 + FCC. 1× Ethernet, 2× CAN 2.0, 6× analog 16-bit @ 50 Hz, 2× digital in, 3× digital out, 5× RS232, 1× RS232/RS422. Inertial+height-sensor fusion claimed to "centimetre accuracy". For AC75 / IMOCA / Ultim foilers. Won Dame Award 2021 special mention. |
-| **Exocet Safety** | Newer product (2025+) focused on safety functions (MOB, anti-collision integration with sea.ai). |
-| **Exocet Cloud** | Cloud-hosted variant (details behind login). |
-| **Exocet FlyingShape** | Joint product with MDS: real-time 3D sail shape measurement. |
+| Product                | Role                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Exocet Essential**   | Entry-level all-in-one: navigation + data logger + autopilot (overlay). Targets Class 40 / IRC / multihulls / Mini 6.50. Marketed as "offshore racing tech for a wider community".                                                                                                                                                                     |
+| **Exocet Silver**      | Mid-tier (specs not public).                                                                                                                                                                                                                                                                                                                           |
+| **Exocet Blue**        | Multi-protocol data logger + monitoring + web visual programming interface (i.e. Manta) with real-time viewing. The data-recording side of the stack.                                                                                                                                                                                                  |
+| **Exocet Gold**        | Foiling flight controller. 350 g aluminum IP67 box, 9–51 V / 4 W, -10 to +50 °C, CE EN 60945 + FCC. 1× Ethernet, 2× CAN 2.0, 6× analog 16-bit @ 50 Hz, 2× digital in, 3× digital out, 5× RS232, 1× RS232/RS422. Inertial+height-sensor fusion claimed to "centimetre accuracy". For AC75 / IMOCA / Ultim foilers. Won Dame Award 2021 special mention. |
+| **Exocet Safety**      | Newer product (2025+) focused on safety functions (MOB, anti-collision integration with sea.ai).                                                                                                                                                                                                                                                       |
+| **Exocet Cloud**       | Cloud-hosted variant (details behind login).                                                                                                                                                                                                                                                                                                           |
+| **Exocet FlyingShape** | Joint product with MDS: real-time 3D sail shape measurement.                                                                                                                                                                                                                                                                                           |
 
 ## 2. Confirmed software architecture
 
@@ -92,7 +92,7 @@ not a replacement.** From Yachting World:
 > system changing the requested pilot heading depending on inputs from
 > sensor data, including speed, heel and wind data."
 
-So Exocet modifies the *target* the H5000 course computer receives but
+So Exocet modifies the _target_ the H5000 course computer receives but
 lets the H5000 own the actual rudder-drive PID.
 
 **Our master spec §7 deliberately picks the other path: replace the
@@ -104,7 +104,7 @@ talk to via PGN 127237 + the B&G proprietary 1857 PGNs.
 
 The replace path is more work but is what the spec says we're doing.
 The Exocet feature inventory below is therefore strictly a survey of
-*what features we might want to copy* — not a topology argument.
+_what features we might want to copy_ — not a topology argument.
 
 ## 4a. Feature-gap inventory (Exocet has it, we don't yet)
 
@@ -113,25 +113,25 @@ current commit. Sorted by my judgement of value-for-our-boat.
 
 ### High value — should add
 
-| Exocet feature | Our state | Notes |
-|---|---|---|
-| **Man Over Board** (button + DR bearing/range channels — H-LINK fns 185, 186) | Not in master spec | Safety. Big red button on the page; stamps GPS pos; surfaces `mob.dr.bearing` + `mob.dr.range` channels; helm tile group. |
-| **Alerts engine + `/alerts` page** (history, mute, per-channel sector/low/high rules; H-LINK message types 32/33/34) | We have `alarm.autopilot.watchdog` channel name and that's it — no engine, no UI | Define an alarm-rule type per channel; central engine subscribes the bus and publishes `alarm.*` events; UI lists active + history. |
-| **Tidal Set + Drift as first-class channels** (Exocet exposes; H5000 H-LINK fns 131, 132) | Spec §6.4 Kalman model produces this vector internally but doesn't expose it | One small follow-on once §6.4 lands: publish `tidal.set` (rad) and `tidal.drift` (m/s) channels; helm tile pair. |
-| **Operating-variable channels — daggerboard up/down at minimum** | Polar is keyed only by TWS/TWA; no provision for boards-up vs boards-down | Real catamaran impact: boards-up vs boards-down can shift target speeds by 10–20%. Today the sail wardrobe handles sail config but not appendage config. Two options: (a) add a boards-position channel + a boards-axis to the polar table, (b) use the wardrobe to encode "Default — boards down" + "Default — boards up" as separate sail configs. (b) is cheaper, (a) is more flexible. |
-| **PHSPD / PASHR 0183 frames** | We parse MWV; not these | PHSPD = high-precision speed-and-heading (B&G/Garmin), PASHR = Applanix/Hemisphere proprietary attitude. Worth knowing they exist — add only if a sensor on the boat emits them. |
-| **Layered diagnose view on `/autopilot`** | Not in master spec | Per the H5000 design notes (`autopilot-design-notes.md`). The Exocet UI surfaces sensor freshness + algorithm state separately. We already publish all the underlying observables; just need the assembly page. |
+| Exocet feature                                                                                                       | Our state                                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Man Over Board** (button + DR bearing/range channels — H-LINK fns 185, 186)                                        | Not in master spec                                                               | Safety. Big red button on the page; stamps GPS pos; surfaces `mob.dr.bearing` + `mob.dr.range` channels; helm tile group.                                                                                                                                                                                                                                                                  |
+| **Alerts engine + `/alerts` page** (history, mute, per-channel sector/low/high rules; H-LINK message types 32/33/34) | We have `alarm.autopilot.watchdog` channel name and that's it — no engine, no UI | Define an alarm-rule type per channel; central engine subscribes the bus and publishes `alarm.*` events; UI lists active + history.                                                                                                                                                                                                                                                        |
+| **Tidal Set + Drift as first-class channels** (Exocet exposes; H5000 H-LINK fns 131, 132)                            | Spec §6.4 Kalman model produces this vector internally but doesn't expose it     | One small follow-on once §6.4 lands: publish `tidal.set` (rad) and `tidal.drift` (m/s) channels; helm tile pair.                                                                                                                                                                                                                                                                           |
+| **Operating-variable channels — daggerboard up/down at minimum**                                                     | Polar is keyed only by TWS/TWA; no provision for boards-up vs boards-down        | Real catamaran impact: boards-up vs boards-down can shift target speeds by 10–20%. Today the sail wardrobe handles sail config but not appendage config. Two options: (a) add a boards-position channel + a boards-axis to the polar table, (b) use the wardrobe to encode "Default — boards down" + "Default — boards up" as separate sail configs. (b) is cheaper, (a) is more flexible. |
+| **PHSPD / PASHR 0183 frames**                                                                                        | We parse MWV; not these                                                          | PHSPD = high-precision speed-and-heading (B&G/Garmin), PASHR = Applanix/Hemisphere proprietary attitude. Worth knowing they exist — add only if a sensor on the boat emits them.                                                                                                                                                                                                           |
+| **Layered diagnose view on `/autopilot`**                                                                            | Not in master spec                                                               | Per the H5000 design notes (`autopilot-design-notes.md`). The Exocet UI surfaces sensor freshness + algorithm state separately. We already publish all the underlying observables; just need the assembly page.                                                                                                                                                                            |
 
 ### Medium value — worth a follow-up
 
-| Exocet feature | Our state | Notes |
-|---|---|---|
-| **Race timer + start-line tools** (start-line bearing, port/stbd-end distance, line bias; H-LINK fns 152, 272-275, 281) | Master spec §2.1 explicitly excluded | Spec exclusion was about scope, not about value. Race timer is small; start-line tools are bigger. Worth re-opening if a regatta is on the calendar. |
-| **Bidirectional Expedition integration** (`Expedition_in` + `Expedition_out` boxes) | We import polar CSV; no live data exchange | Most race tactical software wants live data IN and waypoint/route OUT. We could expose a `/expedition` integration that speaks their UDP/serial format. H-LINK is already most of the path (Expedition supports H-LINK reads). |
-| **GoFree integration** (B&G's WiFi nav protocol) | Not in spec | The Zeus SR plotter on the boat speaks GoFree. We could read waypoint/route info over WiFi without going through the N2K bus. Useful for /autopilot Navigation mode. |
-| **Heel correction on BSP** (H5000 has 2D BSP[heel_bin][speed_bin]) | Our BSP cal is 1D | H5000 default; meaningful on a heeling monohull, much less on a cat. Worth knowing the table shape if we ever decide to add it; YAGNI for now. |
-| **Optimum Wind Angle channel** distinct from Target TWA (H-LINK fns 53 + 83) | We have `performance.target.twaUpwind` only | H5000 exposes both — function 53 (absolute optimum TWA, polar-derived) and function 83 (signed target TWA accounting for tack). Worth surfacing as separate channels for clarity. |
-| **Damping config exposed via H-LINK** (H5000 H-LINK message type 206) | We have damping config exposed via REST + `/damping` UI; not via H-LINK | Add H-LINK message type 206 support if tactical software wants it; small extension to the H-LINK server. |
+| Exocet feature                                                                                                          | Our state                                                               | Notes                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Race timer + start-line tools** (start-line bearing, port/stbd-end distance, line bias; H-LINK fns 152, 272-275, 281) | Master spec §2.1 explicitly excluded                                    | Spec exclusion was about scope, not about value. Race timer is small; start-line tools are bigger. Worth re-opening if a regatta is on the calendar.                                                                           |
+| **Bidirectional Expedition integration** (`Expedition_in` + `Expedition_out` boxes)                                     | We import polar CSV; no live data exchange                              | Most race tactical software wants live data IN and waypoint/route OUT. We could expose a `/expedition` integration that speaks their UDP/serial format. H-LINK is already most of the path (Expedition supports H-LINK reads). |
+| **GoFree integration** (B&G's WiFi nav protocol)                                                                        | Not in spec                                                             | The Zeus SR plotter on the boat speaks GoFree. We could read waypoint/route info over WiFi without going through the N2K bus. Useful for /autopilot Navigation mode.                                                           |
+| **Heel correction on BSP** (H5000 has 2D BSP[heel_bin][speed_bin])                                                      | Our BSP cal is 1D                                                       | H5000 default; meaningful on a heeling monohull, much less on a cat. Worth knowing the table shape if we ever decide to add it; YAGNI for now.                                                                                 |
+| **Optimum Wind Angle channel** distinct from Target TWA (H-LINK fns 53 + 83)                                            | We have `performance.target.twaUpwind` only                             | H5000 exposes both — function 53 (absolute optimum TWA, polar-derived) and function 83 (signed target TWA accounting for tack). Worth surfacing as separate channels for clarity.                                              |
+| **Damping config exposed via H-LINK** (H5000 H-LINK message type 206)                                                   | We have damping config exposed via REST + `/damping` UI; not via H-LINK | Add H-LINK message type 206 support if tactical software wants it; small extension to the H-LINK server.                                                                                                                       |
 
 ### Out of scope (explicit) — for reference
 
@@ -168,21 +168,21 @@ of salt, but the boats are real):
 
 From Yachting World (real-racing context):
 
-- Class 40, mid-Channel, gusting 30 kn close-hauled: *"our heading
+- Class 40, mid-Channel, gusting 30 kn close-hauled: _"our heading
   feathers up a little into the wind to avoid excess heel, while
-  simultaneously maximising VMG"* — exactly the Gust Response + Heel
+  simultaneously maximising VMG"_ — exactly the Gust Response + Heel
   Compensation behaviour we'd model.
 
 From Rupert Holmes (Yachting World):
 
-- *"I've sailed raceboats with complex and expensive electronics that
+- _"I've sailed raceboats with complex and expensive electronics that
   require extensive set up to get decent performance, yet every setting
   was still on the factory default even after the completion of a Rolex
-  Fastnet Race."*
+  Fastnet Race."_
 
 That last quote is the strongest argument for our "all expert systems
 default off, sensible base config" stance from the autopilot design
-notes — the failure mode in this industry is *not* under-engineering,
+notes — the failure mode in this industry is _not_ under-engineering,
 it's over-engineering with un-tuned settings.
 
 ## 7. Sources

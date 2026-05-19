@@ -10,7 +10,10 @@ const CATEGORIES: { key: SailCategory; label: string }[] = [
 ];
 
 function slug(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
 }
 
 export default function SailsPage() {

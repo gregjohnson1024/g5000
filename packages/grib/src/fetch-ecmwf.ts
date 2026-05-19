@@ -72,9 +72,7 @@ export async function fetchEcmwfMessages(opts: {
     .split(/\n/)
     .filter(Boolean)
     .map((l) => JSON.parse(l) as IndexLine);
-  const wanted = lines.filter((l) =>
-    opts.variables.includes(l.param as '10u' | '10v' | 'msl'),
-  );
+  const wanted = lines.filter((l) => opts.variables.includes(l.param as '10u' | '10v' | 'msl'));
   const buffers: Buffer[] = [];
   for (const w of wanted) {
     const res = await fetchFn(urls.grib, {

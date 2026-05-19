@@ -77,7 +77,11 @@ export default function DevicesPage() {
         <button
           onClick={refresh}
           disabled={busy || !canRefresh}
-          title={canRefresh ? '' : `Refresh sends an ISO Request on the N2K bus — available in live mode only (currently ${mode}).`}
+          title={
+            canRefresh
+              ? ''
+              : `Refresh sends an ISO Request on the N2K bus — available in live mode only (currently ${mode}).`
+          }
           className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy ? 'Refreshing…' : 'Refresh devices'}

@@ -183,7 +183,9 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
                     }`}
                     title={`TWS ${(tws * MS_TO_KNOTS).toFixed(1)} kn, TWA ${(
                       polar.twaBins[twaIdx]! * RAD_TO_DEG
-                    ).toFixed(0)}°, target ${(v * MS_TO_KNOTS).toFixed(2)} kn — double-click to edit`}
+                    ).toFixed(
+                      0,
+                    )}°, target ${(v * MS_TO_KNOTS).toFixed(2)} kn — double-click to edit`}
                   >
                     {isEditing ? (
                       <CellInput

@@ -32,11 +32,7 @@ const TRAIL_LAYER_ID = 'live-trail-layer';
  * /tracks page interrupts the active recording, so the chart drops the
  * previous breadcrumb and starts a fresh line for the new track.
  */
-export function LiveBoatMarker({
-  map,
-  flyToOnFirstFix = true,
-  onUpdate,
-}: LiveBoatMarkerProps) {
+export function LiveBoatMarker({ map, flyToOnFirstFix = true, onUpdate }: LiveBoatMarkerProps) {
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const flownRef = useRef<boolean>(false);
   const trailRef = useRef<Array<[number, number]>>([]);
@@ -63,7 +59,11 @@ export function LiveBoatMarker({
       if (map.getSource(TRAIL_SOURCE_ID)) return;
       map.addSource(TRAIL_SOURCE_ID, {
         type: 'geojson',
-        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} },
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
       });
       map.addLayer({
         id: TRAIL_LAYER_ID,
@@ -109,8 +109,7 @@ export function LiveBoatMarker({
     void hydrate();
 
     // Re-hydrate when /tracks page interrupts the active recording.
-    const bc =
-      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('tracks') : null;
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('tracks') : null;
     bc?.addEventListener('message', (e) => {
       const m = e.data as { kind?: string } | null;
       if (m?.kind === 'interrupted') {
@@ -139,8 +138,7 @@ export function LiveBoatMarker({
         // own down-sampled copy to disk; we don't reach back to /api/tracks
         // on every fix. On reload, hydrate() picks up the persisted copy.
         const last = trailRef.current[trailRef.current.length - 1];
-        const moved =
-          !last || Math.abs(last[0] - p.lon) > 1e-5 || Math.abs(last[1] - p.lat) > 1e-5;
+        const moved = !last || Math.abs(last[0] - p.lon) > 1e-5 || Math.abs(last[1] - p.lat) > 1e-5;
         if (moved) {
           trailRef.current.push([p.lon, p.lat]);
           updateTrail();

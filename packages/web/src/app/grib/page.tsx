@@ -96,9 +96,7 @@ export default async function GribCachePage() {
       <div className="text-xs text-slate-500 mb-4">
         {items.length} run{items.length === 1 ? '' : 's'} · {formatSize(totalSize)} total
       </div>
-      {items.length === 0 && (
-        <div className="text-slate-400">Cache is empty.</div>
-      )}
+      {items.length === 0 && <div className="text-slate-400">Cache is empty.</div>}
       {items.length > 0 && (
         <table className="w-full text-sm">
           <thead>
@@ -115,7 +113,9 @@ export default async function GribCachePage() {
                 <td className="py-2 pr-4 uppercase">{it.model}</td>
                 <td className="py-2 pr-4 font-mono text-xs">{formatRunTime(it.runTime)}</td>
                 <td className="py-2 pr-4 text-right">{formatSize(it.size)}</td>
-                <td className="py-2 pr-4 font-mono text-xs text-slate-400">{formatMtime(it.mtime)}</td>
+                <td className="py-2 pr-4 font-mono text-xs text-slate-400">
+                  {formatMtime(it.mtime)}
+                </td>
               </tr>
             ))}
           </tbody>

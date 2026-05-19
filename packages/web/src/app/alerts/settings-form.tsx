@@ -5,7 +5,12 @@ import { useEffect, useState } from 'react';
 interface AlarmsConfig {
   enabled: Record<string, boolean>;
   thresholds: {
-    anchor: { armed: boolean; point?: { lat: number; lon: number }; droppedAt?: string; radiusM: number };
+    anchor: {
+      armed: boolean;
+      point?: { lat: number; lon: number };
+      droppedAt?: string;
+      radiusM: number;
+    };
     shallowWater: { thresholdM?: number; holdMs: number };
     overSpeed: { thresholdKn?: number; holdMs: number };
     lowBattery: { thresholdV?: number; holdMs: number };
@@ -66,7 +71,10 @@ export function SettingsForm() {
           onChange={(v) =>
             save({
               ...cfg,
-              thresholds: { ...cfg.thresholds, shallowWater: { ...cfg.thresholds.shallowWater, thresholdM: v } },
+              thresholds: {
+                ...cfg.thresholds,
+                shallowWater: { ...cfg.thresholds.shallowWater, thresholdM: v },
+              },
             })
           }
         />
@@ -76,7 +84,10 @@ export function SettingsForm() {
           onChange={(v) =>
             save({
               ...cfg,
-              thresholds: { ...cfg.thresholds, overSpeed: { ...cfg.thresholds.overSpeed, thresholdKn: v } },
+              thresholds: {
+                ...cfg.thresholds,
+                overSpeed: { ...cfg.thresholds.overSpeed, thresholdKn: v },
+              },
             })
           }
         />
@@ -86,7 +97,10 @@ export function SettingsForm() {
           onChange={(v) =>
             save({
               ...cfg,
-              thresholds: { ...cfg.thresholds, lowBattery: { ...cfg.thresholds.lowBattery, thresholdV: v } },
+              thresholds: {
+                ...cfg.thresholds,
+                lowBattery: { ...cfg.thresholds.lowBattery, thresholdV: v },
+              },
             })
           }
         />
@@ -107,7 +121,15 @@ export function SettingsForm() {
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function NumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
   return (
     <label className="flex items-center gap-2 py-1">
       <span className="w-48">{label}</span>

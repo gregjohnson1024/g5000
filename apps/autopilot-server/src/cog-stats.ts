@@ -61,9 +61,10 @@ export function startCogStats(
       const R = Math.hypot(meanSin, meanCos);
       // Below ~0.01 the angle is essentially undefined (samples nearly
       // uniformly distributed). Return null to signal that to the UI.
-      const avgRad = R < 0.01
-        ? null
-        : ((Math.atan2(meanSin, meanCos) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const avgRad =
+        R < 0.01
+          ? null
+          : ((Math.atan2(meanSin, meanCos) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       return {
         avgRad,
         concentration: R,

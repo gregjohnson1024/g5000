@@ -36,7 +36,9 @@ export function parseGrib2Json(
   if (us.length === 0) throw new Error(`parseGrib2Json: missing ${uVar} messages`);
   if (vs.length === 0) throw new Error(`parseGrib2Json: missing ${vVar} messages`);
   if (us.length !== vs.length) {
-    throw new Error(`parseGrib2Json: ${uVar} (${us.length}) and ${vVar} (${vs.length}) count differs`);
+    throw new Error(
+      `parseGrib2Json: ${uVar} (${us.length}) and ${vVar} (${vs.length}) count differs`,
+    );
   }
 
   // Sort both lists by forecastTime ascending.
@@ -110,12 +112,13 @@ export async function runWgrib2(gribPath: string): Promise<Grib2JsonMessage[]> {
     const runMatch = parts[2]!.match(/^d=(\d{10})$/);
     if (!runMatch) continue;
     const runRaw = runMatch[1]!;
-    const runTimeUnix = Date.UTC(
-      Number(runRaw.slice(0, 4)),
-      Number(runRaw.slice(4, 6)) - 1,
-      Number(runRaw.slice(6, 8)),
-      Number(runRaw.slice(8, 10)),
-    ) / 1000;
+    const runTimeUnix =
+      Date.UTC(
+        Number(runRaw.slice(0, 4)),
+        Number(runRaw.slice(4, 6)) - 1,
+        Number(runRaw.slice(6, 8)),
+        Number(runRaw.slice(8, 10)),
+      ) / 1000;
     const variable = parts[3]!;
     const level = parts[4]!.trim();
     // Forecast description like "6 hour fcst" or "anl"; "anl" → 0h.

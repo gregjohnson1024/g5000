@@ -1,4 +1,6 @@
-import { getSharedConfigStore } from '@g5000/db';
+import { firstValueFrom } from 'rxjs';
+import { ulid } from 'ulid';
+import { getSharedConfigStore, type PolarRevision } from '@g5000/db';
 import { parseExpeditionPolar } from '@g5000/compute';
 
 export const dynamic = 'force-dynamic';
@@ -16,9 +18,21 @@ export async function POST(req: Request): Promise<Response> {
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 422 });
   }
-  await store.setPolars(polar);
+  const wardrobe = await firstValueFrom(store.sails$);
+  const rev: PolarRevision = {
+    id: ulid(),
+    boatId: wardrobe.boatId,
+    sailConfigId: wardrobe.activeMode,
+    mode: wardrobe.activeMode,
+    parentRevisionId: null,
+    createdAt: Math.floor(Date.now() / 1000),
+    lineage: { kind: 'imported_csv' },
+    table: polar,
+  };
+  await store.createRevision(rev);
   return Response.json({
     ok: true,
+    revisionId: rev.id,
     twsBinCount: polar.twsBins.length,
     twaBinCount: polar.twaBins.length,
   });

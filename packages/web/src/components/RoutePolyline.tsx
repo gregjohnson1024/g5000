@@ -96,11 +96,16 @@ function attachIsochrones(map: maplibregl.Map, route: Route): void {
           'interpolate',
           ['linear'],
           ['get', 'hours'],
-          0, '#7dd3fc',  // sky-300
-          12, '#22d3ee', // cyan-400
-          24, '#86efac', // green-300
-          48, '#fde047', // yellow-300
-          72, '#fb7185', // rose-400
+          0,
+          '#7dd3fc', // sky-300
+          12,
+          '#22d3ee', // cyan-400
+          24,
+          '#86efac', // green-300
+          48,
+          '#fde047', // yellow-300
+          72,
+          '#fb7185', // rose-400
         ],
         'line-width': 1.5,
         'line-opacity': 0.7,

@@ -10,13 +10,48 @@ interface LogRow {
   result: string;
 }
 
-const COMMANDS: { name: AutopilotCommandName; label: string; group: 'mode' | 'course'; description: string }[] = [
-  { name: 'auto',       label: 'ENABLE (AUTO)', group: 'mode',   description: 'Engages heading-hold at the current vessel heading.' },
-  { name: 'standby',    label: 'DISABLE (STBY)', group: 'mode',  description: 'Disengages active steering — boat falls back to manual / follow-up.' },
-  { name: 'course_-10', label: '−10°',  group: 'course', description: 'Adjust target heading 10° to port.' },
-  { name: 'course_-1',  label: '−1°',   group: 'course', description: 'Adjust target heading 1° to port.' },
-  { name: 'course_+1',  label: '+1°',   group: 'course', description: 'Adjust target heading 1° to starboard.' },
-  { name: 'course_+10', label: '+10°',  group: 'course', description: 'Adjust target heading 10° to starboard.' },
+const COMMANDS: {
+  name: AutopilotCommandName;
+  label: string;
+  group: 'mode' | 'course';
+  description: string;
+}[] = [
+  {
+    name: 'auto',
+    label: 'ENABLE (AUTO)',
+    group: 'mode',
+    description: 'Engages heading-hold at the current vessel heading.',
+  },
+  {
+    name: 'standby',
+    label: 'DISABLE (STBY)',
+    group: 'mode',
+    description: 'Disengages active steering — boat falls back to manual / follow-up.',
+  },
+  {
+    name: 'course_-10',
+    label: '−10°',
+    group: 'course',
+    description: 'Adjust target heading 10° to port.',
+  },
+  {
+    name: 'course_-1',
+    label: '−1°',
+    group: 'course',
+    description: 'Adjust target heading 1° to port.',
+  },
+  {
+    name: 'course_+1',
+    label: '+1°',
+    group: 'course',
+    description: 'Adjust target heading 1° to starboard.',
+  },
+  {
+    name: 'course_+10',
+    label: '+10°',
+    group: 'course',
+    description: 'Adjust target heading 10° to starboard.',
+  },
 ];
 
 interface CaptureCodesResponse {
@@ -47,7 +82,13 @@ export function ControlPanel(): React.ReactElement {
   }, []);
 
   function isBuiltin(name: AutopilotCommandName): boolean {
-    return name === 'standby' || name === 'auto' || name === 'nav' || name === 'wind' || name === 'no_drift';
+    return (
+      name === 'standby' ||
+      name === 'auto' ||
+      name === 'nav' ||
+      name === 'wind' ||
+      name === 'no_drift'
+    );
   }
 
   function buttonEnabled(name: AutopilotCommandName): boolean {
@@ -67,8 +108,7 @@ export function ControlPanel(): React.ReactElement {
     setPendingCommand(null);
     const t0 = Date.now();
     const modeBefore = channelsRef.current.get('autopilot.mode') as JsonSafeSample | undefined;
-    const modeBeforeValue =
-      modeBefore?.value.kind === 'enum' ? modeBefore.value.value : null;
+    const modeBeforeValue = modeBefore?.value.kind === 'enum' ? modeBefore.value.value : null;
 
     let resultText: string;
     try {
@@ -77,7 +117,11 @@ export function ControlPanel(): React.ReactElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event: name }),
       });
-      const body = (await resp.json()) as { ok: boolean; txMs?: number; error?: { kind: string; message: string } };
+      const body = (await resp.json()) as {
+        ok: boolean;
+        txMs?: number;
+        error?: { kind: string; message: string };
+      };
       if (!resp.ok || !body.ok) {
         const err = body.error;
         if (err?.kind === 'unavailable') resultText = 'bus down — check YDWG';
@@ -99,10 +143,12 @@ export function ControlPanel(): React.ReactElement {
     } catch (e) {
       resultText = `TX error: ${(e as Error).message}`;
     }
-    setLog((prev) => [
-      { id: ++logIdRef.current, t: Date.now() / 1000, command: name, result: resultText },
-      ...prev,
-    ].slice(0, 10));
+    setLog((prev) =>
+      [
+        { id: ++logIdRef.current, t: Date.now() / 1000, command: name, result: resultText },
+        ...prev,
+      ].slice(0, 10),
+    );
     setCooldownUntil(Date.now() + 500);
   }
 
@@ -111,10 +157,12 @@ export function ControlPanel(): React.ReactElement {
       <div className="bg-amber-900/30 border border-amber-700 rounded p-3 text-amber-100 text-sm space-y-2">
         <div className="font-semibold">⚠ TEST CONTROLS · MAC ONLY</div>
         <p>
-          Sends real PGN 130850 frames to the live autopilot. Confirm each press.
-          Increment buttons (±1°, ±10°) are disabled until the Triton keypad
-          values are captured at <a href="/sniff" className="underline">/sniff</a>
-          {' '}and added to <code>~/.g5000-router/ap-tx-codes.json</code>.
+          Sends real PGN 130850 frames to the live autopilot. Confirm each press. Increment buttons
+          (±1°, ±10°) are disabled until the Triton keypad values are captured at{' '}
+          <a href="/sniff" className="underline">
+            /sniff
+          </a>{' '}
+          and added to <code>~/.g5000-router/ap-tx-codes.json</code>.
         </p>
       </div>
 
@@ -160,7 +208,11 @@ export function ControlPanel(): React.ReactElement {
           <div className="bg-slate-900 border border-slate-700 rounded p-6 max-w-md space-y-4">
             <div className="text-lg font-semibold text-slate-100">Confirm AP command</div>
             <div className="text-sm text-slate-300">
-              Send <span className="font-mono font-semibold">{COMMANDS.find((c) => c.name === pendingCommand)?.label}</span> to the autopilot?
+              Send{' '}
+              <span className="font-mono font-semibold">
+                {COMMANDS.find((c) => c.name === pendingCommand)?.label}
+              </span>{' '}
+              to the autopilot?
             </div>
             <div className="text-xs text-slate-400">
               {COMMANDS.find((c) => c.name === pendingCommand)?.description}
@@ -197,7 +249,9 @@ export function ControlPanel(): React.ReactElement {
             return (
               <div key={r.id} className="flex gap-3">
                 <span className="text-slate-500">{`${hh}:${mm}:${ss}`}</span>
-                <span className="font-semibold w-32">{COMMANDS.find((c) => c.name === r.command)?.label ?? r.command}</span>
+                <span className="font-semibold w-32">
+                  {COMMANDS.find((c) => c.name === r.command)?.label ?? r.command}
+                </span>
                 <span>→ {r.result}</span>
               </div>
             );

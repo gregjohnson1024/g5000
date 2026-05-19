@@ -15,6 +15,7 @@
 ## Task 1: Add `electrical.battery.voltage` channel
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts`
 
 - [ ] **Step 1: Add Electrical namespace to Channels constant**
@@ -46,6 +47,7 @@ git commit -m "feat(core): add electrical.battery.voltage channel"
 ## Task 2: Define AlarmsRegistry types and globalThis accessors
 
 **Files:**
+
 - Create: `packages/core/src/alarms.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -75,7 +77,12 @@ describe('AlarmsRegistry', () => {
   });
 
   it('fires an alarm and reports it as active', () => {
-    registry.fire({ id: 'shallow-water', severity: 'CRITICAL', label: 'Shallow Water', sticky: false });
+    registry.fire({
+      id: 'shallow-water',
+      severity: 'CRITICAL',
+      label: 'Shallow Water',
+      sticky: false,
+    });
     const active = registry.active();
     expect(active).toHaveLength(1);
     expect(active[0]?.id).toBe('shallow-water');
@@ -85,7 +92,12 @@ describe('AlarmsRegistry', () => {
   });
 
   it('non-sticky alarms drop out of active when cleared', () => {
-    registry.fire({ id: 'shallow-water', severity: 'CRITICAL', label: 'Shallow Water', sticky: false });
+    registry.fire({
+      id: 'shallow-water',
+      severity: 'CRITICAL',
+      label: 'Shallow Water',
+      sticky: false,
+    });
     registry.clear('shallow-water');
     expect(registry.active()).toHaveLength(0);
     const all = registry.all();
@@ -279,6 +291,7 @@ git commit -m "feat(core): AlarmsRegistry types + impl for g5000-derived alarms"
 ## Task 3: Add `alarms_config` and `alarms_history` tables to schema
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 
 - [ ] **Step 1: Append both tables**
@@ -317,7 +330,7 @@ Expected: clean exit.
 
 - [ ] **Step 3: Add DDL to ConfigStore.open**
 
-`packages/db/src/config-store.ts` creates tables at boot via `raw.exec(\`CREATE TABLE IF NOT EXISTS ...\`)` around line 100. Append two more statements to that same multi-table `exec` block:
+`packages/db/src/config-store.ts` creates tables at boot via `raw.exec(\`CREATE TABLE IF NOT EXISTS ...\`)`around line 100. Append two more statements to that same multi-table`exec` block:
 
 ```sql
 CREATE TABLE IF NOT EXISTS alarms_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -350,6 +363,7 @@ git commit -m "feat(db): alarms_config + alarms_history tables"
 ## Task 4: AlarmsConfig type + loader/saver helpers
 
 **Files:**
+
 - Create: `packages/db/src/alarms-config.ts`
 - Create: `packages/db/src/alarms-config.test.ts`
 
@@ -397,7 +411,12 @@ describe('AlarmsConfig persistence', () => {
       enabled: { ...DEFAULT_ALARMS_CONFIG.enabled, 'over-speed': false },
       thresholds: {
         ...DEFAULT_ALARMS_CONFIG.thresholds,
-        anchor: { armed: true, point: { lat: 32.3, lon: -64.8 }, droppedAt: '2026-05-18T12:00:00Z', radiusM: 75 },
+        anchor: {
+          armed: true,
+          point: { lat: 32.3, lon: -64.8 },
+          droppedAt: '2026-05-18T12:00:00Z',
+          radiusM: 75,
+        },
       },
     };
     await saveAlarmsConfig(store, next);
@@ -528,6 +547,7 @@ git commit -m "feat(db): AlarmsConfig type + persistence helpers"
 ## Task 5: Alarm history table helpers
 
 **Files:**
+
 - Create: `packages/db/src/alarms-history.ts`
 - Create: `packages/db/src/alarms-history.test.ts`
 
@@ -728,6 +748,7 @@ git commit -m "feat(db): alarm history append/list/update helpers"
 ## Task 6: Anchor watch predicate
 
 **Files:**
+
 - Create: `packages/compute/src/alarms/anchor-watch.ts`
 - Create: `packages/compute/src/alarms/anchor-watch.test.ts`
 
@@ -833,18 +854,14 @@ import type { AlarmsConfig } from '@g5000/db';
 
 const ID = 'anchor-watch';
 
-function haversineMeters(
-  a: { lat: number; lon: number },
-  b: { lat: number; lon: number },
-): number {
+function haversineMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371_008.8;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(b.lat - a.lat);
   const dLon = toRad(b.lon - a.lon);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
@@ -896,6 +913,7 @@ git commit -m "feat(compute): anchor-watch predicate"
 ## Task 7: Shallow-water predicate
 
 **Files:**
+
 - Create: `packages/compute/src/alarms/shallow-water.ts`
 - Create: `packages/compute/src/alarms/shallow-water.test.ts`
 
@@ -1060,6 +1078,7 @@ git commit -m "feat(compute): shallow-water predicate with hold-time debounce"
 ## Task 8: Over-speed predicate
 
 **Files:**
+
 - Create: `packages/compute/src/alarms/over-speed.ts`
 - Create: `packages/compute/src/alarms/over-speed.test.ts`
 
@@ -1108,7 +1127,7 @@ describe('over-speed predicate', () => {
 
   it('does not fire below threshold', () => {
     const { dispose } = startOverSpeedPredicate(bus, registry, configRef);
-    bus.publish(scalarSample('nav.gps.sog', 4));  // ~7.8 kn
+    bus.publish(scalarSample('nav.gps.sog', 4)); // ~7.8 kn
     vi.advanceTimersByTime(2000);
     expect(registry.active()).toHaveLength(0);
     dispose();
@@ -1215,6 +1234,7 @@ git commit -m "feat(compute): over-speed predicate"
 ## Task 9: Low-battery predicate
 
 **Files:**
+
 - Create: `packages/compute/src/alarms/low-battery.ts`
 - Create: `packages/compute/src/alarms/low-battery.test.ts`
 
@@ -1366,6 +1386,7 @@ git commit -m "feat(compute): low-battery predicate"
 ## Task 10: Alarms pipeline orchestrator
 
 **Files:**
+
 - Create: `packages/compute/src/alarms/index.ts`
 - Create: `packages/compute/src/alarms/pipeline.test.ts`
 
@@ -1445,7 +1466,12 @@ import { startShallowWaterPredicate } from './shallow-water.js';
 import { startOverSpeedPredicate } from './over-speed.js';
 import { startLowBatteryPredicate } from './low-battery.js';
 
-export { startAnchorWatchPredicate, startShallowWaterPredicate, startOverSpeedPredicate, startLowBatteryPredicate };
+export {
+  startAnchorWatchPredicate,
+  startShallowWaterPredicate,
+  startOverSpeedPredicate,
+  startLowBatteryPredicate,
+};
 
 export function startAlarmsPipeline(
   bus: Bus,
@@ -1488,6 +1514,7 @@ git commit -m "feat(compute): alarms pipeline orchestrator"
 ## Task 11: Map PGN 127508 to electrical.battery.voltage
 
 **Files:**
+
 - Modify: `packages/bridge/src/channel-mapper.ts`
 - Modify: `packages/bridge/src/channel-mapper.test.ts`
 
@@ -1505,9 +1532,9 @@ it('maps PGN 127508 (DC Battery Status) to electrical.battery.voltage for instan
     dst: 255,
     prio: 6,
     rxTimestamp: BigInt(1_700_000_000_000) * 1_000_000n,
-    fields: { 'Instance': 0, 'Voltage': 12.6 },
+    fields: { Instance: 0, Voltage: 12.6 },
   };
-  const samples = mapDecodedPgnToSamples(decoded);  // use whatever the mapper's export is
+  const samples = mapDecodedPgnToSamples(decoded); // use whatever the mapper's export is
   const batt = samples.find((s) => s.channel === 'electrical.battery.voltage');
   expect(batt).toBeDefined();
   expect(batt?.value).toEqual({ kind: 'scalar', value: 12.6 });
@@ -1520,7 +1547,7 @@ it('ignores PGN 127508 frames for non-zero instances (v1 lowest-only)', () => {
     dst: 255,
     prio: 6,
     rxTimestamp: BigInt(1_700_000_000_000) * 1_000_000n,
-    fields: { 'Instance': 1, 'Voltage': 13.1 },
+    fields: { Instance: 1, Voltage: 13.1 },
   };
   const samples = mapDecodedPgnToSamples(decoded);
   expect(samples.find((s) => s.channel === 'electrical.battery.voltage')).toBeUndefined();
@@ -1579,6 +1606,7 @@ git commit -m "feat(bridge): map PGN 127508 to electrical.battery.voltage (insta
 ## Task 12: Wire AlarmsRegistry into autopilot-server boot
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 
 - [ ] **Step 1: Read the existing boot sequence**
@@ -1602,13 +1630,15 @@ After ConfigStore is opened (search for `ConfigStore.open` to find the spot) and
 const alarmsRegistry = createAlarmsRegistry();
 setSharedAlarms(alarmsRegistry);
 
-const initialAlarmsConfig = await loadAlarmsConfig(store);  // `store` is the ConfigStore var name; rename if different
+const initialAlarmsConfig = await loadAlarmsConfig(store); // `store` is the ConfigStore var name; rename if different
 const alarmsConfigRef: { current: AlarmsConfig } = { current: initialAlarmsConfig };
 
 const alarmsPipelineHandle = startAlarmsPipeline(bus, alarmsRegistry, alarmsConfigRef);
 
 // Expose for API routes that need to reload config:
-(globalThis as { __g5000_alarms_config_ref__?: typeof alarmsConfigRef }).__g5000_alarms_config_ref__ = alarmsConfigRef;
+(
+  globalThis as { __g5000_alarms_config_ref__?: typeof alarmsConfigRef }
+).__g5000_alarms_config_ref__ = alarmsConfigRef;
 ```
 
 Find the existing shutdown / cleanup block (search for `process.on('SIGTERM'` or a `shutdown` function). Add disposal of `alarmsPipelineHandle.dispose()` there.
@@ -1655,6 +1685,7 @@ git commit -m "feat(autopilot-server): boot AlarmsRegistry and alarms pipeline"
 ## Task 13: GET/POST/PATCH /api/alarms route
 
 **Files:**
+
 - Create: `packages/web/src/app/api/alarms/route.ts`
 - Create: `packages/web/src/app/api/alarms/route.test.ts`
 
@@ -1753,7 +1784,8 @@ export async function GET(): Promise<NextResponse> {
 
 export async function POST(req: Request): Promise<NextResponse> {
   const registry = getSharedAlarms();
-  if (!registry) return NextResponse.json({ ok: false, error: 'registry unavailable' }, { status: 503 });
+  if (!registry)
+    return NextResponse.json({ ok: false, error: 'registry unavailable' }, { status: 503 });
 
   let body: { id?: string; action?: string; context?: Record<string, unknown> };
   try {
@@ -1781,7 +1813,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
 export async function PATCH(req: Request): Promise<NextResponse> {
   const registry = getSharedAlarms();
-  if (!registry) return NextResponse.json({ ok: false, error: 'registry unavailable' }, { status: 503 });
+  if (!registry)
+    return NextResponse.json({ ok: false, error: 'registry unavailable' }, { status: 503 });
 
   let body: { id?: string; action?: string };
   try {
@@ -1815,6 +1848,7 @@ git commit -m "feat(web): /api/alarms GET/POST/PATCH endpoints"
 ## Task 14: GET/PUT /api/alarms/config route
 
 **Files:**
+
 - Create: `packages/web/src/app/api/alarms/config/route.ts`
 - Create: `packages/web/src/app/api/alarms/config/route.test.ts`
 
@@ -1840,7 +1874,9 @@ vi.mock('@g5000/db', async (orig) => {
 describe('/api/alarms/config', () => {
   beforeEach(() => {
     // Reset the alarms config ref shared via globalThis
-    (globalThis as { __g5000_alarms_config_ref__?: { current: unknown } }).__g5000_alarms_config_ref__ = {
+    (
+      globalThis as { __g5000_alarms_config_ref__?: { current: unknown } }
+    ).__g5000_alarms_config_ref__ = {
       current: structuredClone(DEFAULT_ALARMS_CONFIG),
     };
   });
@@ -1878,7 +1914,12 @@ Create `packages/web/src/app/api/alarms/config/route.ts`:
 
 ```ts
 import { NextResponse } from 'next/server';
-import { DEFAULT_ALARMS_CONFIG, getSharedConfigStore, saveAlarmsConfig, type AlarmsConfig } from '@g5000/db';
+import {
+  DEFAULT_ALARMS_CONFIG,
+  getSharedConfigStore,
+  saveAlarmsConfig,
+  type AlarmsConfig,
+} from '@g5000/db';
 
 interface ConfigRef {
   current: AlarmsConfig;
@@ -1940,6 +1981,7 @@ git commit -m "feat(web): /api/alarms/config GET/PUT"
 ## Task 15: GET /api/alarms/history route
 
 **Files:**
+
 - Create: `packages/web/src/app/api/alarms/history/route.ts`
 
 - [ ] **Step 1: Create the route directly (no unit test — thin pass-through)**
@@ -1987,6 +2029,7 @@ git commit -m "feat(web): /api/alarms/history GET"
 ## Task 16: POST /api/alarms/anchor (drop/weigh)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/alarms/anchor/route.ts`
 - Create: `packages/web/src/app/api/alarms/anchor/route.test.ts`
 
@@ -2001,11 +2044,16 @@ import { DEFAULT_ALARMS_CONFIG, type AlarmsConfig } from '@g5000/db';
 
 describe('/api/alarms/anchor', () => {
   beforeEach(() => {
-    (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }).__g5000_alarms_config_ref__ = {
+    (
+      globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }
+    ).__g5000_alarms_config_ref__ = {
       current: structuredClone(DEFAULT_ALARMS_CONFIG),
     };
     // Stash a synthetic position in the bus's last-value table via globalThis
-    (globalThis as { __g5000_test_position__?: unknown }).__g5000_test_position__ = { lat: 32.3, lon: -64.8 };
+    (globalThis as { __g5000_test_position__?: unknown }).__g5000_test_position__ = {
+      lat: 32.3,
+      lon: -64.8,
+    };
   });
 
   it('drop with explicit position sets armed=true and stores the point', async () => {
@@ -2016,7 +2064,8 @@ describe('/api/alarms/anchor', () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
 
-    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }).__g5000_alarms_config_ref__!;
+    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } })
+      .__g5000_alarms_config_ref__!;
     expect(ref.current.thresholds.anchor.armed).toBe(true);
     expect(ref.current.thresholds.anchor.point).toEqual({ lat: 32.3, lon: -64.8 });
     expect(ref.current.thresholds.anchor.radiusM).toBe(60);
@@ -2025,7 +2074,8 @@ describe('/api/alarms/anchor', () => {
 
   it('weigh sets armed=false but preserves point + droppedAt for history', async () => {
     // Pre-set as armed
-    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }).__g5000_alarms_config_ref__!;
+    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } })
+      .__g5000_alarms_config_ref__!;
     ref.current.thresholds.anchor = {
       armed: true,
       point: { lat: 32.3, lon: -64.8 },
@@ -2066,7 +2116,9 @@ Create `packages/web/src/app/api/alarms/anchor/route.ts`:
 import { NextResponse } from 'next/server';
 import type { AlarmsConfig } from '@g5000/db';
 
-interface ConfigRef { current: AlarmsConfig }
+interface ConfigRef {
+  current: AlarmsConfig;
+}
 
 function getRef(): ConfigRef | null {
   const g = globalThis as { __g5000_alarms_config_ref__?: ConfigRef };
@@ -2086,7 +2138,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   if (body.action === 'drop') {
     const position = body.position;
-    if (!position) return NextResponse.json({ ok: false, error: 'position required for drop' }, { status: 400 });
+    if (!position)
+      return NextResponse.json({ ok: false, error: 'position required for drop' }, { status: 400 });
     const radiusM = body.radiusM ?? ref.current.thresholds.anchor.radiusM ?? 50;
     ref.current = {
       ...ref.current,
@@ -2135,6 +2188,7 @@ git commit -m "feat(web): /api/alarms/anchor drop/weigh"
 ## Task 17: /alerts page shell with tabs
 
 **Files:**
+
 - Create: `packages/web/src/app/alerts/page.tsx`
 
 - [ ] **Step 1: Create the page shell**
@@ -2146,15 +2200,15 @@ import { ActiveList } from './active-list.js';
 import { HistoryList } from './history-list.js';
 import { SettingsForm } from './settings-form.js';
 
-export default function AlertsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>;
-}) {
+export default function AlertsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   return <AlertsPageInner searchParamsPromise={searchParams} />;
 }
 
-async function AlertsPageInner({ searchParamsPromise }: { searchParamsPromise: Promise<{ tab?: string }> }) {
+async function AlertsPageInner({
+  searchParamsPromise,
+}: {
+  searchParamsPromise: Promise<{ tab?: string }>;
+}) {
   const { tab = 'active' } = await searchParamsPromise;
 
   return (
@@ -2195,6 +2249,7 @@ Skip the build for now. Move to Task 18.
 ## Task 18: ActiveList client component
 
 **Files:**
+
 - Create: `packages/web/src/app/alerts/active-list.tsx`
 
 - [ ] **Step 1: Create the component**
@@ -2262,7 +2317,15 @@ export function ActiveList() {
     ...alarms.map((r) => ({ kind: 'alarm' as const, severity: r.severity, row: r })),
     ...alerts.map((r) => ({ kind: 'alert' as const, severity: r.type, row: r })),
   ];
-  const severityRank: Record<string, number> = { CRITICAL: 3, 'Emergency Alarm': 3, Alarm: 3, WARN: 2, Warning: 2, Caution: 1, INFO: 0 };
+  const severityRank: Record<string, number> = {
+    CRITICAL: 3,
+    'Emergency Alarm': 3,
+    Alarm: 3,
+    WARN: 2,
+    Warning: 2,
+    Caution: 1,
+    INFO: 0,
+  };
   allRows.sort((a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0));
 
   if (allRows.length === 0) {
@@ -2273,13 +2336,19 @@ export function ActiveList() {
     <ul className="space-y-2">
       {allRows.map((entry) => (
         <li
-          key={entry.kind === 'alarm' ? `alarm-${(entry.row as AlarmRow).id}` : `alert-${(entry.row as AlertRow).key}`}
+          key={
+            entry.kind === 'alarm'
+              ? `alarm-${(entry.row as AlarmRow).id}`
+              : `alert-${(entry.row as AlertRow).key}`
+          }
           className={`p-3 rounded border ${severityRank[entry.severity] >= 3 ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'}`}
         >
           <div className="flex justify-between items-center">
             <div>
               <span className="font-semibold">
-                {entry.kind === 'alarm' ? (entry.row as AlarmRow).label : (entry.row as AlertRow).text ?? 'N2K alert'}
+                {entry.kind === 'alarm'
+                  ? (entry.row as AlarmRow).label
+                  : ((entry.row as AlertRow).text ?? 'N2K alert')}
               </span>
               <span className="ml-2 text-sm text-gray-600">{entry.severity}</span>
             </div>
@@ -2314,6 +2383,7 @@ Run: `npx tsc --noEmit -p packages/web/tsconfig.json` (or `npm run typecheck --w
 ## Task 19: HistoryList client component
 
 **Files:**
+
 - Create: `packages/web/src/app/alerts/history-list.tsx`
 
 - [ ] **Step 1: Create the component**
@@ -2385,6 +2455,7 @@ export function HistoryList() {
 ## Task 20: SettingsForm client component
 
 **Files:**
+
 - Create: `packages/web/src/app/alerts/settings-form.tsx`
 
 - [ ] **Step 1: Create the component**
@@ -2399,7 +2470,12 @@ import { useEffect, useState } from 'react';
 interface AlarmsConfig {
   enabled: Record<string, boolean>;
   thresholds: {
-    anchor: { armed: boolean; point?: { lat: number; lon: number }; droppedAt?: string; radiusM: number };
+    anchor: {
+      armed: boolean;
+      point?: { lat: number; lon: number };
+      droppedAt?: string;
+      radiusM: number;
+    };
     shallowWater: { thresholdM?: number; holdMs: number };
     overSpeed: { thresholdKn?: number; holdMs: number };
     lowBattery: { thresholdV?: number; holdMs: number };
@@ -2460,7 +2536,10 @@ export function SettingsForm() {
           onChange={(v) =>
             save({
               ...cfg,
-              thresholds: { ...cfg.thresholds, shallowWater: { ...cfg.thresholds.shallowWater, thresholdM: v } },
+              thresholds: {
+                ...cfg.thresholds,
+                shallowWater: { ...cfg.thresholds.shallowWater, thresholdM: v },
+              },
             })
           }
         />
@@ -2470,7 +2549,10 @@ export function SettingsForm() {
           onChange={(v) =>
             save({
               ...cfg,
-              thresholds: { ...cfg.thresholds, overSpeed: { ...cfg.thresholds.overSpeed, thresholdKn: v } },
+              thresholds: {
+                ...cfg.thresholds,
+                overSpeed: { ...cfg.thresholds.overSpeed, thresholdKn: v },
+              },
             })
           }
         />
@@ -2480,7 +2562,10 @@ export function SettingsForm() {
           onChange={(v) =>
             save({
               ...cfg,
-              thresholds: { ...cfg.thresholds, lowBattery: { ...cfg.thresholds.lowBattery, thresholdV: v } },
+              thresholds: {
+                ...cfg.thresholds,
+                lowBattery: { ...cfg.thresholds.lowBattery, thresholdV: v },
+              },
             })
           }
         />
@@ -2501,7 +2586,15 @@ export function SettingsForm() {
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function NumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
   return (
     <label className="flex items-center gap-2 py-1">
       <span className="w-48">{label}</span>
@@ -2534,6 +2627,7 @@ git commit -m "feat(web): /alerts page with Active/History/Settings tabs"
 ## Task 21: AlarmBanner root-layout component
 
 **Files:**
+
 - Create: `packages/web/src/components/alarm-banner.tsx`
 - Modify: `packages/web/src/app/layout.tsx`
 
@@ -2583,7 +2677,12 @@ export function AlarmBanner() {
 
   if (!topAlarm) return null;
 
-  const bg = topAlarm.severity === 'CRITICAL' ? 'bg-red-600' : topAlarm.severity === 'WARN' ? 'bg-yellow-500' : 'bg-blue-500';
+  const bg =
+    topAlarm.severity === 'CRITICAL'
+      ? 'bg-red-600'
+      : topAlarm.severity === 'WARN'
+        ? 'bg-yellow-500'
+        : 'bg-blue-500';
 
   return (
     <a
@@ -2643,6 +2742,7 @@ git commit -m "feat(web): persistent AlarmBanner in root layout"
 ## Task 22: MOB button for helm
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/mob-button.tsx`
 - Modify: `packages/web/src/app/helm/page.tsx`
 
@@ -2677,7 +2777,9 @@ export function MobButton() {
       // simpler — let the server side capture position when MOB POST arrives;
       // pass no context here and let the registry's context be filled by a follow-up.
       // For v1, we POST without position and rely on the bridge to publish one.
-    } catch { /* ignored */ }
+    } catch {
+      /* ignored */
+    }
 
     await fetch('/api/alarms', {
       method: 'POST',
@@ -2708,7 +2810,10 @@ export function MobButton() {
               >
                 Cancel
               </button>
-              <button onClick={fireMob} className="px-4 py-2 bg-red-600 text-white rounded font-bold">
+              <button
+                onClick={fireMob}
+                className="px-4 py-2 bg-red-600 text-white rounded font-bold"
+              >
                 Confirm
               </button>
             </div>
@@ -2727,7 +2832,7 @@ Open `packages/web/src/app/helm/page.tsx`. Add the import and render it inside t
 ```tsx
 import { MobButton } from './mob-button.js';
 // ... inside the page return:
-<MobButton />
+<MobButton />;
 ```
 
 - [ ] **Step 3: Build web**
@@ -2751,6 +2856,7 @@ git commit -m "feat(web): MOB button on helm with confirm modal"
 ## Task 23: AudibleAlarm component (helm only)
 
 **Files:**
+
 - Create: `packages/web/src/components/audible-alarm.tsx`
 - Modify: `packages/web/src/app/helm/page.tsx`
 
@@ -2780,7 +2886,9 @@ export function AudibleAlarm() {
   useEffect(() => {
     function warm() {
       if (!ctxRef.current) {
-        const Ctx = (window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+        const Ctx =
+          window.AudioContext ??
+          (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (Ctx) ctxRef.current = new Ctx();
       }
       window.removeEventListener('pointerdown', warm);
@@ -2823,18 +2931,23 @@ export function AudibleAlarm() {
       intervalRef.current = null;
     }
     if (oscRef.current) {
-      try { oscRef.current.stop(); } catch { /* already stopped */ }
+      try {
+        oscRef.current.stop();
+      } catch {
+        /* already stopped */
+      }
       oscRef.current.disconnect();
       oscRef.current = null;
     }
 
     if (muted || !active || !ctxRef.current) return;
     const ctx = ctxRef.current;
-    const cfg = active === 'CRITICAL'
-      ? { freq: 880, type: 'square' as const, onMs: 200, offMs: 200 }
-      : active === 'WARN'
-      ? { freq: 440, type: 'sine' as const, onMs: 500, offMs: 1000 }
-      : { freq: 440, type: 'sine' as const, onMs: 250, offMs: 60_000 };
+    const cfg =
+      active === 'CRITICAL'
+        ? { freq: 880, type: 'square' as const, onMs: 200, offMs: 200 }
+        : active === 'WARN'
+          ? { freq: 440, type: 'sine' as const, onMs: 500, offMs: 1000 }
+          : { freq: 440, type: 'sine' as const, onMs: 250, offMs: 60_000 };
 
     function beep() {
       const osc = ctx.createOscillator();
@@ -2845,7 +2958,11 @@ export function AudibleAlarm() {
       gain.gain.value = 0.15;
       osc.start();
       setTimeout(() => {
-        try { osc.stop(); } catch { /* ignored */ }
+        try {
+          osc.stop();
+        } catch {
+          /* ignored */
+        }
         osc.disconnect();
         gain.disconnect();
       }, cfg.onMs);
@@ -2879,7 +2996,7 @@ In `packages/web/src/app/helm/page.tsx`, add the import and render alongside `<M
 ```tsx
 import { AudibleAlarm } from '../../components/audible-alarm.js';
 // inside return:
-<AudibleAlarm />
+<AudibleAlarm />;
 ```
 
 - [ ] **Step 3: Build web**
@@ -2903,6 +3020,7 @@ git commit -m "feat(web): AudibleAlarm on helm with persistent mute indicator"
 ## Task 24: History row writeback on alarm transitions
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts` (already touched in Task 12)
 
 - [ ] **Step 1: Wrap the registry to write history on fire/clear/ack**
@@ -2927,7 +3045,9 @@ alarmsRegistry.fire = (req) => {
       context: snapshot.context as Record<string, unknown> | undefined,
     })
       .then((rowId) => rowIdByAlarmId.set(req.id, rowId))
-      .catch(() => { /* don't fail the alarm on a DB hiccup */ });
+      .catch(() => {
+        /* don't fail the alarm on a DB hiccup */
+      });
   }
 };
 
@@ -2972,6 +3092,7 @@ git commit -m "feat(autopilot-server): persist alarm fire/clear/ack to history t
 ## Task 25: Replay-driven integration test
 
 **Files:**
+
 - Create: `packages/compute/src/alarms/integration.test.ts`
 
 - [ ] **Step 1: Write the test**
@@ -3007,7 +3128,9 @@ describe('alarms pipeline (synthetic session integration)', () => {
     vi.useFakeTimers();
     const bus = new Bus();
     const registry = createAlarmsRegistry();
-    const configRef: { current: AlarmsConfig } = { current: structuredClone(DEFAULT_ALARMS_CONFIG) };
+    const configRef: { current: AlarmsConfig } = {
+      current: structuredClone(DEFAULT_ALARMS_CONFIG),
+    };
     configRef.current.thresholds.anchor = {
       armed: true,
       point: { lat: 32.3, lon: -64.8 },
@@ -3037,7 +3160,9 @@ describe('alarms pipeline (synthetic session integration)', () => {
     vi.useFakeTimers();
     const bus = new Bus();
     const registry = createAlarmsRegistry();
-    const configRef: { current: AlarmsConfig } = { current: structuredClone(DEFAULT_ALARMS_CONFIG) };
+    const configRef: { current: AlarmsConfig } = {
+      current: structuredClone(DEFAULT_ALARMS_CONFIG),
+    };
     configRef.current.thresholds.shallowWater = { thresholdM: 3, holdMs: 500 };
 
     const handle = startAlarmsPipeline(bus, registry, configRef);
@@ -3077,6 +3202,7 @@ git commit -m "test(compute): integration test for anchor-watch + shallow-water 
 ## Task 26: Update spec status
 
 **Files:**
+
 - Modify: `docs/superpowers/specs/2026-05-18-safety-alarms-design.md`
 
 - [ ] **Step 1: Mark spec as implemented**

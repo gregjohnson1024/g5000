@@ -24,27 +24,27 @@ H5000 Operation Manual chapter 11):
 Function numbers we currently expose (channel ↔ H5000 function mapping
 lives in `apps/autopilot-server/src/hlink/function-table.ts`):
 
-| Fn | What it is | Internal channel | Unit out |
-|---:|---|---|---|
-| 11 | Rudder angle | `boat.rudder.angle` | deg, signed |
-| 52 | Heel | `motion.heel` | deg, signed |
-| 53 | Target TWA (absolute, polar-optimum) | `performance.target.twaUpwind` | deg |
-| 65 | Boat speed | `boat.speed.water` | knots |
-| 73 | Heading (magnetic) | `boat.heading.magnetic` | deg, 0–360 |
-| 77 | AWS | `wind.apparent.speed` | knots |
-| 81 | AWA | `wind.apparent.angle` | deg, signed |
-| 83 | Target TWA (signed, tack-aware) | `performance.target.twaUpwind` | deg, signed |
-| 85 | TWS | `wind.true.speed` | knots |
-| 89 | TWA | `wind.true.angle` | deg, signed |
-| 109 | TWD | `wind.true.direction` | deg, 0–360 |
-| 124 | Polar performance | `performance.percentPolar` | % |
-| 125 | Target boat speed | `performance.target.boatSpeed` | knots |
-| 127 | VMG | `performance.vmg` | knots |
-| 155 | Fore/aft trim (pitch) | `motion.pitch` | deg |
-| 193 | Depth | `nav.depth` | meters |
-| 233 | COG | `nav.gps.cog` | deg, 0–360 |
-| 235 | SOG | `nav.gps.sog` | knots |
-| 285 | VMG performance (target) | `performance.target.vmg` | knots |
+|  Fn | What it is                           | Internal channel               | Unit out    |
+| --: | ------------------------------------ | ------------------------------ | ----------- |
+|  11 | Rudder angle                         | `boat.rudder.angle`            | deg, signed |
+|  52 | Heel                                 | `motion.heel`                  | deg, signed |
+|  53 | Target TWA (absolute, polar-optimum) | `performance.target.twaUpwind` | deg         |
+|  65 | Boat speed                           | `boat.speed.water`             | knots       |
+|  73 | Heading (magnetic)                   | `boat.heading.magnetic`        | deg, 0–360  |
+|  77 | AWS                                  | `wind.apparent.speed`          | knots       |
+|  81 | AWA                                  | `wind.apparent.angle`          | deg, signed |
+|  83 | Target TWA (signed, tack-aware)      | `performance.target.twaUpwind` | deg, signed |
+|  85 | TWS                                  | `wind.true.speed`              | knots       |
+|  89 | TWA                                  | `wind.true.angle`              | deg, signed |
+| 109 | TWD                                  | `wind.true.direction`          | deg, 0–360  |
+| 124 | Polar performance                    | `performance.percentPolar`     | %           |
+| 125 | Target boat speed                    | `performance.target.boatSpeed` | knots       |
+| 127 | VMG                                  | `performance.vmg`              | knots       |
+| 155 | Fore/aft trim (pitch)                | `motion.pitch`                 | deg         |
+| 193 | Depth                                | `nav.depth`                    | meters      |
+| 233 | COG                                  | `nav.gps.cog`                  | deg, 0–360  |
+| 235 | SOG                                  | `nav.gps.sog`                  | knots       |
+| 285 | VMG performance (target)             | `performance.target.vmg`       | knots       |
 
 The server also throttles each function to **5 Hz max per client**
 (streaming bus traffic at 10–20 Hz would saturate slow TCP buffers and

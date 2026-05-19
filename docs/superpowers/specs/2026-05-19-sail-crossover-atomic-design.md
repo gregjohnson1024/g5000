@@ -30,22 +30,23 @@ This collapses a naturally 3D selection problem (one headsail × one mainsail-re
 type SailCategory = 'headsail' | 'main' | 'downwind';
 
 interface Sail {
-  id: string;            // 'j0', 'light-jib', 'stj', 'stj-reefed',
-                         //   'full-main', 'reef1', 'reef2', 'reef3',
-                         //   'g0', 'hfg', 'a2'
-  name: string;          // 'J0', 'Reef 1', 'A2'
+  id: string; // 'j0', 'light-jib', 'stj', 'stj-reefed',
+  //   'full-main', 'reef1', 'reef2', 'reef3',
+  //   'g0', 'hfg', 'a2'
+  name: string; // 'J0', 'Reef 1', 'A2'
   category: SailCategory;
-  areaSqM?: number;      // optional, from North chart
+  areaSqM?: number; // optional, from North chart
   notes?: string;
-  region: { cells: string[] };   // grid cell keys "twsIdx,twaIdx"
+  region: { cells: string[] }; // grid cell keys "twsIdx,twaIdx"
 }
 
 interface SailWardrobe {
   schemaVersion: 3;
   boatId: string;
   sails: Sail[];
-  active: {              // currently hoisted; one per category, all optional
-    headsail?: string;   // sail.id
+  active: {
+    // currently hoisted; one per category, all optional
+    headsail?: string; // sail.id
     main?: string;
     downwind?: string;
   };
@@ -56,6 +57,7 @@ interface SailWardrobe {
 ### Category semantics
 
 The three categories encode mutual exclusivity:
+
 - **headsail** — exactly one flown when sailing; valid range varies by sail
 - **main** — exactly one reef state; `full-main` is the unreefed state
 - **downwind** — at most one (none in pure upwind); independent of headsail / main
@@ -93,13 +95,15 @@ The grid parameters are constants in `@g5000/core` — not stored per wardrobe. 
 **`crossover_map` table** — dropped entirely. Single-winner model is gone.
 
 **`crossover_settings` table** — retained, but trimmed:
+
 ```ts
 interface CrossoverSettings {
-  recommendationStableSeconds: number;  // unchanged, default 30
-  forecastIntervalMinutes: number;      // unchanged, default 30
-  forecastDurationHours: number;        // unchanged, default 12
+  recommendationStableSeconds: number; // unchanged, default 30
+  forecastIntervalMinutes: number; // unchanged, default 30
+  forecastDurationHours: number; // unchanged, default 12
 }
 ```
+
 Fields removed: `chartTwsMaxKn`, `chartTwaMinDeg`, `chartTwaMaxDeg` (grid is fixed).
 
 ### Migration v2 → v3
@@ -134,10 +138,11 @@ The migration is one-shot and idempotent. Sula's wardrobe currently has ~1 paint
 ```ts
 interface SailRecommendation {
   kind: 'sail_recommendation';
-  cellTwsKn: number;        // snapped to grid center
+  cellTwsKn: number; // snapped to grid center
   cellTwaDeg: number;
-  valid: {                  // sail.id[], sorted by areaSqM desc (largest first);
-                            // sails without areaSqM sort last, tie-break by id asc
+  valid: {
+    // sail.id[], sorted by areaSqM desc (largest first);
+    // sails without areaSqM sort last, tie-break by id asc
     headsail: string[];
     main: string[];
     downwind: string[];
@@ -147,12 +152,13 @@ interface SailRecommendation {
     main?: string;
     downwind?: string;
   };
-  changeNeeded: {           // active sail not in valid set for ≥ stableSeconds
+  changeNeeded: {
+    // active sail not in valid set for ≥ stableSeconds
     headsail: boolean;
     main: boolean;
     downwind: boolean;
   };
-  enteredAt: number;        // UNIX seconds when current valid-set was first seen
+  enteredAt: number; // UNIX seconds when current valid-set was first seen
   stableSeconds: number;
 }
 ```
@@ -160,6 +166,7 @@ interface SailRecommendation {
 ### Stability logic
 
 `changeNeeded[cat]` fires only when:
+
 1. `active[cat]` is defined, AND
 2. `active[cat]` has been continuously outside its region (i.e., not in `valid[cat]`) for ≥ `stableSeconds`.
 
@@ -201,6 +208,7 @@ Three sections, one per category. Each shows the sails in that category as rows:
 Layout: left rail = recommendation panel; main = chart; right rail = sail picker.
 
 **Recommendation panel** (left):
+
 - Three rows: Headsail / Main / Downwind
 - Each row shows:
   - Active sail name (or "—" if unset)
@@ -209,6 +217,7 @@ Layout: left rail = recommendation panel; main = chart; right rail = sail picker
 - Footer: current snapped cell `(TWS kn, TWA °)` and stability timer
 
 **Chart** (center):
+
 - Fixed grid background (41 × 37). Light gridlines every 5 kt, 30°.
 - **View mode** ("show all"): each sail rendered as a semi-transparent colored region. Color from `lib/config-color.ts` (rekeyed by sail id). Overlaps blend naturally.
 - **Edit mode**: pick a sail from the right rail → its region renders solid, others fade. Click a cell to toggle in/out of that sail's region.
@@ -216,6 +225,7 @@ Layout: left rail = recommendation panel; main = chart; right rail = sail picker
 - Toggle between view / edit modes via a chip at top of chart.
 
 **Sail picker** (right):
+
 - Grouped by category, mirrors `/sails` layout but compact.
 - Selecting a sail enters edit mode for that sail.
 - "Set active" toggle per sail (clicking sets it as `active[category]`).

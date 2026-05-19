@@ -26,7 +26,9 @@ describe('alarms pipeline (synthetic session integration)', () => {
     vi.useFakeTimers();
     const bus = new Bus();
     const registry = createAlarmsRegistry();
-    const configRef: { current: AlarmsConfig } = { current: structuredClone(DEFAULT_ALARMS_CONFIG) };
+    const configRef: { current: AlarmsConfig } = {
+      current: structuredClone(DEFAULT_ALARMS_CONFIG),
+    };
     configRef.current.thresholds.anchor = {
       armed: true,
       point: { lat: 32.3, lon: -64.8 },
@@ -56,7 +58,9 @@ describe('alarms pipeline (synthetic session integration)', () => {
     vi.useFakeTimers();
     const bus = new Bus();
     const registry = createAlarmsRegistry();
-    const configRef: { current: AlarmsConfig } = { current: structuredClone(DEFAULT_ALARMS_CONFIG) };
+    const configRef: { current: AlarmsConfig } = {
+      current: structuredClone(DEFAULT_ALARMS_CONFIG),
+    };
     configRef.current.thresholds.shallowWater = { thresholdM: 3, holdMs: 500 };
 
     const handle = startAlarmsPipeline(bus, registry, configRef);

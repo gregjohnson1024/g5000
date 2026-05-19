@@ -235,6 +235,7 @@ Expected: `nothing to commit, working tree clean`.
 ## Task 2: Bootstrap `@g5000/grib` package skeleton
 
 **Files:**
+
 - Create: `packages/grib/package.json`
 - Create: `packages/grib/tsconfig.json`
 - Create: `packages/grib/src/index.ts`
@@ -329,6 +330,7 @@ EOF
 ## Task 3: Type definitions for `@g5000/grib`
 
 **Files:**
+
 - Create: `packages/grib/src/types.ts`
 - Modify: `packages/grib/src/index.ts` — re-export types
 
@@ -424,9 +426,10 @@ EOF
 ## Task 4: GRIB2 parsing via `wgrib2`
 
 **Files:**
+
 - Create: `packages/grib/src/parse-grib2.ts`
 - Create: `packages/grib/src/parse-grib2.test.ts`
-- Create: `packages/grib/test/fixtures/synthetic-tiny.json` (a hand-built mock for the parser's *output* — we test the post-wgrib2 stage with this)
+- Create: `packages/grib/test/fixtures/synthetic-tiny.json` (a hand-built mock for the parser's _output_ — we test the post-wgrib2 stage with this)
 
 `wgrib2` is a Homebrew-installed C binary. We invoke it with `-json` and parse its stdout. The synthetic fixture short-circuits the binary call in tests.
 
@@ -464,7 +467,7 @@ describe('parseGrib2Json', () => {
     expect(field.lons).toEqual([-75, -74]);
     expect(field.times.length).toBe(2);
     expect(field.u.length).toBe(2);
-    expect(field.u[0]!.length).toBe(2);     // 2 lats
+    expect(field.u[0]!.length).toBe(2); // 2 lats
     expect(field.u[0]![0]!.length).toBe(2); // 2 lons
     expect(field.u[0]![0]![0]).toBeCloseTo(5.0, 6);
     expect(field.v[0]![0]![0]).toBeCloseTo(2.0, 6);
@@ -495,28 +498,40 @@ describe('parseGrib2Json', () => {
     "level": "10 m above ground",
     "forecastTime": 1715500800,
     "grid": { "lats": [30, 31], "lons": [-75, -74] },
-    "values": [[5.0, 5.1], [5.2, 5.3]]
+    "values": [
+      [5.0, 5.1],
+      [5.2, 5.3]
+    ]
   },
   {
     "variable": "VGRD",
     "level": "10 m above ground",
     "forecastTime": 1715500800,
     "grid": { "lats": [30, 31], "lons": [-75, -74] },
-    "values": [[2.0, 2.1], [2.2, 2.3]]
+    "values": [
+      [2.0, 2.1],
+      [2.2, 2.3]
+    ]
   },
   {
     "variable": "UGRD",
     "level": "10 m above ground",
     "forecastTime": 1715504400,
     "grid": { "lats": [30, 31], "lons": [-75, -74] },
-    "values": [[6.0, 6.1], [6.2, 6.3]]
+    "values": [
+      [6.0, 6.1],
+      [6.2, 6.3]
+    ]
   },
   {
     "variable": "VGRD",
     "level": "10 m above ground",
     "forecastTime": 1715504400,
     "grid": { "lats": [30, 31], "lons": [-75, -74] },
-    "values": [[3.0, 3.1], [3.2, 3.3]]
+    "values": [
+      [3.0, 3.1],
+      [3.2, 3.3]
+    ]
   }
 ]
 ```
@@ -571,7 +586,9 @@ export function parseGrib2Json(
   if (us.length === 0) throw new Error(`parseGrib2Json: missing ${uVar} messages`);
   if (vs.length === 0) throw new Error(`parseGrib2Json: missing ${vVar} messages`);
   if (us.length !== vs.length) {
-    throw new Error(`parseGrib2Json: ${uVar} (${us.length}) and ${vVar} (${vs.length}) count differs`);
+    throw new Error(
+      `parseGrib2Json: ${uVar} (${us.length}) and ${vVar} (${vs.length}) count differs`,
+    );
   }
 
   // Sort both lists by forecastTime ascending.
@@ -665,6 +682,7 @@ EOF
 ## Task 5: Trilinear wind / current interpolation
 
 **Files:**
+
 - Create: `packages/grib/src/interpolate.ts`
 - Create: `packages/grib/src/interpolate.test.ts`
 - Modify: `packages/grib/src/index.ts`
@@ -683,12 +701,24 @@ const FIELD: WindField = {
   lons: [-75, -74],
   times: [1000, 2000],
   u: [
-    [[5, 7], [9, 11]],   // t=1000, [lat][lon]
-    [[15, 17], [19, 21]], // t=2000
+    [
+      [5, 7],
+      [9, 11],
+    ], // t=1000, [lat][lon]
+    [
+      [15, 17],
+      [19, 21],
+    ], // t=2000
   ],
   v: [
-    [[2, 4], [6, 8]],
-    [[12, 14], [16, 18]],
+    [
+      [2, 4],
+      [6, 8],
+    ],
+    [
+      [12, 14],
+      [16, 18],
+    ],
   ],
   source: 'GFS',
   runTime: 1000,
@@ -861,6 +891,7 @@ EOF
 ## Task 6: GRIB cache layout
 
 **Files:**
+
 - Create: `packages/grib/src/cache.ts`
 - Create: `packages/grib/src/cache.test.ts`
 - Modify: `packages/grib/src/index.ts`
@@ -1027,6 +1058,7 @@ EOF
 ## Task 7: GFS fetch from NOAA NOMADS
 
 **Files:**
+
 - Create: `packages/grib/src/fetch-gfs.ts`
 - Create: `packages/grib/src/fetch-gfs.test.ts`
 - Modify: `packages/grib/src/index.ts`
@@ -1043,11 +1075,7 @@ This task ships the **URL builder + cache wiring** with unit tests; the actual b
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import {
-  buildGfsUrl,
-  pickGfsRunForDeparture,
-  gfsForecastHoursForRange,
-} from './fetch-gfs.js';
+import { buildGfsUrl, pickGfsRunForDeparture, gfsForecastHoursForRange } from './fetch-gfs.js';
 import type { Bbox } from './types.js';
 
 const BBOX: Bbox = { latMin: 30, latMax: 40, lonMin: -75, lonMax: -65 };
@@ -1072,8 +1100,11 @@ describe('buildGfsUrl', () => {
 
   it('zero-pads forecast hour to 3 digits', () => {
     const u = buildGfsUrl({
-      runDateUtc: '2026-05-12', runHourUtc: 0,
-      forecastHour: 96, variables: ['UGRD'], bbox: BBOX,
+      runDateUtc: '2026-05-12',
+      runHourUtc: 0,
+      forecastHour: 96,
+      variables: ['UGRD'],
+      bbox: BBOX,
     });
     expect(u).toContain('f096');
   });
@@ -1183,10 +1214,7 @@ export function pickGfsRunForDeparture(atUnixSec: number): {
  * GFS publishes f000…f120 hourly and f120…f384 every 3 hours.
  * Returns the forecast hour list spanning [startHour, endHour] (inclusive).
  */
-export function gfsForecastHoursForRange(o: {
-  startHour: number;
-  endHour: number;
-}): number[] {
+export function gfsForecastHoursForRange(o: { startHour: number; endHour: number }): number[] {
   const out: number[] = [];
   for (let h = o.startHour; h <= Math.min(120, o.endHour); h++) out.push(h);
   for (let h = 123; h <= o.endHour; h += 3) out.push(h);
@@ -1217,12 +1245,13 @@ export async function fetchGfsBlobs(o: FetchGfsOpts): Promise<{
   const now = Math.floor(Date.now() / 1000);
   const run = pickGfsRunForDeparture(now);
   const hours = gfsForecastHoursForRange({ startHour: 0, endHour: o.hours });
-  const runTime = Date.UTC(
-    Number(run.runDateUtc.slice(0, 4)),
-    Number(run.runDateUtc.slice(5, 7)) - 1,
-    Number(run.runDateUtc.slice(8, 10)),
-    run.runHourUtc,
-  ) / 1000;
+  const runTime =
+    Date.UTC(
+      Number(run.runDateUtc.slice(0, 4)),
+      Number(run.runDateUtc.slice(5, 7)) - 1,
+      Number(run.runDateUtc.slice(8, 10)),
+      run.runHourUtc,
+    ) / 1000;
 
   const cachedPaths: string[] = [];
   for (const h of hours) {
@@ -1262,7 +1291,7 @@ export async function fetchGfsBlobs(o: FetchGfsOpts): Promise<{
 
   function cachePath(root: string, k: CacheKey): string {
     // Local helper to avoid circular import in plain text; real impl uses cache.cachePath
-    return import('./cache.js').then(m => m.cachePath(root, k)) as unknown as string;
+    return import('./cache.js').then((m) => m.cachePath(root, k)) as unknown as string;
   }
 }
 ```
@@ -1326,6 +1355,7 @@ EOF
 ## Task 8: Wire `runWgrib2` for binary→messages conversion
 
 **Files:**
+
 - Modify: `packages/grib/src/parse-grib2.ts` — fill in `runWgrib2`
 - Create: `packages/grib/test/fixtures/gfs-sample.grb2` — checked-in real GRIB slice (~200 KB)
 - Create: `packages/grib/src/parse-grib2.integration.test.ts`
@@ -1514,6 +1544,7 @@ EOF
 ## Task 9: Bootstrap `@g5000/coastline` package
 
 **Files:**
+
 - Create: `packages/coastline/package.json`
 - Create: `packages/coastline/tsconfig.json`
 - Create: `packages/coastline/src/index.ts`
@@ -1589,7 +1620,10 @@ export interface CoastlinePolygon {
 }
 
 export interface RBushEntry {
-  minX: number; minY: number; maxX: number; maxY: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
   polygon: CoastlinePolygon;
 }
 
@@ -1647,6 +1681,7 @@ EOF
 ## Task 10: GSHHG download script
 
 **Files:**
+
 - Create: `packages/coastline/scripts/fetch-coastline.ts`
 - Modify: `.gitignore` — add `packages/coastline/data/`
 
@@ -1687,7 +1722,10 @@ interface Level {
  * conversion (npm `shapefile`).
  */
 const LEVELS: Level[] = [
-  { name: 'l', url: 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson' },
+  {
+    name: 'l',
+    url: 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
+  },
   // ↑ placeholder — see Step 3 for the actual GSHHG mirror; this URL ships countries
   //   land at low resolution and is suitable for `l`-level use in routing on a global
   //   scale. For `i` and `h` we use the GSHHG conversions published at:
@@ -1764,6 +1802,7 @@ EOF
 ## Task 11: Geometry primitives — point-in-polygon, segment intersection
 
 **Files:**
+
 - Create: `packages/coastline/src/geometry.ts`
 - Create: `packages/coastline/src/geometry.test.ts`
 - Modify: `packages/coastline/src/index.ts`
@@ -1779,7 +1818,11 @@ import { describe, it, expect } from 'vitest';
 import { pointInRing, segmentsIntersect, segmentCrossesRing } from './geometry.js';
 
 const SQUARE: Array<[number, number]> = [
-  [-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1],
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+  [-1, -1],
 ];
 
 describe('pointInRing', () => {
@@ -1845,9 +1888,7 @@ export function pointInRing(p: Point, ring: Point[]): boolean {
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i]!;
     const [xj, yj] = ring[j]!;
-    const intersect =
-      yi > py !== yj > py &&
-      px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
@@ -1874,8 +1915,10 @@ export function segmentCrossesRing(a: Point, b: Point, ring: Point[]): boolean {
   // Cheap bbox prefilter
   const ringBbox = ringAabb(ring);
   const segBbox: [number, number, number, number] = [
-    Math.min(a[0], b[0]), Math.min(a[1], b[1]),
-    Math.max(a[0], b[0]), Math.max(a[1], b[1]),
+    Math.min(a[0], b[0]),
+    Math.min(a[1], b[1]),
+    Math.max(a[0], b[0]),
+    Math.max(a[1], b[1]),
   ];
   if (!bboxOverlap(ringBbox, segBbox)) return false;
   for (let i = 0; i < ring.length - 1; i++) {
@@ -1887,7 +1930,10 @@ export function segmentCrossesRing(a: Point, b: Point, ring: Point[]): boolean {
 }
 
 export function ringAabb(ring: Point[]): [number, number, number, number] {
-  let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+  let xmin = Infinity,
+    ymin = Infinity,
+    xmax = -Infinity,
+    ymax = -Infinity;
   for (const [x, y] of ring) {
     if (x < xmin) xmin = x;
     if (x > xmax) xmax = x;
@@ -1915,8 +1961,10 @@ function sign(n: number): -1 | 0 | 1 {
 }
 function onSegment(a: Point, b: Point, p: Point): boolean {
   return (
-    Math.min(a[0], b[0]) <= p[0] && p[0] <= Math.max(a[0], b[0]) &&
-    Math.min(a[1], b[1]) <= p[1] && p[1] <= Math.max(a[1], b[1])
+    Math.min(a[0], b[0]) <= p[0] &&
+    p[0] <= Math.max(a[0], b[0]) &&
+    Math.min(a[1], b[1]) <= p[1] &&
+    p[1] <= Math.max(a[1], b[1])
   );
 }
 ```
@@ -1964,6 +2012,7 @@ EOF
 ## Task 12: Coastline loader (GeoJSON → R-tree)
 
 **Files:**
+
 - Create: `packages/coastline/src/load.ts`
 - Create: `packages/coastline/src/load.test.ts`
 - Create: `packages/coastline/test/fixtures/bahamas-l.geojson` — small slice for tests
@@ -1984,7 +2033,15 @@ Hand-author a tiny GeoJSON with one square island for tests:
       "properties": {},
       "geometry": {
         "type": "Polygon",
-        "coordinates": [[[-77, 24], [-76, 24], [-76, 25], [-77, 25], [-77, 24]]]
+        "coordinates": [
+          [
+            [-77, 24],
+            [-76, 24],
+            [-76, 25],
+            [-77, 25],
+            [-77, 24]
+          ]
+        ]
       }
     },
     {
@@ -1993,8 +2050,24 @@ Hand-author a tiny GeoJSON with one square island for tests:
       "geometry": {
         "type": "MultiPolygon",
         "coordinates": [
-          [[[-78, 23], [-77.5, 23], [-77.5, 23.5], [-78, 23.5], [-78, 23]]],
-          [[[-79, 25], [-78.5, 25], [-78.5, 25.5], [-79, 25.5], [-79, 25]]]
+          [
+            [
+              [-78, 23],
+              [-77.5, 23],
+              [-77.5, 23.5],
+              [-78, 23.5],
+              [-78, 23]
+            ]
+          ],
+          [
+            [
+              [-79, 25],
+              [-78.5, 25],
+              [-78.5, 25.5],
+              [-79, 25.5],
+              [-79, 25]
+            ]
+          ]
         ]
       }
     }
@@ -2030,7 +2103,10 @@ describe('loadCoastlineFromGeojson', () => {
   it('builds an R-tree that finds the right polygon for a query bbox', async () => {
     const c = await loadCoastlineFromGeojson(FIXTURE, 'l');
     const hits = c.index.search({
-      minX: -76.5, minY: 24.2, maxX: -76.3, maxY: 24.4,
+      minX: -76.5,
+      minY: 24.2,
+      maxX: -76.3,
+      maxY: 24.4,
     });
     expect(hits.length).toBe(1);
     expect(hits[0]!.polygon.bbox).toEqual([-77, 24, -76, 25]);
@@ -2085,7 +2161,10 @@ export async function loadCoastlineFromGeojson(
   const index = new RBush<RBushEntry>();
   index.load(
     polygons.map((p) => ({
-      minX: p.bbox[0], minY: p.bbox[1], maxX: p.bbox[2], maxY: p.bbox[3],
+      minX: p.bbox[0],
+      minY: p.bbox[1],
+      maxX: p.bbox[2],
+      maxY: p.bbox[3],
       polygon: p,
     })),
   );
@@ -2149,6 +2228,7 @@ EOF
 ## Task 13: Coastline queries — `isOnLand` and `intersectsLand`
 
 **Files:**
+
 - Create: `packages/coastline/src/queries.ts`
 - Create: `packages/coastline/src/queries.test.ts`
 - Modify: `packages/coastline/src/index.ts`
@@ -2169,7 +2249,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = resolve(here, '../test/fixtures/bahamas-l.geojson');
 let c: Coastline;
 
-beforeAll(async () => { c = await loadCoastlineFromGeojson(FIXTURE, 'l'); });
+beforeAll(async () => {
+  c = await loadCoastlineFromGeojson(FIXTURE, 'l');
+});
 
 describe('isOnLand', () => {
   it('detects a point inside the big island', () => {
@@ -2209,7 +2291,10 @@ import { pointInRing, segmentCrossesRing, type Point } from './geometry.js';
 
 export function isOnLand(c: Coastline, lat: number, lon: number): boolean {
   const candidates = c.index.search({
-    minX: lon, minY: lat, maxX: lon, maxY: lat,
+    minX: lon,
+    minY: lat,
+    maxX: lon,
+    maxY: lat,
   });
   for (const cand of candidates) {
     if (pointInRing([lon, lat], cand.polygon.ring)) return true;
@@ -2219,8 +2304,10 @@ export function isOnLand(c: Coastline, lat: number, lon: number): boolean {
 
 export function intersectsLand(
   c: Coastline,
-  lat1: number, lon1: number,
-  lat2: number, lon2: number,
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
 ): boolean {
   const minX = Math.min(lon1, lon2);
   const maxX = Math.max(lon1, lon2);
@@ -2280,6 +2367,7 @@ EOF
 ## Task 14: Bootstrap `@g5000/routing` package
 
 **Files:**
+
 - Create: `packages/routing/package.json`
 - Create: `packages/routing/tsconfig.json`
 - Create: `packages/routing/src/index.ts`
@@ -2378,6 +2466,7 @@ EOF
 ## Task 15: Routing types
 
 **Files:**
+
 - Create: `packages/routing/src/types.ts`
 - Modify: `packages/routing/src/index.ts`
 
@@ -2421,13 +2510,13 @@ export interface Route {
 }
 
 export interface PlanOptions {
-  stepMinutes?: number;            // default 30
-  headingFanDeg?: number;          // default 90 (±)
-  headingResolutionDeg?: number;   // default 5
-  maxHours?: number;               // default 168
-  avoidLand?: boolean;             // default true
-  useCurrents?: boolean;           // default false
-  pruneBucketDeg?: number;         // default 2
+  stepMinutes?: number; // default 30
+  headingFanDeg?: number; // default 90 (±)
+  headingResolutionDeg?: number; // default 5
+  maxHours?: number; // default 168
+  avoidLand?: boolean; // default true
+  useCurrents?: boolean; // default false
+  pruneBucketDeg?: number; // default 2
 }
 
 export interface PlanInput {
@@ -2448,9 +2537,7 @@ export interface PlanInput {
 
 ```ts
 // packages/routing/src/index.ts
-export type {
-  LatLon, RouteLeg, Route, PlanOptions, PlanInput,
-} from './types.js';
+export type { LatLon, RouteLeg, Route, PlanOptions, PlanInput } from './types.js';
 ```
 
 - [ ] **Step 3: Build check**
@@ -2481,6 +2568,7 @@ EOF
 ## Task 16: Geographic geometry helpers
 
 **Files:**
+
 - Create: `packages/routing/src/geometry.ts`
 - Create: `packages/routing/src/geometry.test.ts`
 - Modify: `packages/routing/src/index.ts`
@@ -2500,7 +2588,7 @@ import {
 } from './geometry.js';
 
 const NEWPORT = { lat: 41.49, lon: -71.31 };
-const BERMUDA = { lat: 32.30, lon: -64.78 };
+const BERMUDA = { lat: 32.3, lon: -64.78 };
 
 describe('normalizeAngle', () => {
   it('wraps into [-π, π]', () => {
@@ -2585,22 +2673,20 @@ export function normalizeBearing(rad: number): number {
 }
 
 export function greatCircleDistance(a: LatLon, b: LatLon): number {
-  const φ1 = a.lat * DEG, φ2 = b.lat * DEG;
+  const φ1 = a.lat * DEG,
+    φ2 = b.lat * DEG;
   const Δφ = (b.lat - a.lat) * DEG;
   const Δλ = (b.lon - a.lon) * DEG;
-  const h =
-    Math.sin(Δφ / 2) ** 2 +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  const h = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 export function greatCircleBearing(a: LatLon, b: LatLon): number {
-  const φ1 = a.lat * DEG, φ2 = b.lat * DEG;
+  const φ1 = a.lat * DEG,
+    φ2 = b.lat * DEG;
   const Δλ = (b.lon - a.lon) * DEG;
   const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x =
-    Math.cos(φ1) * Math.sin(φ2) -
-    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
   return normalizeBearing(Math.atan2(y, x));
 }
 
@@ -2615,15 +2701,13 @@ export function rhumbStep(start: LatLon, distance_m: number, bearing: number): L
   const λ1 = start.lon * DEG;
   const Δφ = δ * Math.cos(bearing);
   const φ2 = φ1 + Δφ;
-  const Δψ = Math.log(
-    Math.tan(Math.PI / 4 + φ2 / 2) / Math.tan(Math.PI / 4 + φ1 / 2),
-  );
+  const Δψ = Math.log(Math.tan(Math.PI / 4 + φ2 / 2) / Math.tan(Math.PI / 4 + φ1 / 2));
   const q = Math.abs(Δψ) > 1e-12 ? Δφ / Δψ : Math.cos(φ1);
   const Δλ = (δ * Math.sin(bearing)) / q;
   const λ2 = λ1 + Δλ;
   return {
     lat: φ2 / DEG,
-    lon: (((λ2 / DEG) + 540) % 360) - 180,
+    lon: ((λ2 / DEG + 540) % 360) - 180,
   };
 }
 ```
@@ -2640,9 +2724,7 @@ Expected: 6 passing.
 
 ```ts
 // packages/routing/src/index.ts
-export type {
-  LatLon, RouteLeg, Route, PlanOptions, PlanInput,
-} from './types.js';
+export type { LatLon, RouteLeg, Route, PlanOptions, PlanInput } from './types.js';
 export {
   greatCircleBearing,
   greatCircleDistance,
@@ -2672,6 +2754,7 @@ EOF
 ## Task 17: Wind decomposition (u/v → TWS/TWD)
 
 **Files:**
+
 - Create: `packages/routing/src/wind.ts`
 - Create: `packages/routing/src/wind.test.ts`
 - Modify: `packages/routing/src/index.ts`
@@ -2761,12 +2844,13 @@ Expected: 5 passing.
 
 ```ts
 // packages/routing/src/index.ts
-export type {
-  LatLon, RouteLeg, Route, PlanOptions, PlanInput,
-} from './types.js';
+export type { LatLon, RouteLeg, Route, PlanOptions, PlanInput } from './types.js';
 export {
-  greatCircleBearing, greatCircleDistance, rhumbStep,
-  normalizeAngle, normalizeBearing,
+  greatCircleBearing,
+  greatCircleDistance,
+  rhumbStep,
+  normalizeAngle,
+  normalizeBearing,
 } from './geometry.js';
 export { decomposeWind, twaFromWindAndHeading } from './wind.js';
 ```
@@ -2792,6 +2876,7 @@ EOF
 ## Task 18: Heading fan generation
 
 **Files:**
+
 - Create: `packages/routing/src/fan.ts`
 - Create: `packages/routing/src/fan.test.ts`
 - Modify: `packages/routing/src/index.ts`
@@ -2917,6 +3002,7 @@ EOF
 ## Task 19: Bearing-bucket pruning
 
 **Files:**
+
 - Create: `packages/routing/src/prune.ts`
 - Create: `packages/routing/src/prune.test.ts`
 - Modify: `packages/routing/src/index.ts`
@@ -2948,9 +3034,9 @@ function mk(lat: number, lon: number, distFromStart: number): FrontierNode {
 describe('pruneByBearingBucket', () => {
   it('keeps only the furthest node per bearing bucket', () => {
     // Three nodes in roughly the same bearing-from-start; only the farthest stays.
-    const a = mk(31, -75, 100_000);  // due north of start
-    const b = mk(32, -75, 200_000);  // also due north, further
-    const c = mk(30, -74, 80_000);   // due east — different bucket
+    const a = mk(31, -75, 100_000); // due north of start
+    const b = mk(32, -75, 200_000); // also due north, further
+    const c = mk(30, -74, 80_000); // due east — different bucket
     const out = pruneByBearingBucket([a, b, c], START, 2);
     expect(out.length).toBe(2);
     expect(out).toContain(b);
@@ -3050,6 +3136,7 @@ EOF
 ## Task 20: Isochrone `plan()` — core loop (no currents, no land yet)
 
 **Files:**
+
 - Create: `packages/routing/src/plan.ts`
 - Create: `packages/routing/src/plan.test.ts`
 - Modify: `packages/routing/src/index.ts`
@@ -3102,7 +3189,7 @@ describe('plan (core)', () => {
   it('reaches a downwind destination in uniform wind', () => {
     const route = plan({
       start: { lat: 30, lon: -75 },
-      end: { lat: 30, lon: -65 },     // 600 km east; wind blows east → broad reach
+      end: { lat: 30, lon: -65 }, // 600 km east; wind blows east → broad reach
       departure: 0,
       wind: uniformWind(),
       polar: simplePolar(),
@@ -3214,21 +3301,14 @@ export function plan(input: PlanInput): Route {
     const next: FrontierNode[] = [];
     for (const n of frontier) {
       const bearingToDest = greatCircleBearing(n.pos, input.end);
-      const headings = expandFanIfStuck(
-        n,
-        bearingToDest,
-        fanRad,
-        resRad,
-        input,
-        stepSec,
-        o,
-      );
+      const headings = expandFanIfStuck(n, bearingToDest, fanRad, resRad, input, stepSec, o);
       for (const h of headings) {
         const child = propagate(n, h, input, stepSec, o);
         if (!child) continue;
-        if (o.avoidLand && intersectsLand(
-          input.coastline, n.pos.lat, n.pos.lon, child.pos.lat, child.pos.lon,
-        )) {
+        if (
+          o.avoidLand &&
+          intersectsLand(input.coastline, n.pos.lat, n.pos.lon, child.pos.lat, child.pos.lon)
+        ) {
           continue;
         }
         next.push(child);
@@ -3243,8 +3323,7 @@ export function plan(input: PlanInput): Route {
     // Track the best (most progress toward destination) for incomplete return.
     for (const n of frontier) {
       if (
-        greatCircleDistance(n.pos, input.end) <
-        greatCircleDistance(bestForReason.pos, input.end)
+        greatCircleDistance(n.pos, input.end) < greatCircleDistance(bestForReason.pos, input.end)
       ) {
         bestForReason = n;
       }
@@ -3253,7 +3332,7 @@ export function plan(input: PlanInput): Route {
     // Termination: any node within one step's reach of destination → close.
     for (const n of frontier) {
       const dGround = greatCircleDistance(n.pos, input.end);
-      if (dGround <= n.sogGround * stepSec || n.sogGround === 0 && dGround === 0) {
+      if (dGround <= n.sogGround * stepSec || (n.sogGround === 0 && dGround === 0)) {
         // Synthesize final leg pointing directly at destination.
         const finalHeading = greatCircleBearing(n.pos, input.end);
         const finalTime = n.t + (n.sogGround > 0 ? dGround / n.sogGround : 0);
@@ -3422,6 +3501,7 @@ EOF
 ## Task 21: Property tests — uniform wind, distance bound, determinism
 
 **Files:**
+
 - Create: `packages/routing/src/plan.property.test.ts`
 
 - [ ] **Step 1: Write the property tests**
@@ -3522,7 +3602,9 @@ describe('property: uniform wind ⇒ direction roughly toward destination', () =
     const start = { lat: 30, lon: -75 };
     const end = { lat: 30, lon: -65 }; // due east, wind from west (u=8)
     const r = plan({
-      start, end, departure: 0,
+      start,
+      end,
+      departure: 0,
       wind: uniformWind(8, 0),
       polar: reachingPolar(),
       polarId: 't',
@@ -3570,6 +3652,7 @@ EOF
 ## Task 22: Land-avoidance property test
 
 **Files:**
+
 - Modify: `packages/routing/src/plan.property.test.ts`
 
 The `plan()` function already calls `intersectsLand`. This task adds the property test that exercises land avoidance with a synthetic island.
@@ -3585,13 +3668,27 @@ import type { Coastline, RBushEntry } from '@g5000/coastline';
 function syntheticIsland(): Coastline {
   // 1°×1° box centered at (30, -70).
   const ring: Array<[number, number]> = [
-    [-70.5, 29.5], [-69.5, 29.5], [-69.5, 30.5], [-70.5, 30.5], [-70.5, 29.5],
+    [-70.5, 29.5],
+    [-69.5, 29.5],
+    [-69.5, 30.5],
+    [-70.5, 30.5],
+    [-70.5, 29.5],
   ];
-  const polygon = { kind: 'land' as const, ring, bbox: [-70.5, 29.5, -69.5, 30.5] as [number, number, number, number] };
+  const polygon = {
+    kind: 'land' as const,
+    ring,
+    bbox: [-70.5, 29.5, -69.5, 30.5] as [number, number, number, number],
+  };
   const index = new RBush<RBushEntry>();
-  index.load([{
-    minX: -70.5, minY: 29.5, maxX: -69.5, maxY: 30.5, polygon,
-  }]);
+  index.load([
+    {
+      minX: -70.5,
+      minY: 29.5,
+      maxX: -69.5,
+      maxY: 30.5,
+      polygon,
+    },
+  ]);
   return { level: 'l', polygons: [polygon], index };
 }
 
@@ -3604,12 +3701,24 @@ describe('property: coastline forces detour', () => {
     const coastline = syntheticIsland();
 
     const rOff = plan({
-      start, end, departure: 0, wind, polar, polarId: 't',
-      coastline, options: { avoidLand: false, maxHours: 72 },
+      start,
+      end,
+      departure: 0,
+      wind,
+      polar,
+      polarId: 't',
+      coastline,
+      options: { avoidLand: false, maxHours: 72 },
     });
     const rOn = plan({
-      start, end, departure: 0, wind, polar, polarId: 't',
-      coastline, options: { avoidLand: true, maxHours: 72 },
+      start,
+      end,
+      departure: 0,
+      wind,
+      polar,
+      polarId: 't',
+      coastline,
+      options: { avoidLand: true, maxHours: 72 },
     });
 
     expect(rOff.incomplete).toBeFalsy();
@@ -3655,6 +3764,7 @@ EOF
 ## Task 23: Currents property test (currents-reverse symmetry)
 
 **Files:**
+
 - Modify: `packages/routing/src/plan.property.test.ts`
 
 `plan()` already handles `useCurrents`. This task adds the symmetry test.
@@ -3680,7 +3790,12 @@ describe('property: currents reverse → ETA asymmetry', () => {
     const wind = uniformWind(8, 0);
     const polar = reachingPolar();
     const args = {
-      start, end, departure: 0, wind, polar, polarId: 't',
+      start,
+      end,
+      departure: 0,
+      wind,
+      polar,
+      polarId: 't',
       coastline: fakeCoastline,
       options: { avoidLand: false, maxHours: 72, useCurrents: true },
     };
@@ -3722,6 +3837,7 @@ EOF
 ## Task 24: New g5000 endpoint — `/api/wardrobe/active`
 
 **Files:**
+
 - Create: `packages/web/src/app/api/wardrobe/active/route.ts`
 - Create: `packages/web/src/app/api/wardrobe/active/route.test.ts`
 
@@ -3833,6 +3949,7 @@ EOF
 ## Task 25: New g5000 endpoint — `/api/position` (SSE)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/position/route.ts`
 - Create: `packages/web/src/app/api/position/route.test.ts`
 
@@ -3875,7 +3992,10 @@ export async function GET(): Promise<Response> {
   const stream = new ReadableStream({
     start(controller) {
       const latest: Record<'lat' | 'lon' | 'sog' | 'cog', number | undefined> = {
-        lat: undefined, lon: undefined, sog: undefined, cog: undefined,
+        lat: undefined,
+        lon: undefined,
+        sog: undefined,
+        cog: undefined,
       };
       let timer: NodeJS.Timeout | null = null;
       let closed = false;
@@ -3924,7 +4044,7 @@ export async function GET(): Promise<Response> {
     headers: {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache, no-transform',
-      'connection': 'keep-alive',
+      connection: 'keep-alive',
     },
   });
 }
@@ -3962,6 +4082,7 @@ EOF
 ## Task 26: Bootstrap `apps/router` (Next.js + Tailwind)
 
 **Files:**
+
 - Create: `apps/router/package.json`
 - Create: `apps/router/tsconfig.json`
 - Create: `apps/router/next.config.ts`
@@ -4048,7 +4169,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
 ```tsx
 export default function HomePage() {
-  return <main className="p-8"><h1 className="text-2xl">Router (placeholder)</h1></main>;
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl">Router (placeholder)</h1>
+    </main>
+  );
 }
 ```
 
@@ -4091,6 +4216,7 @@ EOF
 ## Task 27: Local filesystem paths and persistence helpers
 
 **Files:**
+
 - Create: `apps/router/src/lib/paths.ts`
 - Create: `apps/router/src/lib/persistence.ts`
 - Create: `apps/router/src/lib/persistence.test.ts`
@@ -4120,8 +4246,12 @@ import { join } from 'node:path';
 import { writeJson, readJson, listJson } from './persistence.js';
 
 let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'router-')); });
-afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'router-'));
+});
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
 
 describe('persistence', () => {
   it('writeJson + readJson roundtrip', async () => {
@@ -4199,6 +4329,7 @@ EOF
 ## Task 28: API route — `POST /api/route/plan`
 
 **Files:**
+
 - Create: `apps/router/src/app/api/route/plan/route.ts`
 - Create: `apps/router/src/app/api/route/plan/route.test.ts`
 
@@ -4210,17 +4341,23 @@ import { describe, it, expect, vi } from 'vitest';
 import { POST } from './route.js';
 
 vi.mock('@g5000/routing', async () => ({
-  ...await vi.importActual('@g5000/routing'),
+  ...(await vi.importActual('@g5000/routing')),
   plan: vi.fn(() => ({
     legs: [{ t: 0, lat: 30, lon: -75, heading: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 }],
-    start: 0, end: 3600, distance: 18000,
-    model: 'GFS', usedCurrents: false, polarId: 'test',
+    start: 0,
+    end: 3600,
+    distance: 18000,
+    model: 'GFS',
+    usedCurrents: false,
+    polarId: 'test',
   })),
 }));
 
 // Stub the GRIB + coastline loaders the handler invokes:
 vi.mock('../../../lib/grib-context.js', () => ({
-  loadWindFor: vi.fn(async () => ({ /* tiny mock WindField */ })),
+  loadWindFor: vi.fn(async () => ({
+    /* tiny mock WindField */
+  })),
 }));
 vi.mock('../../../lib/coastline.js', () => ({
   loadDefaultCoastline: vi.fn(async () => ({})),
@@ -4282,14 +4419,17 @@ export async function loadWindFor(
 ): Promise<WindField> {
   if (model === 'GFS') {
     const { cachedPaths, runDateUtc, runHourUtc } = await fetchGfsBlobs({
-      bbox, hours, cacheRoot: GRIB_CACHE,
+      bbox,
+      hours,
+      cacheRoot: GRIB_CACHE,
     });
-    const runTime = Date.UTC(
-      Number(runDateUtc.slice(0, 4)),
-      Number(runDateUtc.slice(5, 7)) - 1,
-      Number(runDateUtc.slice(8, 10)),
-      runHourUtc,
-    ) / 1000;
+    const runTime =
+      Date.UTC(
+        Number(runDateUtc.slice(0, 4)),
+        Number(runDateUtc.slice(5, 7)) - 1,
+        Number(runDateUtc.slice(8, 10)),
+        runHourUtc,
+      ) / 1000;
     const messages = (await Promise.all(cachedPaths.map((p) => runWgrib2(p)))).flat();
     return parseGrib2Json(messages, 'GFS', runTime) as WindField;
   }
@@ -4352,11 +4492,19 @@ function validate(b: unknown): b is Body {
 
 export async function POST(req: Request): Promise<Response> {
   let body: unknown;
-  try { body = await req.json(); } catch {
-    return NextResponse.json({ ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } }, { status: 400 });
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
+      { status: 400 },
+    );
   }
   if (!validate(body)) {
-    return NextResponse.json({ ok: false, error: { kind: 'bad_request', message: 'missing required fields' } }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: { kind: 'bad_request', message: 'missing required fields' } },
+      { status: 400 },
+    );
   }
   const b = body;
   try {
@@ -4377,7 +4525,14 @@ export async function POST(req: Request): Promise<Response> {
   } catch (err) {
     const e = err as { kind?: string; status?: number; retryable?: boolean; message?: string };
     return NextResponse.json(
-      { ok: false, error: { kind: e.kind ?? 'internal', message: e.message ?? String(err), retryable: e.retryable ?? false } },
+      {
+        ok: false,
+        error: {
+          kind: e.kind ?? 'internal',
+          message: e.message ?? String(err),
+          retryable: e.retryable ?? false,
+        },
+      },
       { status: e.status ?? 500 },
     );
   }
@@ -4411,6 +4566,7 @@ EOF
 ## Task 29: g5000 client + live-mode SSE/JSON proxies
 
 **Files:**
+
 - Create: `apps/router/src/lib/g5000-client.ts`
 - Create: `apps/router/src/app/api/live/polar/route.ts`
 - Create: `apps/router/src/app/api/live/position/route.ts`
@@ -4530,6 +4686,7 @@ EOF
 ## Task 30: Map shell with MapLibre + status badge
 
 **Files:**
+
 - Create: `apps/router/src/components/Map.tsx`
 - Create: `apps/router/src/components/StatusBadge.tsx`
 - Modify: `apps/router/src/app/page.tsx`
@@ -4560,19 +4717,20 @@ export function StatusBadge() {
     };
     check();
     const id = setInterval(check, 15_000);
-    return () => { cancelled = true; clearInterval(id); };
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
   const color =
-    mode === 'live' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-700'
-    : mode === 'offline' ? 'bg-amber-500/20 text-amber-300 border-amber-700'
-    : 'bg-slate-700/40 text-slate-300 border-slate-700';
+    mode === 'live'
+      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-700'
+      : mode === 'offline'
+        ? 'bg-amber-500/20 text-amber-300 border-amber-700'
+        : 'bg-slate-700/40 text-slate-300 border-slate-700';
   const label =
-    mode === 'live' ? 'Live: g5000 onboard ✓'
-    : mode === 'offline' ? 'Offline 🌐'
-    : 'Checking…';
-  return (
-    <span className={`text-xs px-2 py-1 border rounded ${color}`}>{label}</span>
-  );
+    mode === 'live' ? 'Live: g5000 onboard ✓' : mode === 'offline' ? 'Offline 🌐' : 'Checking…';
+  return <span className={`text-xs px-2 py-1 border rounded ${color}`}>{label}</span>;
 }
 ```
 
@@ -4617,8 +4775,10 @@ export function Map({ center, zoom, onClick }: MapProps) {
       map.on('click', (e) => onClick({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
     }
     mapRef.current = map;
-    return () => { map.remove(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      map.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return <div ref={ref} className="w-full h-full" />;
 }
@@ -4672,6 +4832,7 @@ EOF
 ## Task 31: Plan controls + route polyline rendering
 
 **Files:**
+
 - Create: `apps/router/src/components/PlanControls.tsx`
 - Create: `apps/router/src/components/RoutePolyline.tsx`
 - Modify: `apps/router/src/app/page.tsx`
@@ -4710,13 +4871,18 @@ export function PlanControls(props: {
     const t = Math.floor(new Date(departure).getTime() / 1000);
     if (!props.start || !props.end) return alert('Click start and end on the map first.');
     props.onPlan({
-      start: props.start, end: props.end, departure: t,
-      model, polarId: polar.id ?? 'default', polar: polar.polar ?? polar,
+      start: props.start,
+      end: props.end,
+      departure: t,
+      model,
+      polarId: polar.id ?? 'default',
+      polar: polar.polar ?? polar,
     });
   };
   return (
     <div className="space-y-2">
-      <label className="block text-sm">Departure (UTC)
+      <label className="block text-sm">
+        Departure (UTC)
         <input
           type="datetime-local"
           value={departure}
@@ -4724,7 +4890,8 @@ export function PlanControls(props: {
           className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
         />
       </label>
-      <label className="block text-sm">Wind model
+      <label className="block text-sm">
+        Wind model
         <select
           value={model}
           onChange={(e) => setModel(e.target.value as 'GFS' | 'ECMWF')}
@@ -4756,24 +4923,33 @@ import { useEffect } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { Route } from '@g5000/routing';
 
-export function attachRoute(map: maplibregl.Map, id: string, route: Route, color = '#22d3ee'): void {
+export function attachRoute(
+  map: maplibregl.Map,
+  id: string,
+  route: Route,
+  color = '#22d3ee',
+): void {
   const data: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
-    features: [{
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: route.legs.map((l) => [l.lon, l.lat]),
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: route.legs.map((l) => [l.lon, l.lat]),
+        },
       },
-    }],
+    ],
   };
   if (map.getSource(id)) {
     (map.getSource(id) as maplibregl.GeoJSONSource).setData(data);
   } else {
     map.addSource(id, { type: 'geojson', data });
     map.addLayer({
-      id, type: 'line', source: id,
+      id,
+      type: 'line',
+      source: id,
       paint: { 'line-color': color, 'line-width': 2 },
     });
   }
@@ -4812,14 +4988,19 @@ export default function HomePage() {
   const onMapClick = (p: Pos) => {
     if (!start) setStart(p);
     else if (!end) setEnd(p);
-    else { setStart(p); setEnd(undefined); setRoute(undefined); }
+    else {
+      setStart(p);
+      setEnd(undefined);
+      setRoute(undefined);
+    }
   };
   const onPlan = async (req: PlanRequest) => {
     setLoading(true);
     setError(undefined);
     try {
       const res = await fetch('/api/route/plan', {
-        method: 'POST', body: JSON.stringify(req),
+        method: 'POST',
+        body: JSON.stringify(req),
         headers: { 'content-type': 'application/json' },
       });
       const j = await res.json();
@@ -4834,23 +5015,33 @@ export default function HomePage() {
   };
   return (
     <main className="grid grid-cols-[1fr_360px] h-screen">
-      <Map center={{ lat: 35, lon: -70 }} zoom={4} onClick={onMapClick}
+      <Map
+        center={{ lat: 35, lon: -70 }}
+        zoom={4}
+        onClick={onMapClick}
         // To access the map ref, hoist via a callback. For brevity, refactor
         // Map.tsx to accept onLoad?: (m: Map) => void and store it here.
       />
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <StatusBadge />
         <div className="text-xs text-slate-400 space-y-1">
-          <div>Start: {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}</div>
-          <div>End:   {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}</div>
+          <div>
+            Start: {start ? `${start.lat.toFixed(3)}, ${start.lon.toFixed(3)}` : '— click map'}
+          </div>
+          <div>End: {end ? `${end.lat.toFixed(3)}, ${end.lon.toFixed(3)}` : '— click map'}</div>
         </div>
         <PlanControls start={start} end={end} onPlan={onPlan} loading={loading} />
         {error && <div className="text-rose-400 text-xs">{error}</div>}
-        {route && <div className="text-xs text-slate-300">
-          ETA: {new Date(route.end * 1000).toISOString()}<br/>
-          Distance: {(route.distance / 1852).toFixed(0)} NM<br/>
-          Model: {route.model}{route.incomplete ? ` (incomplete: ${route.reason})` : ''}
-        </div>}
+        {route && (
+          <div className="text-xs text-slate-300">
+            ETA: {new Date(route.end * 1000).toISOString()}
+            <br />
+            Distance: {(route.distance / 1852).toFixed(0)} NM
+            <br />
+            Model: {route.model}
+            {route.incomplete ? ` (incomplete: ${route.reason})` : ''}
+          </div>
+        )}
       </aside>
     </main>
   );
@@ -4883,6 +5074,7 @@ EOF
 ## Task 32: Route timeline + GPX export
 
 **Files:**
+
 - Create: `apps/router/src/components/RouteTimeline.tsx`
 - Create: `apps/router/src/lib/gpx.ts`
 - Create: `apps/router/src/lib/gpx.test.ts`
@@ -4901,8 +5093,12 @@ const r: Route = {
     { t: 0, lat: 30, lon: -75, heading: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 },
     { t: 3600, lat: 30, lon: -74, heading: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 },
   ],
-  start: 0, end: 3600, distance: 100000,
-  model: 'GFS', usedCurrents: false, polarId: 'test',
+  start: 0,
+  end: 3600,
+  distance: 100000,
+  model: 'GFS',
+  usedCurrents: false,
+  polarId: 'test',
 };
 
 describe('routeToGpx', () => {
@@ -4930,11 +5126,14 @@ npm test -- apps/router/src/lib/gpx.test.ts
 import type { Route } from '@g5000/routing';
 
 export function routeToGpx(r: Route, name: string): string {
-  const trkpts = r.legs.map((l) =>
-    `      <trkpt lat="${l.lat}" lon="${l.lon}">\n` +
-    `        <time>${new Date(l.t * 1000).toISOString()}</time>\n` +
-    `      </trkpt>`
-  ).join('\n');
+  const trkpts = r.legs
+    .map(
+      (l) =>
+        `      <trkpt lat="${l.lat}" lon="${l.lon}">\n` +
+        `        <time>${new Date(l.t * 1000).toISOString()}</time>\n` +
+        `      </trkpt>`,
+    )
+    .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="g5000-router" xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
@@ -4947,7 +5146,10 @@ ${trkpts}
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]!));
+  return s.replace(
+    /[<>&"]/g,
+    (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!,
+  );
 }
 ```
 
@@ -4972,16 +5174,25 @@ export function RouteTimeline({ route }: { route: Route }) {
     const blob = new Blob([routeToGpx(route, 'Route')], { type: 'application/gpx+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'route.gpx'; a.click();
+    a.href = url;
+    a.download = 'route.gpx';
+    a.click();
     URL.revokeObjectURL(url);
   };
   return (
     <div className="space-y-2">
-      <button onClick={onExport} className="bg-slate-700 px-2 py-1 rounded text-xs">Export GPX</button>
+      <button onClick={onExport} className="bg-slate-700 px-2 py-1 rounded text-xs">
+        Export GPX
+      </button>
       <div className="text-xs max-h-64 overflow-y-auto font-mono">
         <table className="w-full">
           <thead className="text-slate-500">
-            <tr><th className="text-left">t</th><th>TWS</th><th>TWA</th><th>BSP</th></tr>
+            <tr>
+              <th className="text-left">t</th>
+              <th>TWS</th>
+              <th>TWA</th>
+              <th>BSP</th>
+            </tr>
           </thead>
           <tbody>
             {route.legs.map((l, i) => (
@@ -5022,6 +5233,7 @@ EOF
 ## Task 33: ECMWF Open Data fetch
 
 **Files:**
+
 - Create: `packages/grib/src/fetch-ecmwf.ts`
 - Create: `packages/grib/src/fetch-ecmwf.test.ts`
 - Modify: `packages/grib/src/index.ts`
@@ -5043,8 +5255,12 @@ import { buildEcmwfUrls, pickEcmwfRun } from './fetch-ecmwf.js';
 describe('buildEcmwfUrls', () => {
   it('builds full + index URLs for a step', () => {
     const u = buildEcmwfUrls({ runDateUtc: '2026-05-12', runHourUtc: 0, forecastHour: 3 });
-    expect(u.grib).toBe('https://data.ecmwf.int/forecasts/20260512/00z/ifs/0p25/oper/20260512000000-3h-oper-fc.grib2');
-    expect(u.index).toBe('https://data.ecmwf.int/forecasts/20260512/00z/ifs/0p25/oper/20260512000000-3h-oper-fc.index');
+    expect(u.grib).toBe(
+      'https://data.ecmwf.int/forecasts/20260512/00z/ifs/0p25/oper/20260512000000-3h-oper-fc.grib2',
+    );
+    expect(u.index).toBe(
+      'https://data.ecmwf.int/forecasts/20260512/00z/ifs/0p25/oper/20260512000000-3h-oper-fc.index',
+    );
   });
 });
 
@@ -5079,7 +5295,10 @@ export function buildEcmwfUrls(o: BuildEcmwfUrlsOpts): { grib: string; index: st
   return { grib: `${base}/${file}.grib2`, index: `${base}/${file}.index` };
 }
 
-export function pickEcmwfRun(atUnixSec: number): { runDateUtc: string; runHourUtc: 0 | 6 | 12 | 18 } {
+export function pickEcmwfRun(atUnixSec: number): {
+  runDateUtc: string;
+  runHourUtc: 0 | 6 | 12 | 18;
+} {
   const lagMs = 6 * 60 * 60 * 1000;
   const d = new Date(atUnixSec * 1000 - lagMs);
   const hour = d.getUTCHours();
@@ -5090,10 +5309,18 @@ export function pickEcmwfRun(atUnixSec: number): { runDateUtc: string; runHourUt
   return { runDateUtc: `${y}-${m}-${day}`, runHourUtc: runHour };
 }
 
-interface IndexLine { _offset: number; _length: number; param: string; levelist?: string; levtype?: string; }
+interface IndexLine {
+  _offset: number;
+  _length: number;
+  param: string;
+  levelist?: string;
+  levtype?: string;
+}
 
 export async function fetchEcmwfMessages(opts: {
-  runDateUtc: string; runHourUtc: 0 | 6 | 12 | 18; forecastHour: number;
+  runDateUtc: string;
+  runHourUtc: 0 | 6 | 12 | 18;
+  forecastHour: number;
   variables: Array<'10u' | '10v' | 'msl'>;
   fetchImpl?: typeof fetch;
 }): Promise<Buffer[]> {
@@ -5102,7 +5329,10 @@ export async function fetchEcmwfMessages(opts: {
   const idxRes = await fetchFn(urls.index);
   if (!idxRes.ok) throw new Error(`ECMWF index ${urls.index} → ${idxRes.status}`);
   const text = await idxRes.text();
-  const lines = text.split(/\n/).filter(Boolean).map((l) => JSON.parse(l) as IndexLine);
+  const lines = text
+    .split(/\n/)
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as IndexLine);
   const wanted = lines.filter((l) => opts.variables.includes(l.param as '10u' | '10v' | 'msl'));
   const buffers: Buffer[] = [];
   for (const w of wanted) {
@@ -5118,7 +5348,10 @@ export async function fetchEcmwfMessages(opts: {
 }
 
 export async function fetchEcmwfBlobs(opts: {
-  bbox: Bbox; hours: number; cacheRoot: string; fetchImpl?: typeof fetch;
+  bbox: Bbox;
+  hours: number;
+  cacheRoot: string;
+  fetchImpl?: typeof fetch;
 }): Promise<{ runDateUtc: string; runHourUtc: number; cachedPaths: string[] }> {
   // ECMWF Open Data publishes at 0/3/6/9...h cadence to 144h.
   const now = Math.floor(Date.now() / 1000);
@@ -5131,12 +5364,13 @@ export async function fetchEcmwfBlobs(opts: {
   // wgrib2's `-undefine out-box` operator. Bbox passed through here only to
   // form cache keys.
   const { cachePath, cacheStore, cacheHas } = await import('./cache.js');
-  const runTime = Date.UTC(
-    Number(run.runDateUtc.slice(0, 4)),
-    Number(run.runDateUtc.slice(5, 7)) - 1,
-    Number(run.runDateUtc.slice(8, 10)),
-    run.runHourUtc,
-  ) / 1000;
+  const runTime =
+    Date.UTC(
+      Number(run.runDateUtc.slice(0, 4)),
+      Number(run.runDateUtc.slice(5, 7)) - 1,
+      Number(run.runDateUtc.slice(8, 10)),
+      run.runHourUtc,
+    ) / 1000;
   for (const h of steps) {
     const key = {
       model: 'ecmwf' as const,
@@ -5146,8 +5380,11 @@ export async function fetchEcmwfBlobs(opts: {
     };
     if (!cacheHas(opts.cacheRoot, key)) {
       const buffers = await fetchEcmwfMessages({
-        runDateUtc: run.runDateUtc, runHourUtc: run.runHourUtc, forecastHour: h,
-        variables: ['10u', '10v'], fetchImpl: opts.fetchImpl,
+        runDateUtc: run.runDateUtc,
+        runHourUtc: run.runHourUtc,
+        forecastHour: h,
+        variables: ['10u', '10v'],
+        fetchImpl: opts.fetchImpl,
       });
       const combined = Buffer.concat(buffers);
       await cacheStore(opts.cacheRoot, key, combined);
@@ -5165,14 +5402,17 @@ In `apps/router/src/lib/grib-context.ts`, replace the `throw new Error('loadWind
 ```ts
 if (model === 'ECMWF') {
   const { cachedPaths, runDateUtc, runHourUtc } = await fetchEcmwfBlobs({
-    bbox, hours, cacheRoot: GRIB_CACHE,
+    bbox,
+    hours,
+    cacheRoot: GRIB_CACHE,
   });
-  const runTime = Date.UTC(
-    Number(runDateUtc.slice(0, 4)),
-    Number(runDateUtc.slice(5, 7)) - 1,
-    Number(runDateUtc.slice(8, 10)),
-    runHourUtc,
-  ) / 1000;
+  const runTime =
+    Date.UTC(
+      Number(runDateUtc.slice(0, 4)),
+      Number(runDateUtc.slice(5, 7)) - 1,
+      Number(runDateUtc.slice(8, 10)),
+      runHourUtc,
+    ) / 1000;
   const messages = (await Promise.all(cachedPaths.map((p) => runWgrib2(p)))).flat();
   return parseGrib2Json(messages, 'ECMWF', runTime) as WindField;
 }
@@ -5185,7 +5425,10 @@ Add `fetchEcmwfBlobs` to the imports.
 ```ts
 // packages/grib/src/index.ts
 export {
-  buildEcmwfUrls, pickEcmwfRun, fetchEcmwfMessages, fetchEcmwfBlobs,
+  buildEcmwfUrls,
+  pickEcmwfRun,
+  fetchEcmwfMessages,
+  fetchEcmwfBlobs,
 } from './fetch-ecmwf.js';
 ```
 
@@ -5210,6 +5453,7 @@ EOF
 ## Task 34: RTOFS surface-current fetch
 
 **Files:**
+
 - Create: `packages/grib/src/fetch-rtofs.ts`
 - Create: `packages/grib/src/fetch-rtofs.test.ts`
 - Modify: `packages/grib/src/index.ts`
@@ -5227,7 +5471,8 @@ import { buildRtofsUrl } from './fetch-rtofs.js';
 describe('buildRtofsUrl', () => {
   it('formats a 2d subset URL for UOGRD/VOGRD', () => {
     const u = buildRtofsUrl({
-      runDateUtc: '2026-05-12', forecastHour: 24,
+      runDateUtc: '2026-05-12',
+      forecastHour: 24,
       bbox: { latMin: 30, latMax: 35, lonMin: -75, lonMax: -65 },
     });
     expect(u).toContain('filter_rtofs_2d.pl');
@@ -5271,7 +5516,10 @@ export function buildRtofsUrl(o: BuildRtofsUrlOpts): string {
 }
 
 export async function fetchRtofsBlobs(opts: {
-  bbox: Bbox; hours: number; cacheRoot: string; fetchImpl?: typeof fetch;
+  bbox: Bbox;
+  hours: number;
+  cacheRoot: string;
+  fetchImpl?: typeof fetch;
 }): Promise<{ runDateUtc: string; cachedPaths: string[] }> {
   const fetchFn = opts.fetchImpl ?? globalThis.fetch;
   const now = new Date();
@@ -5287,14 +5535,18 @@ export async function fetchRtofsBlobs(opts: {
     const runTime = Date.UTC(y, d.getUTCMonth(), d.getUTCDate(), 0) / 1000 + h * 3600;
     const key = {
       model: 'rtofs' as const,
-      runTime, bbox: opts.bbox, variable: 'uogrd' as const,
+      runTime,
+      bbox: opts.bbox,
+      variable: 'uogrd' as const,
     };
     if (!cacheHas(opts.cacheRoot, key)) {
       const url = buildRtofsUrl({ runDateUtc, forecastHour: h, bbox: opts.bbox });
       const res = await fetchFn(url);
       if (!res.ok) {
         throw Object.assign(new Error(`RTOFS fetch failed: ${res.status}`), {
-          kind: 'fetch_failed', source: 'RTOFS', status: res.status,
+          kind: 'fetch_failed',
+          source: 'RTOFS',
+          status: res.status,
           retryable: res.status >= 500,
         });
       }
@@ -5314,12 +5566,13 @@ import type { CurrentField } from '@g5000/grib';
 
 export async function loadCurrentFor(bbox: Bbox, hours: number): Promise<CurrentField> {
   const { cachedPaths, runDateUtc } = await fetchRtofsBlobs({ bbox, hours, cacheRoot: GRIB_CACHE });
-  const runTime = Date.UTC(
-    Number(runDateUtc.slice(0, 4)),
-    Number(runDateUtc.slice(5, 7)) - 1,
-    Number(runDateUtc.slice(8, 10)),
-    0,
-  ) / 1000;
+  const runTime =
+    Date.UTC(
+      Number(runDateUtc.slice(0, 4)),
+      Number(runDateUtc.slice(5, 7)) - 1,
+      Number(runDateUtc.slice(8, 10)),
+      0,
+    ) / 1000;
   const messages = (await Promise.all(cachedPaths.map((p) => runWgrib2(p)))).flat();
   return parseGrib2Json(messages, 'RTOFS', runTime) as CurrentField;
 }
@@ -5350,6 +5603,7 @@ EOF
 ## Task 35: Wire currents toggle through API + UI
 
 **Files:**
+
 - Modify: `apps/router/src/app/api/route/plan/route.ts`
 - Modify: `apps/router/src/components/PlanControls.tsx`
 
@@ -5399,6 +5653,7 @@ EOF
 ## Task 36: Departure-window scan — API + UI
 
 **Files:**
+
 - Create: `apps/router/src/app/api/route/window/route.ts`
 - Create: `apps/router/src/app/window/page.tsx`
 - Create: `apps/router/src/components/WindowHeatmap.tsx`
@@ -5417,7 +5672,7 @@ import { loadDefaultCoastline } from '../../../../lib/coastline.js';
 interface Body {
   start: { lat: number; lon: number };
   end: { lat: number; lon: number };
-  windowStart: number;  // unix seconds
+  windowStart: number; // unix seconds
   windowHours: number;
   stepHours: number;
   model: 'GFS' | 'ECMWF';
@@ -5427,7 +5682,7 @@ interface Body {
 }
 
 export async function POST(req: Request) {
-  const b = await req.json() as Body;
+  const b = (await req.json()) as Body;
   const bbox = {
     latMin: Math.min(b.start.lat, b.end.lat) - 2,
     latMax: Math.max(b.start.lat, b.end.lat) + 2,
@@ -5438,21 +5693,38 @@ export async function POST(req: Request) {
   const currents = b.useCurrents ? await loadCurrentFor(bbox, b.windowHours + 168) : undefined;
   const coastline = await loadDefaultCoastline();
   const out: Array<{
-    departure: number; eta: number; distance: number; meanTws: number; maxTws: number;
+    departure: number;
+    eta: number;
+    distance: number;
+    meanTws: number;
+    maxTws: number;
     incomplete?: boolean;
   }> = [];
   for (let t = b.windowStart; t < b.windowStart + b.windowHours * 3600; t += b.stepHours * 3600) {
     const r = plan({
-      start: b.start, end: b.end, departure: t,
-      wind, polar: b.polar, polarId: b.polarId, coastline,
-      currents, options: { useCurrents: !!b.useCurrents, maxHours: 168 },
+      start: b.start,
+      end: b.end,
+      departure: t,
+      wind,
+      polar: b.polar,
+      polarId: b.polarId,
+      coastline,
+      currents,
+      options: { useCurrents: !!b.useCurrents, maxHours: 168 },
     });
-    let meanTws = 0; let maxTws = 0;
-    for (const l of r.legs) { meanTws += l.tws; if (l.tws > maxTws) maxTws = l.tws; }
+    let meanTws = 0;
+    let maxTws = 0;
+    for (const l of r.legs) {
+      meanTws += l.tws;
+      if (l.tws > maxTws) maxTws = l.tws;
+    }
     meanTws /= Math.max(1, r.legs.length);
     out.push({
-      departure: t, eta: r.end, distance: r.distance,
-      meanTws, maxTws,
+      departure: t,
+      eta: r.end,
+      distance: r.distance,
+      meanTws,
+      maxTws,
       ...(r.incomplete ? { incomplete: true } : {}),
     });
   }
@@ -5467,11 +5739,18 @@ export async function POST(req: Request) {
 ```tsx
 'use client';
 export interface WindowResult {
-  departure: number; eta: number; distance: number;
-  meanTws: number; maxTws: number; incomplete?: boolean;
+  departure: number;
+  eta: number;
+  distance: number;
+  meanTws: number;
+  maxTws: number;
+  incomplete?: boolean;
 }
 
-export function WindowHeatmap({ results, onPick }: {
+export function WindowHeatmap({
+  results,
+  onPick,
+}: {
   results: WindowResult[];
   onPick: (r: WindowResult) => void;
 }) {
@@ -5499,11 +5778,12 @@ export function WindowHeatmap({ results, onPick }: {
           <tr key={day}>
             <td className="text-slate-500 pr-2">{day}</td>
             {rs.map((r) => (
-              <td key={r.departure}
-                  onClick={() => onPick(r)}
-                  className="w-8 h-6 cursor-pointer border border-slate-900"
-                  style={{ background: r.incomplete ? '#444' : color((r.eta - r.departure) / 3600) }}
-                  title={`Dep: ${new Date(r.departure*1000).toISOString()}\nETA: ${((r.eta - r.departure)/3600).toFixed(1)} h${r.incomplete ? ' (incomplete)' : ''}`}
+              <td
+                key={r.departure}
+                onClick={() => onPick(r)}
+                className="w-8 h-6 cursor-pointer border border-slate-900"
+                style={{ background: r.incomplete ? '#444' : color((r.eta - r.departure) / 3600) }}
+                title={`Dep: ${new Date(r.departure * 1000).toISOString()}\nETA: ${((r.eta - r.departure) / 3600).toFixed(1)} h${r.incomplete ? ' (incomplete)' : ''}`}
               />
             ))}
           </tr>
@@ -5543,6 +5823,7 @@ EOF
 ## Task 37: Plans persistence (CRUD)
 
 **Files:**
+
 - Create: `apps/router/src/app/api/plans/route.ts`
 - Create: `apps/router/src/app/api/plans/[id]/route.ts`
 - Create: `apps/router/src/app/plans/page.tsx`
@@ -5559,14 +5840,12 @@ import { writeJson, readJson, listJson } from '../../../lib/persistence.js';
 
 export async function GET() {
   const names = await listJson(PLANS_DIR);
-  const items = await Promise.all(
-    names.map(async (n) => readJson(join(PLANS_DIR, n))),
-  );
+  const items = await Promise.all(names.map(async (n) => readJson(join(PLANS_DIR, n))));
   return NextResponse.json({ ok: true, items });
 }
 
 export async function POST(req: Request) {
-  const body = await req.json() as { name: string; route: unknown; createdAt?: number };
+  const body = (await req.json()) as { name: string; route: unknown; createdAt?: number };
   const id = randomUUID();
   const record = {
     id,
@@ -5607,11 +5886,18 @@ import { join } from 'node:path';
 import { PLANS_DIR } from '../../lib/paths';
 import { listJson, readJson } from '../../lib/persistence';
 
-interface PlanRecord { id: string; name: string; createdAt: number; route: { distance: number; model: string }; }
+interface PlanRecord {
+  id: string;
+  name: string;
+  createdAt: number;
+  route: { distance: number; model: string };
+}
 
 export default async function PlansPage() {
   const names = await listJson(PLANS_DIR);
-  const items = (await Promise.all(names.map((n) => readJson<PlanRecord>(join(PLANS_DIR, n))))).filter(Boolean) as PlanRecord[];
+  const items = (
+    await Promise.all(names.map((n) => readJson<PlanRecord>(join(PLANS_DIR, n))))
+  ).filter(Boolean) as PlanRecord[];
   return (
     <main className="p-8 max-w-3xl">
       <h1 className="text-2xl mb-4">Saved Plans</h1>
@@ -5619,9 +5905,11 @@ export default async function PlansPage() {
       <ul className="divide-y divide-slate-800">
         {items.map((p) => (
           <li key={p.id} className="py-2 flex justify-between">
-            <Link href={`/?plan=${p.id}`} className="text-emerald-400">{p.name}</Link>
+            <Link href={`/?plan=${p.id}`} className="text-emerald-400">
+              {p.name}
+            </Link>
             <span className="text-xs text-slate-500">
-              {p.route.model} · {(p.route.distance/1852).toFixed(0)} NM ·
+              {p.route.model} · {(p.route.distance / 1852).toFixed(0)} NM ·
               {new Date(p.createdAt * 1000).toISOString().slice(0, 10)}
             </span>
           </li>
@@ -5657,6 +5945,7 @@ EOF
 ## Task 38: Settings page
 
 **Files:**
+
 - Create: `apps/router/src/app/api/settings/route.ts`
 - Create: `apps/router/src/app/settings/page.tsx`
 
@@ -5703,6 +5992,7 @@ EOF
 ## Task 39: /grib cache inspector
 
 **Files:**
+
 - Create: `apps/router/src/app/api/grib/list/route.ts`
 - Create: `apps/router/src/app/grib/page.tsx`
 
@@ -5725,7 +6015,8 @@ export async function GET() {
     const modelDir = join(GRIB_CACHE, model);
     for (const run of await readdir(modelDir)) {
       const runDir = join(modelDir, run);
-      let size = 0; let mtime = 0;
+      let size = 0;
+      let mtime = 0;
       for (const bboxDir of await readdir(runDir)) {
         for (const f of await readdir(join(runDir, bboxDir))) {
           const s = await stat(join(runDir, bboxDir, f));
@@ -5764,6 +6055,7 @@ EOF
 ## Task 40: Performance benchmark suite
 
 **Files:**
+
 - Create: `packages/routing/test/perf.bench.ts`
 - Modify: `packages/routing/package.json` — add `bench` script
 
@@ -5808,17 +6100,29 @@ function polar(): PolarTable {
     ],
   };
 }
-const fakeCoast = { level: 'l' as const, polygons: [], index: { search: () => [], load: () => undefined } as never };
+const fakeCoast = {
+  level: 'l' as const,
+  polygons: [],
+  index: { search: () => [], load: () => undefined } as never,
+};
 
 describe('plan benchmarks', () => {
-  bench('3-day passage, 30-min step', () => {
-    plan({
-      start: { lat: 30, lon: -75 }, end: { lat: 35, lon: -65 },
-      departure: 0, wind: field(), polar: polar(), polarId: 't',
-      coastline: fakeCoast,
-      options: { avoidLand: false, maxHours: 72, stepMinutes: 30 },
-    });
-  }, { iterations: 5, time: 5000 });
+  bench(
+    '3-day passage, 30-min step',
+    () => {
+      plan({
+        start: { lat: 30, lon: -75 },
+        end: { lat: 35, lon: -65 },
+        departure: 0,
+        wind: field(),
+        polar: polar(),
+        polarId: 't',
+        coastline: fakeCoast,
+        options: { avoidLand: false, maxHours: 72, stepMinutes: 30 },
+      });
+    },
+    { iterations: 5, time: 5000 },
+  );
 });
 ```
 
@@ -5851,6 +6155,7 @@ EOF
 ## Task 41: Integration test — Bermuda → Newport regression
 
 **Files:**
+
 - Create: `packages/routing/test/integration/bermuda-newport.test.ts`
 - Acquire: a small real GFS slice covering the route + a real coastline slice (already in `packages/coastline/data/i.geojson` after the fetch script)
 
@@ -5875,8 +6180,8 @@ describe('Bermuda → Newport regression', () => {
     const wind = parseGrib2Json(messages, 'GFS', 0);
     const coast = await loadCoastlineFromGeojson(COAST, 'i');
     const r = plan({
-      start: { lat: 32.30, lon: -64.78 }, // Bermuda
-      end: { lat: 41.49, lon: -71.31 },   // Newport
+      start: { lat: 32.3, lon: -64.78 }, // Bermuda
+      end: { lat: 41.49, lon: -71.31 }, // Newport
       departure: 0,
       wind,
       polar: DEFAULT_POLARS,
@@ -5925,12 +6230,14 @@ EOF
 ## Task 42: Final wiring, smoke pass, and README
 
 **Files:**
+
 - Create: `apps/router/README.md`
 - Modify: workspace root `README.md` (if it exists) — add a pointer
 
 - [ ] **Step 1: Write `apps/router/README.md`**
 
 Cover:
+
 - What it does.
 - How to run: `npm install`, `wgrib2` install via Homebrew, fetch coastline (`npm run fetch --workspace @g5000/coastline`), `npm run dev --workspace @g5000/router-app`.
 - Live mode setup (env var `G5000_HOST`).
@@ -5941,6 +6248,7 @@ Cover:
 
 Start g5000 autopilot-server (or skip if you only want offline mode).
 Start the router app.
+
 - Click two points → Plan → see a route.
 - Toggle useCurrents on a Gulf Stream-ish route → see ETA delta.
 - Save the plan → /plans shows it.
@@ -5990,7 +6298,3 @@ EOF
 - Task 8 (`runWgrib2`) parses `wgrib2 -V` output via regex; `wgrib2`'s exact format has stabilized but if a future Homebrew bump changes column delimiters, adjust the regex (not the architecture).
 - Tasks 28, 36, 41 require real network or real fixtures. Tests in Tasks 28 + 36 are mock-based; Task 41 requires a checked-in GRIB fixture and is intentionally an integration test.
 - The g5000 endpoint additions in Tasks 24 + 25 require checking the existing patterns in `packages/web/src/app/api/config/polars/route.ts` — the imports `getConfigStore` / `getBus` are placeholders for the real symbol names in g5000.
-
-
-
-

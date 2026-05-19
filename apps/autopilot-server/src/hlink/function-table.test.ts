@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  hlinkFormat,
-  FUNCTION_TABLE,
-  CHANNEL_TO_FUNCTIONS,
-} from './function-table.js';
+import { hlinkFormat, FUNCTION_TABLE, CHANNEL_TO_FUNCTIONS } from './function-table.js';
 import type { ChannelValue } from '@g5000/core';
 
 const scalar = (v: number, unit?: string): ChannelValue => ({
@@ -72,8 +68,7 @@ describe('hlinkFormat — unmapped functions and wrong kinds', () => {
 describe('FUNCTION_TABLE structure', () => {
   it('contains all required function numbers', () => {
     const expected = [
-      11, 52, 53, 65, 73, 77, 81, 83, 85, 89, 109, 124, 125, 127, 155, 193, 233,
-      235, 285,
+      11, 52, 53, 65, 73, 77, 81, 83, 85, 89, 109, 124, 125, 127, 155, 193, 233, 235, 285,
     ];
     for (const fn of expected) {
       expect(FUNCTION_TABLE.has(fn)).toBe(true);

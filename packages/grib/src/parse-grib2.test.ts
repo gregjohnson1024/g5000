@@ -18,7 +18,7 @@ describe('parseGrib2Json', () => {
     expect(field.lons).toEqual([-75, -74]);
     expect(field.times.length).toBe(2);
     expect(field.u.length).toBe(2);
-    expect(field.u[0]!.length).toBe(2);     // 2 lats
+    expect(field.u[0]!.length).toBe(2); // 2 lats
     expect(field.u[0]![0]!.length).toBe(2); // 2 lons
     expect(field.u[0]![0]![0]).toBeCloseTo(5.0, 6);
     expect(field.v[0]![0]![0]).toBeCloseTo(2.0, 6);

@@ -52,9 +52,7 @@ export function CategoryRecommendation({ wardrobe }: { wardrobe: SailWardrobe })
           <div key={cat} className="border rounded p-2">
             <div className="text-sm font-medium flex items-center gap-2">
               {labels[cat]}
-              {change && (
-                <span className="bg-red-500 text-white text-xs px-1 rounded">change</span>
-              )}
+              {change && <span className="bg-red-500 text-white text-xs px-1 rounded">change</span>}
             </div>
             <div className="text-sm">
               <span className="text-gray-600">active:</span>{' '}

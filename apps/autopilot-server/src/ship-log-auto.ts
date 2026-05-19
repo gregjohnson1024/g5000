@@ -1,10 +1,6 @@
 import type { Bus } from '@g5000/core';
 import { Channels } from '@g5000/core';
-import {
-  type ConfigStore,
-  insertShipLogEntry,
-  lastAutoEntryTsMs,
-} from '@g5000/db';
+import { type ConfigStore, insertShipLogEntry, lastAutoEntryTsMs } from '@g5000/db';
 
 const RAD_TO_DEG = 180 / Math.PI;
 const MS_TO_KN = 1 / 0.514444;
@@ -98,11 +94,11 @@ export function startShipLogAuto(args: {
       kind: 'position',
       lat: pos.lat,
       lon: pos.lon,
-      cogDeg: cog ? ((cog.value * RAD_TO_DEG) % 360 + 360) % 360 : null,
+      cogDeg: cog ? (((cog.value * RAD_TO_DEG) % 360) + 360) % 360 : null,
       sogKn: sog ? sog.value * MS_TO_KN : null,
-      hdgDeg: hdg ? ((hdg.value * RAD_TO_DEG) % 360 + 360) % 360 : null,
+      hdgDeg: hdg ? (((hdg.value * RAD_TO_DEG) % 360) + 360) % 360 : null,
       twsKn: tws ? tws.value * MS_TO_KN : null,
-      twdDeg: twd ? ((twd.value * RAD_TO_DEG) % 360 + 360) % 360 : null,
+      twdDeg: twd ? (((twd.value * RAD_TO_DEG) % 360) + 360) % 360 : null,
       author: null,
       boatId,
     });

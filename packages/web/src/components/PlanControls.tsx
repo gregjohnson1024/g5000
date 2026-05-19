@@ -35,9 +35,7 @@ export function PlanControls(props: {
   // Departure is stored as an absolute UNIX-seconds anchor; the displayed
   // string is derived from anchor + tz, so flipping the toggle preserves
   // the moment in time rather than the wallclock typed.
-  const [departureAnchor, setDepartureAnchor] = useState<number>(
-    () => Date.now() / 1000 + 3600,
-  );
+  const [departureAnchor, setDepartureAnchor] = useState<number>(() => Date.now() / 1000 + 3600);
   const departureInput = toDatetimeLocalInput(departureAnchor, tz);
   const [useCurrents, setUseCurrents] = useState<boolean>(false);
   // Motor mode + cruise speed (knots). Persisted to localStorage so the
@@ -93,7 +91,8 @@ export function PlanControls(props: {
   };
   return (
     <div className="space-y-2">
-      <label className="block text-sm">Departure ({tz === 'utc' ? 'UTC' : 'local'})
+      <label className="block text-sm">
+        Departure ({tz === 'utc' ? 'UTC' : 'local'})
         <input
           type="datetime-local"
           value={departureInput}
@@ -104,7 +103,8 @@ export function PlanControls(props: {
           ≡ {fmtTimestamp(departureAnchor, tz === 'utc' ? 'local' : 'utc')}
         </span>
       </label>
-      <label className="block text-sm">Wind model
+      <label className="block text-sm">
+        Wind model
         <select
           value={model}
           onChange={(e) => setModel(e.target.value as 'GFS' | 'ECMWF')}
@@ -133,7 +133,8 @@ export function PlanControls(props: {
         Motor (ignore polar, use fixed speed)
       </label>
       {motor && (
-        <label className="block text-sm pl-6">Motor speed
+        <label className="block text-sm pl-6">
+          Motor speed
           <div className="flex items-center gap-1">
             <input
               type="number"

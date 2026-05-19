@@ -42,7 +42,7 @@ function bearingDeg(aLat: number, aLon: number, bLat: number, bLon: number): num
   const y = Math.sin(Δλ) * Math.cos(φ2);
   const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
   const θ = Math.atan2(y, x);
-  return (((θ * 180) / Math.PI) + 360) % 360;
+  return ((θ * 180) / Math.PI + 360) % 360;
 }
 
 /**

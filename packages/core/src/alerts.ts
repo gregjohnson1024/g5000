@@ -10,12 +10,7 @@
  * the bridge sends PGN 126984 (Alert Response) onto the bus.
  */
 
-export type AlertType =
-  | 'Emergency Alarm'
-  | 'Alarm'
-  | 'Warning'
-  | 'Caution'
-  | 'unknown';
+export type AlertType = 'Emergency Alarm' | 'Alarm' | 'Warning' | 'Caution' | 'unknown';
 
 export type AlertState =
   | 'Disabled'

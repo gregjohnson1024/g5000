@@ -39,7 +39,7 @@ describe('plan (core)', () => {
   it('reaches a downwind destination in uniform wind', () => {
     const route = plan({
       start: { lat: 30, lon: -75 },
-      end: { lat: 30, lon: -65 },     // 600 km east; wind blows east → broad reach
+      end: { lat: 30, lon: -65 }, // 600 km east; wind blows east → broad reach
       departure: 0,
       wind: uniformWind(),
       polar: simplePolar(),

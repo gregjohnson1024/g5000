@@ -171,10 +171,7 @@ export default function SourcesPage() {
 
   const addRule = (channelPattern: string): void => {
     if (!channelPattern) return;
-    setDraft((prev) => [
-      ...prev,
-      { channelPattern, sources: [], freshnessSeconds: 2 },
-    ]);
+    setDraft((prev) => [...prev, { channelPattern, sources: [], freshnessSeconds: 2 }]);
   };
 
   const deleteRule = (idx: number): void => {
@@ -187,9 +184,7 @@ export default function SourcesPage() {
 
   const setRuleFreshness = (idx: number, freshness: number): void => {
     const clamped = Math.max(MIN_FRESHNESS, Math.min(MAX_FRESHNESS, freshness));
-    setDraft((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, freshnessSeconds: clamped } : r)),
-    );
+    setDraft((prev) => prev.map((r, i) => (i === idx ? { ...r, freshnessSeconds: clamped } : r)));
   };
 
   const addSource = (idx: number, source: string): void => {
@@ -257,7 +252,13 @@ export default function SourcesPage() {
         throw new Error(`save failed: ${res.status} ${t}`);
       }
       setDraft(next);
-      setRules(next.map((r) => ({ ...r, sources: [...r.sources], blocked: r.blocked ? [...r.blocked] : undefined })));
+      setRules(
+        next.map((r) => ({
+          ...r,
+          sources: [...r.sources],
+          blocked: r.blocked ? [...r.blocked] : undefined,
+        })),
+      );
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
     } catch (e) {
@@ -281,7 +282,11 @@ export default function SourcesPage() {
         const others = r.sources.filter((s) => s !== source);
         // Promoting unblocks too — can't be primary and blocked.
         const blocked = (r.blocked ?? []).filter((s) => s !== source);
-        return { ...r, sources: [source, ...others], ...(blocked.length ? { blocked } : { blocked: undefined }) };
+        return {
+          ...r,
+          sources: [source, ...others],
+          ...(blocked.length ? { blocked } : { blocked: undefined }),
+        };
       });
     } else {
       next = [{ channelPattern: channel, sources: [source], freshnessSeconds: 2 }, ...draft];
@@ -418,9 +423,7 @@ export default function SourcesPage() {
                                 title={p.source}
                               >
                                 {friendlySourceLabel(p.source)}
-                                {devName && (
-                                  <span className="text-slate-500"> · {devName}</span>
-                                )}
+                                {devName && <span className="text-slate-500"> · {devName}</span>}
                                 {isPrimary && (
                                   <span className="ml-1 text-[10px] uppercase text-amber-500">
                                     primary
@@ -535,7 +538,9 @@ export default function SourcesPage() {
         {rules === null && !err && <p className="text-slate-400 text-sm">Loading…</p>}
 
         {draft.length === 0 && rules !== null && (
-          <p className="text-sm text-slate-500">No rules configured. Use the table above to add one.</p>
+          <p className="text-sm text-slate-500">
+            No rules configured. Use the table above to add one.
+          </p>
         )}
 
         <div className="space-y-3">
@@ -592,7 +597,10 @@ export default function SourcesPage() {
                   // For exact patterns it's a single lookup; for trailing-`*`
                   // patterns we pick the first match.
                   for (const e of observed) {
-                    if (s === e.source || (s.endsWith('*') && e.source.startsWith(s.slice(0, -1)))) {
+                    if (
+                      s === e.source ||
+                      (s.endsWith('*') && e.source.startsWith(s.slice(0, -1)))
+                    ) {
                       return { value: e.lastValue, ageMs: e.ageMs };
                     }
                   }
@@ -674,7 +682,14 @@ interface SourceListProps {
   lookupDevice?: (source: string) => string | null;
 }
 
-function SourceList({ sources, onAdd, onRemove, onMove, lookupValue, lookupDevice }: SourceListProps) {
+function SourceList({
+  sources,
+  onAdd,
+  onRemove,
+  onMove,
+  lookupValue,
+  lookupDevice,
+}: SourceListProps) {
   const [newSource, setNewSource] = useState('');
   return (
     <div className="space-y-1">
@@ -685,42 +700,45 @@ function SourceList({ sources, onAdd, onRemove, onMove, lookupValue, lookupDevic
         const live = lookupValue?.(s) ?? null;
         const dev = lookupDevice?.(s) ?? null;
         return (
-        <div key={s + j} className="grid grid-cols-[1.25rem_minmax(0,1fr)_5rem_4rem_auto_auto_auto] gap-x-2 items-baseline text-sm">
-          <span className="text-slate-500 text-right">{j + 1}.</span>
-          <span className="text-slate-300" title={s}>
-            {friendlySourceLabel(s)}
-            {dev && <span className="text-slate-500"> · {dev}</span>}
-          </span>
-          <span className="text-right text-slate-200 font-mono text-xs">
-            {live ? formatChannelValue(live.value) : <span className="text-slate-600">—</span>}
-          </span>
-          <span className="text-right text-slate-500 font-mono text-xs">
-            {live ? `${live.ageMs} ms` : ''}
-          </span>
-          <button
-            onClick={() => onMove(j, -1)}
-            disabled={j === 0}
-            className="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 rounded disabled:opacity-30"
-            title="Move up (higher priority)"
+          <div
+            key={s + j}
+            className="grid grid-cols-[1.25rem_minmax(0,1fr)_5rem_4rem_auto_auto_auto] gap-x-2 items-baseline text-sm"
           >
-            ↑
-          </button>
-          <button
-            onClick={() => onMove(j, 1)}
-            disabled={j === sources.length - 1}
-            className="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 rounded disabled:opacity-30"
-            title="Move down"
-          >
-            ↓
-          </button>
-          <button
-            onClick={() => onRemove(j)}
-            className="px-2 py-0.5 text-xs bg-red-900/60 hover:bg-red-800 text-red-100 rounded"
-            title="Remove"
-          >
-            ×
-          </button>
-        </div>
+            <span className="text-slate-500 text-right">{j + 1}.</span>
+            <span className="text-slate-300" title={s}>
+              {friendlySourceLabel(s)}
+              {dev && <span className="text-slate-500"> · {dev}</span>}
+            </span>
+            <span className="text-right text-slate-200 font-mono text-xs">
+              {live ? formatChannelValue(live.value) : <span className="text-slate-600">—</span>}
+            </span>
+            <span className="text-right text-slate-500 font-mono text-xs">
+              {live ? `${live.ageMs} ms` : ''}
+            </span>
+            <button
+              onClick={() => onMove(j, -1)}
+              disabled={j === 0}
+              className="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 rounded disabled:opacity-30"
+              title="Move up (higher priority)"
+            >
+              ↑
+            </button>
+            <button
+              onClick={() => onMove(j, 1)}
+              disabled={j === sources.length - 1}
+              className="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 rounded disabled:opacity-30"
+              title="Move down"
+            >
+              ↓
+            </button>
+            <button
+              onClick={() => onRemove(j)}
+              className="px-2 py-0.5 text-xs bg-red-900/60 hover:bg-red-800 text-red-100 rounded"
+              title="Remove"
+            >
+              ×
+            </button>
+          </div>
         );
       })}
       <div className="flex items-center gap-2 pt-1">

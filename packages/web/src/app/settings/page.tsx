@@ -183,10 +183,7 @@ export default function SettingsPage() {
     };
   }, []);
 
-  const onApplySocketCan = async (
-    enabled: boolean,
-    iface: string,
-  ): Promise<void> => {
+  const onApplySocketCan = async (enabled: boolean, iface: string): Promise<void> => {
     setSocketCanBusy(true);
     setSocketCanError(undefined);
     try {
@@ -307,12 +304,10 @@ export default function SettingsPage() {
       >
         <legend className="px-2 text-sm text-slate-300">Source mode</legend>
         <p className="text-[11px] text-slate-500">
-          Switches the data source feeding the bus and pipelines.{' '}
-          <strong>Live</strong> ingests from the real NMEA hardware
-          (NGT-1 / YDWG / 0183). <strong>Demo</strong> swaps in a synthetic
-          injector — useful on the dock or for UI work without a boat.{' '}
-          <strong>Replay</strong> mode (not switchable here) is started via the
-          Sessions page.
+          Switches the data source feeding the bus and pipelines. <strong>Live</strong> ingests from
+          the real NMEA hardware (NGT-1 / YDWG / 0183). <strong>Demo</strong> swaps in a synthetic
+          injector — useful on the dock or for UI work without a boat. <strong>Replay</strong> mode
+          (not switchable here) is started via the Sessions page.
         </p>
         <div className="flex items-center gap-4 flex-wrap text-sm">
           <label className="flex items-center gap-2">
@@ -342,20 +337,15 @@ export default function SettingsPage() {
               replay · {sourceMode.sessionId ?? 'unknown'} · {sourceMode.phase ?? '—'}
             </span>
           )}
-          {sourceModeBusy && (
-            <span className="text-slate-500 text-xs">Switching…</span>
-          )}
+          {sourceModeBusy && <span className="text-slate-500 text-xs">Switching…</span>}
         </div>
         {sourceMode?.mode === 'demo' && (
           <div className="text-amber-300 text-xs">
-            ⚠ Demo data is synthetic — anything plotted on /chart or /helm is
-            fake. Switch back to <strong>Live</strong> before relying on
-            navigation data.
+            ⚠ Demo data is synthetic — anything plotted on /chart or /helm is fake. Switch back to{' '}
+            <strong>Live</strong> before relying on navigation data.
           </div>
         )}
-        {sourceModeError && (
-          <div className="text-rose-400 text-xs">{sourceModeError}</div>
-        )}
+        {sourceModeError && <div className="text-rose-400 text-xs">{sourceModeError}</div>}
       </fieldset>
 
       <fieldset
@@ -367,14 +357,11 @@ export default function SettingsPage() {
               : 'border-slate-700'
         }`}
       >
-        <legend className="px-2 text-sm text-slate-300">
-          Live ingest — SocketCAN (PiCAN-M)
-        </legend>
+        <legend className="px-2 text-sm text-slate-300">Live ingest — SocketCAN (PiCAN-M)</legend>
         <p className="text-[11px] text-slate-500">
-          Reads N2K frames directly from a Linux SocketCAN interface (e.g. the
-          PiCAN-M HAT on the boat Pi). Runs <em>alongside</em> YDWG-02 and
-          NGT-1 — the bridge dedupes by source address + PGN, so toggling
-          this on while YDWG stays connected is safe for verification.
+          Reads N2K frames directly from a Linux SocketCAN interface (e.g. the PiCAN-M HAT on the
+          boat Pi). Runs <em>alongside</em> YDWG-02 and NGT-1 — the bridge dedupes by source address
+          + PGN, so toggling this on while YDWG stays connected is safe for verification.
         </p>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -386,9 +373,7 @@ export default function SettingsPage() {
             }
           />
           <span>Enable SocketCAN ingest</span>
-          {socketCanBusy && (
-            <span className="text-xs text-slate-500">Applying…</span>
-          )}
+          {socketCanBusy && <span className="text-xs text-slate-500">Applying…</span>}
           {!socketCanBusy && socketCanEnabled && socketCanRunning && (
             <span className="text-xs text-sky-300 font-mono">running</span>
           )}
@@ -424,21 +409,18 @@ export default function SettingsPage() {
           </span>
         </label>
         <p className="text-[11px] text-slate-500">
-          Takes effect immediately — the driver is added to or removed from the
-          live bridge via <code>/api/socketcan</code> without a service restart.
-          Persisted to <code>~/.g5000-router/settings.json</code> so it also
-          survives the next reboot. Requires <code>socketcan</code> npm package
-          on the Pi and the <code>mcp2515-can0</code> dt-overlay loaded with
-          the interface up at 250 kbit/s.
+          Takes effect immediately — the driver is added to or removed from the live bridge via{' '}
+          <code>/api/socketcan</code> without a service restart. Persisted to{' '}
+          <code>~/.g5000-router/settings.json</code> so it also survives the next reboot. Requires{' '}
+          <code>socketcan</code> npm package on the Pi and the <code>mcp2515-can0</code> dt-overlay
+          loaded with the interface up at 250 kbit/s.
         </p>
-        {socketCanError && (
-          <div className="text-rose-400 text-xs">{socketCanError}</div>
-        )}
+        {socketCanError && <div className="text-rose-400 text-xs">{socketCanError}</div>}
       </fieldset>
 
       <p className="text-xs text-slate-400">
-        The fields below are persisted to <code>~/.g5000-router/settings.json</code>.
-        Leave a field blank to fall back to the env-derived default shown below it.
+        The fields below are persisted to <code>~/.g5000-router/settings.json</code>. Leave a field
+        blank to fall back to the env-derived default shown below it.
       </p>
       {loading ? (
         <div className="text-slate-400 text-sm">Loading…</div>
@@ -484,15 +466,12 @@ export default function SettingsPage() {
             </span>
           </label>
           <fieldset className="border border-slate-700 rounded p-3 space-y-2">
-            <legend className="px-2 text-sm text-slate-300">
-              Forecast refresh ROI
-            </legend>
+            <legend className="px-2 text-sm text-slate-300">Forecast refresh ROI</legend>
             <p className="text-[10px] text-slate-500 mb-2">
-              Bounding box for the periodic forecast refresh on the Pi (every 3 h
-              via g5000-forecast-refresh.timer). Leave blank to use default
-              ({DEFAULT_FORECAST_BBOX.latMin}–{DEFAULT_FORECAST_BBOX.latMax}°N,{' '}
-              {Math.abs(DEFAULT_FORECAST_BBOX.lonMax)}–
-              {Math.abs(DEFAULT_FORECAST_BBOX.lonMin)}°W).
+              Bounding box for the periodic forecast refresh on the Pi (every 3 h via
+              g5000-forecast-refresh.timer). Leave blank to use default (
+              {DEFAULT_FORECAST_BBOX.latMin}–{DEFAULT_FORECAST_BBOX.latMax}°N,{' '}
+              {Math.abs(DEFAULT_FORECAST_BBOX.lonMax)}–{Math.abs(DEFAULT_FORECAST_BBOX.lonMin)}°W).
             </p>
             <div className="grid grid-cols-4 gap-2">
               <label className="block text-xs">

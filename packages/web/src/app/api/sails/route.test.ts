@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import {
-  ConfigStore,
-  setSharedConfigStore,
-  _resetSharedConfigStoreForTests,
-} from '@g5000/db';
+import { ConfigStore, setSharedConfigStore, _resetSharedConfigStoreForTests } from '@g5000/db';
 import { GET, PUT } from './route.js';
 
 let store: ConfigStore;

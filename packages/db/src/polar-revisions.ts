@@ -72,7 +72,9 @@ interface RevisionRow {
 }
 
 function rowToRevision(row: RevisionRow): PolarRevision {
-  const lineageMeta = row.lineageMeta ? (JSON.parse(row.lineageMeta) as { source?: string; notes?: string }) : {};
+  const lineageMeta = row.lineageMeta
+    ? (JSON.parse(row.lineageMeta) as { source?: string; notes?: string })
+    : {};
   return {
     id: row.id,
     boatId: row.boatId,
@@ -112,7 +114,11 @@ export function insertRevision(db: BetterSQLite3Database, rev: PolarRevision): v
 }
 
 export function getRevision(db: BetterSQLite3Database, id: string): PolarRevision | undefined {
-  const rows = db.select().from(polarRevisions).where(eq(polarRevisions.id, id)).all() as RevisionRow[];
+  const rows = db
+    .select()
+    .from(polarRevisions)
+    .where(eq(polarRevisions.id, id))
+    .all() as RevisionRow[];
   return rows[0] ? rowToRevision(rows[0]) : undefined;
 }
 
@@ -125,10 +131,13 @@ export interface ListFilter {
 export function listRevisions(db: BetterSQLite3Database, filter: ListFilter = {}): PolarRevision[] {
   const conds = [];
   if (filter.boatId !== undefined) conds.push(eq(polarRevisions.boatId, filter.boatId));
-  if (filter.sailConfigId !== undefined) conds.push(eq(polarRevisions.sailConfigId, filter.sailConfigId));
+  if (filter.sailConfigId !== undefined)
+    conds.push(eq(polarRevisions.sailConfigId, filter.sailConfigId));
   if (filter.mode !== undefined) conds.push(eq(polarRevisions.mode, filter.mode));
   const where = conds.length === 0 ? undefined : conds.length === 1 ? conds[0] : and(...conds);
   const q = db.select().from(polarRevisions);
-  const rows = (where ? q.where(where) : q).orderBy(desc(polarRevisions.createdAt)).all() as RevisionRow[];
+  const rows = (where ? q.where(where) : q)
+    .orderBy(desc(polarRevisions.createdAt))
+    .all() as RevisionRow[];
   return rows.map(rowToRevision);
 }

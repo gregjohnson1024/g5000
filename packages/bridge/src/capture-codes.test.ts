@@ -21,12 +21,15 @@ describe('readCaptureCodes', () => {
 
   it('parses a well-formed file', async () => {
     const p = path.join(tmpDir, 'codes.json');
-    await fs.writeFile(p, JSON.stringify({
-      version: 1,
-      captures: {
-        'course_+1': { fields: { Event: 'Change course', Direction: 'Starboard', Angle: 1 } },
-      },
-    }));
+    await fs.writeFile(
+      p,
+      JSON.stringify({
+        version: 1,
+        captures: {
+          'course_+1': { fields: { Event: 'Change course', Direction: 'Starboard', Angle: 1 } },
+        },
+      }),
+    );
     const r = await readCaptureCodes(p);
     expect(r.captures['course_+1']?.fields['Direction']).toBe('Starboard');
   });

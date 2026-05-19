@@ -162,11 +162,7 @@ export function createDamper(): DampFn {
 }
 
 /** Initialize state for a channel from its current sample. */
-function initState(
-  states: Map<string, ChannelState>,
-  sample: Sample,
-  isAngle: boolean,
-): void {
+function initState(states: Map<string, ChannelState>, sample: Sample, isAngle: boolean): void {
   if (sample.value.kind !== 'scalar') return; // unreachable; guarded by caller
   const v = sample.value.value;
   if (isAngle) {

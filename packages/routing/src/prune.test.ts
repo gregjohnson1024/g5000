@@ -20,9 +20,9 @@ function mk(lat: number, lon: number, distFromStart: number): FrontierNode {
 describe('pruneByBearingBucket', () => {
   it('keeps only the furthest node per bearing bucket', () => {
     // Three nodes in roughly the same bearing-from-start; only the farthest stays.
-    const a = mk(31, -75, 100_000);  // due north of start
-    const b = mk(32, -75, 200_000);  // also due north, further
-    const c = mk(30, -74, 80_000);   // due east — different bucket
+    const a = mk(31, -75, 100_000); // due north of start
+    const b = mk(32, -75, 200_000); // also due north, further
+    const c = mk(30, -74, 80_000); // due east — different bucket
     const out = pruneByBearingBucket([a, b, c], START, 2);
     expect(out.length).toBe(2);
     expect(out).toContain(b);

@@ -1,6 +1,4 @@
-export type {
-  LatLon, RouteLeg, Route, PlanOptions, PlanInput,
-} from './types.js';
+export type { LatLon, RouteLeg, Route, PlanOptions, PlanInput } from './types.js';
 export {
   greatCircleBearing,
   greatCircleDistance,
