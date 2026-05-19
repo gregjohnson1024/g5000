@@ -20,7 +20,7 @@ import { WindOverlay, type WindGrid, type WindModel } from '../../components/Win
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
-import { SeamarkLayer } from '../../components/SeamarkLayer';
+import { EncLayer } from '../../components/EncLayer';
 import { CogExtension } from '../../components/CogExtension';
 import { LayersControl, type LayersState } from './LayersControl';
 import { TzToggle } from '../../components/TzToggle';
@@ -344,17 +344,18 @@ function ChartPageInner() {
     }
   }, [route, restored]);
 
-  // Layer visibility — which chart overlays are currently on. Seamarks
-  // default on so the chart shows navigation marks on first visit.
+  // Layer visibility — only the NOAA chart toggle in v1. Default off
+  // so first-time visitors see the OSM basemap. Persists to
+  // localStorage so the choice survives reloads.
   const [layers, setLayers] = useState<LayersState>(() => {
-    if (typeof window === 'undefined') return { seamarks: true };
+    if (typeof window === 'undefined') return { enc: false };
     try {
       const raw = window.localStorage.getItem('chart:layers');
-      if (!raw) return { seamarks: true };
+      if (!raw) return { enc: false };
       const parsed = JSON.parse(raw) as Partial<LayersState>;
-      return { seamarks: parsed.seamarks ?? true };
+      return { enc: parsed.enc ?? false };
     } catch {
-      return { seamarks: true };
+      return { enc: false };
     }
   });
   useEffect(() => {
@@ -550,7 +551,7 @@ function ChartPageInner() {
         />
         {/* <LaylinesLayer map={mapInstance} />  disabled — not currently useful */}
         <StartLineLayer map={mapInstance} />
-        <SeamarkLayer map={mapInstance} visible={layers.seamarks} />
+        <EncLayer map={mapInstance} visible={layers.enc} />
         <LayersControl
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
