@@ -4,6 +4,7 @@ import { RaceTimer } from './RaceTimer';
 import { RaceAudible } from './RaceAudible';
 import { LinePingPanel } from './LinePingPanel';
 import { ActiveMarkSelector } from './ActiveMarkSelector';
+import { RaceSettings } from './RaceSettings';
 import { WindShiftPlot } from '../../components/WindShiftPlot';
 
 export default function RacePage(): React.ReactElement {
@@ -21,6 +22,9 @@ export default function RacePage(): React.ReactElement {
         <ActiveMarkSelector />
         <div className="md:col-span-2">
           <WindShiftPlot />
+        </div>
+        <div className="md:col-span-2">
+          <RaceSettings />
         </div>
       </div>
     </main>
