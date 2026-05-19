@@ -1,0 +1,85 @@
+name: Deploy to Pi
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # manual trigger from the Actions tab
+
+# Only one deploy at a time. Newer pushes wait for older ones to
+# finish; we don't cancel mid-flight (a half-built dist on the Pi
+# is worse than waiting an extra minute).
+concurrency:
+  group: deploy-pi
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: pull + rebuild + restart
+    # The self-hosted runner lives on the Pi itself (registered as a
+    # systemd service). The runner polls GitHub for jobs; no inbound
+    # connection to the Pi is needed. See docs/ops/deploy-runner.md
+    # for the registration steps if the runner needs to be re-installed.
+    runs-on: [self-hosted, sula-pi]
+
+    # Path on the Pi where the production checkout lives. The runner
+    # workspace defaults to a per-job dir under _work/, but we want
+    # to run against the real autopilot checkout that the systemd
+    # service points at, so we cd in explicitly.
+    env:
+      AUTOPILOT_DIR: /home/greg/autopilot
+
+    steps:
+      - name: Show what we're deploying
+        run: |
+          echo "Triggered by: ${{ github.event_name }}"
+          echo "Commit:       ${{ github.sha }}"
+          echo "Message:      ${{ github.event.head_commit.message }}"
+
+      - name: Pull main
+        working-directory: ${{ env.AUTOPILOT_DIR }}
+        run: |
+          git fetch origin main
+          git pull --ff-only origin main
+          git log -1 --oneline
+
+      - name: Install deps if package-lock changed
+        working-directory: ${{ env.AUTOPILOT_DIR }}
+        run: |
+          # `npm ci` is the right thing here but ~3-4× slower than
+          # incremental `npm install` and we don't ship to other
+          # machines from this clone. Use install + lockfile check.
+          if git diff --quiet HEAD@{1} HEAD -- package-lock.json; then
+            echo "package-lock unchanged — skipping install"
+          else
+            echo "package-lock changed — running npm install"
+            npm install
+          fi
+
+      - name: Build composite refs
+        working-directory: ${{ env.AUTOPILOT_DIR }}
+        run: |
+          # CLAUDE.md §Deployment lists this exact order. Don't reorder
+          # without reading the "stale-dist gotcha" callout there.
+          npx tsc -b packages/core packages/db packages/grib packages/compute packages/bridge packages/routing packages/coastline
+
+      - name: Build autopilot-server
+        working-directory: ${{ env.AUTOPILOT_DIR }}/apps/autopilot-server
+        run: npm run build
+
+      - name: Build web (next build)
+        working-directory: ${{ env.AUTOPILOT_DIR }}/packages/web
+        run: npm run build
+
+      - name: Restart service
+        run: sudo systemctl restart g5000-autopilot
+
+      - name: Verify service is active
+        run: |
+          sleep 4
+          systemctl is-active --quiet g5000-autopilot
+          echo "service active"
+          # Surface the last few startup log lines so failed boots
+          # show up in the GitHub Actions log rather than only in
+          # journalctl on the Pi.
+          journalctl -u g5000-autopilot --since "30 seconds ago" --no-pager | tail -15
