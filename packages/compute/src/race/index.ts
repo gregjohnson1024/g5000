@@ -51,24 +51,15 @@ export function startRaceComputePipeline(
   // Polar targets predicate self-manages its subscriptions.
   const polarTargets = startPolarTargetsPredicate(bus, polarRef);
 
-  // Wind-shift detector (consumed by the wind-shift subscriber below).
-  let detector = createWindShiftDetector({
+  // Wind-shift detector. Threshold is read via getter on every update,
+  // so settings PUTs apply to the next sample without recreating the
+  // detector — preserving the 5-min rolling baseline window.
+  const detector = createWindShiftDetector({
     baselineWindowMs: 300_000,
     currentWindowMs: 30_000,
-    thresholdRad: raceState.get().settings.shiftThresholdDeg * DEG,
+    getThresholdRad: () => raceState.get().settings.shiftThresholdDeg * DEG,
     persistenceMs: 60_000,
   });
-  // Reconfigure detector on settings change.
-  unsubs.push(
-    raceState.subscribe((cfg) => {
-      detector = createWindShiftDetector({
-        baselineWindowMs: 300_000,
-        currentWindowMs: 30_000,
-        thresholdRad: cfg.settings.shiftThresholdDeg * DEG,
-        persistenceMs: 60_000,
-      });
-    }),
-  );
 
   // --- Input subscriptions (cache latest, recompute derived) ---
   unsubs.push(
