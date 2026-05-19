@@ -548,7 +548,7 @@ function ChartPageInner() {
             }
           }}
         />
-        <LaylinesLayer map={mapInstance} />
+        {/* <LaylinesLayer map={mapInstance} />  disabled — not currently useful */}
         <StartLineLayer map={mapInstance} />
         <SeamarkLayer map={mapInstance} visible={layers.seamarks} />
         <LayersControl
