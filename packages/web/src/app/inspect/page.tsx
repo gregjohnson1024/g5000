@@ -22,8 +22,10 @@ function formatValue(s: JsonSafeSample): string {
       return `${s.value.value.lat.toFixed(5)}, ${s.value.value.lon.toFixed(5)}`;
     case 'enum':
       return s.value.value;
-    case 'sail_recommendation':
-      return `rec=${s.value.recommendedConfigId ?? '-'} active=${s.value.activeConfigId} cell=${s.value.cellTwsIdx},${s.value.cellTwaIdx}`;
+    case 'sail_recommendation': {
+      const v = s.value;
+      return `cell (${v.cellTwsKn} kn, ${v.cellTwaDeg}°) — H:${v.valid.headsail.join('/') || '—'} M:${v.valid.main.join('/') || '—'} D:${v.valid.downwind.join('/') || '—'}`;
+    }
   }
 }
 
