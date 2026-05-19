@@ -89,7 +89,11 @@ export function RaceSettings(): React.ReactElement {
       >
         <span className="text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2">
           Settings
-          {modified && <span className="text-amber-400" title="unsaved changes">●</span>}
+          {modified && (
+            <span className="text-amber-400" title="unsaved changes">
+              ●
+            </span>
+          )}
         </span>
         <span className="text-slate-500 font-mono text-sm">{open ? '▾' : '▸'}</span>
       </button>
@@ -124,8 +128,7 @@ export function RaceSettings(): React.ReactElement {
             ))}
             <label className="flex flex-col gap-1 text-sm text-slate-300">
               <span className="text-xs text-slate-400">
-                Integrate current in laylines{' '}
-                <span className="text-slate-500">(default on)</span>
+                Integrate current in laylines <span className="text-slate-500">(default on)</span>
               </span>
               <div className="flex items-center gap-2 pt-1">
                 <input

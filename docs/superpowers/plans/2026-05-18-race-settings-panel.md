@@ -4,7 +4,7 @@
 
 **Goal:** Expose the four `RaceSettings` knobs (`shiftThresholdDeg`, `ocsLookAheadSec`, `laylineDistanceNm`, `integrateCurrent`) through a collapsible panel on `/race`, with explicit-Save UX. Refactor the wind-shift detector so changing the threshold mid-race no longer wipes its 5-min baseline window.
 
-**Architecture:** Backend is already wired — `PUT /api/race/state { settings: { ... } }` accepts partial updates and `raceState.subscribe(...)` propagates them. The compute pipeline currently *recreates* the wind-shift detector when settings change (`compute/race/index.ts:66-75`), which discards rolling history. This plan replaces that with a `getThresholdRad: () => number` callback the detector reads per `update()`, eliminating the recreate.
+**Architecture:** Backend is already wired — `PUT /api/race/state { settings: { ... } }` accepts partial updates and `raceState.subscribe(...)` propagates them. The compute pipeline currently _recreates_ the wind-shift detector when settings change (`compute/race/index.ts:66-75`), which discards rolling history. This plan replaces that with a `getThresholdRad: () => number` callback the detector reads per `update()`, eliminating the recreate.
 
 **Tech Stack:** TypeScript (strict, ESM), React 19 client component, Tailwind 4, Vitest.
 
@@ -15,6 +15,7 @@
 ## Task 1: Refactor wind-shift detector to read threshold via getter
 
 **Files:**
+
 - Modify: `packages/compute/src/race/wind-shift.ts`
 - Modify: `packages/compute/src/race/wind-shift.test.ts`
 
@@ -29,6 +30,7 @@ The current `createWindShiftDetector({ thresholdRad, ... })` bakes the threshold
 ## Task 2: Drop the recreate-on-change subscriber in the race pipeline
 
 **Files:**
+
 - Modify: `packages/compute/src/race/index.ts`
 
 The pipeline currently wires `raceState.subscribe((cfg) => { detector = createWindShiftDetector(...); })` to recreate the detector whenever settings change. With Task 1's refactor, that subscriber is no longer needed — the detector reads `raceState.get().settings.shiftThresholdDeg` via the getter each tick.
@@ -41,9 +43,11 @@ The pipeline currently wires `raceState.subscribe((cfg) => { detector = createWi
 ## Task 3: Create the `<RaceSettings>` component
 
 **Files:**
+
 - Create: `packages/web/src/app/race/RaceSettings.tsx`
 
 Collapsible panel with:
+
 - Header row: "Settings" + a `▸`/`▾` chevron, plus a small `●` indicator when there are unsaved changes. Click header to toggle expand. Collapsed by default.
 - Body (when expanded): four labeled inputs in a 1-col stack on mobile, 2-col on md+:
   - **Wind shift threshold** — number input, range 1–30, unit `°`, hint `default 7`.
@@ -63,6 +67,7 @@ Validation: number inputs clamp to their range with `min`/`max` attrs; on Save, 
 ## Task 4: Mount `<RaceSettings>` on `/race`
 
 **Files:**
+
 - Modify: `packages/web/src/app/race/page.tsx`
 
 Insert below `<WindShiftPlot />`, full-width (`md:col-span-2`).
@@ -74,9 +79,11 @@ Insert below `<WindShiftPlot />`, full-width (`md:col-span-2`).
 ## Task 5: Component test for `<RaceSettings>`
 
 **Files:**
+
 - Create: `packages/web/src/app/race/RaceSettings.test.tsx`
 
 Cover:
+
 - Initial render fetches `/api/race/state` and seeds the form with current values.
 - Editing a field marks the panel as modified; Save button enables; Revert button appears.
 - Click Save → PUT with partial settings body that includes only the changed keys (or all keys, your call — verify the actual behavior).
@@ -92,6 +99,7 @@ Use `@testing-library/react` (already a dep) + `vi.fn()` for fetch mocking.
 ## Task 6: Quick smoke test for `<WindShiftPlot>` (issue #18 also flagged)
 
 **Files:**
+
 - Create: `packages/web/src/components/WindShiftPlot.test.tsx`
 
 Mount the component with a stubbed `useSse` that yields a fixed `race.windShift.bias` sample. Assert the placeholder ("waiting for samples…") shows before any sample, and the SVG polyline renders after ≥2 samples arrive.
