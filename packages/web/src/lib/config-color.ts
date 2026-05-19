@@ -7,6 +7,10 @@
  * No schema change — the persisted color field is captured as a future
  * issue. v1: identifiers map deterministically to hues.
  */
+export function colorForId(id: string): string {
+  return getConfigColor(id);
+}
+
 export function getConfigColor(id: string): string {
   let h = 0x811c9dc5; // FNV-1a 32-bit offset basis
   for (let i = 0; i < id.length; i++) {
