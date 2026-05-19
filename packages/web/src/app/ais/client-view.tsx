@@ -13,8 +13,21 @@ const DEFAULT_RANGE_NM = 30;
 /** localStorage key for the user's preferred radar range. Survives tab
  *  navigation and page reloads. */
 const RANGE_STORAGE_KEY = 'ais:rangeNm';
-/** Fixed-length COG extension drawn for own ship and every AIS target. */
-const COG_EXTENSION_NM = 10;
+/**
+ * Time horizon (minutes) used to project each vessel forward along its COG at
+ * its own SOG. Length = SOG × this. Matches standard ARPA radar convention of
+ * a tactical-horizon vector, scaled to sailing speeds: at 10 kn the arrow is
+ * ~5 NM, at 20 kn ~10 NM. Clipped to the visible range so fast targets near
+ * the edge don't run off-canvas.
+ */
+const COG_EXTENSION_MINUTES = 30;
+/**
+ * SOG floor (knots) below which a vessel is treated as stationary: rendered
+ * with a diamond icon and no COG extension. COG is meaningless at very low
+ * speeds (sensor noise dominates the bearing). 0.5 kn is well above the noise
+ * floor and below realistic underway speeds for any AIS-equipped boat.
+ */
+const STATIONARY_THRESHOLD_KN = 0.5;
 /** Targets unseen for this long render in a "stale" style. */
 const STALE_MS = 60_000;
 /** Targets unseen for this long are dropped from the UI (server evicts at
@@ -292,9 +305,13 @@ export function AisClientView() {
   // and full-range marks.
   const ringRadii = [rangeNm * 0.25, rangeNm * 0.5, rangeNm * 0.75].filter((r) => r > 0);
 
+  // Visual threat indication (red triangle, pulse ring, red row text) is
+  // independent of `alarmConfig.enabled` — situational awareness should always
+  // be on. `alarmConfig.enabled` continues to gate the audio klaxon inside
+  // `useThreatAudio`, so turning the alarm OFF silences sound but keeps the
+  // chart visually honest.
   const isThreat = (cpa: CpaResult | null): boolean =>
     !!cpa &&
-    alarmConfig.enabled &&
     cpa.cpaMeters < alarmConfig.cpaMeters &&
     cpa.tcpaSeconds > 0 &&
     cpa.tcpaSeconds < alarmConfig.tcpaSeconds;
@@ -347,7 +364,7 @@ export function AisClientView() {
     }
     return s;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetsWithCpa, alarmConfig.enabled, alarmConfig.cpaMeters, alarmConfig.tcpaSeconds, mutes]);
+  }, [targetsWithCpa, alarmConfig.cpaMeters, alarmConfig.tcpaSeconds, mutes]);
 
   const {
     armed: audioArmed,
@@ -613,14 +630,22 @@ export function AisClientView() {
                 // old to be tactically meaningful).
                 const threat = !stale && isThreat(cpa);
                 const cogDeg = ((target.cog ?? 0) * RAD_TO_DEG) % 360;
-                // Fixed 10 NM COG extension for every target (not SOG-scaled).
-                // Clipped to the current radar range so it doesn't run off-screen.
-                const leaderLen = Math.min(
-                  COG_EXTENSION_NM * NM * metersToPx,
-                  svgRadius - dist + 7,
-                );
-                const triFill = stale ? 'none' : threat ? '#ef4444' : '#94a3b8';
-                const triStroke = stale ? '#64748b' : '#0f172a';
+                // Stationary vessels (under 0.5 kn or no SOG) render with a
+                // diamond icon and no COG leader — COG isn't meaningful at
+                // that speed.
+                const sogKn = (target.sog ?? 0) * MS_TO_KN;
+                const stationary = !Number.isFinite(sogKn) || sogKn < STATIONARY_THRESHOLD_KN;
+                // SOG-proportional leader: SOG (m/s) × horizon (s) → metres,
+                // then scaled to canvas px. Clipped to the visible chart
+                // so fast vessels near the edge don't shoot off-canvas.
+                const leaderLen = stationary
+                  ? 0
+                  : Math.min(
+                      (target.sog ?? 0) * COG_EXTENSION_MINUTES * 60 * metersToPx,
+                      svgRadius - dist + 7,
+                    );
+                const fill = stale ? 'none' : threat ? '#ef4444' : '#94a3b8';
+                const stroke = stale ? '#64748b' : '#0f172a';
                 const leaderStroke = stale ? '#475569' : threat ? '#ef4444' : '#475569';
                 return (
                   <g
@@ -630,26 +655,38 @@ export function AisClientView() {
                     opacity={stale ? 0.55 : 1}
                   >
                     <g transform={`translate(${x}, ${y})`}>
-                      <g transform={`rotate(${cogDeg})`}>
+                      {stationary ? (
+                        // Diamond, not rotated — directionless icon for
+                        // anchored/moored vessels.
                         <polygon
-                          points="0,-14 -8,10 8,10"
-                          fill={triFill}
-                          stroke={triStroke}
+                          points="0,-9 9,0 0,9 -9,0"
+                          fill={fill}
+                          stroke={stroke}
                           strokeWidth={stale ? 1.5 : 1}
                           strokeDasharray={stale ? '3 2' : undefined}
                         />
-                        {leaderLen > 1 && (
-                          <line
-                            x1="0"
-                            y1="-14"
-                            x2="0"
-                            y2={-14 - leaderLen}
-                            stroke={leaderStroke}
-                            strokeWidth="1.5"
-                            strokeDasharray={stale ? '4 3' : undefined}
+                      ) : (
+                        <g transform={`rotate(${cogDeg})`}>
+                          <polygon
+                            points="0,-14 -8,10 8,10"
+                            fill={fill}
+                            stroke={stroke}
+                            strokeWidth={stale ? 1.5 : 1}
+                            strokeDasharray={stale ? '3 2' : undefined}
                           />
-                        )}
-                      </g>
+                          {leaderLen > 1 && (
+                            <line
+                              x1="0"
+                              y1="-14"
+                              x2="0"
+                              y2={-14 - leaderLen}
+                              stroke={leaderStroke}
+                              strokeWidth="1.5"
+                              strokeDasharray={stale ? '4 3' : undefined}
+                            />
+                          )}
+                        </g>
+                      )}
                       {selectedMmsi === target.mmsi && (
                         <circle r="11" fill="none" stroke="#fbbf24" strokeWidth="1.5" />
                       )}
@@ -674,14 +711,33 @@ export function AisClientView() {
                 );
               })}
 
-              {/* Own boat — at center, triangle and 10 NM extension both
-                  rotated by COG so the apparent direction matches every other
-                  vessel on the screen. (HDG is published separately and shown
-                  in the helm view; on the radar we want a consistent COG-
-                  based picture.) */}
+              {/* Own boat — at center. Triangle and SOG-proportional leader
+                  both rotated by COG so the apparent direction matches every
+                  other vessel on the screen. (HDG is published separately and
+                  shown in the helm view; on the radar we want a consistent
+                  COG-based picture.) Under 0.5 kn we render a diamond with no
+                  leader, same convention as AIS targets. */}
               {(() => {
+                const ownSogKn = ownSog * MS_TO_KN;
+                const ownStationary =
+                  !Number.isFinite(ownSogKn) || ownSogKn < STATIONARY_THRESHOLD_KN;
+                if (ownStationary) {
+                  return (
+                    <g transform={`translate(${center}, ${center})`}>
+                      <polygon
+                        points="0,-9 9,0 0,9 -9,0"
+                        fill="#fbbf24"
+                        stroke="#0f172a"
+                        strokeWidth="1"
+                      />
+                    </g>
+                  );
+                }
                 const ownCogDeg = (ownCog * RAD_TO_DEG) % 360;
-                const ownLeaderLen = Math.min(COG_EXTENSION_NM * NM * metersToPx, svgRadius - 14);
+                const ownLeaderLen = Math.min(
+                  ownSog * COG_EXTENSION_MINUTES * 60 * metersToPx,
+                  svgRadius - 14,
+                );
                 return (
                   <g transform={`translate(${center}, ${center}) rotate(${ownCogDeg})`}>
                     {ownLeaderLen > 1 && (
