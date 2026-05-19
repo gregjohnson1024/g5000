@@ -226,6 +226,23 @@ export function AisClientView() {
       /* quota / private mode — silently drop */
     }
   }, [rangeNm]);
+
+  // Sort state for the targets table. Threats always float to the top
+  // regardless of sort selection (safety invariant); within the threat
+  // group and the non-threat group, rows order by `sortKey` in `sortDir`.
+  type SortKey = 'mmsi' | 'name' | 'length' | 'sog' | 'cog' | 'range' | 'cpa' | 'tcpa';
+  const [sortKey, setSortKey] = useState<SortKey>('cpa');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const handleSort = (k: SortKey): void => {
+    if (sortKey === k) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(k);
+      // Numeric columns default to ascending (smallest range/CPA first feels
+      // natural); name defaults to ascending alphabetical. No special case.
+      setSortDir('asc');
+    }
+  };
   // North-up toggle removed at the user's request — page is permanently
   // north-up. The branch below in canvasRotationDeg is now effectively a
   // no-op; left in place in case we want the toggle back.
@@ -861,14 +878,32 @@ export function AisClientView() {
           <table className="w-full text-sm font-mono">
             <thead>
               <tr className="text-slate-400 border-b border-slate-800">
-                <th className="text-left py-1">MMSI</th>
-                <th className="text-left py-1">Name</th>
-                <th className="text-right py-1">LOA</th>
-                <th className="text-right py-1">SOG</th>
-                <th className="text-right py-1">COG</th>
-                <th className="text-right py-1">Range</th>
-                <th className="text-right py-1">CPA</th>
-                <th className="text-right py-1">TCPA</th>
+                {(
+                  [
+                    { k: 'mmsi', label: 'MMSI', align: 'left' },
+                    { k: 'name', label: 'Name', align: 'left' },
+                    { k: 'length', label: 'LOA', align: 'right' },
+                    { k: 'sog', label: 'SOG', align: 'right' },
+                    { k: 'cog', label: 'COG', align: 'right' },
+                    { k: 'range', label: 'Range', align: 'right' },
+                    { k: 'cpa', label: 'CPA', align: 'right' },
+                    { k: 'tcpa', label: 'TCPA', align: 'right' },
+                  ] as { k: SortKey; label: string; align: 'left' | 'right' }[]
+                ).map(({ k, label, align }) => {
+                  const active = sortKey === k;
+                  const arrow = active ? (sortDir === 'asc' ? '▲' : '▼') : '';
+                  return (
+                    <th
+                      key={k}
+                      className={`py-1 ${align === 'left' ? 'text-left' : 'text-right'} cursor-pointer select-none hover:text-slate-200 ${active ? 'text-slate-200' : ''}`}
+                      onClick={() => handleSort(k)}
+                      title={`Sort by ${label}`}
+                    >
+                      {label}
+                      {arrow && <span className="ml-1 text-[10px]">{arrow}</span>}
+                    </th>
+                  );
+                })}
                 <th className="text-right py-1">Mute</th>
               </tr>
             </thead>
@@ -876,11 +911,45 @@ export function AisClientView() {
               {targetsWithCpa
                 .filter(({ cpa }) => cpa && cpa.rangeMeters < rangeNm * NM * 2)
                 .sort((a, b) => {
-                  // Threats first, then by CPA ascending.
-                  const ta = isThreat(a.cpa) ? 0 : 1;
-                  const tb = isThreat(b.cpa) ? 0 : 1;
+                  // Safety invariant: threats always float to the top of the
+                  // list regardless of column-sort choice. Stale-position CPA
+                  // doesn't count as a threat (last fix is too old to act on).
+                  const ta = !a.stale && isThreat(a.cpa) ? 0 : 1;
+                  const tb = !b.stale && isThreat(b.cpa) ? 0 : 1;
                   if (ta !== tb) return ta - tb;
-                  return (a.cpa?.cpaMeters ?? Infinity) - (b.cpa?.cpaMeters ?? Infinity);
+                  // Within the threat / non-threat groups, sort by the
+                  // selected column. Missing values sort to the bottom of
+                  // whichever direction is active so they don't dominate.
+                  const valueOf = (r: typeof a): number | string | null => {
+                    switch (sortKey) {
+                      case 'mmsi':
+                        return r.target.mmsi;
+                      case 'name':
+                        return r.target.name ?? null;
+                      case 'length':
+                        return r.target.length ?? null;
+                      case 'sog':
+                        return r.target.sog ?? null;
+                      case 'cog':
+                        return r.target.cog ?? null;
+                      case 'range':
+                        return r.cpa?.rangeMeters ?? null;
+                      case 'cpa':
+                        return r.cpa?.cpaMeters ?? null;
+                      case 'tcpa':
+                        return r.cpa?.tcpaSeconds ?? null;
+                    }
+                  };
+                  const av = valueOf(a);
+                  const bv = valueOf(b);
+                  if (av === null && bv === null) return 0;
+                  if (av === null) return 1;
+                  if (bv === null) return -1;
+                  const raw =
+                    typeof av === 'string' && typeof bv === 'string'
+                      ? av.localeCompare(bv)
+                      : (av as number) - (bv as number);
+                  return sortDir === 'asc' ? raw : -raw;
                 })
                 .map(({ target, cpa, stale }) => {
                   const threat = !stale && isThreat(cpa);
