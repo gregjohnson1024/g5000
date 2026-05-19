@@ -8,7 +8,7 @@ describe('windShiftDetector', () => {
     const d = createWindShiftDetector({
       baselineWindowMs: 300_000,
       currentWindowMs: 30_000,
-      thresholdRad: 7 * DEG,
+      getThresholdRad: () => 7 * DEG,
       persistenceMs: 60_000,
     });
     // Feed 200 samples at TWD = 180°, spaced 1 s apart
@@ -27,7 +27,7 @@ describe('windShiftDetector', () => {
     const d = createWindShiftDetector({
       baselineWindowMs: 300_000,
       currentWindowMs: 30_000,
-      thresholdRad: 7 * DEG,
+      getThresholdRad: () => 7 * DEG,
       persistenceMs: 60_000,
     });
     // 300 baseline samples at 180°
@@ -46,7 +46,7 @@ describe('windShiftDetector', () => {
     const d = createWindShiftDetector({
       baselineWindowMs: 300_000,
       currentWindowMs: 30_000,
-      thresholdRad: 7 * DEG,
+      getThresholdRad: () => 7 * DEG,
       persistenceMs: 60_000,
     });
     for (let i = 0; i < 300; i++) d.update(180 * DEG, i * 1000);
@@ -64,7 +64,7 @@ describe('windShiftDetector', () => {
     const d = createWindShiftDetector({
       baselineWindowMs: 60_000,
       currentWindowMs: 60_000,
-      thresholdRad: 7 * DEG,
+      getThresholdRad: () => 7 * DEG,
       persistenceMs: 60_000,
     });
     const samples = [359, 1, 0, 358, 2];
@@ -74,5 +74,41 @@ describe('windShiftDetector', () => {
     }
     // Baseline ≈ current here (one window), bias near 0.
     expect(Math.abs(last!)).toBeLessThan(0.05);
+  });
+
+  it('threshold change applies on the next update without recreating the detector', () => {
+    // Mutable threshold the getter closes over — simulates RaceState.subscribe
+    // updating a settings value live. Use a 20-min baseline window so the
+    // baseline median stays anchored at 180° throughout the test (a 5-min
+    // baseline would flip to 195° around the same time persistence fires).
+    let thresholdDeg = 20; // Initially too high for a 15° shift to fire.
+    const d = createWindShiftDetector({
+      baselineWindowMs: 1_200_000,
+      currentWindowMs: 30_000,
+      getThresholdRad: () => thresholdDeg * DEG,
+      persistenceMs: 60_000,
+    });
+    // 300 baseline samples at 180°.
+    for (let i = 0; i < 300; i++) d.update(180 * DEG, i * 1000);
+    // 90 seconds of 15° shift. With threshold=20°, the 15° bias never
+    // exceeds threshold, so no event fires.
+    let event: ReturnType<typeof d.update>['event'] = null;
+    for (let i = 300; i < 390; i++) {
+      const r = d.update(195 * DEG, i * 1000);
+      if (r.event) event = r.event;
+    }
+    expect(event).toBeNull();
+    // Now lower the threshold to 7° via the getter — without recreating
+    // the detector. The very next update should observe that 15° > 7°
+    // and start counting persistence. After 60s of continued shift the
+    // event fires; the baseline window is intact (samples were never
+    // reset by a detector swap).
+    thresholdDeg = 7;
+    let postLowerEvent: ReturnType<typeof d.update>['event'] = null;
+    for (let i = 390; i < 390 + 65; i++) {
+      const r = d.update(195 * DEG, i * 1000);
+      if (r.event) postLowerEvent = r.event;
+    }
+    expect(postLowerEvent).not.toBeNull();
   });
 });

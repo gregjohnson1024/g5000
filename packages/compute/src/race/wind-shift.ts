@@ -1,7 +1,10 @@
 export interface WindShiftConfig {
   baselineWindowMs: number;
   currentWindowMs: number;
-  thresholdRad: number;
+  /** Called per `update()` so the threshold can change at runtime
+   *  without recreating the detector (which would discard the rolling
+   *  baseline window). Return radians. */
+  getThresholdRad: () => number;
   persistenceMs: number;
 }
 
@@ -95,8 +98,11 @@ export function createWindShiftDetector(cfg: WindShiftConfig): WindShiftDetector
         return { biasRad: 0, event: null };
       }
       const bias = circularDiffRad(cMed, bMed);
-      // Persistence tracker
-      if (Math.abs(bias) > cfg.thresholdRad) {
+      // Persistence tracker — threshold is fetched fresh each tick so
+      // changes from /api/race/state PUTs apply without recreating the
+      // detector (preserving the 5-min rolling baseline).
+      const thresholdRad = cfg.getThresholdRad();
+      if (Math.abs(bias) > thresholdRad) {
         if (aboveThresholdSinceMs === null) aboveThresholdSinceMs = tMs;
       } else {
         aboveThresholdSinceMs = null;
