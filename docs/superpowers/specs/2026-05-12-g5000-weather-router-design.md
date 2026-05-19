@@ -12,7 +12,7 @@ The user owns a cruising catamaran. The g5000 monorepo currently produces:
 - A **sail wardrobe** with per-config polars, edited in the helm web UI.
 - Live channels for GPS, true wind, boat speed, etc.
 
-What's missing is the *planning* counterpart: a Mac-side application that
+What's missing is the _planning_ counterpart: a Mac-side application that
 
 1. Fetches weather (wind) and surface-current GRIBs.
 2. Runs an isochrone router against the active boat polar to compute optimal
@@ -33,7 +33,7 @@ helm drives routing decisions ashore or aboard.
   Gulf-Stream-style decision of "with vs against" is itself instructive.
 - Scan a departure window (e.g., "next 7 days, 3-hour steps") and surface the
   best departure as a calendar heat-map.
-- Run live on the boat *and* offline ashore. Live = subscribe to g5000 for
+- Run live on the boat _and_ offline ashore. Live = subscribe to g5000 for
   position + polar; offline = cached polar + manual start.
 
 ### Non-goals (v1)
@@ -64,12 +64,12 @@ This means two Claude sessions can operate concurrently without `npm install`,
 
 ### 3.2 Packages added to g5000
 
-| Package             | Kind     | Depends on                                            | Purpose                                                       |
-|---------------------|----------|-------------------------------------------------------|---------------------------------------------------------------|
-| `packages/grib`     | pure lib | (wraps `wgrib2`)                                      | Fetch & parse GRIB2 wind and current → typed fields           |
-| `packages/coastline`| pure lib | (GSHHG shapefiles)                                    | Point-in-polygon & segment-crosses-land queries               |
-| `packages/routing`  | pure lib | `@g5000/db`, `@g5000/compute`, `@g5000/grib`, `@g5000/coastline` | Isochrone router, pure functions                |
-| `apps/router`       | Next.js  | all of the above                                      | UI + API route handlers                                       |
+| Package              | Kind     | Depends on                                                       | Purpose                                             |
+| -------------------- | -------- | ---------------------------------------------------------------- | --------------------------------------------------- |
+| `packages/grib`      | pure lib | (wraps `wgrib2`)                                                 | Fetch & parse GRIB2 wind and current → typed fields |
+| `packages/coastline` | pure lib | (GSHHG shapefiles)                                               | Point-in-polygon & segment-crosses-land queries     |
+| `packages/routing`   | pure lib | `@g5000/db`, `@g5000/compute`, `@g5000/grib`, `@g5000/coastline` | Isochrone router, pure functions                    |
+| `apps/router`        | Next.js  | all of the above                                                 | UI + API route handlers                             |
 
 ### 3.3 Tiny additions in existing `g5000/packages/web`
 
@@ -144,7 +144,7 @@ Same engine, repeated:
 2. App ensures GRIBs cover the full window.
 3. For each candidate departure `t_d`, run `plan()` → record summary
    `{ eta, mean_tws, max_tws, total_distance, time_above_30kn,
-   time_with_twa<40°, incomplete }`.
+time_with_twa<40°, incomplete }`.
 4. Render as a calendar heat-map: rows = days, columns = hours-of-day, cell
    color = ETA (or roughness, switchable).
 5. Click a cell → drill into that specific route in Flow A's view.
@@ -156,13 +156,13 @@ minute on the user's Mac.
 
 ```ts
 type WindField = {
-  lats: number[];     // degrees, ascending
-  lons: number[];     // degrees, ascending (handles dateline)
-  times: number[];    // unix seconds, ascending
-  u: number[][][];    // [t][lat][lon] m/s east-component
-  v: number[][][];    // [t][lat][lon] m/s north-component
+  lats: number[]; // degrees, ascending
+  lons: number[]; // degrees, ascending (handles dateline)
+  times: number[]; // unix seconds, ascending
+  u: number[][][]; // [t][lat][lon] m/s east-component
+  v: number[][][]; // [t][lat][lon] m/s north-component
   source: 'GFS' | 'ECMWF';
-  runTime: number;    // unix seconds, when the model run was issued
+  runTime: number; // unix seconds, when the model run was issued
 };
 
 type CurrentField = Omit<WindField, 'source'> & { source: 'RTOFS' };
@@ -170,24 +170,24 @@ type CurrentField = Omit<WindField, 'source'> & { source: 'RTOFS' };
 type LatLon = { lat: number; lon: number };
 
 type RouteLeg = {
-  t: number;          // unix seconds at start of leg
+  t: number; // unix seconds at start of leg
   lat: number;
   lon: number;
-  heading: number;    // radians true, water-frame
-  twa: number;        // radians, |twa|
-  tws: number;        // m/s
-  bsp: number;        // m/s, through-water
-  sogGround: number;  // m/s, over-ground (differs from bsp when currents on)
+  heading: number; // radians true, water-frame
+  twa: number; // radians, |twa|
+  tws: number; // m/s
+  bsp: number; // m/s, through-water
+  sogGround: number; // m/s, over-ground (differs from bsp when currents on)
 };
 
 type Route = {
   legs: RouteLeg[];
-  start: number;      // unix seconds
-  end: number;        // unix seconds
-  distance: number;   // meters, integrated along-track over-ground
+  start: number; // unix seconds
+  end: number; // unix seconds
+  distance: number; // meters, integrated along-track over-ground
   model: 'GFS' | 'ECMWF';
   usedCurrents: boolean;
-  polarId: string;    // wardrobe entry used
+  polarId: string; // wardrobe entry used
   incomplete?: boolean;
   reason?: 'exceeded_max_hours' | 'no_wind' | 'land_blocked';
 };
@@ -250,6 +250,7 @@ https://www.soest.hawaii.edu/pwessel/gshhg/ — LGPL, multi-resolution,
 self-consistent. Used by qtVlm, LuckGrib, OpenCPN, GMT.
 
 **Resolution choices:**
+
 - `i` (intermediate, ~1 km, ~30 MB) — routing land-avoidance.
 - `h` (high, ~200 m, ~100 MB) — map display only.
 
@@ -324,6 +325,7 @@ from `@g5000/compute`. Same polar interpolation drives autopilot
 target-BSP and routing decisions — they cannot disagree.
 
 **v2-deferred refinements** (architecturally non-breaking):
+
 - Tack-penalty / heading-continuity bonus in fan ranking.
 - Per-leg sail-config selection from wardrobe (`Route.legs[i].polarId`).
 - Wind shear correction (10 m → masthead via power-law).
@@ -331,6 +333,7 @@ target-BSP and routing decisions — they cannot disagree.
 ### 5.4 `apps/router` (Next.js App Router)
 
 **Pages:**
+
 - `/` — main planner (map left, controls right).
 - `/window` — departure-window picker + heat-map.
 - `/plans` — saved plans list.
@@ -338,6 +341,7 @@ target-BSP and routing decisions — they cannot disagree.
 - `/settings` — g5000 host URL, polar fallback path, `wgrib2` path, cache root.
 
 **API route handlers:**
+
 - `GET /api/live/position` — SSE proxy from g5000.
 - `GET /api/live/polar` — JSON proxy from g5000.
 - `POST /api/grib/fetch` — `{ model, bbox, hours }` → triggers fetch, returns cached info.
@@ -346,12 +350,14 @@ target-BSP and routing decisions — they cannot disagree.
 - `GET/POST /api/plans` and `GET /api/plans/[id]` — local-FS storage.
 
 **Local persistence:** flat JSON files under `~/.g5000-router/`:
+
 ```
 plans/{id}.json
 grib-cache/{model}/{runTime}/{bbox-hash}/*.grb2
 cached-polar.json
 settings.json
 ```
+
 No SQLite in v1; single-user, no concurrent writes.
 
 **Map:** MapLibre GL JS, OSM raster base + OpenSeaMap nautical overlay.
@@ -361,6 +367,7 @@ planning UI). Currents as small arrows when `Show current` is on.
 ### 5.5 g5000 endpoint additions
 
 `packages/web/src/app/api/position/route.ts`:
+
 - Opens SSE.
 - Subscribes to bus channels `gps.position.lat`, `gps.position.lon`,
   `gps.position.sog`, `gps.position.cog`.
@@ -368,6 +375,7 @@ planning UI). Currents as small arrows when `Show current` is on.
   (rate-limited to ~1 Hz).
 
 `packages/web/src/app/api/wardrobe/active/route.ts`:
+
 - JSON GET; reads first value of `configStore.activeWardrobe$`.
 - Returns active `SailConfig` including its full polar.
 
@@ -415,9 +423,11 @@ That is the entire footprint on the autopilot side.
 ### 6.5 Error shape
 
 All API responses on failure:
+
 ```ts
 { ok: false, error: { kind, message, retryable: boolean, ...details } }
 ```
+
 The UI has one error-banner component that switches on `kind`.
 
 ## 7. Testing strategy

@@ -9,7 +9,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = resolve(here, '../test/fixtures/bahamas-l.geojson');
 let c: Coastline;
 
-beforeAll(async () => { c = await loadCoastlineFromGeojson(FIXTURE, 'l'); });
+beforeAll(async () => {
+  c = await loadCoastlineFromGeojson(FIXTURE, 'l');
+});
 
 describe('isOnLand', () => {
   it('detects a point inside the big island', () => {

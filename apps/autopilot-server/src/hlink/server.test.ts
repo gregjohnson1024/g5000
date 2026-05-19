@@ -32,16 +32,11 @@ function makeClient(port: number): Promise<TcpClient> {
             socket.end(() => res());
           }),
         // wait for `predicate(buf)` to be true; returns buf at that point
-        waitFor: async (
-          predicate: (buf: string) => boolean,
-          timeoutMs = 2000,
-        ): Promise<string> => {
+        waitFor: async (predicate: (buf: string) => boolean, timeoutMs = 2000): Promise<string> => {
           const start = Date.now();
           while (!predicate(buf)) {
             if (Date.now() - start > timeoutMs) {
-              throw new Error(
-                `timeout waiting; buf so far = ${JSON.stringify(buf)}`,
-              );
+              throw new Error(`timeout waiting; buf so far = ${JSON.stringify(buf)}`);
             }
             await new Promise<void>((res) => {
               resolveNext = res;

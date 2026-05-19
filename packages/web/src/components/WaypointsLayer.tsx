@@ -28,13 +28,7 @@ const RING_LAYER = 'waypoints-ring';
  * Z-order: dots and rings are maplibre layers so they sit above the
  * `__above-wind__` sentinel — i.e. above wind, on top of the chart.
  */
-export function WaypointsLayer({
-  map,
-  marks,
-}: {
-  map: maplibregl.Map | null;
-  marks: MarkLike[];
-}) {
+export function WaypointsLayer({ map, marks }: { map: maplibregl.Map | null; marks: MarkLike[] }) {
   // Persistent across re-renders so the marks-change effect can update
   // labels without tearing down the layer.
   const labelMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
@@ -122,9 +116,12 @@ export function WaypointsLayer({
         if (!Number.isFinite(m.lat) || !Number.isFinite(m.lon)) continue;
         const key = `${m.lat.toFixed(5)},${m.lon.toFixed(5)}`;
         live.add(key);
-        const label = m.badge === 'S' ? `S — ${m.name ?? ''}`
-          : m.badge === 'E' ? `E — ${m.name ?? ''}`
-          : m.name ?? '';
+        const label =
+          m.badge === 'S'
+            ? `S — ${m.name ?? ''}`
+            : m.badge === 'E'
+              ? `E — ${m.name ?? ''}`
+              : (m.name ?? '');
         if (!label.trim()) continue;
         let mk = labelMarkers.get(key);
         if (!mk) {

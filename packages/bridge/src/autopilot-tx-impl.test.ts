@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetAutopilotTxForTests, getSharedAutopilotTx } from '@g5000/core';
-import {
-  createAutopilotTx,
-  registerAutopilotTxIfEnabled,
-} from './autopilot-tx-impl.js';
+import { createAutopilotTx, registerAutopilotTxIfEnabled } from './autopilot-tx-impl.js';
 import type { WireDriver } from './wire-driver.js';
 
 function fakeDriver(): WireDriver & { txPgnSpy: ReturnType<typeof vi.fn> } {

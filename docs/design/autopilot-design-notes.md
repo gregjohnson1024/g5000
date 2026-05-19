@@ -1,7 +1,7 @@
 # G5000 autopilot design notes
 
 **Status:** Notes, not spec. Captures lessons from H5000 operator experience
-(particularly the *"8 things I wish I'd known about the B&G H5000 autopilot"*
+(particularly the _"8 things I wish I'd known about the B&G H5000 autopilot"_
 post by Tobias Hammar at blur.se) that should shape our Phase 0b/0c design.
 
 Master spec §7 ("N2K & autopilot integration") was written before this
@@ -17,24 +17,24 @@ H5000 has two underlying steering algorithms:
 **Implication for us:** Don't bake in a hidden algorithm and expose a "performance dial" as the user-visible knob. That's how H5000 users end up tuning a parameter that no longer matters at their chosen level. Our Phase 0c should:
 
 - Ship a transparent PID as the only steering algorithm initially. Inputs and gains are inspectable on `/autopilot`.
-- If we later add a model-based mode, expose it as a *separate mode* (e.g. "Adaptive"), not a dial that silently changes the algorithm.
+- If we later add a model-based mode, expose it as a _separate mode_ (e.g. "Adaptive"), not a dial that silently changes the algorithm.
 
 ## 2. "Expert Systems" are target-shifters, not rudder-commanders (with one exception)
 
 The H5000 autopilot has three add-on systems that everyone confuses:
 
-| System | What it actually does |
-|---|---|
-| **Gust Response** | Detects heel-rate spike, **shifts target TWA wider** to bear away pre-emptively |
-| **TWS Response** | Low-passes wind-speed trend; **shifts target TWA** to bias for the average breeze |
-| **Heel Compensation** | Directly applies rudder as a *fast-learning* weather-helm offset (the only one that touches the rudder directly) |
+| System                | What it actually does                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Gust Response**     | Detects heel-rate spike, **shifts target TWA wider** to bear away pre-emptively                                  |
+| **TWS Response**      | Low-passes wind-speed trend; **shifts target TWA** to bias for the average breeze                                |
+| **Heel Compensation** | Directly applies rudder as a _fast-learning_ weather-helm offset (the only one that touches the rudder directly) |
 
 **Implication for us:** Don't lump these into "autopilot tuning". Build them as separate subsystems that each take typed inputs and produce typed outputs:
 
 - Gust/TWS Response → publish a `performance.target.twa.bias` channel that the autopilot reads alongside `performance.target.twaUpwind`/`Downwind`. Pure compute; testable in isolation.
 - Heel Compensation → its own fast-learning weather-helm filter in the autopilot pipeline. Different time constant from AutoTrim.
 
-This also makes the failure mode debuggable. From the blog: *"If the boat bears away too much in gusts, adjust Gust Response gain before Rudder Gain. If it rounds up, check Heel Compensation before the performance level."*
+This also makes the failure mode debuggable. From the blog: _"If the boat bears away too much in gusts, adjust Gust Response gain before Rudder Gain. If it rounds up, check Heel Compensation before the performance level."_
 
 ## 3. Cruising Speed is a PID-scaling constant, not a speed reference
 
@@ -57,13 +57,13 @@ When you press AUTO, H5000 averages your rudder over the last ~30 s and uses tha
 - Show a "steady for 30 s" countdown / ready indicator before AUTO is armed
 - If the user engages anyway, expect 30–60 s of poor steering while AutoTrim re-converges
 
-Real cost from the blog: *"On doublehanded boats transitioning to foredeck work, those 60 seconds of poor steering matter."*
+Real cost from the blog: _"On doublehanded boats transitioning to foredeck work, those 60 seconds of poor steering matter."_
 
 ## 5. AWA vs TWA upwind: mode choice matters by condition
 
 Conventional Auto mode (AWA upwind ≤60° TWA, TWA downwind) breaks in two regimes:
 
-- **Light air (< 8–10 kts true):** AWA fluctuates wildly with every puff/lull. Pilot chases the fluctuations. TWA is more stable; produces smoother steering. The blog says some experienced pilots use TWA upwind *most* of the time for light-air consistency.
+- **Light air (< 8–10 kts true):** AWA fluctuates wildly with every puff/lull. Pilot chases the fluctuations. TWA is more stable; produces smoother steering. The blog says some experienced pilots use TWA upwind _most_ of the time for light-air consistency.
 - **Heavy air (> 18 kts, TWA 55–62°):** TWA prevents pinching in lulls — you want a stable wider target than AWA gives you.
 
 **Implication for us:** Wind mode should be a first-class user choice (Auto / Apparent / True / Polar), not buried in advanced settings. The `/autopilot` page should make the trade-off legible (a short blurb under each option). H5000 has this as a four-way picker; ours should too.
@@ -98,7 +98,7 @@ How to measure: NFU mode, drive full one way, stopwatch swing the other way.
 
 ## 8. Troubleshoot in layers, bottom-up
 
-H5000 users default to twisting Rudder Gain when steering goes wrong. The blog argues most problems are *not* in the steering algorithm — they're below it:
+H5000 users default to twisting Rudder Gain when steering goes wrong. The blog argues most problems are _not_ in the steering algorithm — they're below it:
 
 1. **Drive** — motor, ram, rudder-feedback zero, battery voltage
 2. **Sensors** — paddlewheel fouled? Compass calibrated? Wind trustworthy?
@@ -106,7 +106,7 @@ H5000 users default to twisting Rudder Gain when steering goes wrong. The blog a
 4. **Algorithm** — PID gains (Perf 1) or PS-model (Perf 2–5)
 5. **Expert Systems** — Gust/TWS Response, Heel Compensation interacting badly?
 
-*"A fouled paddlewheel produces the same symptoms as bad PID tuning."*
+_"A fouled paddlewheel produces the same symptoms as bad PID tuning."_
 
 **Implication for us:** Our `/autopilot` page should structure its troubleshooting view this way. We already have most of the underlying observables:
 
@@ -120,13 +120,13 @@ The cheap UX win: a "diagnose" panel on `/autopilot` that walks the layers in or
 
 ## 9. Disable Adapt (H5000 2.0.0.2 firmware-specific gotcha)
 
-The author's claim — *"the single most important setting change you can make"* — is to disable "Adapt" after upgrading to 2.0.0.2. Adapt continuously refines rudder-to-turn-rate understanding and apparently degrades performance under the latest firmware.
+The author's claim — _"the single most important setting change you can make"_ — is to disable "Adapt" after upgrading to 2.0.0.2. Adapt continuously refines rudder-to-turn-rate understanding and apparently degrades performance under the latest firmware.
 
-**Implication for us:** Not a design lesson per se, but a warning: if we ship a "continuously learning" rudder-response feature, we *must* be able to disable it from the UI, *and* we should treat firmware changes that alter its dynamics as breaking changes that require re-validation. Continuous learning is a maintenance liability if it's not transparent.
+**Implication for us:** Not a design lesson per se, but a warning: if we ship a "continuously learning" rudder-response feature, we _must_ be able to disable it from the UI, _and_ we should treat firmware changes that alter its dynamics as breaking changes that require re-validation. Continuous learning is a maintenance liability if it's not transparent.
 
 ## 10. Start minimal, add features one at a time
 
-The author's commissioning advice: Perf 3 / Wind Mode Auto / *everything else disabled*. Then add TWS Response, then Heel Comp, then Gust Response, one at a time, in conditions where you can see the effect.
+The author's commissioning advice: Perf 3 / Wind Mode Auto / _everything else disabled_. Then add TWS Response, then Heel Comp, then Gust Response, one at a time, in conditions where you can see the effect.
 
 **Implication for us:** Defaults matter. Our shipped `/autopilot` config should be:
 
@@ -135,7 +135,7 @@ The author's commissioning advice: Perf 3 / Wind Mode Auto / *everything else di
 - All Expert Systems off
 - Cruising speed at a sane default for the boat's LOA
 
-The user opts into each Expert System individually. The UI should *visibly* show which systems are on (chips? checkboxes with a "default off" indicator). This makes "what did I change last time?" inspectable.
+The user opts into each Expert System individually. The UI should _visibly_ show which systems are on (chips? checkboxes with a "default off" indicator). This makes "what did I change last time?" inspectable.
 
 ---
 

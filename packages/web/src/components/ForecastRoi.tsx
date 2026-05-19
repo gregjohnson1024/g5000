@@ -282,7 +282,9 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
       const j = (await r.json()) as { ok?: boolean; pruned?: number };
       setStatus('idle');
       setStatusText(
-        j.pruned && j.pruned > 0 ? `models refreshed (pruned ${j.pruned} stale)` : 'models refreshed',
+        j.pruned && j.pruned > 0
+          ? `models refreshed (pruned ${j.pruned} stale)`
+          : 'models refreshed',
       );
       // Tell siblings (forecast page badge, etc.) to re-read the manifest.
       if (typeof BroadcastChannel !== 'undefined') {

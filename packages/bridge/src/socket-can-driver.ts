@@ -48,9 +48,7 @@ export interface SocketCanDriverOptions {
  * mcp2515-can0 dt-overlay loaded, and `ip link set can0 up type can
  * bitrate 250000` already done — see CLAUDE.md "PiCAN-M" section.
  */
-export function createSocketCanRawChannelFactory(
-  iface: string,
-): () => SocketCanRawChannel {
+export function createSocketCanRawChannelFactory(iface: string): () => SocketCanRawChannel {
   return () => {
     // The `createRequire`-style dynamic load is intentional: this module
     // must import cleanly on Mac (where `socketcan` isn't installable) so
@@ -99,11 +97,7 @@ export class SocketCanDriver implements WireDriver {
   private errors = 0;
   private healthTimer: ReturnType<typeof setInterval> | null = null;
 
-  private readonly onMessage = (msg: {
-    id: number;
-    ext: boolean;
-    data: Buffer;
-  }): void => {
+  private readonly onMessage = (msg: { id: number; ext: boolean; data: Buffer }): void => {
     // SocketCAN gives us standard-frame messages too if the bus has any;
     // N2K is strictly 29-bit extended, so drop anything else as noise.
     if (!msg.ext) return;

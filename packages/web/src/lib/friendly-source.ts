@@ -52,9 +52,7 @@ const PGN_LABELS: Record<number, string> = {
  * Parse a `n2k:<pgn>@0x<src>` tag into its parts. Returns null for non-N2K
  * tags (e.g. `computed:true_wind`, `demo`).
  */
-export function parseN2kSource(
-  tag: string,
-): { pgn: number; srcHex: string; src: number } | null {
+export function parseN2kSource(tag: string): { pgn: number; srcHex: string; src: number } | null {
   const m = /^n2k:(\d+)@0x([0-9a-fA-F]+)$/.exec(tag);
   if (!m) return null;
   return { pgn: Number(m[1]), srcHex: `0x${m[2]!.toLowerCase()}`, src: parseInt(m[2]!, 16) };

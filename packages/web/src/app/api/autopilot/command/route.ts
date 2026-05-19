@@ -4,8 +4,15 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const VALID_EVENTS: AutopilotCommandName[] = [
-  'standby', 'auto', 'nav', 'wind', 'no_drift',
-  'course_+1', 'course_-1', 'course_+10', 'course_-10',
+  'standby',
+  'auto',
+  'nav',
+  'wind',
+  'no_drift',
+  'course_+1',
+  'course_-1',
+  'course_+10',
+  'course_-10',
 ];
 
 interface Body {
@@ -40,14 +47,23 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (!VALID_EVENTS.includes(body.event)) {
     return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: `invalid event: ${String(body.event)}` } },
+      {
+        ok: false,
+        error: { kind: 'bad_request', message: `invalid event: ${String(body.event)}` },
+      },
       { status: 400 },
     );
   }
   const tx = getSharedAutopilotTx();
   if (!tx) {
     return Response.json(
-      { ok: false, error: { kind: 'unavailable', message: 'AP TX not registered (bridge not booted with G5000_ENABLE_AP_TX=1)' } },
+      {
+        ok: false,
+        error: {
+          kind: 'unavailable',
+          message: 'AP TX not registered (bridge not booted with G5000_ENABLE_AP_TX=1)',
+        },
+      },
       { status: 503 },
     );
   }
@@ -55,8 +71,5 @@ export async function POST(req: Request): Promise<Response> {
   if (r.ok) {
     return Response.json({ ok: true, txMs: r.txMs });
   }
-  return Response.json(
-    { ok: false, error: r.error },
-    { status: 502 },
-  );
+  return Response.json({ ok: false, error: r.error }, { status: 502 });
 }

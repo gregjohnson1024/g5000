@@ -4,7 +4,9 @@ import { DEFAULT_ALARMS_CONFIG, type AlarmsConfig } from '@g5000/db';
 
 describe('/api/alarms/anchor', () => {
   beforeEach(() => {
-    (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }).__g5000_alarms_config_ref__ = {
+    (
+      globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }
+    ).__g5000_alarms_config_ref__ = {
       current: structuredClone(DEFAULT_ALARMS_CONFIG),
     };
   });
@@ -17,7 +19,8 @@ describe('/api/alarms/anchor', () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
 
-    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }).__g5000_alarms_config_ref__!;
+    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } })
+      .__g5000_alarms_config_ref__!;
     expect(ref.current.thresholds.anchor.armed).toBe(true);
     expect(ref.current.thresholds.anchor.point).toEqual({ lat: 32.3, lon: -64.8 });
     expect(ref.current.thresholds.anchor.radiusM).toBe(60);
@@ -25,7 +28,8 @@ describe('/api/alarms/anchor', () => {
   });
 
   it('weigh sets armed=false but preserves point + droppedAt for history', async () => {
-    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } }).__g5000_alarms_config_ref__!;
+    const ref = (globalThis as { __g5000_alarms_config_ref__?: { current: AlarmsConfig } })
+      .__g5000_alarms_config_ref__!;
     ref.current.thresholds.anchor = {
       armed: true,
       point: { lat: 32.3, lon: -64.8 },

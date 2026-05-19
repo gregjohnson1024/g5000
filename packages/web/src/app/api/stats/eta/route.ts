@@ -19,11 +19,7 @@ const DESTINATION = {
  * track on disk). Returns 503 if there is no active track.
  */
 export async function GET(): Promise<Response> {
-  const eta = await computeEta(
-    DESTINATION.lat,
-    DESTINATION.lon,
-    DESTINATION.label,
-  );
+  const eta = await computeEta(DESTINATION.lat, DESTINATION.lon, DESTINATION.label);
   if (!eta) {
     return Response.json(
       { ok: false, error: { kind: 'no_track', message: 'no active track with points' } },

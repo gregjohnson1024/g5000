@@ -12,20 +12,20 @@ Last verified: 2026-05-13 (~16:10 UTC, off Bermuda en route Newport).
 
 Subnet `192.168.1.0/24` · Gateway `192.168.1.1` · DHCP from gateway.
 
-| IP | Name | Known services |
-|---|---|---|
-| `192.168.1.1` | Starlink router | 80/http (web UI, title `Starlink`) |
-| `192.168.1.64` | PredictWind DataHub (mfr Remote Data Sensing LLC) — bridges to boat LAN as `…bd:a0`. Default LAN IP is `10.10.10.1`; this unit has been re-IP'd. | 22/ssh (Dropbear; **no documented user access** per official manual), 53/dns, 80/http → `cgi-bin/luci/` (OpenWrt LuCI, admin/admin), 443/https (cert `O=Remote Data Sensing, LLC`). **Wi-Fi-side has severe packet loss (~90% on SulaStarlink path)**; reliable admin path is IPv6 link-local via eth0. NMEA0183 broadcast on UDP 11101 + TCP 11102 is documented but bound to the AP-side (SulaLocal) interface, not reachable from SulaStarlink or boat-LAN paths. |
-| `192.168.1.100` | Yacht Devices YDWG (NMEA 2000 ↔ Wi-Fi gateway, ESP32-based) | 80/http (web UI, redirects to `/login.html`), **1456/tcp NMEA-0183 transmit-only**, **1457/tcp YD-RAW bidirectional**. Both feeds carry the full N2K bus content (GPS, AIS, wind, heading, pitch/roll, water temp, log). |
-| `192.168.1.129` | Victron Venus OS GX (Wi-Fi side; same MAC as `.14.187` on boat LAN) | 80/http (`GX device login`), 443/https (cert `O=Victron Energy, OU=Venus OS, CN=venus.local`) |
-| `192.168.1.114` | Mac (`en0`) | — |
-| `192.168.1.157` | Greg's iPhone | — |
-| `192.168.1.232` | Pi `sula-bassana` (`wlan0`) | 22/ssh |
+| IP              | Name                                                                                                                                             | Known services                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `192.168.1.1`   | Starlink router                                                                                                                                  | 80/http (web UI, title `Starlink`)                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `192.168.1.64`  | PredictWind DataHub (mfr Remote Data Sensing LLC) — bridges to boat LAN as `…bd:a0`. Default LAN IP is `10.10.10.1`; this unit has been re-IP'd. | 22/ssh (Dropbear; **no documented user access** per official manual), 53/dns, 80/http → `cgi-bin/luci/` (OpenWrt LuCI, admin/admin), 443/https (cert `O=Remote Data Sensing, LLC`). **Wi-Fi-side has severe packet loss (~90% on SulaStarlink path)**; reliable admin path is IPv6 link-local via eth0. NMEA0183 broadcast on UDP 11101 + TCP 11102 is documented but bound to the AP-side (SulaLocal) interface, not reachable from SulaStarlink or boat-LAN paths. |
+| `192.168.1.100` | Yacht Devices YDWG (NMEA 2000 ↔ Wi-Fi gateway, ESP32-based)                                                                                      | 80/http (web UI, redirects to `/login.html`), **1456/tcp NMEA-0183 transmit-only**, **1457/tcp YD-RAW bidirectional**. Both feeds carry the full N2K bus content (GPS, AIS, wind, heading, pitch/roll, water temp, log).                                                                                                                                                                                                                                             |
+| `192.168.1.129` | Victron Venus OS GX (Wi-Fi side; same MAC as `.14.187` on boat LAN)                                                                              | 80/http (`GX device login`), 443/https (cert `O=Victron Energy, OU=Venus OS, CN=venus.local`)                                                                                                                                                                                                                                                                                                                                                                        |
+| `192.168.1.114` | Mac (`en0`)                                                                                                                                      | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `192.168.1.157` | Greg's iPhone                                                                                                                                    | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `192.168.1.232` | Pi `sula-bassana` (`wlan0`)                                                                                                                      | 22/ssh                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Unidentified
 
-| IP | MAC | Notes |
-|---|---|---|
+| IP                               | MAC                               | Notes                                                                                                                                           |
+| -------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `192.168.1.136`, `192.168.1.181` | locally-administered (randomized) | iOS/macOS private-MAC clients — distinct from boat-LAN Zeus SR units that happen to share the `.136`/`.181` addresses on a different L2 segment |
 
 ---
@@ -46,15 +46,15 @@ it advertises no IPv6 default route — outbound IPv6 via eth0 returns
 "Network is unreachable". The hub is configured as a one-way data uploader
 for its own traffic, not a transit router for LAN/SulaLocal clients.
 
-| IP(s) | Name | Known services |
-|---|---|---|
-| `192.168.0.1` | Gateway / DHCP server (B&G NEP-1 per user; unverified — all TCP filtered) | — |
-| `192.168.0.2`, `192.168.43.23` | B&G H5000 CPU | 22/ssh, 80/http (web UI, title `B&G H5000 : Data`), 2053/tcp (H5000 WebSocket data feed) |
-| `192.168.58.78`, `192.168.1.181` | Navico chartplotter #1 (reported Zeus SR) | 8443/https (cert `O=C-Map`), 10110/tcp (NMEA-0183 stream) |
-| `192.168.57.31`, `192.168.1.136` | Navico chartplotter #2 (reported Zeus SR) | 8443/https (cert `O=C-Map`), 10110/tcp (NMEA-0183 stream) |
-| `192.168.60.181` | Victron Venus OS GX (wired) | 80/http (`GX device login`), 443/https (cert `O=Victron Energy, OU=Venus OS, CN=venus.local`) |
-| `192.168.14.187` | Victron Venus OS GX endpoint (Wi-Fi side; possibly same device as `.60.181`, not yet distinguished) | 80/http, 443/https (same Venus OS cert) |
-| `192.168.2.2` | Pi `sula-bassana` (`eth0`) | 22/ssh |
+| IP(s)                            | Name                                                                                                | Known services                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `192.168.0.1`                    | Gateway / DHCP server (B&G NEP-1 per user; unverified — all TCP filtered)                           | —                                                                                             |
+| `192.168.0.2`, `192.168.43.23`   | B&G H5000 CPU                                                                                       | 22/ssh, 80/http (web UI, title `B&G H5000 : Data`), 2053/tcp (H5000 WebSocket data feed)      |
+| `192.168.58.78`, `192.168.1.181` | Navico chartplotter #1 (reported Zeus SR)                                                           | 8443/https (cert `O=C-Map`), 10110/tcp (NMEA-0183 stream)                                     |
+| `192.168.57.31`, `192.168.1.136` | Navico chartplotter #2 (reported Zeus SR)                                                           | 8443/https (cert `O=C-Map`), 10110/tcp (NMEA-0183 stream)                                     |
+| `192.168.60.181`                 | Victron Venus OS GX (wired)                                                                         | 80/http (`GX device login`), 443/https (cert `O=Victron Energy, OU=Venus OS, CN=venus.local`) |
+| `192.168.14.187`                 | Victron Venus OS GX endpoint (Wi-Fi side; possibly same device as `.60.181`, not yet distinguished) | 80/http, 443/https (same Venus OS cert)                                                       |
+| `192.168.2.2`                    | Pi `sula-bassana` (`eth0`)                                                                          | 22/ssh                                                                                        |
 
 The PredictWind Hub's ethernet side is on this LAN as IPv6 link-local `fe80::20a:52ff:fe07:bda0` (MAC `00:0a:52:07:bd:a0`); no IPv4 address observed on this segment.
 
@@ -83,8 +83,8 @@ don't want.
 Each Zeus SR chart plotter broadcasts its own Wi-Fi AP for the B&G/Navico
 GoFree mobile app. Observed in the Mac's "Known Networks" list:
 
-| SSID | Notes |
-|---|---|
+| SSID               | Notes                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `B&G Zeus SR_8708` | Hosted by one of the two Zeus SR plotters on the boat LAN (the `8708` suffix is the unit's serial-number tail). Not joined this session — subnet and IP details TBD. |
 
 The second Zeus SR likely broadcasts an analogous SSID but it was not visible
@@ -94,11 +94,11 @@ in the screenshot; check the full Wi-Fi scan list to confirm.
 
 ## Pi reach paths
 
-| Path | Address |
-|---|---|
-| SulaStarlink Wi-Fi | `192.168.1.232` |
-| Boat ethernet LAN | `192.168.2.2` |
-| Tailscale | `100.64.0.117` (also `sula-bassana.tailnet…`) |
+| Path               | Address                                       |
+| ------------------ | --------------------------------------------- |
+| SulaStarlink Wi-Fi | `192.168.1.232`                               |
+| Boat ethernet LAN  | `192.168.2.2`                                 |
+| Tailscale          | `100.64.0.117` (also `sula-bassana.tailnet…`) |
 
 ### Pi routing policy
 

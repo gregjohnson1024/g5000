@@ -27,6 +27,7 @@
 ### Task 1: Session-summary scanner (pure module)
 
 **Files:**
+
 - Create: `packages/bridge/src/persistence/session-summary.ts`
 - Create: `packages/bridge/src/persistence/session-summary.test.ts`
 - Modify: `packages/bridge/src/index.ts` (add re-exports)
@@ -309,6 +310,7 @@ git commit -m "feat(bridge): session-summary scanner (listSessions, summarizeSes
 ### Task 2: SourceMode types + controller + index.ts wiring
 
 **Files:**
+
 - Create: `packages/core/src/source-mode.ts` (types + globalThis accessor)
 - Modify: `packages/core/src/index.ts` (re-export source-mode)
 - Create: `apps/autopilot-server/src/source-mode-controller.ts` (factory)
@@ -504,9 +506,9 @@ describe('SourceModeController', () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'g5000-srcmode-'));
     try {
       const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
-      await expect(
-        c.startReplay({ sessionId: 'nope', paceMode: 'asap' }),
-      ).rejects.toThrow(/not found/i);
+      await expect(c.startReplay({ sessionId: 'nope', paceMode: 'asap' })).rejects.toThrow(
+        /not found/i,
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -523,9 +525,9 @@ describe('SourceModeController', () => {
 
       const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
       await c.startReplay({ sessionId: 'f1', paceMode: 'asap' });
-      await expect(
-        c.startReplay({ sessionId: 'f2', paceMode: 'asap' }),
-      ).rejects.toThrow(/already/i);
+      await expect(c.startReplay({ sessionId: 'f2', paceMode: 'asap' })).rejects.toThrow(
+        /already/i,
+      );
       await c.stopReplay();
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -596,8 +598,9 @@ export function createSourceModeController(opts: CreateOptions): SourceModeContr
         await prev.teardown();
         // Stash the restart fn (if any) on the controller via closure.
         // We re-arm on stopReplay.
-        (controller as unknown as { __prevRestart?: () => Promise<BaseSourceHandle> }).__prevRestart =
-          prev.restart;
+        (
+          controller as unknown as { __prevRestart?: () => Promise<BaseSourceHandle> }
+        ).__prevRestart = prev.restart;
       }
 
       const driver = new ReplayDriver({ filePath, mode: paceMode });
@@ -630,9 +633,11 @@ export function createSourceModeController(opts: CreateOptions): SourceModeContr
         }
       }
       // Re-arm the base source if a restart fn was stashed.
-      const prevRestart = (controller as unknown as {
-        __prevRestart?: () => Promise<BaseSourceHandle>;
-      }).__prevRestart;
+      const prevRestart = (
+        controller as unknown as {
+          __prevRestart?: () => Promise<BaseSourceHandle>;
+        }
+      ).__prevRestart;
       if (prevRestart) {
         try {
           baseHandle = await prevRestart();
@@ -746,6 +751,7 @@ git commit -m "feat(core,server): SourceModeController with base-source teardown
 ### Task 3: TX gating during replay
 
 **Files:**
+
 - Modify: `packages/bridge/src/tx/true-wind-tx.ts`
 - Modify: `packages/bridge/src/tx/true-wind-tx.test.ts`
 
@@ -790,7 +796,11 @@ describe('startTrueWindTx — shouldTransmit gate', () => {
     const txCalls: OutgoingPgn[] = [];
     const stop = await startTrueWindTx({
       bus,
-      driver: { txPgn: async (p) => { txCalls.push(p); } },
+      driver: {
+        txPgn: async (p) => {
+          txCalls.push(p);
+        },
+      },
       shouldTransmit: () => false,
     });
     bus.publish({
@@ -859,6 +869,7 @@ git commit -m "feat(bridge,server): gate true-wind TX with shouldTransmit; skip 
 ### Task 4: Sessions REST API routes (list, summary, download, delete)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/sessions/route.ts`
 - Create: `packages/web/src/app/api/sessions/[id]/route.ts`
 - Create: `packages/web/src/app/api/sessions/[id]/download/route.ts`
@@ -1036,6 +1047,7 @@ git commit -m "feat(web): /api/sessions REST surface (list, summary, download, d
 ### Task 5: Replay control + source-mode REST API routes
 
 **Files:**
+
 - Create: `packages/web/src/app/api/replay/start/route.ts`
 - Create: `packages/web/src/app/api/replay/stop/route.ts`
 - Create: `packages/web/src/app/api/replay/status/route.ts`
@@ -1185,6 +1197,7 @@ git commit -m "feat(web): replay control + source-mode REST endpoints"
 ### Task 6: `/sessions` page
 
 **Files:**
+
 - Create: `packages/web/src/app/sessions/page.tsx`
 
 **Why:** User-facing UI to list, summarise, download, replay, and delete sessions.
@@ -1347,8 +1360,8 @@ export default function SessionsPage() {
           {sessions.length === 0 && (
             <tr>
               <td colSpan={6} className="py-6 text-center text-slate-500">
-                No sessions yet. Run the server with{' '}
-                <code>SESSION_LOG_DIR=./data/sessions</code> to start recording.
+                No sessions yet. Run the server with <code>SESSION_LOG_DIR=./data/sessions</code> to
+                start recording.
               </td>
             </tr>
           )}
@@ -1368,9 +1381,7 @@ export default function SessionsPage() {
                 </td>
                 <td className="py-2 pr-3 text-right">{formatBytes(s.sizeBytes)}</td>
                 <td className="py-2 pr-3 text-right text-slate-300">
-                  {summary
-                    ? `${summary.canLines} can / ${summary.otLines} 0183`
-                    : '…'}
+                  {summary ? `${summary.canLines} can / ${summary.otLines} 0183` : '…'}
                 </td>
                 <td className="py-2 pr-3 text-right text-slate-300">
                   {summary ? formatDuration(summary.durationMs) : '…'}
@@ -1433,6 +1444,7 @@ git commit -m "feat(web): /sessions page — list, summarise, download, replay, 
 ### Task 7: Navbar tri-state source-mode chip + `/sessions` nav entry
 
 **Files:**
+
 - Modify: `packages/web/src/app/Navbar.tsx`
 
 **Why:** The chip becomes the always-visible signal of "what is driving the bus right now". Also add a Sessions link to the nav.
@@ -1523,9 +1535,7 @@ export function Navbar() {
             : `Source mode: ${status.mode}`
         }
       >
-        {status.mode === 'replay'
-          ? `REPLAY: ${status.sessionId ?? ''}`
-          : status.mode.toUpperCase()}
+        {status.mode === 'replay' ? `REPLAY: ${status.sessionId ?? ''}` : status.mode.toUpperCase()}
       </a>
     </nav>
   );
@@ -1535,6 +1545,7 @@ export function Navbar() {
 - [ ] **Step 2: Build and smoke-test**
 
 Reload the browser. Expect to see:
+
 - A new "Sessions" entry in the nav.
 - An amber `DEMO` chip on the right when `DEMO_MODE=1`.
 - The chip turns purple `REPLAY: <id>` when a replay is active, and green `LIVE` when neither.
@@ -1551,6 +1562,7 @@ git commit -m "feat(web): navbar tri-state source-mode chip + /sessions link"
 ### Task 8: End-to-end verification + final commit
 
 **Files:**
+
 - Create: `packages/bridge/src/persistence/replay-roundtrip.test.ts` (real-PGN integration test)
 
 **Why:** The browser walkthrough is necessary but not sufficient — DEMO_MODE doesn't drive raw CAN frames into the session logger, so a captured-in-demo log replays as silence. We need a unit test that exercises the full `record → ReplayDriver → decoder → bus` path with a real PGN 130306 frame so we have machine-verified evidence the replay path works. The browser walkthrough then verifies just the swap UX.

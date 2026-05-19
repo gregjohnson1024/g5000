@@ -100,8 +100,7 @@ export function CogExtension({
       return;
     }
     // Distance-based mode wins if set; otherwise time-based (SOG × time).
-    const totalM =
-      totalNm !== undefined ? totalNm * 1852 : p.sog * (totalMinutes * 60);
+    const totalM = totalNm !== undefined ? totalNm * 1852 : p.sog * (totalMinutes * 60);
     if (totalM < 200) {
       src.setData({ type: 'FeatureCollection', features: [] });
       return;

@@ -17,6 +17,7 @@
 ## File structure
 
 ### Create
+
 - `packages/bridge/src/tx/fast-packet.ts` — pure helper splitting canboatjs multi-line output into ordered `RawCanFrame[]`
 - `packages/bridge/src/tx/fast-packet.test.ts` — round-trip + frame-counter + single-frame tests
 - `packages/bridge/src/autopilot-commands.ts` — pure `resolveCommand(event, captureCodes)` returning a PGN field-bag
@@ -32,6 +33,7 @@
 - `packages/web/src/app/api/autopilot/capture-codes/route.ts`
 
 ### Modify
+
 - `packages/bridge/src/ydwg-raw-tcp-driver.ts` — rewrite `txPgn` to use `parseActisenseFrameLines`
 - `packages/bridge/src/ydwg-raw-tcp-driver.test.ts` — replace negative test with positive multi-frame test
 - `packages/bridge/src/bridge.ts` — call `registerAutopilotTxIfEnabled(driver)` for the first YDWG driver
@@ -43,6 +45,7 @@
 ### Task 1: Fast Packet split helper
 
 **Files:**
+
 - Create: `packages/bridge/src/tx/fast-packet.ts`
 - Create: `packages/bridge/src/tx/fast-packet.test.ts`
 
@@ -123,12 +126,24 @@ describe('parseActisenseFrameLines', () => {
       'Command Type': 'AP Command',
       Event: 'Standby',
     };
-    const a = parseActisenseFrameLines(pgnToActisenseSerialFormat({
-      pgn: 130850, prio: 3, dst: 255, src: 254, fields,
-    }));
-    const b = parseActisenseFrameLines(pgnToActisenseSerialFormat({
-      pgn: 130850, prio: 3, dst: 255, src: 254, fields,
-    }));
+    const a = parseActisenseFrameLines(
+      pgnToActisenseSerialFormat({
+        pgn: 130850,
+        prio: 3,
+        dst: 255,
+        src: 254,
+        fields,
+      }),
+    );
+    const b = parseActisenseFrameLines(
+      pgnToActisenseSerialFormat({
+        pgn: 130850,
+        prio: 3,
+        dst: 255,
+        src: 254,
+        fields,
+      }),
+    );
     // Sequence bits = data[0] >> 5; should rotate between consecutive sends.
     expect(a[0]!.data[0]! >> 5).not.toBe(b[0]!.data[0]! >> 5);
   });
@@ -213,6 +228,7 @@ git commit -m "$(printf 'feat(bridge): Fast Packet split helper\n\nPure parseAct
 ### Task 2: Wire YDWG driver's `txPgn` to use the helper
 
 **Files:**
+
 - Modify: `packages/bridge/src/ydwg-raw-tcp-driver.ts` (lines ~165–205)
 - Modify: `packages/bridge/src/ydwg-raw-tcp-driver.test.ts` (lines ~265–280)
 
@@ -221,33 +237,33 @@ git commit -m "$(printf 'feat(bridge): Fast Packet split helper\n\nPure parseAct
 Find the existing `it('txPgn throws for Fast Packet PGNs ...')` test in `packages/bridge/src/ydwg-raw-tcp-driver.test.ts` (around line 268) and replace it with:
 
 ```typescript
-  it('txPgn writes ordered frames for Fast Packet PGN 130850', async () => {
-    await driver.txPgn({
-      pgn: 130850,
-      prio: 3,
-      dst: 255,
-      fields: {
-        'Manufacturer Code': 'Simrad',
-        'Industry Code': 'Marine Industry',
-        Address: 0,
-        'Proprietary ID': 'Autopilot',
-        'Command Type': 'AP Command',
-        Event: 'Standby',
-      },
-    });
-    // PGN 130850 PropID=255 Event=Standby is 11 bytes = 2 Fast Packet frames.
-    expect(socket.writes.length).toBe(2);
-    socket.writes.forEach((line) => {
-      expect(line).toMatch(/^[0-9A-F]{8}( [0-9A-F]{2})+\r\n$/);
-    });
-    // Frame counters (low 5 bits of first data byte) should be 0, 1.
-    const dataByte0 = (line: string): number => {
-      const parts = line.trim().split(/\s+/);
-      return parseInt(parts[1]!, 16);
-    };
-    expect(dataByte0(socket.writes[0]!) & 0x1f).toBe(0);
-    expect(dataByte0(socket.writes[1]!) & 0x1f).toBe(1);
+it('txPgn writes ordered frames for Fast Packet PGN 130850', async () => {
+  await driver.txPgn({
+    pgn: 130850,
+    prio: 3,
+    dst: 255,
+    fields: {
+      'Manufacturer Code': 'Simrad',
+      'Industry Code': 'Marine Industry',
+      Address: 0,
+      'Proprietary ID': 'Autopilot',
+      'Command Type': 'AP Command',
+      Event: 'Standby',
+    },
   });
+  // PGN 130850 PropID=255 Event=Standby is 11 bytes = 2 Fast Packet frames.
+  expect(socket.writes.length).toBe(2);
+  socket.writes.forEach((line) => {
+    expect(line).toMatch(/^[0-9A-F]{8}( [0-9A-F]{2})+\r\n$/);
+  });
+  // Frame counters (low 5 bits of first data byte) should be 0, 1.
+  const dataByte0 = (line: string): number => {
+    const parts = line.trim().split(/\s+/);
+    return parseInt(parts[1]!, 16);
+  };
+  expect(dataByte0(socket.writes[0]!) & 0x1f).toBe(0);
+  expect(dataByte0(socket.writes[1]!) & 0x1f).toBe(1);
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -312,6 +328,7 @@ git commit -m "$(printf 'feat(bridge): YDWG txPgn supports Fast Packet PGNs\n\nR
 ### Task 3: AutopilotTx interface + singleton in core
 
 **Files:**
+
 - Create: `packages/core/src/autopilot-tx.ts`
 - Modify: `packages/core/src/index.ts`
 
@@ -397,6 +414,7 @@ git commit -m "$(printf 'feat(core): AutopilotTx interface + globalThis singleto
 ### Task 4: Command resolver (event-name → PGN field-bag)
 
 **Files:**
+
 - Create: `packages/bridge/src/autopilot-commands.ts`
 - Create: `packages/bridge/src/autopilot-commands.test.ts`
 
@@ -427,13 +445,16 @@ describe('resolveCommand', () => {
 
   it('resolves nav / wind / no_drift to their canboat Events', () => {
     expect(resolveCommand('nav', { version: 1, captures: {} })).toMatchObject({
-      ok: true, fields: expect.objectContaining({ Event: 'Nav mode' }),
+      ok: true,
+      fields: expect.objectContaining({ Event: 'Nav mode' }),
     });
     expect(resolveCommand('wind', { version: 1, captures: {} })).toMatchObject({
-      ok: true, fields: expect.objectContaining({ Event: 'Wind mode' }),
+      ok: true,
+      fields: expect.objectContaining({ Event: 'Wind mode' }),
     });
     expect(resolveCommand('no_drift', { version: 1, captures: {} })).toMatchObject({
-      ok: true, fields: expect.objectContaining({ Event: 'No Drift mode' }),
+      ok: true,
+      fields: expect.objectContaining({ Event: 'No Drift mode' }),
     });
   });
 
@@ -447,7 +468,14 @@ describe('resolveCommand', () => {
     const r = resolveCommand('course_+1', {
       version: 1,
       captures: {
-        'course_+1': { fields: { 'Proprietary ID': 'Autopilot', Event: 'Change course', Direction: 'Starboard', Angle: 1 } },
+        'course_+1': {
+          fields: {
+            'Proprietary ID': 'Autopilot',
+            Event: 'Change course',
+            Direction: 'Starboard',
+            Angle: 1,
+          },
+        },
       },
     });
     expect(r.ok).toBe(true);
@@ -566,6 +594,7 @@ git commit -m "$(printf 'feat(bridge): autopilot command resolver\n\nPure resolv
 ### Task 5: Capture-codes file reader
 
 **Files:**
+
 - Create: `packages/bridge/src/capture-codes.ts`
 - Create: `packages/bridge/src/capture-codes.test.ts`
 
@@ -597,12 +626,15 @@ describe('readCaptureCodes', () => {
 
   it('parses a well-formed file', async () => {
     const p = path.join(tmpDir, 'codes.json');
-    await fs.writeFile(p, JSON.stringify({
-      version: 1,
-      captures: {
-        'course_+1': { fields: { Event: 'Change course', Direction: 'Starboard', Angle: 1 } },
-      },
-    }));
+    await fs.writeFile(
+      p,
+      JSON.stringify({
+        version: 1,
+        captures: {
+          'course_+1': { fields: { Event: 'Change course', Direction: 'Starboard', Angle: 1 } },
+        },
+      }),
+    );
     const r = await readCaptureCodes(p);
     expect(r.captures['course_+1']?.fields['Direction']).toBe('Starboard');
   });
@@ -680,6 +712,7 @@ git commit -m "$(printf 'feat(bridge): read AP capture-codes file\n\nReads ~/.g5
 ### Task 6: AutopilotTx implementation + Fastpath registration helper
 
 **Files:**
+
 - Create: `packages/bridge/src/autopilot-tx-impl.ts`
 - Create: `packages/bridge/src/autopilot-tx-impl.test.ts`
 
@@ -690,10 +723,7 @@ Create `packages/bridge/src/autopilot-tx-impl.test.ts`:
 ```typescript
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetAutopilotTxForTests, getSharedAutopilotTx } from '@g5000/core';
-import {
-  createAutopilotTx,
-  registerAutopilotTxIfEnabled,
-} from './autopilot-tx-impl.js';
+import { createAutopilotTx, registerAutopilotTxIfEnabled } from './autopilot-tx-impl.js';
 import type { WireDriver } from './wire-driver.js';
 
 function fakeDriver(): WireDriver & { txPgnSpy: ReturnType<typeof vi.fn> } {
@@ -913,6 +943,7 @@ git commit -m "$(printf 'feat(bridge): AutopilotTx implementation + boot-time ga
 ### Task 7: Wire the registration into the bridge boot
 
 **Files:**
+
 - Modify: `packages/bridge/src/bridge.ts`
 
 - [ ] **Step 1: Add the registration call**
@@ -920,11 +951,11 @@ git commit -m "$(printf 'feat(bridge): AutopilotTx implementation + boot-time ga
 Open `packages/bridge/src/bridge.ts`. After the `await Promise.all(drivers.map((d) => d.start()));` line (around line 27), add:
 
 ```typescript
-  // AP TX is disabled by default. Mac dev enables it by setting
-  // G5000_ENABLE_AP_TX=1 before launching the autopilot server.
-  if (drivers.length > 0) {
-    registerAutopilotTxIfEnabled(drivers[0]!);
-  }
+// AP TX is disabled by default. Mac dev enables it by setting
+// G5000_ENABLE_AP_TX=1 before launching the autopilot server.
+if (drivers.length > 0) {
+  registerAutopilotTxIfEnabled(drivers[0]!);
+}
 ```
 
 Then add the import at the top of the file (next to the existing imports):
@@ -955,6 +986,7 @@ git commit -m "$(printf 'feat(bridge): register AutopilotTx singleton at boot\n\
 ### Task 8: API route `/api/autopilot/command`
 
 **Files:**
+
 - Create: `packages/web/src/app/api/autopilot/command/route.ts`
 
 - [ ] **Step 1: Implement the route**
@@ -968,8 +1000,15 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const VALID_EVENTS: AutopilotCommandName[] = [
-  'standby', 'auto', 'nav', 'wind', 'no_drift',
-  'course_+1', 'course_-1', 'course_+10', 'course_-10',
+  'standby',
+  'auto',
+  'nav',
+  'wind',
+  'no_drift',
+  'course_+1',
+  'course_-1',
+  'course_+10',
+  'course_-10',
 ];
 
 interface Body {
@@ -1004,14 +1043,23 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (!VALID_EVENTS.includes(body.event)) {
     return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: `invalid event: ${String(body.event)}` } },
+      {
+        ok: false,
+        error: { kind: 'bad_request', message: `invalid event: ${String(body.event)}` },
+      },
       { status: 400 },
     );
   }
   const tx = getSharedAutopilotTx();
   if (!tx) {
     return Response.json(
-      { ok: false, error: { kind: 'unavailable', message: 'AP TX not registered (bridge not booted with G5000_ENABLE_AP_TX=1)' } },
+      {
+        ok: false,
+        error: {
+          kind: 'unavailable',
+          message: 'AP TX not registered (bridge not booted with G5000_ENABLE_AP_TX=1)',
+        },
+      },
       { status: 503 },
     );
   }
@@ -1019,10 +1067,7 @@ export async function POST(req: Request): Promise<Response> {
   if (r.ok) {
     return Response.json({ ok: true, txMs: r.txMs });
   }
-  return Response.json(
-    { ok: false, error: r.error },
-    { status: 502 },
-  );
+  return Response.json({ ok: false, error: r.error }, { status: 502 });
 }
 ```
 
@@ -1036,6 +1081,7 @@ Expected: No errors.
 Confirm dev server is up: `curl http://localhost:3000/api/autopilot/command -X POST -H 'Content-Type: application/json' -d '{"event":"standby"}'`
 
 Two valid outcomes depending on the dev server's env:
+
 - If `G5000_ENABLE_AP_TX=1`: `{ ok: true, txMs: N }` and the AP transitions to Standby on the helm.
 - If unset: `{ ok: false, error: { kind: 'forbidden', ... } }` with HTTP 403.
 
@@ -1053,6 +1099,7 @@ git commit -m "$(printf 'feat(web): POST /api/autopilot/command\n\nMac-only AP c
 ### Task 9: API route `/api/autopilot/capture-codes`
 
 **Files:**
+
 - Create: `packages/web/src/app/api/autopilot/capture-codes/route.ts`
 
 - [ ] **Step 1: Implement the route**
@@ -1116,6 +1163,7 @@ git commit -m "$(printf 'feat(web): GET /api/autopilot/capture-codes\n\nThin wra
 ### Task 10: Control panel client component
 
 **Files:**
+
 - Create: `packages/web/src/app/autopilot/control-panel.tsx`
 
 Build this BEFORE the page conversion so the tree never enters a non-building state. ControlPanel is self-contained — it does not depend on anything in page.tsx or readonly-view.tsx.
@@ -1346,6 +1394,7 @@ git commit -m "$(printf 'feat(web,autopilot): Mac-only control panel + recent-co
 ### Task 11: Convert `/autopilot` to Server Component + extract read-only view + render ControlPanel
 
 **Files:**
+
 - Create: `packages/web/src/app/autopilot/readonly-view.tsx`
 - Modify: `packages/web/src/app/autopilot/page.tsx`
 
@@ -1515,6 +1564,7 @@ Expected: No errors. ControlPanel was created in Task 10, so the import resolves
 - [ ] **Step 4: Manual smoke**
 
 Reload the dev server's /autopilot page. With `G5000_ENABLE_AP_TX=1`:
+
 - Read-only readouts appear unchanged (the listen-only footnote disappears).
 - Below them, the amber warning + 6 buttons appear. ENABLE and DISABLE active. Increment buttons greyed with tooltip mentioning ap-tx-codes.json.
 - Click ENABLE → modal appears. Cancel → modal closes, no send. Confirm → recent-commands log shows the send and either `mode→Heading (NN ms)` or `no mode change within 2 s`.
@@ -1531,7 +1581,6 @@ git commit -m "$(printf 'feat(web,autopilot): wire control panel into Server Com
 ```
 
 ---
-
 
 ## Self-review notes
 

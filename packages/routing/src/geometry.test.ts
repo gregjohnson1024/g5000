@@ -8,7 +8,7 @@ import {
 } from './geometry.js';
 
 const NEWPORT = { lat: 41.49, lon: -71.31 };
-const BERMUDA = { lat: 32.30, lon: -64.78 };
+const BERMUDA = { lat: 32.3, lon: -64.78 };
 
 describe('normalizeAngle', () => {
   it('wraps into [-π, π]', () => {

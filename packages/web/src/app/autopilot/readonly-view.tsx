@@ -124,8 +124,8 @@ export function ReadonlyView({ apTxEnabled }: { apTxEnabled: boolean }) {
 
       {!apTxEnabled && (
         <section className="text-xs text-slate-500 pt-4 border-t border-slate-800 max-w-xl">
-          Listen-only. The G5000 does not transmit any autopilot commands. All values above come from
-          PGN 127237 broadcast by your H5000 (or other autopilot computer) on the N2K bus. If
+          Listen-only. The G5000 does not transmit any autopilot commands. All values above come
+          from PGN 127237 broadcast by your H5000 (or other autopilot computer) on the N2K bus. If
           "Unknown" / "—" persists, your autopilot may use B&G-proprietary PGNs instead of (or in
           addition to) standard 127237 — those are decoded in a later plan.
         </section>

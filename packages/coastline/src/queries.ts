@@ -3,7 +3,10 @@ import { pointInRing, segmentCrossesRing, type Point } from './geometry.js';
 
 export function isOnLand(c: Coastline, lat: number, lon: number): boolean {
   const candidates = c.index.search({
-    minX: lon, minY: lat, maxX: lon, maxY: lat,
+    minX: lon,
+    minY: lat,
+    maxX: lon,
+    maxY: lat,
   });
   for (const cand of candidates) {
     if (pointInRing([lon, lat], cand.polygon.ring)) return true;
@@ -13,8 +16,10 @@ export function isOnLand(c: Coastline, lat: number, lon: number): boolean {
 
 export function intersectsLand(
   c: Coastline,
-  lat1: number, lon1: number,
-  lat2: number, lon2: number,
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
 ): boolean {
   const minX = Math.min(lon1, lon2);
   const maxX = Math.max(lon1, lon2);

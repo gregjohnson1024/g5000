@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import {
-  ConfigStore,
-  setSharedConfigStore,
-  _resetSharedConfigStoreForTests,
-  DEFAULT_CROSSOVER_SETTINGS,
-} from '@g5000/db';
+import { ConfigStore, setSharedConfigStore, _resetSharedConfigStoreForTests } from '@g5000/db';
 import { GET, POST } from './route.js';
 
 let store: ConfigStore;
 
 beforeEach(async () => {
-  store = await ConfigStore.open(`${tmpdir()}/crossover-settings-${Date.now()}-${Math.random()}.db`);
+  store = await ConfigStore.open(
+    `${tmpdir()}/crossover-settings-${Date.now()}-${Math.random()}.db`,
+  );
   setSharedConfigStore(store);
 });
 
@@ -20,36 +17,29 @@ afterEach(async () => {
   _resetSharedConfigStoreForTests();
 });
 
-describe('GET /api/crossover-settings', () => {
-  it('returns defaults on a fresh store', async () => {
+describe('/api/crossover-settings', () => {
+  it('GET returns the 3-field shape', async () => {
     const res = await GET();
-    const json = (await res.json()) as { ok: boolean; settings: typeof DEFAULT_CROSSOVER_SETTINGS };
-    expect(json.ok).toBe(true);
-    expect(json.settings).toEqual(DEFAULT_CROSSOVER_SETTINGS);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual([
+      'forecastDurationHours',
+      'forecastIntervalMinutes',
+      'recommendationStableSeconds',
+    ]);
   });
-});
 
-describe('POST /api/crossover-settings', () => {
-  it('persists a posted settings object', async () => {
-    const body = { ...DEFAULT_CROSSOVER_SETTINGS, recommendationStableSeconds: 90 };
-    const req = new Request('http://localhost/api/crossover-settings', {
+  it('POST round-trips', async () => {
+    const req = new Request('http://x', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        recommendationStableSeconds: 10,
+        forecastIntervalMinutes: 15,
+        forecastDurationHours: 6,
+      }),
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    const reread = await GET();
-    const json = (await reread.json()) as { ok: boolean; settings: typeof DEFAULT_CROSSOVER_SETTINGS };
-    expect(json.settings.recommendationStableSeconds).toBe(90);
-  });
-
-  it('400s on malformed body', async () => {
-    const req = new Request('http://localhost/api/crossover-settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{nope',
-    });
-    expect((await POST(req)).status).toBe(400);
+    const back = (await (await GET()).json()) as { recommendationStableSeconds: number };
+    expect(back.recommendationStableSeconds).toBe(10);
   });
 });

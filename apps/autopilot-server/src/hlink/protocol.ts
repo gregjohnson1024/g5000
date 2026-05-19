@@ -133,12 +133,7 @@ function pad3(n: number): string {
  *  - `fn`: function number.
  *  - `value`: pre-formatted payload (`"4.37"`) or `""` for unmapped.
  */
-export function formatV(
-  fn: number,
-  value: string,
-  node: number = 1,
-  msgType: number = 1,
-): string {
+export function formatV(fn: number, value: string, node: number = 1, msgType: number = 1): string {
   const payload = `V${pad3(node)},${pad3(msgType)},${pad3(fn)},${value}`;
   return `${payload}*${hlinkChecksum(payload)}\r\n`;
 }

@@ -2,25 +2,24 @@ import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { BehaviorSubject, combineLatest, type Observable, map } from 'rxjs';
-import { ulid } from 'ulid';
 import {
   DEFAULT_AIS_ALARM_CONFIG,
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_BOAT_CONFIG,
   DEFAULT_BSP_CAL,
   DEFAULT_COMPASS_DEVIATION,
-  DEFAULT_CROSSOVER_MAP,
   DEFAULT_CROSSOVER_SETTINGS,
   DEFAULT_DAMPING_CONFIG,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
+  DEFAULT_WARDROBE,
+  SAIL_CATEGORIES,
   type AisAlarmConfig,
   type AwsAwaCalTable,
   type BoatConfig,
   type BoatId,
   type BspCal,
   type CompassDeviation,
-  type CrossoverMap,
   type CrossoverSettings,
   type DampingConfig,
   type PassageLog,
@@ -36,11 +35,9 @@ import {
   bspCal,
   boatConfig as boatConfigTable,
   compassDeviation,
-  crossoverMap as crossoverMapTable,
   crossoverSettings as crossoverSettingsTable,
   dampingConfig as dampingConfigTable,
   passageLog as passageLogTable,
-  polars,
   sailWardrobe,
   sourcePriorityConfig as sourcePriorityConfigTable,
 } from './schema.js';
@@ -50,9 +47,7 @@ import {
   getRevision as getRevisionRepo,
   type ListFilter,
 } from './polar-revisions.js';
-import { migrateWardrobeV1ToV2 } from './migrate-wardrobe-v2.js';
-
-const __warnedMissingRevisions = new Set<string>();
+import { migrateWardrobeV2toV3, type V2Wardrobe } from './migrate-wardrobe-v3.js';
 
 const SINGLETON = 'singleton';
 
@@ -74,7 +69,6 @@ export class ConfigStore {
     aisAlarm: BehaviorSubject<AisAlarmConfig>;
     passageLog: BehaviorSubject<PassageLog>;
     polarRevisions: BehaviorSubject<Map<string, PolarRevision>>;
-    crossoverMap: BehaviorSubject<CrossoverMap>;
     crossoverSettings: BehaviorSubject<CrossoverSettings>;
   };
 
@@ -99,7 +93,6 @@ export class ConfigStore {
       aisAlarm: AisAlarmConfig;
       passageLog: PassageLog;
       polarRevisions: Map<string, PolarRevision>;
-      crossoverMap: CrossoverMap;
       crossoverSettings: CrossoverSettings;
     },
     activeBoatId: BoatId,
@@ -116,7 +109,6 @@ export class ConfigStore {
       aisAlarm: new BehaviorSubject(initial.aisAlarm),
       passageLog: new BehaviorSubject(initial.passageLog),
       polarRevisions: new BehaviorSubject(initial.polarRevisions),
-      crossoverMap: new BehaviorSubject(initial.crossoverMap),
       crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
     };
   }
@@ -127,12 +119,16 @@ export class ConfigStore {
 
     // Create tables if they don't exist. Using exec for IF NOT EXISTS DDL
     // since drizzle-kit migrations are heavier than this Phase 0 needs.
+    //
+    // NOTE: `crossover_map` is created here (if missing) only so the v2→v3
+    // migrator can read any legacy row. It's dropped at the end of open()
+    // once the migration has resolved.
     raw.exec(`
       CREATE TABLE IF NOT EXISTS boat_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS aws_awa_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS bsp_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS compass_deviation (id TEXT PRIMARY KEY, value TEXT NOT NULL);
-      -- DEPRECATED: legacy v1 singleton polar; read by migrator, then unused. Drop after v2 migration confirmed on Pi.
+      -- DEPRECATED: legacy v1 singleton polar. No longer read; left in schema so legacy DBs don't error.
       CREATE TABLE IF NOT EXISTS polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS damping_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -212,59 +208,89 @@ export class ConfigStore {
       return defaultValue;
     };
 
-    // Migration logic for sail wardrobe:
-    // 1. Load/seed the legacy polars row (legacy ingestion path).
-    // 2. Read the wardrobe row (may be missing, v1, or v2).
-    // 3. If v1 (or synthesized from legacy polar), run the pure migrator and
-    //    persist wardrobe + new revisions in a single SQLite transaction.
-    // DEPRECATED: legacy v1 read path; only the migrator consumes this. Drop after v2 confirmed on Pi.
-    const legacyPolar = loadOrInsert<PolarTable>(polars, DEFAULT_POLARS);
-
+    // Wardrobe load / migrate:
+    //   - If no sail_wardrobe row → seed DEFAULT_WARDROBE (already v3) and skip
+    //     the migrator. Fresh installs start at v3.
+    //   - If row exists and is already v3 → migrator returns it unchanged.
+    //   - If row exists and is v2 → run v2→v3 migrator with the legacy
+    //     crossover_map row (if any) for region remapping, then persist v3.
+    //
+    // Legacy v1 wardrobes (with embedded `polar` per config and no `modes`)
+    // are no longer supported. All known production installs (the Pi) have
+    // been on v2 for >1 deploy cycle, so the v1 path was dropped along with
+    // migrate-wardrobe-v2.ts.
     const wardrobeRows = db.select().from(sailWardrobe).where(eq(sailWardrobe.id, SINGLETON)).all();
-    let rawWardrobe: unknown;
-    if (wardrobeRows[0]) {
-      rawWardrobe = JSON.parse((wardrobeRows[0] as { value: string }).value);
+    let wardrobeValue: SailWardrobe;
+    if (!wardrobeRows[0]) {
+      wardrobeValue = { ...DEFAULT_WARDROBE, boatId: activeBoatId };
+      db.insert(sailWardrobe)
+        .values({ id: SINGLETON, value: JSON.stringify(wardrobeValue) })
+        .run();
     } else {
-      // No wardrobe row — synthesise a v1 wardrobe from the legacy polar so the
-      // migrator produces a single revision-0 + v2 wardrobe in one pass.
-      rawWardrobe = {
-        configs: [
-          {
-            id: 'default',
-            name: 'Default',
-            notes: 'Initial baseline polar. Replace with your boat-specific data.',
-            polar: legacyPolar,
-          },
-        ],
-        activeConfigId: 'default',
-      };
-    }
+      const rawWardrobe: unknown = JSON.parse((wardrobeRows[0] as { value: string }).value);
 
-    const migrated = migrateWardrobeV1ToV2(
-      rawWardrobe,
-      activeBoatId,
-      Math.floor(Date.now() / 1000),
-      () => ulid().toLowerCase(),
-      legacyPolar,
-    );
-
-    if (migrated.revisions.length > 0) {
-      // v1→v2 migration: write revisions + wardrobe atomically.
-      raw.transaction(() => {
-        for (const rev of migrated.revisions) {
-          insertRevision(db, rev);
+      // Read legacy crossover_map row for the active (boat, mode) so the v2→v3
+      // migrator can remap painted cells. Use a raw prepared statement so we
+      // don't need to keep the drizzle table import around just for this read.
+      let v2MapForMigrator: {
+        boatId: BoatId;
+        mode: PolarMode;
+        cells: Record<string, string>;
+        updatedAt: number;
+      } | null = null;
+      const activeMode: PolarMode =
+        (rawWardrobe as { activeMode?: PolarMode })?.activeMode ?? 'default';
+      try {
+        const row = raw
+          .prepare('SELECT value FROM crossover_map WHERE boat_id = ? AND mode = ?')
+          .get(activeBoatId, activeMode) as { value: string } | undefined;
+        if (row) {
+          const parsed = JSON.parse(row.value) as Partial<{
+            cells: Record<string, string>;
+            updatedAt: number;
+          }>;
+          v2MapForMigrator = {
+            boatId: activeBoatId,
+            mode: activeMode,
+            cells: parsed.cells ?? {},
+            updatedAt: parsed.updatedAt ?? 0,
+          };
         }
+      } catch {
+        // crossover_map table may not exist on very old DBs; treat as no row.
+      }
+
+      // Pick the most-recent polar revision for (activeBoatId, activeMode) as
+      // the table the migrator uses to translate (twsIdx, twaIdx) polar cells
+      // into fixed-grid cells. Falls back to DEFAULT_POLARS if no revision yet.
+      const activePolarForMigrator: PolarTable = (() => {
+        const revs = listRevisionsRepo(db, { boatId: activeBoatId, mode: activeMode });
+        return revs[0]?.table ?? DEFAULT_POLARS;
+      })();
+
+      wardrobeValue = migrateWardrobeV2toV3(
+        rawWardrobe as V2Wardrobe | SailWardrobe,
+        v2MapForMigrator,
+        activePolarForMigrator,
+      );
+
+      // Persist v3 back so subsequent boots short-circuit (idempotent).
+      if (wardrobeValue !== rawWardrobe) {
         db.insert(sailWardrobe)
-          .values({ id: SINGLETON, value: JSON.stringify(migrated.v2) })
+          .values({ id: SINGLETON, value: JSON.stringify(wardrobeValue) })
           .onConflictDoUpdate({
             target: sailWardrobe.id,
-            set: { value: JSON.stringify(migrated.v2) },
+            set: { value: JSON.stringify(wardrobeValue) },
           })
           .run();
-      })();
+      }
     }
 
-    const wardrobeValue: SailWardrobe = migrated.v2;
+    // Drop the legacy crossover_map table; it's no longer needed once the
+    // migrator above has consumed it. Subsequent reopens will recreate-as-empty
+    // via the CREATE TABLE IF NOT EXISTS above, and the SELECT will return no
+    // rows, so the migrator is a no-op for already-v3 wardrobes.
+    raw.exec('DROP TABLE IF EXISTS crossover_map;');
 
     // Load all revisions for the active boat into the in-memory map.
     const revisionsForBoat = listRevisionsRepo(db, { boatId: activeBoatId });
@@ -288,25 +314,6 @@ export class ConfigStore {
         .values({ id: SINGLETON, value: JSON.stringify(passageLogValue) })
         .run();
     }
-
-    // Load the crossover_map row for the active (boat, mode) and seed the
-    // BehaviorSubject. The row is keyed by composite PK (boat_id, mode); the
-    // active mode comes from the wardrobe we just resolved. Drizzle returns
-    // the JS-side camelCase column names from the schema (`boatId`).
-    const xmRows = db
-      .select()
-      .from(crossoverMapTable)
-      .where(eq(crossoverMapTable.boatId, activeBoatId))
-      .all() as Array<{ boatId: string; mode: string; value: string }>;
-    const xmForMode = xmRows.find((r) => r.mode === wardrobeValue.activeMode);
-    const crossoverMapValue: CrossoverMap = xmForMode
-      ? {
-          ...DEFAULT_CROSSOVER_MAP,
-          ...(JSON.parse(xmForMode.value) as Partial<CrossoverMap>),
-          boatId: activeBoatId,
-          mode: wardrobeValue.activeMode,
-        }
-      : { ...DEFAULT_CROSSOVER_MAP, boatId: activeBoatId, mode: wardrobeValue.activeMode };
 
     // Load the crossover_settings row for the active boat. Single-row table
     // keyed by boatId — no mode component. Stored value is merged with
@@ -337,7 +344,6 @@ export class ConfigStore {
       aisAlarm: loadOrInsert<AisAlarmConfig>(aisAlarmConfigTable, DEFAULT_AIS_ALARM_CONFIG),
       passageLog: passageLogValue,
       polarRevisions: revisionsMap,
-      crossoverMap: crossoverMapValue,
       crossoverSettings: crossoverSettingsValue,
     };
 
@@ -404,29 +410,25 @@ export class ConfigStore {
   get drizzle(): BetterSQLite3Database {
     return this.db;
   }
-  /** Derived from sails$ + polarRevisions$ — resolves the active config's
-   *  active-mode revision to its `PolarTable`. Falls back to DEFAULT_POLARS
-   *  if the wardrobe has no active revisionId or if the pointer is dangling. */
+  /**
+   * Derived from sails$ + polarRevisions$ — resolves the wardrobe's active
+   * (boatId, activeMode) to its most-recent `PolarRevision.table`. Falls back
+   * to DEFAULT_POLARS if no matching revision exists yet.
+   *
+   * In v3 the wardrobe no longer stores per-config polar pointers; the active
+   * polar is simply the newest revision for the boat+mode pair.
+   */
   get activePolar$(): Observable<PolarTable> {
     return combineLatest([this.subjects.sails, this.subjects.polarRevisions]).pipe(
       map(([wardrobe, revisionsById]) => {
-        const cfg = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId);
-        const ref =
-          cfg?.modes[wardrobe.activeMode]?.activeRevisionId ??
-          cfg?.modes.default?.activeRevisionId;
-        const rev = ref ? revisionsById.get(ref) : undefined;
-        if (!ref) return DEFAULT_POLARS;
-        if (!rev) {
-          // Dangling pointer — warn once per ref; resolver feeds a hot pipeline.
-          if (!__warnedMissingRevisions.has(ref)) {
-            __warnedMissingRevisions.add(ref);
-            console.warn(
-              `[config-store] active revision ${ref} not found; falling back to DEFAULT_POLARS`,
-            );
-          }
-          return DEFAULT_POLARS;
+        const mode = wardrobe.activeMode;
+        const candidates: PolarRevision[] = [];
+        for (const rev of revisionsById.values()) {
+          if (rev.boatId === wardrobe.boatId && rev.mode === mode) candidates.push(rev);
         }
-        return rev.table;
+        if (candidates.length === 0) return DEFAULT_POLARS;
+        candidates.sort((a, b) => b.createdAt - a.createdAt);
+        return candidates[0]!.table;
       }),
     );
   }
@@ -439,41 +441,10 @@ export class ConfigStore {
     return this.activePolar$;
   }
   /**
-   * Crossover map for the active (boatId, mode). Seeded at open() from the
-   * crossover_map row that matches `(activeBoatId, wardrobe.activeMode)`, or
-   * DEFAULT_CROSSOVER_MAP if no row exists yet. Writers must keep
-   * `value.boatId`/`value.mode` aligned with the active selection —
-   * setCrossoverMap rejects mismatches.
-   */
-  get crossoverMap$(): Observable<CrossoverMap> {
-    return this.subjects.crossoverMap.asObservable();
-  }
-
-  async setCrossoverMap(value: CrossoverMap): Promise<void> {
-    if (value.boatId !== this.__activeBoatId) {
-      throw new Error(
-        `setCrossoverMap: boatId ${value.boatId} != active ${this.__activeBoatId}`,
-      );
-    }
-    const activeMode = this.subjects.sails.value.activeMode;
-    if (value.mode !== activeMode) {
-      throw new Error(`setCrossoverMap: mode ${value.mode} != active ${activeMode}`);
-    }
-    const stored: CrossoverMap = { ...value, updatedAt: Math.floor(Date.now() / 1000) };
-    this.raw
-      .prepare(
-        'INSERT INTO crossover_map (boat_id, mode, value) VALUES (?, ?, ?) ON CONFLICT (boat_id, mode) DO UPDATE SET value = excluded.value',
-      )
-      .run(stored.boatId, stored.mode, JSON.stringify(stored));
-    this.subjects.crossoverMap.next(stored);
-  }
-
-  /**
-   * Crossover settings (recommendation hysteresis, chart bounds, forecast
-   * cadence) for the active boat. Seeded at open() from the
-   * crossover_settings row for `activeBoatId`, merged over
-   * DEFAULT_CROSSOVER_SETTINGS so missing keys fall back. Single-row table
-   * keyed on `boatId` — there is no per-mode component.
+   * Crossover settings (recommendation hysteresis, forecast cadence) for the
+   * active boat. Seeded at open() from the crossover_settings row for
+   * `activeBoatId`, merged over DEFAULT_CROSSOVER_SETTINGS so missing keys
+   * fall back. Single-row table keyed on `boatId` — no per-mode component.
    */
   get crossoverSettings$(): Observable<CrossoverSettings> {
     return this.subjects.crossoverSettings.asObservable();
@@ -505,21 +476,33 @@ export class ConfigStore {
     this.subjects.compassDeviation.next(value);
   }
   async setSails(value: SailWardrobe): Promise<void> {
-    for (const cfg of value.configs) {
-      if (!cfg.modes || typeof cfg.modes !== 'object') {
-        throw new Error(
-          `sailConfig "${cfg.id}" missing required v2 'modes' field`,
-        );
-      }
-    }
-    const slot = value.configs.find((c) => c.id === value.activeConfigId);
-    if (!slot) {
+    if (value.schemaVersion !== 3) {
       throw new Error(
-        `activeConfigId "${value.activeConfigId}" does not reference any config in configs[]`,
+        `setSails: expected schemaVersion 3, got ${(value as { schemaVersion?: number }).schemaVersion}`,
       );
     }
-    this.upsert(sailWardrobe, value);
-    this.subjects.sails.next(value);
+    const ids = new Set<string>();
+    for (const sail of value.sails) {
+      if (ids.has(sail.id)) {
+        throw new Error(`setSails: duplicate sail id "${sail.id}"`);
+      }
+      ids.add(sail.id);
+      if (!SAIL_CATEGORIES.includes(sail.category)) {
+        throw new Error(`setSails: sail "${sail.id}" has unknown category "${sail.category}"`);
+      }
+    }
+    // Active references must point at a sail in the matching category; any
+    // stale reference (deleted sail or wrong category) is silently cleared.
+    const cleaned: SailWardrobe['active'] = {};
+    for (const cat of SAIL_CATEGORIES) {
+      const ref = value.active[cat];
+      if (!ref) continue;
+      const sail = value.sails.find((s) => s.id === ref);
+      if (sail && sail.category === cat) cleaned[cat] = ref;
+    }
+    const stored: SailWardrobe = { ...value, active: cleaned };
+    this.upsert(sailWardrobe, stored);
+    this.subjects.sails.next(stored);
   }
   async setSourcePriority(value: SourcePriorityConfig): Promise<void> {
     // Sanitise: drop entries that don't validate (missing fields, non-finite
@@ -529,9 +512,12 @@ export class ConfigStore {
       if (!rule || typeof rule !== 'object') continue;
       if (typeof rule.channelPattern !== 'string' || rule.channelPattern.length === 0) continue;
       if (!Array.isArray(rule.sources)) continue;
-      const sources = rule.sources.filter((s): s is string => typeof s === 'string' && s.length > 0);
+      const sources = rule.sources.filter(
+        (s): s is string => typeof s === 'string' && s.length > 0,
+      );
       if (sources.length === 0) continue;
-      if (typeof rule.freshnessSeconds !== 'number' || !Number.isFinite(rule.freshnessSeconds)) continue;
+      if (typeof rule.freshnessSeconds !== 'number' || !Number.isFinite(rule.freshnessSeconds))
+        continue;
       if (rule.freshnessSeconds <= 0) continue;
       const blocked = Array.isArray(rule.blocked)
         ? rule.blocked.filter((s): s is string => typeof s === 'string' && s.length > 0)
@@ -588,25 +574,17 @@ export class ConfigStore {
     this.upsert(dampingConfigTable, cleaned);
     this.subjects.dampingConfig.next(cleaned);
   }
-  async setPolars(value: PolarTable): Promise<void> {
-    // Legacy compatibility: create a new revision under the active slot+mode
-    // with lineage 'manual_edit', then set it active.
-    const wardrobe = this.subjects.sails.value;
-    const slot = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId);
-    if (!slot) return;
-    const id = ulid().toLowerCase();
-    const rev: PolarRevision = {
-      id,
-      boatId: this.__activeBoatId,
-      sailConfigId: slot.id,
-      mode: wardrobe.activeMode,
-      parentRevisionId: slot.modes[wardrobe.activeMode]?.activeRevisionId ?? null,
-      createdAt: Math.floor(Date.now() / 1000),
-      lineage: { kind: 'manual_edit', notes: 'via legacy setPolars()' },
-      table: value,
-    };
-    await this.createRevision(rev);
-    await this.setActiveRevision(slot.id, wardrobe.activeMode, id);
+  /**
+   * @deprecated In v3 the wardrobe no longer carries per-config polar
+   * pointers. The web routes that called this need to be rewritten to
+   * `createRevision()` directly; the active polar is just the most-recent
+   * revision for `(boatId, activeMode)`. Kept as a throwing stub so the
+   * intent of any remaining caller is obvious at runtime.
+   */
+  async setPolars(_value: PolarTable): Promise<void> {
+    throw new Error(
+      'setPolars() is deprecated in v3 — use createRevision() directly; activePolar$ resolves to the newest revision for (boatId, activeMode)',
+    );
   }
 
   async createRevision(rev: PolarRevision): Promise<void> {
@@ -616,27 +594,22 @@ export class ConfigStore {
     this.subjects.polarRevisions.next(next);
   }
 
+  /**
+   * @deprecated In v3 there is no explicit "active revision" pointer — the
+   * active polar is the newest revision for `(boatId, activeMode)`. To make
+   * an older revision active again, the caller should write a new revision
+   * (copying the older table) so it becomes the newest. Kept as a throwing
+   * stub for now; the web route `/api/polar/active` needs to be rewritten
+   * in a later task.
+   */
   async setActiveRevision(
-    sailConfigId: string,
-    mode: PolarMode,
-    revisionId: string,
+    _sailConfigId: string,
+    _mode: PolarMode,
+    _revisionId: string,
   ): Promise<void> {
-    const revs = this.subjects.polarRevisions.value;
-    if (!revs.has(revisionId)) {
-      throw new Error(`revision ${revisionId} not found`);
-    }
-    const wardrobe = this.subjects.sails.value;
-    const idx = wardrobe.configs.findIndex((c) => c.id === sailConfigId);
-    if (idx < 0) throw new Error(`sail config ${sailConfigId} not found`);
-    const newConfigs = wardrobe.configs.slice();
-    const cfg = newConfigs[idx]!;
-    newConfigs[idx] = {
-      ...cfg,
-      modes: { ...cfg.modes, [mode]: { activeRevisionId: revisionId } },
-    };
-    const next: SailWardrobe = { ...wardrobe, configs: newConfigs };
-    this.upsert(sailWardrobe, next);
-    this.subjects.sails.next(next);
+    throw new Error(
+      'setActiveRevision() is deprecated in v3 — write a new revision (copying the desired table) to make it the newest for (boatId, mode)',
+    );
   }
 
   listRevisions(filter: ListFilter = {}): PolarRevision[] {
@@ -659,7 +632,6 @@ export class ConfigStore {
     this.subjects.aisAlarm.complete();
     this.subjects.passageLog.complete();
     this.subjects.polarRevisions.complete();
-    this.subjects.crossoverMap.complete();
     this.subjects.crossoverSettings.complete();
   }
 

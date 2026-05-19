@@ -35,10 +35,7 @@ export async function PUT(req: Request): Promise<Response> {
   const cfg: DampingConfig = {};
   for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
     if (typeof v !== 'number' || !Number.isFinite(v)) {
-      return Response.json(
-        { error: `value for "${k}" is not a finite number` },
-        { status: 422 },
-      );
+      return Response.json({ error: `value for "${k}" is not a finite number` }, { status: 422 });
     }
     cfg[k] = v;
   }

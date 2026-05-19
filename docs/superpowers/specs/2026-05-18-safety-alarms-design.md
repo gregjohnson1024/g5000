@@ -28,43 +28,43 @@ Two alarms deliberately deferred (see §6): off-course (XTE) and arrival (DTW) r
 
 ### Create
 
-| File | Purpose |
-|---|---|
-| `packages/core/src/alarms.ts` | `AlarmsRegistry` interface + `AlarmSnapshot` type + `setSharedAlarms` / `getSharedAlarms` accessors. Distinct from `alerts.ts`; g5000-derived alarms only. |
-| `packages/core/src/alarms.test.ts` | Unit tests for `AlarmsRegistry` impl: fire + auto-clear, sticky behaviour, ack lifecycle, dedupe by id. |
-| `packages/compute/src/alarms/index.ts` | `startAlarmsPipeline(bus, registry, config)` — boots all predicates, returns subscription disposer. |
-| `packages/compute/src/alarms/anchor-watch.ts` | Anchor-watch predicate: subscribes to `nav.gps.position`; if armed, fires when `haversine(pos, anchor) > radius`. |
-| `packages/compute/src/alarms/shallow-water.ts` | Shallow-water predicate: subscribes to `nav.depth`; fires when `depth < threshold`. `nav.depth` semantics on this boat are whatever the channel-mapper produces from PGN 128267 (typically below-transducer); the user configures `thresholdM` to match their preferred safety margin against that reference. The plan should verify the actual semantics during implementation. |
-| `packages/compute/src/alarms/over-speed.ts` | Over-speed predicate: subscribes to `nav.gps.sog`; fires when `sog > threshold`. |
-| `packages/compute/src/alarms/low-battery.ts` | Low-battery predicate: subscribes to `electrical.battery.voltage`; fires when `volts < threshold`. |
-| `packages/compute/src/alarms/anchor-watch.test.ts` | Per-predicate unit tests, fixture samples → assert fire/clear transitions. |
-| `packages/compute/src/alarms/shallow-water.test.ts` | Same shape. |
-| `packages/compute/src/alarms/over-speed.test.ts` | Same shape. |
-| `packages/compute/src/alarms/low-battery.test.ts` | Same shape. |
-| `packages/db/src/alarms-config.ts` | `AlarmsConfig` type + `loadAlarmsConfig` / `saveAlarmsConfig` ConfigStore helpers. |
-| `packages/db/src/alarms-history.ts` | `AlarmHistoryRow` type + `appendAlarmHistory` / `listAlarmHistory(limit)` helpers. Uses a real Drizzle table, not the JSON-blob config pattern, because history is row-oriented and needs `ORDER BY fired_at LIMIT`. |
-| `packages/web/src/app/alerts/page.tsx` | New `/alerts` page (replaces a 404 today). Tabs: **Active** (merges N2K alerts + g5000 alarms), **History** (alarm-only, last 200), **Settings** (per-alarm enable + threshold). |
-| `packages/web/src/app/alerts/active-list.tsx` | Client component: SSE-driven unified active list. |
-| `packages/web/src/app/alerts/history-list.tsx` | Client component: paginated history view. |
-| `packages/web/src/app/alerts/settings-form.tsx` | Client component: per-alarm config editor. |
-| `packages/web/src/app/api/alarms/route.ts` | GET (list active+config) / POST (manual trigger — MOB only) / PATCH (ack). |
-| `packages/web/src/app/api/alarms/config/route.ts` | GET / PUT for `AlarmsConfig`. |
-| `packages/web/src/app/api/alarms/history/route.ts` | GET, query params `limit` + `before`. |
-| `packages/web/src/app/api/alarms/anchor/route.ts` | POST `{action: 'drop'\|'weigh'}` — sets/clears the anchor drop point. Convenience endpoint that just calls into AlarmsConfig. |
-| `packages/web/src/components/alarm-banner.tsx` | Client component: SSE subscriber; renders highest-severity unacked alarm; mounts in root layout. |
-| `packages/web/src/components/audible-alarm.tsx` | Client component: Web Audio API beep loop. Mounted only by `/helm/layout.tsx`. Persistent mute toggle in localStorage with visible indicator. |
-| `packages/web/src/app/helm/mob-button.tsx` | Large red persistent footer button + confirm modal. Keyboard `M` shortcut with confirm. |
+| File                                                | Purpose                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/alarms.ts`                       | `AlarmsRegistry` interface + `AlarmSnapshot` type + `setSharedAlarms` / `getSharedAlarms` accessors. Distinct from `alerts.ts`; g5000-derived alarms only.                                                                                                                                                                                                                       |
+| `packages/core/src/alarms.test.ts`                  | Unit tests for `AlarmsRegistry` impl: fire + auto-clear, sticky behaviour, ack lifecycle, dedupe by id.                                                                                                                                                                                                                                                                          |
+| `packages/compute/src/alarms/index.ts`              | `startAlarmsPipeline(bus, registry, config)` — boots all predicates, returns subscription disposer.                                                                                                                                                                                                                                                                              |
+| `packages/compute/src/alarms/anchor-watch.ts`       | Anchor-watch predicate: subscribes to `nav.gps.position`; if armed, fires when `haversine(pos, anchor) > radius`.                                                                                                                                                                                                                                                                |
+| `packages/compute/src/alarms/shallow-water.ts`      | Shallow-water predicate: subscribes to `nav.depth`; fires when `depth < threshold`. `nav.depth` semantics on this boat are whatever the channel-mapper produces from PGN 128267 (typically below-transducer); the user configures `thresholdM` to match their preferred safety margin against that reference. The plan should verify the actual semantics during implementation. |
+| `packages/compute/src/alarms/over-speed.ts`         | Over-speed predicate: subscribes to `nav.gps.sog`; fires when `sog > threshold`.                                                                                                                                                                                                                                                                                                 |
+| `packages/compute/src/alarms/low-battery.ts`        | Low-battery predicate: subscribes to `electrical.battery.voltage`; fires when `volts < threshold`.                                                                                                                                                                                                                                                                               |
+| `packages/compute/src/alarms/anchor-watch.test.ts`  | Per-predicate unit tests, fixture samples → assert fire/clear transitions.                                                                                                                                                                                                                                                                                                       |
+| `packages/compute/src/alarms/shallow-water.test.ts` | Same shape.                                                                                                                                                                                                                                                                                                                                                                      |
+| `packages/compute/src/alarms/over-speed.test.ts`    | Same shape.                                                                                                                                                                                                                                                                                                                                                                      |
+| `packages/compute/src/alarms/low-battery.test.ts`   | Same shape.                                                                                                                                                                                                                                                                                                                                                                      |
+| `packages/db/src/alarms-config.ts`                  | `AlarmsConfig` type + `loadAlarmsConfig` / `saveAlarmsConfig` ConfigStore helpers.                                                                                                                                                                                                                                                                                               |
+| `packages/db/src/alarms-history.ts`                 | `AlarmHistoryRow` type + `appendAlarmHistory` / `listAlarmHistory(limit)` helpers. Uses a real Drizzle table, not the JSON-blob config pattern, because history is row-oriented and needs `ORDER BY fired_at LIMIT`.                                                                                                                                                             |
+| `packages/web/src/app/alerts/page.tsx`              | New `/alerts` page (replaces a 404 today). Tabs: **Active** (merges N2K alerts + g5000 alarms), **History** (alarm-only, last 200), **Settings** (per-alarm enable + threshold).                                                                                                                                                                                                 |
+| `packages/web/src/app/alerts/active-list.tsx`       | Client component: SSE-driven unified active list.                                                                                                                                                                                                                                                                                                                                |
+| `packages/web/src/app/alerts/history-list.tsx`      | Client component: paginated history view.                                                                                                                                                                                                                                                                                                                                        |
+| `packages/web/src/app/alerts/settings-form.tsx`     | Client component: per-alarm config editor.                                                                                                                                                                                                                                                                                                                                       |
+| `packages/web/src/app/api/alarms/route.ts`          | GET (list active+config) / POST (manual trigger — MOB only) / PATCH (ack).                                                                                                                                                                                                                                                                                                       |
+| `packages/web/src/app/api/alarms/config/route.ts`   | GET / PUT for `AlarmsConfig`.                                                                                                                                                                                                                                                                                                                                                    |
+| `packages/web/src/app/api/alarms/history/route.ts`  | GET, query params `limit` + `before`.                                                                                                                                                                                                                                                                                                                                            |
+| `packages/web/src/app/api/alarms/anchor/route.ts`   | POST `{action: 'drop'\|'weigh'}` — sets/clears the anchor drop point. Convenience endpoint that just calls into AlarmsConfig.                                                                                                                                                                                                                                                    |
+| `packages/web/src/components/alarm-banner.tsx`      | Client component: SSE subscriber; renders highest-severity unacked alarm; mounts in root layout.                                                                                                                                                                                                                                                                                 |
+| `packages/web/src/components/audible-alarm.tsx`     | Client component: Web Audio API beep loop. Mounted only by `/helm/layout.tsx`. Persistent mute toggle in localStorage with visible indicator.                                                                                                                                                                                                                                    |
+| `packages/web/src/app/helm/mob-button.tsx`          | Large red persistent footer button + confirm modal. Keyboard `M` shortcut with confirm.                                                                                                                                                                                                                                                                                          |
 
 ### Modify
 
-| File | Change |
-|---|---|
-| `packages/core/src/channels.ts` | Add `Electrical.BatteryVoltage = 'electrical.battery.voltage'`. |
-| Bridge channel-mapper (locate via `grep -r "PGN.*127" packages/bridge/src` during planning) | Add PGN 127508 (DC Battery Status) → `electrical.battery.voltage` mapping. Pick the lowest-instance battery (usually the house bank). Future spec can disambiguate instances. |
-| `packages/db/src/schema.ts` | Add `alarms_config` (JSON-blob, same shape as other config tables) AND `alarms_history` (row-oriented: `id`, `alarm_id`, `severity`, `fired_at`, `cleared_at NULL`, `acked_at NULL`, `context JSON`). |
-| `apps/autopilot-server/src/index.ts` | After bus + registries are constructed, instantiate `AlarmsRegistry`, register on globalThis, call `startAlarmsPipeline(bus, registry, config)` and stash the disposer. Load config from ConfigStore at boot. |
-| `packages/web/src/app/layout.tsx` | Mount `<AlarmBanner />` in the root layout so it appears on every page. |
-| `packages/web/src/app/helm/layout.tsx` (or `page.tsx` if no layout) | Mount `<AudibleAlarm />` + add `<MobButton />` to the page chrome. |
+| File                                                                                        | Change                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/channels.ts`                                                             | Add `Electrical.BatteryVoltage = 'electrical.battery.voltage'`.                                                                                                                                               |
+| Bridge channel-mapper (locate via `grep -r "PGN.*127" packages/bridge/src` during planning) | Add PGN 127508 (DC Battery Status) → `electrical.battery.voltage` mapping. Pick the lowest-instance battery (usually the house bank). Future spec can disambiguate instances.                                 |
+| `packages/db/src/schema.ts`                                                                 | Add `alarms_config` (JSON-blob, same shape as other config tables) AND `alarms_history` (row-oriented: `id`, `alarm_id`, `severity`, `fired_at`, `cleared_at NULL`, `acked_at NULL`, `context JSON`).         |
+| `apps/autopilot-server/src/index.ts`                                                        | After bus + registries are constructed, instantiate `AlarmsRegistry`, register on globalThis, call `startAlarmsPipeline(bus, registry, config)` and stash the disposer. Load config from ConfigStore at boot. |
+| `packages/web/src/app/layout.tsx`                                                           | Mount `<AlarmBanner />` in the root layout so it appears on every page.                                                                                                                                       |
+| `packages/web/src/app/helm/layout.tsx` (or `page.tsx` if no layout)                         | Mount `<AudibleAlarm />` + add `<MobButton />` to the page chrome.                                                                                                                                            |
 
 ### No change
 
@@ -115,7 +115,7 @@ Every predicate exports a single function:
 export function startXxxAlarmPredicate(
   bus: Bus,
   registry: AlarmsRegistry,
-  configRef: { current: AlarmsConfig },   // hot-reloaded on PUT /api/alarms/config
+  configRef: { current: AlarmsConfig }, // hot-reloaded on PUT /api/alarms/config
 ): { dispose(): void };
 ```
 
@@ -140,13 +140,13 @@ interface AlarmDef {
 
 V1 definitions:
 
-| id | severity | sticky | label |
-|---|---|---|---|
-| `mob` | CRITICAL | true | Man Overboard |
-| `anchor-watch` | CRITICAL | true | Anchor Drift |
-| `shallow-water` | CRITICAL | false | Shallow Water |
-| `over-speed` | WARN | false | Over Speed |
-| `low-battery` | WARN | false | Low Battery |
+| id              | severity | sticky | label         |
+| --------------- | -------- | ------ | ------------- |
+| `mob`           | CRITICAL | true   | Man Overboard |
+| `anchor-watch`  | CRITICAL | true   | Anchor Drift  |
+| `shallow-water` | CRITICAL | false  | Shallow Water |
+| `over-speed`    | WARN     | false  | Over Speed    |
+| `low-battery`   | WARN     | false  | Low Battery   |
 
 CRITICAL + sticky means: the only way to remove MOB or Anchor Drift from the active list is an explicit ack — even if the predicate condition reverses (you recover the MOB, you re-anchor in radius), the alarm stays visible until you actively dismiss it. This is intentional: those events demand human attention regardless of whether the technical condition resolved.
 
@@ -220,6 +220,7 @@ Two new tables:
 ### Restart behaviour
 
 On autopilot-server boot:
+
 1. Load `alarms_config` from ConfigStore.
 2. Construct `AlarmsRegistry` (empty active set).
 3. Start each predicate. Anchor predicate sees `armed=true` from the loaded config and resumes watching.

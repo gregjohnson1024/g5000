@@ -45,10 +45,7 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
       center: [center.lon, center.lat],
       zoom,
     });
-    map.addControl(
-      new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }),
-      'bottom-left',
-    );
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }), 'bottom-left');
     (window as unknown as { __g5kMap?: maplibregl.Map }).__g5kMap = map;
     map.on('click', (e) => {
       onClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
@@ -71,8 +68,10 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
       onLoadRef.current?.(map);
     });
     mapRef.current = map;
-    return () => { map.remove(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      map.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return <div ref={ref} className="w-full h-full" />;
 }

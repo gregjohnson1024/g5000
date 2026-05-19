@@ -20,13 +20,16 @@ describe('resolveCommand', () => {
 
   it('resolves nav / wind / no_drift to their canboat Events', () => {
     expect(resolveCommand('nav', { version: 1, captures: {} })).toMatchObject({
-      ok: true, fields: expect.objectContaining({ Event: 'Nav mode' }),
+      ok: true,
+      fields: expect.objectContaining({ Event: 'Nav mode' }),
     });
     expect(resolveCommand('wind', { version: 1, captures: {} })).toMatchObject({
-      ok: true, fields: expect.objectContaining({ Event: 'Wind mode' }),
+      ok: true,
+      fields: expect.objectContaining({ Event: 'Wind mode' }),
     });
     expect(resolveCommand('no_drift', { version: 1, captures: {} })).toMatchObject({
-      ok: true, fields: expect.objectContaining({ Event: 'No Drift mode' }),
+      ok: true,
+      fields: expect.objectContaining({ Event: 'No Drift mode' }),
     });
   });
 
@@ -40,7 +43,14 @@ describe('resolveCommand', () => {
     const r = resolveCommand('course_+1', {
       version: 1,
       captures: {
-        'course_+1': { fields: { 'Proprietary ID': 'Autopilot', Event: 'Change course', Direction: 'Starboard', Angle: 1 } },
+        'course_+1': {
+          fields: {
+            'Proprietary ID': 'Autopilot',
+            Event: 'Change course',
+            Direction: 'Starboard',
+            Angle: 1,
+          },
+        },
       },
     });
     expect(r.ok).toBe(true);

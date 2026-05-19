@@ -96,28 +96,35 @@ function ChartPageInner() {
   // first render uses the saved values — no default-zoom flash. Falls
   // back to the western-North-Atlantic overview when nothing is saved
   // (first ever visit, or localStorage cleared).
-  const [initialCamera] = useState<{ lat: number; lon: number; zoom: number; bearing: number }>(() => {
-    const fallback = { lat: 35, lon: -70, zoom: 4, bearing: 0 };
-    if (typeof window === 'undefined') return fallback;
-    try {
-      const raw = window.localStorage.getItem('chart:camera');
-      if (!raw) return fallback;
-      const c = JSON.parse(raw) as Partial<typeof fallback>;
-      if (
-        typeof c.lat === 'number' && Number.isFinite(c.lat) &&
-        typeof c.lon === 'number' && Number.isFinite(c.lon) &&
-        typeof c.zoom === 'number' && Number.isFinite(c.zoom)
-      ) {
-        return {
-          lat: c.lat,
-          lon: c.lon,
-          zoom: c.zoom,
-          bearing: typeof c.bearing === 'number' && Number.isFinite(c.bearing) ? c.bearing : 0,
-        };
+  const [initialCamera] = useState<{ lat: number; lon: number; zoom: number; bearing: number }>(
+    () => {
+      const fallback = { lat: 35, lon: -70, zoom: 4, bearing: 0 };
+      if (typeof window === 'undefined') return fallback;
+      try {
+        const raw = window.localStorage.getItem('chart:camera');
+        if (!raw) return fallback;
+        const c = JSON.parse(raw) as Partial<typeof fallback>;
+        if (
+          typeof c.lat === 'number' &&
+          Number.isFinite(c.lat) &&
+          typeof c.lon === 'number' &&
+          Number.isFinite(c.lon) &&
+          typeof c.zoom === 'number' &&
+          Number.isFinite(c.zoom)
+        ) {
+          return {
+            lat: c.lat,
+            lon: c.lon,
+            zoom: c.zoom,
+            bearing: typeof c.bearing === 'number' && Number.isFinite(c.bearing) ? c.bearing : 0,
+          };
+        }
+      } catch {
+        /* corrupt blob; fall through */
       }
-    } catch { /* corrupt blob; fall through */ }
-    return fallback;
-  });
+      return fallback;
+    },
+  );
   // Persist camera state on every pan / zoom / rotation. moveend fires
   // for both user-driven and programmatic camera changes; that's fine —
   // any flyTo we issue (e.g. "fly to boat" button) is something the user
@@ -130,16 +137,23 @@ function ChartPageInner() {
     const handler = (): void => {
       const c = mapInstance.getCenter();
       try {
-        window.localStorage.setItem('chart:camera', JSON.stringify({
-          lat: c.lat,
-          lon: c.lng,
-          zoom: mapInstance.getZoom(),
-          bearing: mapInstance.getBearing(),
-        }));
-      } catch { /* quota / private mode; ignore */ }
+        window.localStorage.setItem(
+          'chart:camera',
+          JSON.stringify({
+            lat: c.lat,
+            lon: c.lng,
+            zoom: mapInstance.getZoom(),
+            bearing: mapInstance.getBearing(),
+          }),
+        );
+      } catch {
+        /* quota / private mode; ignore */
+      }
     };
     mapInstance.on('moveend', handler);
-    return () => { mapInstance.off('moveend', handler); };
+    return () => {
+      mapInstance.off('moveend', handler);
+    };
   }, [mapInstance, initialCamera.bearing]);
 
   // Persist the user-tunable chart settings to localStorage so switching to
@@ -185,7 +199,9 @@ function ChartPageInner() {
 
   const [start, setStart] = useState<Pos | undefined>();
   const [end, setEnd] = useState<Pos | undefined>();
-  const [waypoints, setWaypoints] = useState<Array<{ id: string; name: string; lat: number; lon: number }>>([]);
+  const [waypoints, setWaypoints] = useState<
+    Array<{ id: string; name: string; lat: number; lon: number }>
+  >([]);
   const [loading, setLoading] = useState(false);
   const [route, setRoute] = useState<Route | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -237,7 +253,11 @@ function ChartPageInner() {
         const ecmwf = new Set<number>();
         let gfsRun: number | null = null;
         let ecmwfRun: number | null = null;
-        for (const e of j.entries as Array<{ model: 'gfs' | 'ecmwf'; forecastHour: number; runAt: number }>) {
+        for (const e of j.entries as Array<{
+          model: 'gfs' | 'ecmwf';
+          forecastHour: number;
+          runAt: number;
+        }>) {
           (e.model === 'gfs' ? gfs : ecmwf).add(e.forecastHour);
           if (e.model === 'gfs') gfsRun = Math.max(gfsRun ?? 0, e.runAt);
           else ecmwfRun = Math.max(ecmwfRun ?? 0, e.runAt);
@@ -253,7 +273,8 @@ function ChartPageInner() {
     };
     void tick();
 
-    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('forecast-cache') : null;
+    const bc =
+      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('forecast-cache') : null;
     bc?.addEventListener('message', () => void tick());
 
     const onVisible = (): void => {
@@ -497,7 +518,9 @@ function ChartPageInner() {
               setCurrentStatus(`Error: ${error}`);
             } else if (grid) {
               const ageH = Math.round((Date.now() / 1000 - grid.validAt) / 3600);
-              setCurrentStatus(`CMEMS daily mean for ${new Date(grid.validAt * 1000).toISOString().slice(0, 10)}`);
+              setCurrentStatus(
+                `CMEMS daily mean for ${new Date(grid.validAt * 1000).toISOString().slice(0, 10)}`,
+              );
             }
           }}
         />
@@ -574,9 +597,8 @@ function ChartPageInner() {
           {displayModel === 'CMEMS' && (
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
               <p className="text-slate-400">
-                Surface currents from Copernicus Marine (CMEMS) daily-mean
-                global analysis (1/12°, surface depth). Colour = speed in
-                knots; arrows = direction.
+                Surface currents from Copernicus Marine (CMEMS) daily-mean global analysis (1/12°,
+                surface depth). Colour = speed in knots; arrows = direction.
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -625,113 +647,130 @@ function ChartPageInner() {
           {/* Wind-forecast timeline (run, valid time, hour stepper). Hidden
               when the user has CMEMS selected — currents are a daily mean
               and don't have an hour-stepped slider. */}
-          {displayModel !== 'CMEMS' && (() => {
-            const fullList = availableHours[windModel];
-            if (fullList.length === 0) {
+          {displayModel !== 'CMEMS' &&
+            (() => {
+              const fullList = availableHours[windModel];
+              if (fullList.length === 0) {
+                return (
+                  <div className="text-xs text-amber-300">
+                    No {windModel.toUpperCase()} forecast cached. Visit{' '}
+                    <a href="/forecast" className="underline">
+                      Forecast
+                    </a>
+                    .
+                  </div>
+                );
+              }
+              // Filter out forecast hours whose valid time is in the past.
+              // Slider always starts at "now" (or the first cached hour
+              // that's still useful). Falls back to the full list if we
+              // don't yet know the run time.
+              const runAt = latestRunAt[windModel];
+              const nowS = Date.now() / 1000;
+              const list = runAt
+                ? fullList.filter((h) => runAt + h * 3600 >= nowS - 1800) // 30 min grace
+                : fullList;
+              if (list.length === 0) {
+                return (
+                  <div className="text-xs text-amber-300">
+                    {windModel.toUpperCase()} forecast cache is stale (all valid times in the past).
+                    Refresh on{' '}
+                    <a href="/forecast" className="underline">
+                      Forecast
+                    </a>
+                    .
+                  </div>
+                );
+              }
+              const idx = list.indexOf(windHours);
+              const effectiveIdx = idx >= 0 ? idx : 0;
+              const effectiveHours = list[effectiveIdx]!;
+              if (effectiveHours !== windHours) {
+                setTimeout(() => setWindHours(effectiveHours), 0);
+              }
+              const goPrev = (): void => {
+                if (effectiveIdx > 0) setWindHours(list[effectiveIdx - 1]!);
+              };
+              const goNext = (): void => {
+                if (effectiveIdx < list.length - 1) setWindHours(list[effectiveIdx + 1]!);
+              };
+              // Label: "HH:MM[Z] DD MMM (in N h)" — absolute time in the
+              // page's current Local/UTC mode, plus a relative offset so
+              // it's clear where we are on the timeline.
+              let label = `+${effectiveHours}h`;
+              if (runAt) {
+                const validUnix = runAt + effectiveHours * 3600;
+                const absLabel = fmtHourLabel(validUnix, tz);
+                const hoursFromNow = (validUnix - nowS) / 3600;
+                const rel =
+                  Math.abs(hoursFromNow) < 0.5
+                    ? 'now'
+                    : hoursFromNow < 0
+                      ? `${Math.round(-hoursFromNow)}h ago`
+                      : `in ${Math.round(hoursFromNow)}h`;
+                label = `${absLabel} (${rel})`;
+              }
               return (
-                <div className="text-xs text-amber-300">
-                  No {windModel.toUpperCase()} forecast cached. Visit{' '}
-                  <a href="/forecast" className="underline">
-                    Forecast
-                  </a>
-                  .
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      disabled={effectiveIdx <= 0}
+                      className="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-30"
+                      title="Previous cached hour"
+                    >
+                      ←
+                    </button>
+                    <span className="text-xs text-slate-400 font-mono flex-1 text-center">
+                      {label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      disabled={effectiveIdx >= list.length - 1}
+                      className="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-30"
+                      title="Next cached hour"
+                    >
+                      →
+                    </button>
+                  </div>
+                  <input
+                    type="range"
+                    min={list[0]}
+                    max={list[list.length - 1]}
+                    step={1}
+                    value={effectiveHours}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      const nearest = list.reduce(
+                        (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
+                        list[0]!,
+                      );
+                      setWindHours(nearest);
+                    }}
+                    className="block w-full"
+                  />
                 </div>
               );
-            }
-            // Filter out forecast hours whose valid time is in the past.
-            // Slider always starts at "now" (or the first cached hour
-            // that's still useful). Falls back to the full list if we
-            // don't yet know the run time.
-            const runAt = latestRunAt[windModel];
-            const nowS = Date.now() / 1000;
-            const list = runAt
-              ? fullList.filter((h) => runAt + h * 3600 >= nowS - 1800) // 30 min grace
-              : fullList;
-            if (list.length === 0) {
-              return (
-                <div className="text-xs text-amber-300">
-                  {windModel.toUpperCase()} forecast cache is stale (all
-                  valid times in the past). Refresh on{' '}
-                  <a href="/forecast" className="underline">Forecast</a>.
-                </div>
-              );
-            }
-            const idx = list.indexOf(windHours);
-            const effectiveIdx = idx >= 0 ? idx : 0;
-            const effectiveHours = list[effectiveIdx]!;
-            if (effectiveHours !== windHours) {
-              setTimeout(() => setWindHours(effectiveHours), 0);
-            }
-            const goPrev = (): void => {
-              if (effectiveIdx > 0) setWindHours(list[effectiveIdx - 1]!);
-            };
-            const goNext = (): void => {
-              if (effectiveIdx < list.length - 1) setWindHours(list[effectiveIdx + 1]!);
-            };
-            // Label: "HH:MM[Z] DD MMM (in N h)" — absolute time in the
-            // page's current Local/UTC mode, plus a relative offset so
-            // it's clear where we are on the timeline.
-            let label = `+${effectiveHours}h`;
-            if (runAt) {
-              const validUnix = runAt + effectiveHours * 3600;
-              const absLabel = fmtHourLabel(validUnix, tz);
-              const hoursFromNow = (validUnix - nowS) / 3600;
-              const rel = Math.abs(hoursFromNow) < 0.5
-                ? 'now'
-                : hoursFromNow < 0
-                ? `${Math.round(-hoursFromNow)}h ago`
-                : `in ${Math.round(hoursFromNow)}h`;
-              label = `${absLabel} (${rel})`;
-            }
-            return (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    disabled={effectiveIdx <= 0}
-                    className="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-30"
-                    title="Previous cached hour"
-                  >
-                    ←
-                  </button>
-                  <span className="text-xs text-slate-400 font-mono flex-1 text-center">
-                    {label}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    disabled={effectiveIdx >= list.length - 1}
-                    className="px-2 py-0.5 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-30"
-                    title="Next cached hour"
-                  >
-                    →
-                  </button>
-                </div>
-                <input
-                  type="range"
-                  min={list[0]}
-                  max={list[list.length - 1]}
-                  step={1}
-                  value={effectiveHours}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    const nearest = list.reduce(
-                      (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
-                      list[0]!,
-                    );
-                    setWindHours(nearest);
-                  }}
-                  className="block w-full"
-                />
-              </div>
-            );
-          })()}
+            })()}
           {displayModel !== 'CMEMS' && windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
-              <div>Showing: <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span></div>
-              <div>Run: <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.runAt, tz)}</span></div>
-              <div>Valid: <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.validAt, tz)}</span> (+{windGrid.forecastHour}h)</div>
+              <div>
+                Showing:{' '}
+                <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span>
+              </div>
+              <div>
+                Run:{' '}
+                <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.runAt, tz)}</span>
+              </div>
+              <div>
+                Valid:{' '}
+                <span className="text-slate-200 font-mono">
+                  {fmtHourLabel(windGrid.validAt, tz)}
+                </span>{' '}
+                (+{windGrid.forecastHour}h)
+              </div>
             </div>
           )}
           {displayModel !== 'CMEMS' && windStatus && (
@@ -768,8 +807,7 @@ function ChartPageInner() {
               <button
                 type="button"
                 onClick={() => {
-                  if (livePos)
-                    setStart({ lat: livePos.lat, lon: livePos.lon });
+                  if (livePos) setStart({ lat: livePos.lat, lon: livePos.lon });
                 }}
                 disabled={!livePos}
                 className="px-2 py-1 bg-slate-700 hover:bg-amber-600 hover:text-slate-900 rounded disabled:opacity-40"
@@ -847,9 +885,12 @@ function ChartPageInner() {
         {error && <div className="text-rose-400 text-xs">{error}</div>}
         {route && (
           <div className="text-xs text-slate-300">
-            ETA: {fmtHourLabel(route.end, tz)}<br />
-            Distance: {(route.distance / 1852).toFixed(0)} NM<br />
-            Model: {route.model}{route.incomplete ? ` (incomplete: ${route.reason})` : ''}
+            ETA: {fmtHourLabel(route.end, tz)}
+            <br />
+            Distance: {(route.distance / 1852).toFixed(0)} NM
+            <br />
+            Model: {route.model}
+            {route.incomplete ? ` (incomplete: ${route.reason})` : ''}
           </div>
         )}
         {route && (
@@ -878,7 +919,7 @@ function LiveValues({ p }: { p: LivePos | null }) {
   // Compact marine DMM matching the shared format-coords helper:
   // `33 42.232n` (no °/′ symbols, lowercase hemisphere).
   const fmtCoord = (deg: number, axis: 'lat' | 'lon'): string => {
-    const hemi = (deg >= 0 ? (axis === 'lat' ? 'n' : 'e') : axis === 'lat' ? 's' : 'w');
+    const hemi = deg >= 0 ? (axis === 'lat' ? 'n' : 'e') : axis === 'lat' ? 's' : 'w';
     const abs = Math.abs(deg);
     const d = Math.floor(abs);
     const m = (abs - d) * 60;
@@ -893,13 +934,22 @@ function LiveValues({ p }: { p: LivePos | null }) {
       <div className="font-mono text-slate-200">{fmtCoord(p.lat, 'lat')}</div>
       <div className="font-mono text-slate-200">{fmtCoord(p.lon, 'lon')}</div>
       <div className="text-slate-400">
-        SOG: <span className="text-slate-200 font-mono">{sogKn !== null ? `${sogKn.toFixed(1)} kn` : '—'}</span>
+        SOG:{' '}
+        <span className="text-slate-200 font-mono">
+          {sogKn !== null ? `${sogKn.toFixed(1)} kn` : '—'}
+        </span>
       </div>
       <div className="text-slate-400">
-        COG: <span className="text-slate-200 font-mono">{cogDeg !== null ? `${cogDeg.toFixed(0)}° T` : '—'}</span>
+        COG:{' '}
+        <span className="text-slate-200 font-mono">
+          {cogDeg !== null ? `${cogDeg.toFixed(0)}° T` : '—'}
+        </span>
       </div>
       <div className="text-slate-400">
-        HDG: <span className="text-slate-200 font-mono">{hdgDeg !== null ? `${hdgDeg.toFixed(0)}° T` : '—'}</span>
+        HDG:{' '}
+        <span className="text-slate-200 font-mono">
+          {hdgDeg !== null ? `${hdgDeg.toFixed(0)}° T` : '—'}
+        </span>
       </div>
     </div>
   );
@@ -924,7 +974,8 @@ function SavedPlanLoader({ onLoad }: { onLoad: (plan: PlanRecord) => void }) {
     void fetch('/api/plans', { cache: 'no-store' })
       .then((r) => r.json())
       .then((j: { ok?: boolean; items?: PlanRecord[] }) => {
-        if (j.ok && Array.isArray(j.items)) setItems(j.items.sort((a, b) => b.createdAt - a.createdAt));
+        if (j.ok && Array.isArray(j.items))
+          setItems(j.items.sort((a, b) => b.createdAt - a.createdAt));
       })
       .catch(() => {
         /* ignore */
@@ -989,8 +1040,7 @@ function CursorReadout({
   boat: LivePos | null;
 }) {
   if (!cursor) return null;
-  const hasBoat =
-    !!boat && Number.isFinite(boat.lat) && Number.isFinite(boat.lon);
+  const hasBoat = !!boat && Number.isFinite(boat.lat) && Number.isFinite(boat.lon);
   const rangeBearing = hasBoat
     ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
     : null;
@@ -1019,14 +1069,10 @@ function haversineAndBearing(
   const phi2 = b.lat * DEG;
   const dphi = (b.lat - a.lat) * DEG;
   const dlam = (b.lon - a.lon) * DEG;
-  const h =
-    Math.sin(dphi / 2) ** 2 +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
+  const h = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
   const distNm = 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(h)));
   const y = Math.sin(dlam) * Math.cos(phi2);
-  const x =
-    Math.cos(phi1) * Math.sin(phi2) -
-    Math.sin(phi1) * Math.cos(phi2) * Math.cos(dlam);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dlam);
   let bearingDeg = (Math.atan2(y, x) * 180) / Math.PI;
   if (bearingDeg < 0) bearingDeg += 360;
   return { distNm, bearingDeg };

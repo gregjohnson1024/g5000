@@ -2,12 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { firstValueFrom } from 'rxjs';
-import {
-  ConfigStore,
-  setSharedConfigStore,
-  _resetSharedConfigStoreForTests,
-} from '@g5000/db';
+import { ConfigStore, setSharedConfigStore, _resetSharedConfigStoreForTests } from '@g5000/db';
 import { GET, POST } from './route.js';
 
 describe('/api/wardrobe/active', () => {
@@ -26,26 +21,21 @@ describe('/api/wardrobe/active', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('GET returns the active SailConfig JSON (v2 shape)', async () => {
+  it('GET returns the active polar table + activeMode (v3 shape)', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json).toHaveProperty('id');
-    expect(json).toHaveProperty('name');
-    expect(json).toHaveProperty('modes');
-    expect(typeof json.modes).toBe('object');
+    expect(json).toHaveProperty('polar');
+    expect(json).toHaveProperty('activeMode');
+    expect(json.polar).toHaveProperty('twsBins');
+    expect(json.polar).toHaveProperty('twaBins');
+    expect(json.polar).toHaveProperty('boatSpeed');
   });
 
-  it('accepts an optional activeMode and persists it', async () => {
-    const res = await POST(
-      new Request('http://x/api/wardrobe/active', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ activeConfigId: 'default', activeMode: 'foiling' }),
-      }),
-    );
-    expect(res.status).toBe(200);
-    const wardrobe = await firstValueFrom(store.sails$);
-    expect(wardrobe.activeMode).toBe('foiling');
+  it('POST returns 501 (no v3 equivalent of v2 activeConfigId)', async () => {
+    const res = await POST();
+    expect(res.status).toBe(501);
+    const json = await res.json();
+    expect(json.error.kind).toBe('not_implemented');
   });
 });

@@ -1,105 +1,115 @@
-import { combineLatest, Subject } from 'rxjs';
-import type { Observable } from 'rxjs';
-import { Channels, type Bus, type Sample } from '@g5000/core';
-import type { CrossoverMap, CrossoverSettings, PolarTable, SailWardrobe } from '@g5000/db';
-import { lookupConfigId, snapToCell } from './lookup.js';
+import { combineLatest, Subscription, type Observable } from 'rxjs';
+import { Bus, Channels, snapToFixedGrid, type Cell } from '@g5000/core';
+import type { CrossoverSettings, SailCategory, SailWardrobe } from '@g5000/db';
+import { findValidSailsByCategory, type ValidByCategory } from './region-lookup.js';
 
-/**
- * Published shape on Channels.SAIL_RECOMMENDATION. Consumers (helm tile,
- * recommendation panel) compute `shouldChange` themselves on each render:
- *
- *   shouldChange = recommendedConfigId
- *               && recommendedConfigId !== activeConfigId
- *               && (Date.now()/1000 - enteredAt) >= stableSeconds
- *
- * This avoids a class of RxJS bugs where the pipeline doesn't re-fire
- * after wind stabilises so the in-pipeline maturation timer never trips.
- */
-export interface SailRecommendation {
-  recommendedConfigId: string | null;
-  activeConfigId: string;
-  /** Index into the active polar's twsBins. */
-  cellTwsIdx: number;
-  /** Index into the active polar's twaBins. */
-  cellTwaIdx: number;
-  /** UNIX seconds when this recommendedConfigId was first observed. Resets
-   *  to "now" when the recommendation flips to a different config. */
-  enteredAt: number;
-  /** Echoed from CrossoverSettings so the UI can compute shouldChange. */
-  stableSeconds: number;
-}
-
-/** Minimal store shape used by the pipeline — duck-typed for testability. */
-export interface CrossoverPipelineStore {
-  activePolar$: Observable<PolarTable>;
-  sails$: Observable<SailWardrobe>;
-  crossoverMap$: Observable<CrossoverMap>;
-  crossoverSettings$: Observable<CrossoverSettings>;
-}
-
-interface WindLatest {
-  tws: number | null;
-  twa: number | null;
-  tNs: bigint;
-}
-
-export function startSailCrossoverPipeline(args: {
+export interface StartArgs {
   bus: Bus;
-  store: CrossoverPipelineStore;
-}): () => void {
-  const { bus, store } = args;
-  const wind$ = new Subject<WindLatest>();
-  let twsLatest: number | null = null;
-  let twaLatest: number | null = null;
+  sails$: Observable<SailWardrobe>;
+  settings$: Observable<CrossoverSettings>;
+  /** UNIX seconds; injectable for tests. */
+  now?: () => number;
+}
 
-  const unsubTws = bus.subscribe('wind.true.speed', (s: Sample) => {
-    if (s.value.kind !== 'scalar') return;
-    twsLatest = s.value.value;
-    wind$.next({ tws: twsLatest, twa: twaLatest, tNs: s.t_ns });
-  });
-  const unsubTwa = bus.subscribe('wind.true.angle', (s: Sample) => {
-    if (s.value.kind !== 'scalar') return;
-    twaLatest = s.value.value;
-    wind$.next({ tws: twsLatest, twa: twaLatest, tNs: s.t_ns });
-  });
+interface CategoryTimer {
+  outSince: number | null;
+  lastActive: string | undefined;
+}
 
-  let lastCandidate: string | null = null;
-  let candidateSince = 0;
+const CATEGORIES: SailCategory[] = ['headsail', 'main', 'downwind'];
 
-  const sub = combineLatest([
-    store.activePolar$,
-    store.sails$,
-    store.crossoverMap$,
-    store.crossoverSettings$,
-    wind$,
-  ]).subscribe(([polar, wardrobe, map, settings, w]) => {
-    if (w.tws === null || w.twa === null) return;
-    const cell = snapToCell(polar, w.tws, w.twa);
-    const recommended = lookupConfigId(map, polar, w.tws, w.twa);
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (recommended !== lastCandidate) {
-      lastCandidate = recommended;
-      candidateSince = nowSec;
-    }
-    const payload: SailRecommendation = {
-      recommendedConfigId: recommended,
-      activeConfigId: wardrobe.activeConfigId,
-      cellTwsIdx: cell.twsIdx,
-      cellTwaIdx: cell.twaIdx,
-      enteredAt: candidateSince,
-      stableSeconds: settings.recommendationStableSeconds,
-    };
-    bus.publish({
-      channel: Channels.SAIL_RECOMMENDATION,
-      source: 'compute:sail-crossover',
-      t_ns: BigInt(nowSec) * 1_000_000_000n,
-      value: { kind: 'sail_recommendation', ...payload },
-    });
-  });
-
-  return () => {
-    sub.unsubscribe();
-    unsubTws();
-    unsubTwa();
+export function startSailCrossoverPipeline(args: StartArgs): Subscription {
+  const now = args.now ?? (() => Math.floor(Date.now() / 1000));
+  const timers: Record<SailCategory, CategoryTimer> = {
+    headsail: { outSince: null, lastActive: undefined },
+    main: { outSince: null, lastActive: undefined },
+    downwind: { outSince: null, lastActive: undefined },
   };
+
+  let lastTws: number | null = null;
+  let lastTwa: number | null = null;
+  let latestWardrobe: SailWardrobe | null = null;
+  let latestSettings: CrossoverSettings | null = null;
+
+  const stateSub = combineLatest([args.sails$, args.settings$]).subscribe(([w, s]) => {
+    latestWardrobe = w;
+    latestSettings = s;
+    // Re-evaluate on store changes too (e.g., user repaints a region).
+    tryEmit();
+  });
+
+  const speedSub = args.bus.subscribe('wind.true.speed', (sample) => {
+    if (sample.value.kind !== 'scalar') return;
+    lastTws = sample.value.value;
+    tryEmit();
+  });
+  const angleSub = args.bus.subscribe('wind.true.angle', (sample) => {
+    if (sample.value.kind !== 'scalar') return;
+    lastTwa = sample.value.value;
+    tryEmit();
+  });
+
+  function tryEmit(): void {
+    if (latestWardrobe === null || latestSettings === null) return;
+    if (lastTws === null || lastTwa === null) return;
+    emit(args.bus, latestWardrobe, latestSettings, lastTws, lastTwa, now(), timers);
+  }
+
+  const sub = new Subscription();
+  sub.add(stateSub);
+  sub.add(() => speedSub());
+  sub.add(() => angleSub());
+  return sub;
+}
+
+function emit(
+  bus: Bus,
+  wardrobe: SailWardrobe,
+  settings: CrossoverSettings,
+  twsMs: number,
+  twaRad: number,
+  t: number,
+  timers: Record<SailCategory, CategoryTimer>,
+): void {
+  const cell: Cell = snapToFixedGrid({ twsMs, twaRad });
+  const valid: ValidByCategory = findValidSailsByCategory(wardrobe.sails, cell);
+  const changeNeeded = { headsail: false, main: false, downwind: false };
+
+  for (const cat of CATEGORIES) {
+    const active = wardrobe.active[cat];
+    const timer = timers[cat];
+    if (active !== timer.lastActive) {
+      timer.outSince = null;
+      timer.lastActive = active;
+    }
+    if (!active) {
+      timer.outSince = null;
+      continue;
+    }
+    const inRange = valid[cat].includes(active);
+    if (inRange) {
+      timer.outSince = null;
+    } else {
+      if (timer.outSince === null) timer.outSince = t;
+      if (t - timer.outSince >= settings.recommendationStableSeconds) {
+        changeNeeded[cat] = true;
+      }
+    }
+  }
+
+  bus.publish({
+    channel: Channels.SAIL_RECOMMENDATION,
+    t_ns: BigInt(t) * 1_000_000_000n,
+    value: {
+      kind: 'sail_recommendation',
+      cellTwsKn: cell.twsIdx, // 1 kn per bin, so idx == knots
+      cellTwaDeg: cell.twaIdx * 5,
+      valid,
+      active: { ...wardrobe.active },
+      changeNeeded,
+      enteredAt: t,
+      stableSeconds: settings.recommendationStableSeconds,
+    },
+    source: 'compute:sail-crossover',
+  });
 }

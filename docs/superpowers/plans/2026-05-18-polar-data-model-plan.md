@@ -17,6 +17,7 @@
 ## File structure
 
 ### Create
+
 - `packages/db/src/polar-revisions.ts` — Drizzle queries + pure validator `validatePolarTable`
 - `packages/db/src/polar-revisions.test.ts`
 - `packages/db/src/migrate-wardrobe-v2.ts` — pure transform `migrateWardrobeV1ToV2`
@@ -29,6 +30,7 @@
 - `packages/web/src/app/api/polar/active/route.test.ts`
 
 ### Modify
+
 - `packages/db/package.json` — add `ulid` dep
 - `packages/db/src/defaults.ts` — new types, extend `PolarTable` / `SailConfig` / `SailWardrobe`, update `DEFAULT_WARDROBE` to v2 shape
 - `packages/db/src/schema.ts` — add `polar_revisions` table
@@ -42,6 +44,7 @@
 - `CLAUDE.md` — document `G5000_BOAT_ID` env var
 
 ### No change
+
 `packages/compute/src/polars/pipeline.ts`, `packages/compute/src/polars/math.ts`, `packages/routing/src/plan.ts`, `packages/bridge/**` — all consume `PolarTable` unchanged.
 
 ---
@@ -60,6 +63,7 @@
 ### Task 1: Add `ulid` dependency to `@g5000/db`
 
 **Files:**
+
 - Modify: `packages/db/package.json`
 
 - [ ] **Step 1: Add the dependency**
@@ -92,6 +96,7 @@ git commit -m "chore(db): add ulid dep for polar revisions"
 ### Task 2: Type definitions (additions only)
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts`
 
 This task only adds new types and adds optional fields to existing types. The existing `SailConfig.polar` field stays in place (still required) so v1 wardrobes continue to type-check during the migration window. Task 3 mutates `SailConfig` to make `polar` optional.
@@ -203,6 +208,7 @@ git commit -m "feat(db): add PolarRevision / PolarLineage types; heel+leeway gri
 This is a breaking type change: `SailConfig.polar` was required, now becomes optional, and a new required `modes` field is added. The runtime code that reads `polar` (only `activeConfigPolar` in `config-store.ts`) is in Task 7. After this task the workspace will fail to typecheck — that's expected and fixed by subsequent tasks. Commit anyway so the diff stays small per step.
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts`
 
 - [ ] **Step 1: Update `SailConfig` and `SailWardrobe`**
@@ -302,6 +308,7 @@ git commit -m "feat(db): v2 wardrobe types (modes pointer, boatId, activeMode)"
 ### Task 4: Add `polar_revisions` Drizzle table
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 
 - [ ] **Step 1: Add the new table**
@@ -352,6 +359,7 @@ git commit -m "feat(db): add polar_revisions Drizzle table"
 ### Task 5: Pure validator + revisions repo (write failing tests first)
 
 `polar-revisions.ts` holds:
+
 - `validatePolarTable(table)` — pure, throws on bad grids
 - `listRevisions(db, filter)` — SELECT with filter
 - `getRevision(db, id)` — single SELECT
@@ -360,6 +368,7 @@ git commit -m "feat(db): add polar_revisions Drizzle table"
 The `setActiveRevision` operation mutates wardrobe JSON and stays in `ConfigStore` (Task 7).
 
 **Files:**
+
 - Create: `packages/db/src/polar-revisions.test.ts`
 - Create: `packages/db/src/polar-revisions.ts`
 
@@ -428,9 +437,7 @@ describe('validatePolarTable', () => {
   });
 
   it('rejects mismatched dimensions', () => {
-    expect(() =>
-      validatePolarTable({ ...GOOD, boatSpeed: [[0, 1, 2]] }),
-    ).toThrow(/dimension/i);
+    expect(() => validatePolarTable({ ...GOOD, boatSpeed: [[0, 1, 2]] })).toThrow(/dimension/i);
   });
 
   it('rejects non-monotonic twsBins', () => {
@@ -438,11 +445,21 @@ describe('validatePolarTable', () => {
   });
 
   it('rejects non-monotonic twaBins', () => {
-    expect(() => validatePolarTable({ ...GOOD, twaBins: [0, Math.PI, Math.PI / 2, (3 * Math.PI) / 4, Math.PI / 4] })).toThrow(/monotonic/i);
+    expect(() =>
+      validatePolarTable({
+        ...GOOD,
+        twaBins: [0, Math.PI, Math.PI / 2, (3 * Math.PI) / 4, Math.PI / 4],
+      }),
+    ).toThrow(/monotonic/i);
   });
 
   it('rejects twaBins outside [0, π]', () => {
-    expect(() => validatePolarTable({ ...GOOD, twaBins: [0, Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4, Math.PI + 0.1] })).toThrow(/\[0, ?π\]/);
+    expect(() =>
+      validatePolarTable({
+        ...GOOD,
+        twaBins: [0, Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4, Math.PI + 0.1],
+      }),
+    ).toThrow(/\[0, ?π\]/);
   });
 
   it('rejects non-finite boatSpeed cell', () => {
@@ -463,9 +480,7 @@ describe('validatePolarTable', () => {
 
   it('accepts a grid with valid heel and leeway', () => {
     const sameShape = GOOD.boatSpeed.map((row) => row.map(() => 0.1));
-    expect(() =>
-      validatePolarTable({ ...GOOD, heel: sameShape, leeway: sameShape }),
-    ).not.toThrow();
+    expect(() => validatePolarTable({ ...GOOD, heel: sameShape, leeway: sameShape })).not.toThrow();
   });
 
   it('rejects empty bins', () => {
@@ -592,7 +607,9 @@ interface RevisionRow {
 }
 
 function rowToRevision(row: RevisionRow): PolarRevision {
-  const lineageMeta = row.lineageMeta ? (JSON.parse(row.lineageMeta) as { source?: string; notes?: string }) : {};
+  const lineageMeta = row.lineageMeta
+    ? (JSON.parse(row.lineageMeta) as { source?: string; notes?: string })
+    : {};
   return {
     id: row.id,
     boatId: row.boatId,
@@ -632,7 +649,11 @@ export function insertRevision(db: BetterSQLite3Database, rev: PolarRevision): v
 }
 
 export function getRevision(db: BetterSQLite3Database, id: string): PolarRevision | undefined {
-  const rows = db.select().from(polarRevisions).where(eq(polarRevisions.id, id)).all() as RevisionRow[];
+  const rows = db
+    .select()
+    .from(polarRevisions)
+    .where(eq(polarRevisions.id, id))
+    .all() as RevisionRow[];
   return rows[0] ? rowToRevision(rows[0]) : undefined;
 }
 
@@ -645,11 +666,14 @@ export interface ListFilter {
 export function listRevisions(db: BetterSQLite3Database, filter: ListFilter = {}): PolarRevision[] {
   const conds = [];
   if (filter.boatId !== undefined) conds.push(eq(polarRevisions.boatId, filter.boatId));
-  if (filter.sailConfigId !== undefined) conds.push(eq(polarRevisions.sailConfigId, filter.sailConfigId));
+  if (filter.sailConfigId !== undefined)
+    conds.push(eq(polarRevisions.sailConfigId, filter.sailConfigId));
   if (filter.mode !== undefined) conds.push(eq(polarRevisions.mode, filter.mode));
   const where = conds.length === 0 ? undefined : conds.length === 1 ? conds[0] : and(...conds);
   const q = db.select().from(polarRevisions);
-  const rows = (where ? q.where(where) : q).orderBy(desc(polarRevisions.createdAt)).all() as RevisionRow[];
+  const rows = (where ? q.where(where) : q)
+    .orderBy(desc(polarRevisions.createdAt))
+    .all() as RevisionRow[];
   return rows.map(rowToRevision);
 }
 ```
@@ -674,6 +698,7 @@ git commit -m "feat(db): polar-revisions repo + validator (TDD)"
 ### Task 6: Pure wardrobe v1→v2 migrator
 
 **Files:**
+
 - Create: `packages/db/src/migrate-wardrobe-v2.test.ts`
 - Create: `packages/db/src/migrate-wardrobe-v2.ts`
 
@@ -696,9 +721,7 @@ const RAW_V1 = {
 
 const RAW_V2: SailWardrobe = {
   boatId: 'sula',
-  configs: [
-    { id: 'default', name: 'Default', modes: { default: { activeRevisionId: 'rev-X' } } },
-  ],
+  configs: [{ id: 'default', name: 'Default', modes: { default: { activeRevisionId: 'rev-X' } } }],
   activeConfigId: 'default',
   activeMode: 'default',
 };
@@ -734,7 +757,14 @@ describe('migrateWardrobeV1ToV2', () => {
   });
 
   it('uses the supplied fallback polar when a v1 slot is missing its polar', () => {
-    const fallback: PolarTable = { twsBins: [3, 5], twaBins: [0, Math.PI], boatSpeed: [[0, 0], [0, 0]] };
+    const fallback: PolarTable = {
+      twsBins: [3, 5],
+      twaBins: [0, Math.PI],
+      boatSpeed: [
+        [0, 0],
+        [0, 0],
+      ],
+    };
     const idg = (() => {
       let n = 0;
       return () => `r-${++n}`;
@@ -879,6 +909,7 @@ git commit -m "feat(db): pure v1→v2 wardrobe migrator (TDD)"
 ### Task 7: Wire migration + new resolver into ConfigStore
 
 This is the largest task. It touches three concerns at once because they share boot state:
+
 1. Create `polar_revisions` table at boot.
 2. Read `G5000_BOAT_ID` env var.
 3. Run the migration inside a single SQLite transaction; populate `polarRevisions$` BehaviorSubject.
@@ -887,6 +918,7 @@ This is the largest task. It touches three concerns at once because they share b
 6. Add new methods: `createRevision`, `setActiveRevision`, `listRevisions`, `getRevision`.
 
 **Files:**
+
 - Modify: `packages/db/src/config-store.ts`
 
 - [ ] **Step 1: Add CREATE TABLE statement at boot**
@@ -1180,6 +1212,7 @@ git commit -m "feat(db): wire v1→v2 migration + revisions resolver into Config
 ### Task 8: Update ConfigStore tests for v2 shape
 
 **Files:**
+
 - Modify: `packages/db/src/config-store.test.ts`
 
 - [ ] **Step 1: Read the existing test file to map what needs updating**
@@ -1189,6 +1222,7 @@ npx vitest run packages/db/src/config-store.test.ts 2>&1 | grep -E "FAIL|expect"
 ```
 
 For each failing test, edit the assertion to match the v2 shape:
+
 - `wardrobe.configs[0].polar` → `wardrobe.configs[0].modes.default.activeRevisionId` (then resolve via `getRevision`)
 - New top-level fields `boatId` and `activeMode` should equal `'sula'` and `'default'`.
 
@@ -1335,6 +1369,7 @@ git commit -m "test(db): ConfigStore v2 wardrobe + migration + dangling-pointer 
 ### Task 9: Re-export new types and functions from `@g5000/db`
 
 **Files:**
+
 - Modify: `packages/db/src/index.ts`
 
 - [ ] **Step 1: Read the existing exports**
@@ -1391,6 +1426,7 @@ git commit -m "feat(db): re-export PolarRevision / PolarLineage / validatePolarT
 ### Task 10: `/api/polar/revisions` route — GET + POST
 
 **Files:**
+
 - Create: `packages/web/src/app/api/polar/revisions/route.ts`
 - Create: `packages/web/src/app/api/polar/revisions/route.test.ts`
 
@@ -1402,10 +1438,7 @@ Create `packages/web/src/app/api/polar/revisions/route.test.ts`:
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { tmpdir } from 'node:os';
 import { ConfigStore } from '@g5000/db';
-import {
-  setSharedConfigStore,
-  __resetSharedConfigStoreForTests,
-} from '@g5000/db';
+import { setSharedConfigStore, __resetSharedConfigStoreForTests } from '@g5000/db';
 import { DEFAULT_POLARS, type PolarTable } from '@g5000/db';
 import { GET, POST } from './route.js';
 
@@ -1472,7 +1505,14 @@ describe('POST /api/polar/revisions', () => {
           sailConfigId: 'default',
           mode: 'default',
           lineage: { kind: 'manual_edit' },
-          table: { twsBins: [5, 3], twaBins: [0, 1], boatSpeed: [[0, 0], [0, 0]] },
+          table: {
+            twsBins: [5, 3],
+            twaBins: [0, 1],
+            boatSpeed: [
+              [0, 0],
+              [0, 0],
+            ],
+          },
         }),
       }),
     );
@@ -1500,7 +1540,7 @@ Note: this test imports `setSharedConfigStore` and `__resetSharedConfigStoreForT
 npx vitest run packages/web/src/app/api/polar/revisions/route.test.ts
 ```
 
-Expected: FAIL with "Cannot find module './route.js'" or "__resetSharedConfigStoreForTests is not a function".
+Expected: FAIL with "Cannot find module './route.js'" or "\_\_resetSharedConfigStoreForTests is not a function".
 
 - [ ] **Step 3: Add a test-only reset helper to `@g5000/db`**
 
@@ -1579,10 +1619,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     await store.createRevision(rev);
   } catch (err) {
-    return Response.json(
-      { error: (err as Error).message ?? 'create failed' },
-      { status: 400 },
-    );
+    return Response.json({ error: (err as Error).message ?? 'create failed' }, { status: 400 });
   }
   return Response.json({ id: rev.id }, { status: 201 });
 }
@@ -1608,6 +1645,7 @@ git commit -m "feat(web): /api/polar/revisions GET+POST (TDD)"
 ### Task 11: `/api/polar/revisions/[id]` route — GET single
 
 **Files:**
+
 - Create: `packages/web/src/app/api/polar/revisions/[id]/route.ts`
 - Create: `packages/web/src/app/api/polar/revisions/[id]/route.test.ts`
 
@@ -1618,11 +1656,7 @@ Create `packages/web/src/app/api/polar/revisions/[id]/route.test.ts`:
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import {
-  ConfigStore,
-  setSharedConfigStore,
-  __resetSharedConfigStoreForTests,
-} from '@g5000/db';
+import { ConfigStore, setSharedConfigStore, __resetSharedConfigStoreForTests } from '@g5000/db';
 import { GET } from './route.js';
 
 let store: ConfigStore;
@@ -1704,6 +1738,7 @@ git commit -m "feat(web): /api/polar/revisions/[id] GET (TDD)"
 ### Task 12: `/api/polar/active` — POST set-active
 
 **Files:**
+
 - Create: `packages/web/src/app/api/polar/active/route.ts`
 - Create: `packages/web/src/app/api/polar/active/route.test.ts`
 
@@ -1819,7 +1854,11 @@ export async function POST(req: Request): Promise<Response> {
   } catch {
     return Response.json({ error: 'invalid json' }, { status: 400 });
   }
-  if (typeof body.sailConfigId !== 'string' || typeof body.mode !== 'string' || typeof body.revisionId !== 'string') {
+  if (
+    typeof body.sailConfigId !== 'string' ||
+    typeof body.mode !== 'string' ||
+    typeof body.revisionId !== 'string'
+  ) {
     return Response.json({ error: 'missing required fields' }, { status: 400 });
   }
   try {
@@ -1855,6 +1894,7 @@ git commit -m "feat(web): /api/polar/active POST (TDD)"
 ### Task 13: Wire `polarId` to revision id in `/api/route/plan`
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/route/plan/route.ts`
 
 - [ ] **Step 1: Read the existing handler**
@@ -1906,6 +1946,7 @@ git commit -m "refactor(web): wire route/plan polarId to active revision id"
 ### Task 14: Accept optional `activeMode` in `/api/wardrobe/active`
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/wardrobe/active/route.ts`
 - Modify: `packages/web/src/app/api/wardrobe/active/route.test.ts`
 
@@ -1968,6 +2009,7 @@ git commit -m "feat(web): /api/wardrobe/active accepts optional activeMode"
 ### Task 15: Compute pipeline picks up revision swaps
 
 **Files:**
+
 - Modify: `packages/compute/src/polars/pipeline.test.ts`
 
 The pipeline already subscribes to `activePolar$`. We're just adding a test that asserts the swap propagates.
@@ -1990,9 +2032,24 @@ describe('startPolarPipeline + revision swap', () => {
 
     // Publish synthetic wind + boatspeed samples first.
     const now_ns = BigInt(Date.now()) * 1_000_000n;
-    bus.publish({ channel: 'wind.true.speed', t_ns: now_ns, value: { kind: 'scalar', value: 5, unit: 'm/s' }, source: 'test' });
-    bus.publish({ channel: 'wind.true.angle', t_ns: now_ns, value: { kind: 'scalar', value: Math.PI / 2, unit: 'rad' }, source: 'test' });
-    bus.publish({ channel: 'boat.speed.water', t_ns: now_ns, value: { kind: 'scalar', value: 3, unit: 'm/s' }, source: 'test' });
+    bus.publish({
+      channel: 'wind.true.speed',
+      t_ns: now_ns,
+      value: { kind: 'scalar', value: 5, unit: 'm/s' },
+      source: 'test',
+    });
+    bus.publish({
+      channel: 'wind.true.angle',
+      t_ns: now_ns,
+      value: { kind: 'scalar', value: Math.PI / 2, unit: 'rad' },
+      source: 'test',
+    });
+    bus.publish({
+      channel: 'boat.speed.water',
+      t_ns: now_ns,
+      value: { kind: 'scalar', value: 3, unit: 'm/s' },
+      source: 'test',
+    });
 
     // Wait a tick for the publish queue.
     await new Promise((r) => setImmediate(r));
@@ -2018,7 +2075,12 @@ describe('startPolarPipeline + revision swap', () => {
     await store.setActiveRevision(slotId, 'default', revId);
 
     // Re-publish samples so the pipeline recomputes against the new polar.
-    bus.publish({ channel: 'wind.true.speed', t_ns: BigInt(Date.now()) * 1_000_000n, value: { kind: 'scalar', value: 5, unit: 'm/s' }, source: 'test' });
+    bus.publish({
+      channel: 'wind.true.speed',
+      t_ns: BigInt(Date.now()) * 1_000_000n,
+      value: { kind: 'scalar', value: 5, unit: 'm/s' },
+      source: 'test',
+    });
     await new Promise((r) => setImmediate(r));
 
     const target = await firstValueFrom(bus.subscribeChannel('performance.target.boatSpeed'));
@@ -2054,6 +2116,7 @@ git commit -m "test(compute): polar pipeline picks up revision swap"
 ### Task 16: Bootstrap surface — startup log + CLAUDE.md env section
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 - Modify: `CLAUDE.md`
 

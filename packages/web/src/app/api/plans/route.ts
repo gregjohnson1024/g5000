@@ -8,9 +8,7 @@ export const runtime = 'nodejs';
 
 export async function GET(): Promise<Response> {
   const names = await listJson(PLANS_DIR);
-  const items = await Promise.all(
-    names.map(async (n) => readJson(join(PLANS_DIR, n))),
-  );
+  const items = await Promise.all(names.map(async (n) => readJson(join(PLANS_DIR, n))));
   return Response.json({ ok: true, items: items.filter(Boolean) });
 }
 

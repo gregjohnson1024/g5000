@@ -17,6 +17,7 @@
 ## Task 1: Types and defaults for CrossoverMap and CrossoverSettings
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts`
 - Test: `packages/db/src/crossover-defaults.test.ts`
 
@@ -149,6 +150,7 @@ git commit -m "feat(db): CrossoverMap + CrossoverSettings types and defaults"
 ## Task 2: Drizzle schema rows for crossover_map and crossover_settings
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 - Test: `packages/db/src/schema-crossover.test.ts`
 
@@ -160,7 +162,10 @@ Create `packages/db/src/schema-crossover.test.ts`:
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { crossoverMap as crossoverMapTable, crossoverSettings as crossoverSettingsTable } from './schema.js';
+import {
+  crossoverMap as crossoverMapTable,
+  crossoverSettings as crossoverSettingsTable,
+} from './schema.js';
 
 describe('schema: crossover tables', () => {
   it('crossover_map is keyed by (boatId, mode) with a JSON value', () => {
@@ -236,7 +241,7 @@ If `primaryKey` isn't already imported in this file, add it to the existing `dri
 
 - [ ] **Step 4: Wire up DDL in ConfigStore.open**
 
-In `packages/db/src/config-store.ts`, find the `raw.exec(\`CREATE TABLE IF NOT EXISTS …\`)` block in `ConfigStore.open`. Append two more `CREATE TABLE IF NOT EXISTS` statements:
+In `packages/db/src/config-store.ts`, find the `raw.exec(\`CREATE TABLE IF NOT EXISTS …\`)`block in`ConfigStore.open`. Append two more `CREATE TABLE IF NOT EXISTS` statements:
 
 ```sql
 CREATE TABLE IF NOT EXISTS crossover_map (
@@ -271,6 +276,7 @@ git commit -m "feat(db): crossover_map and crossover_settings tables + DDL"
 ## Task 3: ConfigStore.crossoverMap$ / setCrossoverMap
 
 **Files:**
+
 - Modify: `packages/db/src/config-store.ts`
 - Test: `packages/db/src/config-store-crossover.test.ts`
 
@@ -354,6 +360,7 @@ Expected: FAIL — `store.crossoverMap$` and `store.setCrossoverMap` don't exist
 In `packages/db/src/config-store.ts`:
 
 (a) Add to imports from `./defaults.js`:
+
 ```typescript
 import {
   // … existing …
@@ -363,6 +370,7 @@ import {
 ```
 
 (b) Add to imports from `./schema.js`:
+
 ```typescript
 import {
   // … existing …
@@ -371,6 +379,7 @@ import {
 ```
 
 (c) Add to the `subjects` shape (private):
+
 ```typescript
 crossoverMap: BehaviorSubject<CrossoverMap>;
 ```
@@ -385,7 +394,12 @@ const xmRows = db
   .all() as Array<{ boat_id: string; mode: string; value: string }>;
 const xmForMode = xmRows.find((r) => r.mode === wardrobeValue.activeMode);
 const crossoverMapValue: CrossoverMap = xmForMode
-  ? { ...DEFAULT_CROSSOVER_MAP, ...(JSON.parse(xmForMode.value) as Partial<CrossoverMap>), boatId: activeBoatId, mode: wardrobeValue.activeMode }
+  ? {
+      ...DEFAULT_CROSSOVER_MAP,
+      ...(JSON.parse(xmForMode.value) as Partial<CrossoverMap>),
+      boatId: activeBoatId,
+      mode: wardrobeValue.activeMode,
+    }
   : { ...DEFAULT_CROSSOVER_MAP, boatId: activeBoatId, mode: wardrobeValue.activeMode };
 ```
 
@@ -450,6 +464,7 @@ git commit -m "feat(db): ConfigStore.crossoverMap\$ + setCrossoverMap"
 ## Task 4: ConfigStore.crossoverSettings$ / setCrossoverSettings
 
 **Files:**
+
 - Modify: `packages/db/src/config-store.ts`
 - Test: `packages/db/src/config-store-crossover-settings.test.ts`
 
@@ -464,7 +479,9 @@ import { ConfigStore } from './config-store.js';
 import { DEFAULT_CROSSOVER_SETTINGS } from './defaults.js';
 
 const stores: ConfigStore[] = [];
-afterEach(async () => { for (const s of stores.splice(0)) await s.close(); });
+afterEach(async () => {
+  for (const s of stores.splice(0)) await s.close();
+});
 
 async function freshStore() {
   const s = await ConfigStore.open(':memory:');
@@ -515,6 +532,7 @@ Expected: FAIL — `crossoverSettings$` and `setCrossoverSettings` don't exist.
 In `packages/db/src/config-store.ts`:
 
 (a) Add to defaults import:
+
 ```typescript
 import {
   // … existing …
@@ -524,6 +542,7 @@ import {
 ```
 
 (b) Add to schema import:
+
 ```typescript
 crossoverSettings as crossoverSettingsTable,
 ```
@@ -544,11 +563,13 @@ const crossoverSettingsValue: CrossoverSettings = xsRow[0]
 Add `crossoverSettings: crossoverSettingsValue` to `initial`.
 
 (d) Subject:
+
 ```typescript
 crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
 ```
 
 (e) Getter:
+
 ```typescript
 get crossoverSettings$(): Observable<CrossoverSettings> {
   return this.subjects.crossoverSettings.asObservable();
@@ -556,6 +577,7 @@ get crossoverSettings$(): Observable<CrossoverSettings> {
 ```
 
 (f) Setter:
+
 ```typescript
 async setCrossoverSettings(value: CrossoverSettings): Promise<void> {
   this.raw
@@ -589,6 +611,7 @@ git commit -m "feat(db): ConfigStore.crossoverSettings\$ + setCrossoverSettings"
 ## Task 5: Channels.SAIL_RECOMMENDATION constant
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts`
 - Test: existing channel pattern tests (no new test file)
 
@@ -624,6 +647,7 @@ git commit -m "feat(core): add Channels.SAIL_RECOMMENDATION"
 ## Task 6: Pure-function crossover cell lookup
 
 **Files:**
+
 - Create: `packages/compute/src/sail-crossover/lookup.ts`
 - Create: `packages/compute/src/sail-crossover/index.ts`
 - Test: `packages/compute/src/sail-crossover/lookup.test.ts`
@@ -640,7 +664,7 @@ import { snapToCell, lookupConfigId } from './lookup.js';
 const PI = Math.PI;
 
 const polar: PolarTable = {
-  twsBins: [3.09, 4.12, 5.14, 6.17, 7.20, 8.23, 10.29, 12.86], // 6,8,10,12,14,16,20,25 kn → m/s
+  twsBins: [3.09, 4.12, 5.14, 6.17, 7.2, 8.23, 10.29, 12.86], // 6,8,10,12,14,16,20,25 kn → m/s
   twaBins: [0, PI / 6, PI / 4, PI / 3, PI / 2, (2 * PI) / 3, (3 * PI) / 4, (5 * PI) / 6, PI],
   boatSpeed: Array.from({ length: 8 }, () => Array.from({ length: 9 }, () => 0)),
 };
@@ -658,7 +682,7 @@ const map: CrossoverMap = {
 
 describe('snapToCell', () => {
   it('snaps an exact bin centre to that cell', () => {
-    expect(snapToCell(polar, 7.20, PI / 2)).toEqual({ twsIdx: 4, twaIdx: 4 });
+    expect(snapToCell(polar, 7.2, PI / 2)).toEqual({ twsIdx: 4, twaIdx: 4 });
   });
 
   it('snaps nearest by absolute distance', () => {
@@ -675,12 +699,12 @@ describe('snapToCell', () => {
   });
 
   it('folds negative TWA into [0, π]', () => {
-    expect(snapToCell(polar, 7.20, -PI / 4)).toEqual(snapToCell(polar, 7.20, PI / 4));
+    expect(snapToCell(polar, 7.2, -PI / 4)).toEqual(snapToCell(polar, 7.2, PI / 4));
   });
 
   it('folds TWA > π by wrapping (port/starboard symmetric)', () => {
     // (3π/2) folds to (π/2)
-    expect(snapToCell(polar, 7.20, (3 * PI) / 2)).toEqual(snapToCell(polar, 7.20, PI / 2));
+    expect(snapToCell(polar, 7.2, (3 * PI) / 2)).toEqual(snapToCell(polar, 7.2, PI / 2));
   });
 });
 
@@ -790,6 +814,7 @@ git commit -m "feat(compute): pure crossover cell snap + lookup"
 **Design note:** Hysteresis ("should I switch?" maturation timer) is **consumer-side**, not pipeline-side. The pipeline tracks only when we first observed the current recommended config (`enteredAt`) and emits `stableSeconds` alongside; the UI (helm tile + recommendation panel) computes `shouldChange = recommended && recommended !== active && (Date.now()/1000 - enteredAt) >= stableSeconds` on each render. This avoids a class of RxJS bugs where a stable wind doesn't re-fire the pipeline so the maturation never gets re-evaluated.
 
 **Files:**
+
 - Create: `packages/compute/src/sail-crossover/pipeline.ts`
 - Test: `packages/compute/src/sail-crossover/pipeline.test.ts`
 
@@ -967,12 +992,7 @@ Create `packages/compute/src/sail-crossover/pipeline.ts`:
 import { combineLatest, Subject } from 'rxjs';
 import type { Observable } from 'rxjs';
 import { Channels, type Bus, type Sample } from '@g5000/core';
-import type {
-  CrossoverMap,
-  CrossoverSettings,
-  PolarTable,
-  SailWardrobe,
-} from '@g5000/db';
+import type { CrossoverMap, CrossoverSettings, PolarTable, SailWardrobe } from '@g5000/db';
 import { lookupConfigId, snapToCell } from './lookup.js';
 
 /**
@@ -1099,6 +1119,7 @@ git commit -m "feat(compute): sail-crossover RxJS pipeline publishing sail.recom
 ## Task 9: Wire pipeline into autopilot-server boot
 
 **Files:**
+
 - Modify: `apps/autopilot-server/src/index.ts`
 
 - [ ] **Step 1: Add the import**
@@ -1142,6 +1163,7 @@ git commit -m "feat(autopilot-server): start sail-crossover pipeline at boot"
 ## Task 10: Routing — PlanInput.crossover + per-leg configId
 
 **Files:**
+
 - Modify: `packages/routing/src/types.ts`
 - Modify: `packages/routing/src/plan.ts`
 - Test: `packages/routing/src/plan.crossover.test.ts`
@@ -1331,6 +1353,7 @@ git commit -m "feat(routing): PlanInput.crossover decorates legs with recommende
 ## Task 11: Sail timeline post-process
 
 **Files:**
+
 - Create: `packages/routing/src/sail-timeline.ts`
 - Test: `packages/routing/src/sail-timeline.test.ts`
 - Modify: `packages/routing/src/types.ts` (add `SailTimelineSegment`)
@@ -1407,6 +1430,7 @@ git commit -m "feat(routing): computeSailTimeline post-process with short-run ab
 ## Task 12: /api/crossover-map GET and POST
 
 **Files:**
+
 - Create: `packages/web/src/app/api/crossover-map/route.ts`
 - Test: `packages/web/src/app/api/crossover-map/route.test.ts`
 
@@ -1417,11 +1441,7 @@ Create `packages/web/src/app/api/crossover-map/route.test.ts`:
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import {
-  ConfigStore,
-  setSharedConfigStore,
-  _resetSharedConfigStoreForTests,
-} from '@g5000/db';
+import { ConfigStore, setSharedConfigStore, _resetSharedConfigStoreForTests } from '@g5000/db';
 import { GET, POST } from './route.js';
 
 let store: ConfigStore;
@@ -1591,6 +1611,7 @@ git commit -m "feat(web): /api/crossover-map GET+POST"
 ## Task 13: /api/crossover-settings GET and POST
 
 **Files:**
+
 - Create: `packages/web/src/app/api/crossover-settings/route.ts`
 - Test: `packages/web/src/app/api/crossover-settings/route.test.ts`
 
@@ -1612,7 +1633,9 @@ import { GET, POST } from './route.js';
 let store: ConfigStore;
 
 beforeEach(async () => {
-  store = await ConfigStore.open(`${tmpdir()}/crossover-settings-${Date.now()}-${Math.random()}.db`);
+  store = await ConfigStore.open(
+    `${tmpdir()}/crossover-settings-${Date.now()}-${Math.random()}.db`,
+  );
   setSharedConfigStore(store);
 });
 
@@ -1641,7 +1664,10 @@ describe('POST /api/crossover-settings', () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
     const reread = await GET();
-    const json = (await reread.json()) as { ok: boolean; settings: typeof DEFAULT_CROSSOVER_SETTINGS };
+    const json = (await reread.json()) as {
+      ok: boolean;
+      settings: typeof DEFAULT_CROSSOVER_SETTINGS;
+    };
     expect(json.settings.recommendationStableSeconds).toBe(90);
   });
 
@@ -1724,6 +1750,7 @@ git commit -m "feat(web): /api/crossover-settings GET+POST"
 ## Task 14: /api/route/plan — wire crossover into the planner
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/route/plan/route.ts`
 - Test: `packages/web/src/app/api/route/plan/route.test.ts`
 
@@ -1777,6 +1804,7 @@ git commit -m "feat(web): /api/route/plan returns sailTimeline; passes crossover
 ## Task 15: Salvage helpers — getConfigColor
 
 **Files:**
+
 - Create: `packages/web/src/lib/config-color.ts`
 - Test: `packages/web/src/lib/config-color.test.ts`
 
@@ -1804,6 +1832,7 @@ git commit -m "feat(web): getConfigColor stable-hash helper (salvaged from issue
 ## Task 16: CrossoverChart — editable grid
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/CrossoverChart.tsx`
 
 This is a fresh implementation; the reference branch's `CrossoverChart.tsx` was a heatmap viewer of per-config polars. Model A's chart is an **authoring surface** for the map.
@@ -1981,6 +2010,7 @@ git commit -m "feat(web,sails): editable CrossoverChart authoring surface"
 ## Task 17: RecommendationPanel — SSE-driven, new payload shape
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/RecommendationPanel.tsx`
 
 **Reference:** `.worktrees/issue-3-sail-crossover/packages/web/src/app/sails/RecommendationPanel.tsx`. Salvage the SSE wiring; swap the payload shape and channel name.
@@ -2104,6 +2134,7 @@ git commit -m "feat(web,sails): RecommendationPanel reads sail.recommendation ch
 ## Task 18: SailRecommendationTile (helm) — new payload shape
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/SailRecommendationTile.tsx`
 
 - [ ] **Step 1: Implement the tile**
@@ -2206,6 +2237,7 @@ git commit -m "feat(web,helm): SailRecommendationTile on the helm page"
 ## Task 19: ForecastTimeline — salvage and re-wire
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/ForecastTimeline.tsx`
 
 - [ ] **Step 1: Copy from reference branch**
@@ -2235,6 +2267,7 @@ git commit -m "feat(web,sails): ForecastTimeline (salvaged) renders the plan's s
 ## Task 20: SettingsDrawer — CrossoverSettings keys
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/SettingsDrawer.tsx`
 
 - [ ] **Step 1: Implement SettingsDrawer.tsx**
@@ -2348,6 +2381,7 @@ git commit -m "feat(web,sails): SettingsDrawer for CrossoverSettings"
 ## Task 21: /sails page — wire everything together
 
 **Files:**
+
 - Modify: `packages/web/src/app/sails/page.tsx`
 
 - [ ] **Step 1: Implement the page**
@@ -2463,6 +2497,7 @@ git commit -m "feat(web,sails): /sails page wires CrossoverChart + Recommendatio
 ## Task 22: Navbar entry for /sails (if missing)
 
 **Files:**
+
 - Modify: `packages/web/src/app/Navbar.tsx` (only if `/sails` is not already linked)
 
 - [ ] **Step 1: Inspect Navbar**
@@ -2490,6 +2525,7 @@ git commit -m "feat(web): Navbar link to /sails"
 ## Task 23: PlanControls — drop wardrobe payload
 
 **Files:**
+
 - Modify: `packages/web/src/components/PlanControls.tsx` (only if the file exists; on develop, check first)
 
 - [ ] **Step 1: Inspect PlanControls**
@@ -2565,6 +2601,7 @@ Wait until the log line shows "Ready on http://localhost:3000".
 - [ ] **Step 2: Open /sails in Chrome**
 
 Use `chrome-devtools-mcp` (or open `http://localhost:3000/sails` manually):
+
 - Page renders without console errors.
 - Wardrobe shows the seeded "Default" config (or whatever's in ConfigStore).
 - Polar grid renders the cells.
@@ -2596,6 +2633,7 @@ If something doesn't work, file a follow-up issue and note it here — do NOT bl
 ## Task 26: Cleanup and merge prep
 
 **Files:**
+
 - Delete: `docs/superpowers/specs/2026-05-18-sail-crossover-chart-design.md`
 - Delete: `docs/superpowers/plans/2026-05-18-sail-crossover-chart.md`
 

@@ -37,7 +37,12 @@ describe('AlarmsConfig persistence', () => {
       enabled: { ...DEFAULT_ALARMS_CONFIG.enabled, 'over-speed': false },
       thresholds: {
         ...DEFAULT_ALARMS_CONFIG.thresholds,
-        anchor: { armed: true, point: { lat: 32.3, lon: -64.8 }, droppedAt: '2026-05-18T12:00:00Z', radiusM: 75 },
+        anchor: {
+          armed: true,
+          point: { lat: 32.3, lon: -64.8 },
+          droppedAt: '2026-05-18T12:00:00Z',
+          radiusM: 75,
+        },
       },
     };
     await saveAlarmsConfig(store, next);

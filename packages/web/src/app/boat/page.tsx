@@ -147,7 +147,11 @@ function ResetCalibrationsButton() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const handle = async (): Promise<void> => {
-    if (!window.confirm('Reset all sensor calibrations (wind, BSP, compass) to defaults? This cannot be undone.')) {
+    if (
+      !window.confirm(
+        'Reset all sensor calibrations (wind, BSP, compass) to defaults? This cannot be undone.',
+      )
+    ) {
       return;
     }
     setBusy(true);

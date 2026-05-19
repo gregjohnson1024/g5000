@@ -1,10 +1,4 @@
-import {
-  activeTrack,
-  createTrack,
-  appendPoint,
-  type Track,
-  type TrackPoint,
-} from './tracks';
+import { activeTrack, createTrack, appendPoint, type Track, type TrackPoint } from './tracks';
 import { positionStreamUrl } from './g5000-client';
 
 /**
@@ -190,7 +184,8 @@ export function recorderStatus(): {
   errorMessage?: string;
 } {
   const rec = globalThis.__g5kTrackRecorder__;
-  if (!rec) return { status: 'not_started', activeTrackId: null, pointsAppended: 0, lastPoint: null };
+  if (!rec)
+    return { status: 'not_started', activeTrackId: null, pointsAppended: 0, lastPoint: null };
   return {
     status: rec.status,
     activeTrackId: rec.activeTrackId,

@@ -1,12 +1,5 @@
 import { firstValueFrom } from 'rxjs';
 import { getSharedConfigStore } from '@g5000/db';
-import type { PolarMode } from '@g5000/db';
-
-interface Body {
-  sailConfigId?: string;
-  mode?: PolarMode;
-  revisionId?: string;
-}
 
 export async function GET(): Promise<Response> {
   try {
@@ -21,29 +14,25 @@ export async function GET(): Promise<Response> {
   }
 }
 
-export async function POST(req: Request): Promise<Response> {
-  const store = getSharedConfigStore();
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return Response.json({ error: 'invalid json' }, { status: 400 });
-  }
-  if (
-    typeof body.sailConfigId !== 'string' ||
-    typeof body.mode !== 'string' ||
-    typeof body.revisionId !== 'string'
-  ) {
-    return Response.json({ error: 'missing required fields' }, { status: 400 });
-  }
-  try {
-    await store.setActiveRevision(body.sailConfigId, body.mode, body.revisionId);
-  } catch (err) {
-    const msg = (err as Error).message;
-    if (msg.includes('not found')) {
-      return Response.json({ error: msg }, { status: 404 });
-    }
-    return Response.json({ error: msg }, { status: 400 });
-  }
-  return Response.json({ ok: true });
+/**
+ * In v2 this endpoint flipped which PolarRevision was "active" for a given
+ * (sailConfigId, mode) slot. v3 dropped per-config polar slots — the active
+ * polar is simply the newest revision for `(boatId, activeMode)`. There is no
+ * clean v3 equivalent, so this returns 501 to surface the change to callers.
+ *
+ * If you want to make a different polar active, write a new revision (copying
+ * the table you want) via createRevision() — activePolar$ resolves to the
+ * newest revision for the active mode.
+ */
+export async function POST(): Promise<Response> {
+  return Response.json(
+    {
+      error: {
+        kind: 'not_implemented',
+        message:
+          'POST /api/polar/active is not implemented in v3. Write a new PolarRevision (copying the desired table) to make it the active polar for (boatId, activeMode).',
+      },
+    },
+    { status: 501 },
+  );
 }

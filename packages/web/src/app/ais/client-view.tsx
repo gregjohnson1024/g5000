@@ -420,11 +420,13 @@ export function AisClientView() {
             type="button"
             onClick={() => armAudio()}
             disabled={audioArmed}
-            title={audioArmed ? 'Audio alarm armed — beeps on new threats' : 'Click to enable beep on new threats (browser requires this user gesture)'}
-            className={`px-2 py-1 rounded text-xs ${
+            title={
               audioArmed
-                ? 'bg-emerald-700 cursor-default'
-                : 'bg-slate-700 hover:bg-slate-600'
+                ? 'Audio alarm armed — beeps on new threats'
+                : 'Click to enable beep on new threats (browser requires this user gesture)'
+            }
+            className={`px-2 py-1 rounded text-xs ${
+              audioArmed ? 'bg-emerald-700 cursor-default' : 'bg-slate-700 hover:bg-slate-600'
             }`}
           >
             {audioArmed ? 'Audio armed' : 'Arm audio'}
@@ -516,13 +518,7 @@ export function AisClientView() {
                 />
               ))}
               {/* Outer ring at full range */}
-              <circle
-                cx={center}
-                cy={center}
-                r={svgRadius}
-                fill="none"
-                stroke="#475569"
-              />
+              <circle cx={center} cy={center} r={svgRadius} fill="none" stroke="#475569" />
               {/* Crosshair */}
               <line
                 x1={center}
@@ -558,8 +554,7 @@ export function AisClientView() {
                 // Clamp drawing to the visible chart area — if the CPA point
                 // is off-canvas the dashed connector still terminates at the
                 // edge, but we skip the marker.
-                const cpaInBounds =
-                  Math.hypot(cpaX - center, cpaY - center) < svgRadius + 12;
+                const cpaInBounds = Math.hypot(cpaX - center, cpaY - center) < svgRadius + 12;
                 return (
                   <g key={`cpa-${target.mmsi}`} pointerEvents="none">
                     <line
@@ -686,10 +681,7 @@ export function AisClientView() {
                   based picture.) */}
               {(() => {
                 const ownCogDeg = (ownCog * RAD_TO_DEG) % 360;
-                const ownLeaderLen = Math.min(
-                  COG_EXTENSION_NM * NM * metersToPx,
-                  svgRadius - 14,
-                );
+                const ownLeaderLen = Math.min(COG_EXTENSION_NM * NM * metersToPx, svgRadius - 14);
                 return (
                   <g transform={`translate(${center}, ${center}) rotate(${ownCogDeg})`}>
                     {ownLeaderLen > 1 && (
@@ -774,9 +766,7 @@ export function AisClientView() {
         </div>
 
         <div className="flex-1 min-w-[320px]">
-          <h2 className="font-semibold mb-2 text-slate-300">
-            Targets ({targetsWithCpa.length})
-          </h2>
+          <h2 className="font-semibold mb-2 text-slate-300">Targets ({targetsWithCpa.length})</h2>
           {selectedRow && (
             <div className="mb-3 bg-slate-900 border border-slate-800 rounded p-3 text-xs font-mono">
               <div className="text-slate-400 mb-1 text-[10px] uppercase">Selected</div>
@@ -801,15 +791,11 @@ export function AisClientView() {
                 </div>
                 <div className="text-slate-400">Range</div>
                 <div>
-                  {selectedRow.cpa
-                    ? `${(selectedRow.cpa.rangeMeters / NM).toFixed(2)} NM`
-                    : '—'}
+                  {selectedRow.cpa ? `${(selectedRow.cpa.rangeMeters / NM).toFixed(2)} NM` : '—'}
                 </div>
                 <div className="text-slate-400">CPA</div>
                 <div>
-                  {selectedRow.cpa
-                    ? `${(selectedRow.cpa.cpaMeters / NM).toFixed(2)} NM`
-                    : '—'}
+                  {selectedRow.cpa ? `${(selectedRow.cpa.cpaMeters / NM).toFixed(2)} NM` : '—'}
                 </div>
                 <div className="text-slate-400">TCPA</div>
                 <div>{selectedRow.cpa ? fmtTcpa(selectedRow.cpa.tcpaSeconds) : '—'}</div>
@@ -881,7 +867,7 @@ export function AisClientView() {
                       </td>
                       <td className="py-1 text-right">
                         {target.cog !== undefined
-                          ? `${String(Math.round(((target.cog * RAD_TO_DEG) % 360 + 360) % 360)).padStart(3, '0')}°`
+                          ? `${String(Math.round((((target.cog * RAD_TO_DEG) % 360) + 360) % 360)).padStart(3, '0')}°`
                           : '—'}
                       </td>
                       <td className="py-1 text-right">

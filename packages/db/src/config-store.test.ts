@@ -67,71 +67,46 @@ describe('ConfigStore', () => {
     expect(v.magVarDeg).toBe(5);
   });
 
-  it('returns the default polar on a fresh database', async () => {
-    const polars = await firstValueFrom(store.polars$);
+  it('returns DEFAULT_POLARS via activePolar$ on a fresh database', async () => {
+    // v3: no revisions yet means activePolar$ falls back to DEFAULT_POLARS.
+    const polars = await firstValueFrom(store.activePolar$);
     expect(polars.twsBins).toEqual(DEFAULT_POLARS.twsBins);
     expect(polars.boatSpeed.length).toBe(DEFAULT_POLARS.twsBins.length);
   });
 
-  it('emits a new polar when setPolars is called', async () => {
-    const updated: PolarTable = {
-      ...DEFAULT_POLARS,
-      boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map(() => 0)),
-    };
-    await store.setPolars(updated);
-    // In v2, setPolars writes a new revision and flips the active pointer.
-    // The legacy polars$ alias is backed by activePolar$ (combineLatest of
-    // sails + revisions), so the post-write current value is what we assert.
-    const v = await firstValueFrom(store.polars$);
-    expect(v.boatSpeed.flat().every((x) => x === 0)).toBe(true);
-  });
-
-  it('returns the default wardrobe on a fresh database', async () => {
+  it('returns the default (empty) wardrobe on a fresh database', async () => {
     const w = await firstValueFrom(store.sails$);
-    expect(w.activeConfigId).toBe('default');
-    expect(w.configs).toHaveLength(1);
-    expect(w.configs[0]!.id).toBe('default');
+    expect(w.schemaVersion).toBe(3);
+    expect(w.boatId).toBe('sula');
+    expect(w.sails).toEqual([]);
+    expect(w.active).toEqual({});
+    expect(w.activeMode).toBe('default');
   });
 
   it('emits a new wardrobe when setSails is called', async () => {
     const next: Promise<SailWardrobe> = firstValueFrom(store.sails$.pipe(skip(1), take(1)));
     const updated: SailWardrobe = {
       ...DEFAULT_WARDROBE,
-      configs: [
-        ...DEFAULT_WARDROBE.configs,
-        {
-          id: 'reef1-a2',
-          name: 'Reef 1 + A2',
-          mainState: 'Reef 1',
-          downwindSail: 'A2',
-          polar: DEFAULT_WARDROBE.configs[0]!.polar,
-          modes: {},
-        },
+      sails: [
+        { id: 'j0', name: 'J0', category: 'headsail', region: { cells: [] } },
+        { id: 'reef1', name: 'Reef 1', category: 'main', region: { cells: [] } },
       ],
+      active: { headsail: 'j0', main: 'reef1' },
     };
     await store.setSails(updated);
     const v = await next;
-    expect(v.configs).toHaveLength(2);
+    expect(v.sails).toHaveLength(2);
+    expect(v.active.headsail).toBe('j0');
   });
 
-  it('rejects setSails with an unknown activeConfigId', async () => {
-    await expect(
-      store.setSails({
-        ...DEFAULT_WARDROBE,
-        activeConfigId: 'does-not-exist',
-      }),
-    ).rejects.toThrow();
-  });
-
-  it('activePolar$ tracks the active config polar', async () => {
+  it('activePolar$ tracks the newest revision for (boatId, activeMode)', async () => {
+    // No revisions yet — activePolar$ falls back to DEFAULT_POLARS.
     const initial = await firstValueFrom(store.activePolar$);
     expect(initial.twsBins.length).toBeGreaterThan(0);
 
-    // In v2: read the active slot's active revision via the resolver, then
-    // create a distinct (all-zeros) revision under the same slot+mode and
-    // flip the active pointer. activePolar$ should track the swap.
+    // Create a distinct (all-zeros) revision for the active boat+mode. Because
+    // it's the newest revision for (sula, default), activePolar$ must emit it.
     const wardrobe = await firstValueFrom(store.sails$);
-    const slot = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)!;
     const distinctPolar: PolarTable = {
       ...initial,
       boatSpeed: initial.boatSpeed.map((row) => row.map(() => 0)),
@@ -140,14 +115,15 @@ describe('ConfigStore', () => {
     await store.createRevision({
       id: newId,
       boatId: 'sula',
-      sailConfigId: slot.id,
+      // v3: sail_config_id has no wardrobe meaning anymore, but the polar_revisions
+      // schema still requires it (free-form provenance label).
+      sailConfigId: 'manual',
       mode: wardrobe.activeMode,
-      parentRevisionId: slot.modes[wardrobe.activeMode]?.activeRevisionId ?? null,
+      parentRevisionId: null,
       createdAt: Math.floor(Date.now() / 1000),
       lineage: { kind: 'manual_edit' },
       table: distinctPolar,
     });
-    await store.setActiveRevision(slot.id, wardrobe.activeMode, newId);
     const after = await firstValueFrom(store.activePolar$);
     expect(after.boatSpeed.flat().every((x) => x === 0)).toBe(true);
   });
@@ -232,8 +208,8 @@ describe('ConfigStore', () => {
     expect(v[0]!.channelPattern).toBe('wind.apparent.angle');
   });
 
-  it('legacy polars$ tracks active config (backward compat)', async () => {
-    // After Task 1, polars$ is an alias for activePolar$.
+  it('legacy polars$ alias tracks activePolar$ (backward compat)', async () => {
+    // polars$ is still exported as an alias for activePolar$.
     const a = await firstValueFrom(store.polars$);
     const b = await firstValueFrom(store.activePolar$);
     expect(a).toEqual(b);
@@ -272,134 +248,98 @@ describe('ConfigStore', () => {
     ).rejects.toThrow(/enabled/);
   });
 
-  describe('v1→v2 wardrobe migration', () => {
-    it('seeds revision-0 from DEFAULT_POLARS on a fresh DB', async () => {
+  describe('v2 → v3 wardrobe migration on open', () => {
+    it('seeds an empty v3 wardrobe on a fresh DB', async () => {
       const tmp = `${tmpdir()}/g5000-cfg-fresh-${Date.now()}.db`;
       const store = await ConfigStore.open(tmp);
       const wardrobe = await firstValueFrom(store.sails$);
+      expect(wardrobe.schemaVersion).toBe(3);
       expect(wardrobe.boatId).toBe('sula');
       expect(wardrobe.activeMode).toBe('default');
-      const slot = wardrobe.configs[0]!;
-      const revId = slot.modes.default?.activeRevisionId;
-      expect(revId).toBeDefined();
-      const rev = store.getRevision(revId!);
-      expect(rev?.lineage.kind).toBe('migrated');
-      expect(rev?.table).toEqual(DEFAULT_POLARS);
+      expect(wardrobe.sails).toEqual([]);
+      expect(wardrobe.active).toEqual({});
       await store.close();
     });
 
-    it('migrates an existing v1 wardrobe row on cold boot', async () => {
-      const tmp = `${tmpdir()}/g5000-cfg-v1-${Date.now()}.db`;
-      // Hand-craft a v1 wardrobe row first.
+    it('migrates an existing v2 wardrobe row on cold boot', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-v2-${Date.now()}.db`;
+      // Hand-craft a v2 wardrobe row before any ConfigStore touches the DB.
       const Database = (await import('better-sqlite3')).default;
       const raw = new Database(tmp);
       raw.exec(`
-        CREATE TABLE polars (id TEXT PRIMARY KEY, value TEXT NOT NULL);
         CREATE TABLE sail_wardrobe (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       `);
-      const v1 = {
+      const v2 = {
+        boatId: 'sula',
         configs: [
-          { id: 'default', name: 'Default', polar: DEFAULT_POLARS },
-          { id: 'storm', name: 'Storm jib', polar: DEFAULT_POLARS },
+          { id: 'j0-full', name: 'J0 + Full', headsail: 'J0', mainState: 'Full', modes: {} },
+          { id: 'j0-reef1', name: 'J0 + Reef1', headsail: 'J0', mainState: 'Reef1', modes: {} },
         ],
-        activeConfigId: 'storm',
+        activeConfigId: 'j0-full',
+        activeMode: 'default',
       };
       raw
         .prepare('INSERT INTO sail_wardrobe (id, value) VALUES (?, ?)')
-        .run('singleton', JSON.stringify(v1));
+        .run('singleton', JSON.stringify(v2));
       raw.close();
 
       const store = await ConfigStore.open(tmp);
       const wardrobe = await firstValueFrom(store.sails$);
+      expect(wardrobe.schemaVersion).toBe(3);
       expect(wardrobe.boatId).toBe('sula');
-      expect(wardrobe.activeConfigId).toBe('storm');
-      expect(wardrobe.configs).toHaveLength(2);
-      for (const c of wardrobe.configs) {
-        expect(c.modes.default?.activeRevisionId).toBeDefined();
-        expect((c as Record<string, unknown>).polar).toBeUndefined();
-      }
+      // Sails are atomic now — J0 (headsail), Full Main + Reef1 (main).
+      const ids = wardrobe.sails.map((s) => s.id).sort();
+      expect(ids).toEqual(['full-main', 'j0', 'reef1']);
+      // Active pointer is derived from the v2 activeConfigId (j0-full).
+      expect(wardrobe.active).toEqual({ headsail: 'j0', main: 'full-main' });
       await store.close();
     });
 
-    it('is idempotent: a second open does not create new revisions', async () => {
+    it('is idempotent: a second open does not rewrite the wardrobe', async () => {
       const tmp = `${tmpdir()}/g5000-cfg-idem-${Date.now()}.db`;
       const a = await ConfigStore.open(tmp);
-      const revsA = a.listRevisions();
+      const wa = await firstValueFrom(a.sails$);
       await a.close();
       const b = await ConfigStore.open(tmp);
-      const revsB = b.listRevisions();
-      expect(revsB.map((r) => r.id).sort()).toEqual(revsA.map((r) => r.id).sort());
+      const wb = await firstValueFrom(b.sails$);
+      expect(wb).toEqual(wa);
       await b.close();
     });
 
-    it('activePolar$ falls back to DEFAULT_POLARS when activeRevisionId is dangling', async () => {
-      const tmp = `${tmpdir()}/g5000-cfg-dangle-${Date.now()}.db`;
+    it('drops the legacy crossover_map table after migration', async () => {
+      const tmp = `${tmpdir()}/g5000-cfg-xm-drop-${Date.now()}.db`;
       const store = await ConfigStore.open(tmp);
-      // Forge a wardrobe with a bad revisionId.
-      const wardrobe = await firstValueFrom(store.sails$);
-      const broken: SailWardrobe = {
-        ...wardrobe,
-        configs: [
-          { ...wardrobe.configs[0]!, modes: { default: { activeRevisionId: 'doesnotexist' } } },
-        ],
-      };
-      await store.setSails(broken);
-      const polar = await firstValueFrom(store.activePolar$);
-      expect(polar).toEqual(DEFAULT_POLARS);
       await store.close();
-    });
-
-    it('transaction primitive used by migration rolls back atomically on throw', async () => {
-      // Proves that the better-sqlite3 transactional primitive ConfigStore.open
-      // relies on (raw.transaction(fn)) rolls back ALL writes if the body
-      // throws partway through. The migration path wraps its
-      // polar_revisions inserts + sail_wardrobe upsert in such a transaction;
-      // this test exercises the rollback property directly so we don't have
-      // to monkey-patch ConfigStore to artificially fail mid-migration.
-      const tmp = `${tmpdir()}/g5000-cfg-tx-${Date.now()}.db`;
       const Database = (await import('better-sqlite3')).default;
       const raw = new Database(tmp);
-      raw.exec(`CREATE TABLE polar_revisions (id TEXT PRIMARY KEY, x TEXT)`);
-      const fn = raw.transaction((shouldFail: boolean) => {
-        raw.prepare('INSERT INTO polar_revisions (id, x) VALUES (?, ?)').run('a', 'one');
-        raw.prepare('INSERT INTO polar_revisions (id, x) VALUES (?, ?)').run('b', 'two');
-        if (shouldFail) throw new Error('simulated mid-tx failure');
-      });
-      expect(() => fn(true)).toThrow(/simulated mid-tx failure/);
-      const rows = raw.prepare('SELECT COUNT(*) as n FROM polar_revisions').get() as { n: number };
-      expect(rows.n).toBe(0);
-      // Sanity: the same transaction without a throw commits both rows.
-      fn(false);
-      const after = raw.prepare('SELECT COUNT(*) as n FROM polar_revisions').get() as { n: number };
-      expect(after.n).toBe(2);
+      const rows = raw
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='crossover_map'")
+        .all() as Array<{ name: string }>;
+      expect(rows).toEqual([]);
       raw.close();
     });
 
-    it('setActiveRevision swaps activePolar$ output within one tick', async () => {
-      const tmp = `${tmpdir()}/g5000-cfg-swap-${Date.now()}.db`;
-      const store = await ConfigStore.open(tmp);
-      const wardrobe = await firstValueFrom(store.sails$);
-      const slotId = wardrobe.configs[0]!.id;
-      // Create a clearly distinct polar.
-      const tweaked: PolarTable = {
-        ...DEFAULT_POLARS,
-        boatSpeed: DEFAULT_POLARS.boatSpeed.map((row) => row.map((v) => v * 1.5)),
-      };
-      const newId = '01HZZZZZZZZZZZZZZZZZZZZZZZ';
-      await store.createRevision({
-        id: newId,
-        boatId: 'sula',
-        sailConfigId: slotId,
-        mode: 'default',
-        parentRevisionId: null,
-        createdAt: Math.floor(Date.now() / 1000),
-        lineage: { kind: 'manual_edit' },
-        table: tweaked,
+    it('transaction primitive used internally rolls back atomically on throw', async () => {
+      // Generic property of the better-sqlite3 transaction primitive — keeps
+      // confidence that any future migration code using raw.transaction(fn)
+      // gets atomic rollback semantics.
+      const tmp = `${tmpdir()}/g5000-cfg-tx-${Date.now()}.db`;
+      const Database = (await import('better-sqlite3')).default;
+      const raw = new Database(tmp);
+      raw.exec(`CREATE TABLE tx_demo (id TEXT PRIMARY KEY, x TEXT)`);
+      const fn = raw.transaction((shouldFail: boolean) => {
+        raw.prepare('INSERT INTO tx_demo (id, x) VALUES (?, ?)').run('a', 'one');
+        raw.prepare('INSERT INTO tx_demo (id, x) VALUES (?, ?)').run('b', 'two');
+        if (shouldFail) throw new Error('simulated mid-tx failure');
       });
-      await store.setActiveRevision(slotId, 'default', newId);
-      const polar = await firstValueFrom(store.activePolar$);
-      expect(polar.boatSpeed[0]![1]).toBeCloseTo(DEFAULT_POLARS.boatSpeed[0]![1]! * 1.5);
-      await store.close();
+      expect(() => fn(true)).toThrow(/simulated mid-tx failure/);
+      const rows = raw.prepare('SELECT COUNT(*) as n FROM tx_demo').get() as { n: number };
+      expect(rows.n).toBe(0);
+      // Sanity: the same transaction without a throw commits both rows.
+      fn(false);
+      const after = raw.prepare('SELECT COUNT(*) as n FROM tx_demo').get() as { n: number };
+      expect(after.n).toBe(2);
+      raw.close();
     });
   });
 });

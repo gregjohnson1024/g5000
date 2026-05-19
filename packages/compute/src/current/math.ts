@@ -47,8 +47,6 @@ export function computeSetDrift(input: SetDriftInput): SetDriftResult {
   // When drift is effectively zero the set angle is meaningless. Return 0
   // rather than NaN so callers don't have to special-case it.
   const setRad =
-    driftMs < 1e-6
-      ? 0
-      : (((Math.atan2(curE, curN) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
+    driftMs < 1e-6 ? 0 : ((Math.atan2(curE, curN) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   return { setRad, driftMs };
 }

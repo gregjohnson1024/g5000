@@ -56,9 +56,10 @@ export function startHdgStats(
       const meanSin = sumSin / buf.length;
       const meanCos = sumCos / buf.length;
       const R = Math.hypot(meanSin, meanCos);
-      const avgRad = R < 0.01
-        ? null
-        : ((Math.atan2(meanSin, meanCos) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const avgRad =
+        R < 0.01
+          ? null
+          : ((Math.atan2(meanSin, meanCos) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       return {
         avgRad,
         concentration: R,

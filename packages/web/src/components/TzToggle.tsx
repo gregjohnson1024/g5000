@@ -6,13 +6,7 @@ import type { TzMode } from '../lib/tz';
  * The owning page holds the `tz` state and decides where to put the
  * toggle in its layout.
  */
-export function TzToggle({
-  tz,
-  setTz,
-}: {
-  tz: TzMode;
-  setTz: (v: TzMode) => void;
-}) {
+export function TzToggle({ tz, setTz }: { tz: TzMode; setTz: (v: TzMode) => void }) {
   const base = 'px-2 py-1 text-xs font-mono';
   return (
     <div

@@ -2,11 +2,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
-const NORTH_WALL_URL =
-  'https://www.ncei.noaa.gov/jag/navy/data/satellite_analysis/gsnw.mrf';
+const NORTH_WALL_URL = 'https://www.ncei.noaa.gov/jag/navy/data/satellite_analysis/gsnw.mrf';
 
-const G5000_ROUTER_ROOT =
-  process.env.G5000_ROUTER_ROOT ?? path.join(os.homedir(), '.g5000-router');
+const G5000_ROUTER_ROOT = process.env.G5000_ROUTER_ROOT ?? path.join(os.homedir(), '.g5000-router');
 
 const CACHE_DIR = path.join(G5000_ROUTER_ROOT, 'gulf-stream');
 const NORTH_WALL_CACHE = path.join(CACHE_DIR, 'north-wall.json');

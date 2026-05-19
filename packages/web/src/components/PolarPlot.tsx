@@ -203,12 +203,26 @@ export function PolarPlot({
           stroke="rgb(50,55,70)"
         />
         {/* Current operating-point dot */}
-        <circle cx="0" cy="0" r="7" fill="rgb(120,255,180)" stroke="rgb(20,40,30)" strokeWidth="1.5" />
+        <circle
+          cx="0"
+          cy="0"
+          r="7"
+          fill="rgb(120,255,180)"
+          stroke="rgb(20,40,30)"
+          strokeWidth="1.5"
+        />
         <text x="16" y="5" fill="rgb(200,210,230)" fontSize="15" fontFamily="monospace">
           Current
         </text>
         {/* Target operating-point dot */}
-        <circle cx="0" cy="24" r="5" fill="rgb(255,180,80)" stroke="rgb(40,30,10)" strokeWidth="1" />
+        <circle
+          cx="0"
+          cy="24"
+          r="5"
+          fill="rgb(255,180,80)"
+          stroke="rgb(40,30,10)"
+          strokeWidth="1"
+        />
         <text x="16" y="29" fill="rgb(200,210,230)" fontSize="15" fontFamily="monospace">
           Target
         </text>
@@ -223,10 +237,24 @@ export function PolarPlot({
         <text x="-4" y="76" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
           light
         </text>
-        <text x="136" y="76" textAnchor="end" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
+        <text
+          x="136"
+          y="76"
+          textAnchor="end"
+          fill="rgb(150,160,180)"
+          fontSize="13"
+          fontFamily="monospace"
+        >
           heavy
         </text>
-        <text x="66" y="76" textAnchor="middle" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
+        <text
+          x="66"
+          y="76"
+          textAnchor="middle"
+          fill="rgb(150,160,180)"
+          fontSize="13"
+          fontFamily="monospace"
+        >
           TWS
         </text>
       </g>

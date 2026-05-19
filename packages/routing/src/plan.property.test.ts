@@ -96,7 +96,9 @@ describe('property: uniform wind => direction roughly toward destination', () =>
     // prefers a 30°/150° zigzag (~16 km/h east) over the optimal 60°/120°
     // zigzag, so 960 km needs ~80h, not 48h.
     const r = plan({
-      start, end, departure: 0,
+      start,
+      end,
+      departure: 0,
       wind: uniformWind(8, 0),
       polar: reachingPolar(),
       polarId: 't',
@@ -128,7 +130,11 @@ function syntheticIsland(): Coastline {
   // real detour. The route can still escape to the south (lat < 25) or push
   // far enough north to clear the top, both of which add distance.
   const ring: Array<[number, number]> = [
-    [-70, 25], [-69, 25], [-69, 45], [-70, 45], [-70, 25],
+    [-70, 25],
+    [-69, 25],
+    [-69, 45],
+    [-70, 45],
+    [-70, 25],
   ];
   const polygon = {
     kind: 'land' as const,
@@ -136,9 +142,15 @@ function syntheticIsland(): Coastline {
     bbox: [-70, 25, -69, 45] as [number, number, number, number],
   };
   const index = new RBush<RBushEntry>();
-  index.load([{
-    minX: -70, minY: 25, maxX: -69, maxY: 45, polygon,
-  }]);
+  index.load([
+    {
+      minX: -70,
+      minY: 25,
+      maxX: -69,
+      maxY: 45,
+      polygon,
+    },
+  ]);
   return { level: 'l', polygons: [polygon], index };
 }
 
@@ -173,12 +185,24 @@ describe.skip('property: coastline forces detour', () => {
     // and (2) the avoidLand=true variant must detour around a tall wall,
     // which adds significant distance on top of the already-slow zigzag.
     const rOff = plan({
-      start, end, departure: 0, wind, polar, polarId: 't',
-      coastline, options: { avoidLand: false, maxHours: 336 },
+      start,
+      end,
+      departure: 0,
+      wind,
+      polar,
+      polarId: 't',
+      coastline,
+      options: { avoidLand: false, maxHours: 336 },
     });
     const rOn = plan({
-      start, end, departure: 0, wind, polar, polarId: 't',
-      coastline, options: { avoidLand: true, maxHours: 336 },
+      start,
+      end,
+      departure: 0,
+      wind,
+      polar,
+      polarId: 't',
+      coastline,
+      options: { avoidLand: true, maxHours: 336 },
     });
 
     expect(rOff.incomplete).toBeFalsy();
@@ -228,7 +252,12 @@ describe.skip('property: currents reverse → ETA asymmetry', () => {
     const wind = uniformWind(8, 0);
     const polar = reachingPolar();
     const args = {
-      start, end, departure: 0, wind, polar, polarId: 't',
+      start,
+      end,
+      departure: 0,
+      wind,
+      polar,
+      polarId: 't',
       coastline: fakeCoastline,
       options: { avoidLand: false, maxHours: 96, useCurrents: true },
     };

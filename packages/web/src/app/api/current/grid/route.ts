@@ -28,10 +28,7 @@ export async function GET(req: Request): Promise<Response> {
     if (!best || v.at > best.at) best = v;
   }
   if (!best) {
-    return Response.json(
-      { ok: false, error: { message: 'not cached' } },
-      { status: 404 },
-    );
+    return Response.json({ ok: false, error: { message: 'not cached' } }, { status: 404 });
   }
   return Response.json({ ok: true, grid: best.grid });
 }

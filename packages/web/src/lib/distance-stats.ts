@@ -7,9 +7,7 @@ function haversineM(a: TrackPoint, b: TrackPoint): number {
   const dLon = ((b.lon - a.lon) * Math.PI) / 180;
   const φ1 = (a.lat * Math.PI) / 180;
   const φ2 = (b.lat * Math.PI) / 180;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
   return 2 * R_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
@@ -19,11 +17,7 @@ function haversineM(a: TrackPoint, b: TrackPoint): number {
  * Lower-bounded by a binary search so a single 24h scan over a multi-day
  * track stays cheap.
  */
-export function distanceInWindow(
-  points: TrackPoint[],
-  fromS: number,
-  toS: number,
-): number {
+export function distanceInWindow(points: TrackPoint[], fromS: number, toS: number): number {
   if (points.length < 2) return 0;
   // Find first index with t >= fromS via binary search.
   let lo = 0;
@@ -109,8 +103,7 @@ export async function computeDistanceStats(
   // Rolling windows always end at `nowS`. Path length is taken from track
   // points within [nowS - W, nowS]. If the boat has been still since the
   // last fix, the result is 0 — which is the right answer for fuel use.
-  const d = (windowS: number): number =>
-    distanceInWindow(points, nowS - windowS, nowS);
+  const d = (windowS: number): number => distanceInWindow(points, nowS - windowS, nowS);
 
   // 24h history: one bucket per hour mark. The most-recent bucket is the
   // last completed hour boundary <= nowS. The oldest bucket is the first

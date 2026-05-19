@@ -55,10 +55,7 @@ export async function POST(req: Request): Promise<Response> {
   try {
     await store.createRevision(rev);
   } catch (err) {
-    return Response.json(
-      { error: (err as Error).message ?? 'create failed' },
-      { status: 400 },
-    );
+    return Response.json({ error: (err as Error).message ?? 'create failed' }, { status: 400 });
   }
   return Response.json({ id: rev.id }, { status: 201 });
 }

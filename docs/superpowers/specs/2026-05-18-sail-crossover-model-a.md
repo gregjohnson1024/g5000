@@ -137,8 +137,10 @@ import { Observable, combineLatest } from 'rxjs';
 import { Channels, type Bus } from '@g5000/core';
 import type { ConfigStore } from '@g5000/db';
 import {
-  type CrossoverMap, type CrossoverSettings,
-  type SailWardrobe, type PolarTable,
+  type CrossoverMap,
+  type CrossoverSettings,
+  type SailWardrobe,
+  type PolarTable,
 } from '@g5000/db/defaults';
 
 export interface SailRecommendation {
@@ -158,10 +160,9 @@ export interface SailRecommendation {
   stableSeconds: number;
 }
 
-export function startSailCrossoverPipeline(args: {
-  bus: Bus;
-  store: ConfigStore;
-}): () => void { /* … */ }
+export function startSailCrossoverPipeline(args: { bus: Bus; store: ConfigStore }): () => void {
+  /* … */
+}
 ```
 
 Algorithm:
@@ -213,7 +214,7 @@ export interface PlanInput {
    *  recommended configId from the crossover map. */
   crossover?: {
     map: CrossoverMap;
-    wardrobe: SailWardrobe;  // needed only to validate configIds exist
+    wardrobe: SailWardrobe; // needed only to validate configIds exist
   };
 }
 ```
@@ -228,7 +229,7 @@ The `wardrobe` and the legacy per-config polar argmax are removed from `PlanInpu
 export interface SailTimelineSegment {
   fromLegIdx: number;
   toLegIdx: number;
-  configId: string;       // routing decorates legs that fall on a painted cell
+  configId: string; // routing decorates legs that fall on a painted cell
   startTime: number;
   endTime: number;
   durationHours: number;
@@ -246,19 +247,19 @@ The `ForecastTimeline` UI component (already on the issue-3 branch) reads `plan.
 
 ## 8. UI inventory
 
-| File | New / Modified / Salvaged |
-|---|---|
-| `packages/web/src/app/sails/page.tsx` | Modified — replace prior CrossoverChart wiring with Model-A wiring |
-| `packages/web/src/app/sails/CrossoverChart.tsx` | Rewritten — editable map (was heatmap) |
-| `packages/web/src/app/sails/RecommendationPanel.tsx` | Salvaged — SSE-driven, just consume new payload shape |
-| `packages/web/src/app/sails/ForecastTimeline.tsx` | Salvaged — reads `plan.sailTimeline` |
-| `packages/web/src/app/sails/SettingsDrawer.tsx` | Modified — new settings keys |
-| `packages/web/src/app/helm/SailRecommendationTile.tsx` | Salvaged |
-| `packages/web/src/lib/config-color.ts` | Salvaged unchanged |
-| `packages/web/src/app/api/crossover-map/route.ts` | NEW — GET/POST `CrossoverMap` |
-| `packages/web/src/app/api/crossover-settings/route.ts` | NEW — GET/POST `CrossoverSettings` |
-| `packages/web/src/app/api/route/plan/route.ts` | Modified — drop wardrobe arg, add crossover arg |
-| `packages/web/src/components/PlanControls.tsx` | Modified — send crossover (not wardrobe) payload |
+| File                                                   | New / Modified / Salvaged                                          |
+| ------------------------------------------------------ | ------------------------------------------------------------------ |
+| `packages/web/src/app/sails/page.tsx`                  | Modified — replace prior CrossoverChart wiring with Model-A wiring |
+| `packages/web/src/app/sails/CrossoverChart.tsx`        | Rewritten — editable map (was heatmap)                             |
+| `packages/web/src/app/sails/RecommendationPanel.tsx`   | Salvaged — SSE-driven, just consume new payload shape              |
+| `packages/web/src/app/sails/ForecastTimeline.tsx`      | Salvaged — reads `plan.sailTimeline`                               |
+| `packages/web/src/app/sails/SettingsDrawer.tsx`        | Modified — new settings keys                                       |
+| `packages/web/src/app/helm/SailRecommendationTile.tsx` | Salvaged                                                           |
+| `packages/web/src/lib/config-color.ts`                 | Salvaged unchanged                                                 |
+| `packages/web/src/app/api/crossover-map/route.ts`      | NEW — GET/POST `CrossoverMap`                                      |
+| `packages/web/src/app/api/crossover-settings/route.ts` | NEW — GET/POST `CrossoverSettings`                                 |
+| `packages/web/src/app/api/route/plan/route.ts`         | Modified — drop wardrobe arg, add crossover arg                    |
+| `packages/web/src/components/PlanControls.tsx`         | Modified — send crossover (not wardrobe) payload                   |
 
 ## 9. Storage
 

@@ -85,14 +85,9 @@ export default function HelmPage() {
     void reloadWardrobe();
   }, [reloadWardrobe]);
 
-  const swapActive = async (configId: string) => {
-    await fetch('/api/sails/active', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ configId }),
-    });
-    await reloadWardrobe();
-  };
+  // In v3 (atomic sails) there's no single active "config"; each category
+  // (headsail / main / downwind) has its own active sail. The /sails page
+  // is the canonical UI for swapping; helm just renders the current state.
 
   const sog = channels.get('nav.gps.sog');
   // Wind + race-derived channels — rendered conditionally; tiles appear only when the channel publishes.
@@ -276,25 +271,18 @@ export default function HelmPage() {
       <AlertsPanel />
 
       {wardrobe && (
-        <div className="flex items-center gap-2 mb-3 text-sm bg-slate-900 border border-slate-800 rounded px-3 py-2">
+        <div className="flex items-center gap-3 mb-3 text-sm bg-slate-900 border border-slate-800 rounded px-3 py-2">
           <span className="text-slate-400">Sails:</span>
-          <select
-            value={wardrobe.activeConfigId}
-            onChange={(e) => swapActive(e.target.value)}
-            className="bg-slate-900 border border-slate-700 rounded text-slate-200 px-2 py-1 text-sm"
-          >
-            {wardrobe.configs.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)?.daggerboard && (
-            <span className="px-2 py-0.5 rounded bg-amber-700 text-amber-100 text-xs font-mono uppercase">
-              boards{' '}
-              {wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)?.daggerboard}
-            </span>
-          )}
+          {(['headsail', 'main', 'downwind'] as const).map((cat) => {
+            const activeId = wardrobe.active[cat];
+            const sail = activeId ? wardrobe.sails.find((s) => s.id === activeId) : undefined;
+            return (
+              <span key={cat} className="text-xs text-slate-300">
+                <span className="text-slate-500">{cat}:</span>{' '}
+                <span className="text-slate-200">{sail?.name ?? '—'}</span>
+              </span>
+            );
+          })}
           <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
             manage
           </a>
@@ -310,7 +298,9 @@ export default function HelmPage() {
         {aws && <HelmTile label="AWS" value={fmtSpeed(aws)} unit="kn" small />}
         {awa && <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />}
         {tbsSample && <HelmTile label="TBS" value={fmtSpeed(tbsSample)} unit="kn" small />}
-        {tTwaSample && <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />}
+        {tTwaSample && (
+          <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />
+        )}
         {pctPolarSample && (
           <HelmTile
             label="% polar"
@@ -322,12 +312,7 @@ export default function HelmPage() {
             small
           />
         )}
-        <HelmTile
-          label="COG"
-          value={fmtHeading(cog)}
-          unit="°"
-          sub={cogRef ?? undefined}
-        />
+        <HelmTile label="COG" value={fmtHeading(cog)} unit="°" sub={cogRef ?? undefined} />
         <HelmTile
           label="HDG"
           value={fmtHeadingRad(hdgValueRad)}
@@ -389,9 +374,8 @@ export default function HelmPage() {
             while (d < -Math.PI) d += 2 * Math.PI;
             driftDeg = (d * 180) / Math.PI;
           }
-          const label = driftDeg === null
-            ? '—'
-            : `${driftDeg >= 0 ? '+' : ''}${driftDeg.toFixed(1)}`;
+          const label =
+            driftDeg === null ? '—' : `${driftDeg >= 0 ? '+' : ''}${driftDeg.toFixed(1)}`;
           return (
             <HelmTile
               label="Drift (COG−HDG)"
@@ -414,8 +398,10 @@ export default function HelmPage() {
           }
           unit="°"
           sub={
-            motion?.heelRmsRad !== null && motion?.heelRmsRad !== undefined &&
-            motion?.pitchRmsRad !== null && motion?.pitchRmsRad !== undefined
+            motion?.heelRmsRad !== null &&
+            motion?.heelRmsRad !== undefined &&
+            motion?.pitchRmsRad !== null &&
+            motion?.pitchRmsRad !== undefined
               ? `h ${((motion.heelRmsRad * 180) / Math.PI).toFixed(1)}° p ${((motion.pitchRmsRad * 180) / Math.PI).toFixed(1)}°`
               : '15 min'
           }
@@ -433,10 +419,7 @@ export default function HelmPage() {
             essential here because the live tile redraws every SSE frame —
             text selection drops on every re-render, so the user can't grab
             the coordinates the usual way. */}
-        <PositionTile
-          positionLat={positionLat}
-          positionLon={positionLon}
-        />
+        <PositionTile positionLat={positionLat} positionLon={positionLon} />
       </div>
       <RaceTiles />
       <MobButton />
@@ -557,10 +540,7 @@ function AlertsPanel(): ReactElement | null {
   // cleared by the operator and hide the panel.
   const now = Date.now();
   const visible = alerts.filter(
-    (a) =>
-      a.state !== 'Normal' &&
-      a.state !== 'Disabled' &&
-      now - a.lastSeenMs < 5000,
+    (a) => a.state !== 'Normal' && a.state !== 'Disabled' && now - a.lastSeenMs < 5000,
   );
   if (visible.length === 0) return null;
 
@@ -595,19 +575,14 @@ function AlertsPanel(): ReactElement | null {
           .filter(Boolean)
           .join(' · ');
         return (
-          <div
-            key={a.key}
-            className={`border rounded p-3 flex items-center gap-3 ${style}`}
-          >
+          <div key={a.key} className={`border rounded p-3 flex items-center gap-3 ${style}`}>
             <div className="flex-1">
               <div className="text-xs uppercase tracking-wide opacity-80">
                 {a.type}
                 {a.text ? <span className="ml-2 normal-case opacity-100">{a.text}</span> : null}
               </div>
               <div className="text-[10px] opacity-70 mt-0.5 font-mono">{sub}</div>
-              {a.location && (
-                <div className="text-[10px] opacity-70 italic">{a.location}</div>
-              )}
+              {a.location && <div className="text-[10px] opacity-70 italic">{a.location}</div>}
             </div>
             <button
               type="button"

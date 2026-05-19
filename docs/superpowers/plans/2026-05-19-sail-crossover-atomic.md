@@ -17,6 +17,7 @@
 ## File map
 
 **Created:**
+
 - `packages/core/src/sail-grid.ts` + `.test.ts` — fixed grid constants + snap
 - `packages/db/src/migrate-wardrobe-v3.ts` + `.test.ts` — v2 → v3 migration
 - `packages/db/src/config-store-sails-v3.test.ts` — v3 validation
@@ -27,6 +28,7 @@
 - `packages/web/src/app/sails/SailRegionEditor.tsx` — single-sail edit chart
 
 **Modified:**
+
 - `packages/core/src/types.ts` — `sail_recommendation` ChannelValue shape
 - `packages/core/src/index.ts` — re-export sail-grid
 - `packages/db/src/defaults.ts` — Sail, SailWardrobe v3, CrossoverSettings trimmed; drop CrossoverMap exports
@@ -44,6 +46,7 @@
 - `packages/routing/src/plan.ts` — drop crossover usage
 
 **Deleted:**
+
 - `packages/db/src/migrate-wardrobe-v2.ts` + `.test.ts`
 - `packages/db/src/config-store-crossover.test.ts`
 - `packages/db/src/config-store-crossover-settings.test.ts`
@@ -84,6 +87,7 @@ Expected: a "Test Files <N> passed" summary line with no failures. Record N as t
 ## Task 2: Fixed-grid constants and snap (TDD)
 
 **Files:**
+
 - Create: `packages/core/src/sail-grid.ts`
 - Create: `packages/core/src/sail-grid.test.ts`
 - Modify: `packages/core/src/index.ts` (add export)
@@ -254,6 +258,7 @@ git commit -m "feat(core): fixed sail-region grid + snap (1 kt × 5°)"
 ## Task 3: Update `sail_recommendation` ChannelValue shape
 
 **Files:**
+
 - Modify: `packages/core/src/types.ts` (lines 14–23)
 
 This task is a type-only change. The test is `tsc -b` across the workspace — many call sites will break and we'll fix them in later tasks. We commit the type change here so the broken state is localized.
@@ -304,6 +309,7 @@ git commit -m "feat(core): redefine sail_recommendation payload (category model)
 ## Task 4: Define Sail and v3 SailWardrobe types
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts`
 
 - [ ] **Step 1: Replace lines 205–256 of `packages/db/src/defaults.ts`**
@@ -317,11 +323,7 @@ Replace the entire `SailConfig` + `SailWardrobe` block (currently lines 195–25
  * sail plan by picking one sail per category (headsail / main / downwind).
  */
 export type SailCategory = 'headsail' | 'main' | 'downwind';
-export const SAIL_CATEGORIES: readonly SailCategory[] = [
-  'headsail',
-  'main',
-  'downwind',
-] as const;
+export const SAIL_CATEGORIES: readonly SailCategory[] = ['headsail', 'main', 'downwind'] as const;
 
 export interface SailRegion {
   /** Grid cell keys "twsIdx,twaIdx" against the fixed grid in @g5000/core. */
@@ -421,6 +423,7 @@ git commit -m "feat(db): v3 atomic-sail types; trim CrossoverSettings; drop Cros
 ## Task 5: Drop `crossover_map` table from schema
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts` (lines 138–148, the `crossoverMap` table block)
 
 - [ ] **Step 1: Edit `packages/db/src/schema.ts`**
@@ -447,6 +450,7 @@ git commit -m "refactor(db): drop crossover_map table (single-winner model remov
 ## Task 6: Migration v2 → v3 (TDD)
 
 **Files:**
+
 - Create: `packages/db/src/migrate-wardrobe-v3.ts`
 - Create: `packages/db/src/migrate-wardrobe-v3.test.ts`
 
@@ -571,12 +575,7 @@ Expected: FAIL — `./migrate-wardrobe-v3` not found.
 Create `packages/db/src/migrate-wardrobe-v3.ts`:
 
 ```ts
-import {
-  SAIL_GRID_TWS_BINS,
-  SAIL_GRID_TWA_BINS,
-  snapToFixedGrid,
-  cellKey,
-} from '@g5000/core';
+import { SAIL_GRID_TWS_BINS, SAIL_GRID_TWA_BINS, snapToFixedGrid, cellKey } from '@g5000/core';
 import type { PolarMode, BoatId, PolarTable } from './defaults';
 import type { Sail, SailCategory, SailWardrobe } from './defaults';
 
@@ -605,7 +604,11 @@ interface V2CrossoverMap {
 }
 
 function isV3(input: unknown): input is SailWardrobe {
-  return !!input && typeof input === 'object' && (input as { schemaVersion?: number }).schemaVersion === 3;
+  return (
+    !!input &&
+    typeof input === 'object' &&
+    (input as { schemaVersion?: number }).schemaVersion === 3
+  );
 }
 
 function slug(s: string): string {
@@ -739,6 +742,7 @@ git commit -m "feat(db): v2 → v3 wardrobe migrator (config splitting + cell re
 ## Task 7: Rewrite `ConfigStore` for v3 wardrobe
 
 **Files:**
+
 - Modify: `packages/db/src/config-store.ts`
 - Delete: `packages/db/src/migrate-wardrobe-v2.ts`, `packages/db/src/migrate-wardrobe-v2.test.ts`
 - Delete: `packages/db/src/config-store-crossover.test.ts`, `packages/db/src/schema-crossover.test.ts`, `packages/db/src/config-store-crossover-settings.test.ts`
@@ -829,7 +833,12 @@ const wardrobeRow = this.raw
 const rawWardrobe = wardrobeRow ? JSON.parse(wardrobeRow.value) : DEFAULT_WARDROBE;
 
 // Read legacy crossover_map row if the table still exists (drop happens next deploy).
-let legacyMap: { boatId: string; mode: string; cells: Record<string, string>; updatedAt: number } | null = null;
+let legacyMap: {
+  boatId: string;
+  mode: string;
+  cells: Record<string, string>;
+  updatedAt: number;
+} | null = null;
 try {
   const row = this.raw
     .prepare('SELECT value FROM crossover_map WHERE boat_id = ? AND mode = ? LIMIT 1')
@@ -990,6 +999,7 @@ git commit -m "refactor(db): rewrite ConfigStore for v3 wardrobe; drop crossover
 ## Task 8: Region-lookup helper for compute pipeline (TDD)
 
 **Files:**
+
 - Create: `packages/compute/src/sail-crossover/region-lookup.ts`
 - Create: `packages/compute/src/sail-crossover/region-lookup.test.ts`
 - Delete: `packages/compute/src/sail-crossover/lookup.ts`, `packages/compute/src/sail-crossover/lookup.test.ts`
@@ -1010,10 +1020,34 @@ import { describe, expect, it } from 'vitest';
 import type { Sail } from '@g5000/db';
 import { findValidSailsByCategory } from './region-lookup';
 
-const j0: Sail = { id: 'j0', name: 'J0', category: 'headsail', areaSqM: 79, region: { cells: ['10,12', '14,9'] } };
-const stj: Sail = { id: 'stj', name: 'STJ', category: 'headsail', areaSqM: 44, region: { cells: ['14,9', '20,9'] } };
-const reef1: Sail = { id: 'reef1', name: 'Reef 1', category: 'main', areaSqM: 58, region: { cells: ['14,9'] } };
-const g0: Sail = { id: 'g0', name: 'G0', category: 'downwind', areaSqM: 143, region: { cells: ['14,30'] } };
+const j0: Sail = {
+  id: 'j0',
+  name: 'J0',
+  category: 'headsail',
+  areaSqM: 79,
+  region: { cells: ['10,12', '14,9'] },
+};
+const stj: Sail = {
+  id: 'stj',
+  name: 'STJ',
+  category: 'headsail',
+  areaSqM: 44,
+  region: { cells: ['14,9', '20,9'] },
+};
+const reef1: Sail = {
+  id: 'reef1',
+  name: 'Reef 1',
+  category: 'main',
+  areaSqM: 58,
+  region: { cells: ['14,9'] },
+};
+const g0: Sail = {
+  id: 'g0',
+  name: 'G0',
+  category: 'downwind',
+  areaSqM: 143,
+  region: { cells: ['14,30'] },
+};
 
 describe('findValidSailsByCategory', () => {
   it('returns sails whose region contains the cell', () => {
@@ -1031,7 +1065,13 @@ describe('findValidSailsByCategory', () => {
   it('sorts sails without areaSqM last, then by id ascending', () => {
     const a: Sail = { id: 'z', name: 'Z', category: 'headsail', region: { cells: ['10,0'] } };
     const b: Sail = { id: 'a', name: 'A', category: 'headsail', region: { cells: ['10,0'] } };
-    const c: Sail = { id: 'c', name: 'C', category: 'headsail', areaSqM: 50, region: { cells: ['10,0'] } };
+    const c: Sail = {
+      id: 'c',
+      name: 'C',
+      category: 'headsail',
+      areaSqM: 50,
+      region: { cells: ['10,0'] },
+    };
     const r = findValidSailsByCategory([a, b, c], { twsIdx: 10, twaIdx: 0 });
     expect(r.headsail).toEqual(['c', 'a', 'z']);
   });
@@ -1110,6 +1150,7 @@ git commit -m "feat(compute): per-category sail region lookup; drop single-winne
 ## Task 9: Rewrite the sail-crossover pipeline (TDD)
 
 **Files:**
+
 - Modify: `packages/compute/src/sail-crossover/pipeline.ts` (full rewrite)
 - Modify: `packages/compute/src/sail-crossover/pipeline.test.ts` (full rewrite)
 - Modify: `packages/compute/src/sail-crossover/index.ts`
@@ -1299,7 +1340,9 @@ export function startSailCrossoverPipeline(args: StartArgs): Subscription {
 // Helper: synchronously read the latest wardrobe/settings via BehaviorSubject pattern.
 // Subscriptions used inside .subscribe() callbacks would re-emit; instead we use a
 // snapshot pattern. Pipeline accepts BehaviorSubject-like observables.
-function wardrobeAndSettings(args: StartArgs): { wardrobe: SailWardrobe; settings: CrossoverSettings } | null {
+function wardrobeAndSettings(
+  args: StartArgs,
+): { wardrobe: SailWardrobe; settings: CrossoverSettings } | null {
   // We rely on the subjects being BehaviorSubjects — read .value via a one-shot subscribe.
   let w: SailWardrobe | null = null;
   let s: CrossoverSettings | null = null;
@@ -1421,6 +1464,7 @@ git commit -m "feat(compute): per-category sail-crossover pipeline (Model B)"
 ## Task 10: Remove routing-side sail timeline
 
 **Files:**
+
 - Delete: `packages/routing/src/sail-timeline.ts`, `packages/routing/src/sail-timeline.test.ts`, `packages/routing/src/plan.crossover.test.ts`
 - Modify: `packages/routing/src/types.ts`, `packages/routing/src/plan.ts`, `packages/routing/src/index.ts`
 
@@ -1466,6 +1510,7 @@ git commit -m "refactor(routing): drop per-leg sail recommendation + sail-timeli
 ## Task 11: Rewrite `/api/sails` route for v3 (TDD)
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/sails/route.ts`
 - Create / modify: `packages/web/src/app/api/sails/route.test.ts`
 
@@ -1599,6 +1644,7 @@ git commit -m "feat(web): /api/sails v3 GET/PUT with validation"
 ## Task 12: Rewrite `/api/sails/active` for per-category set
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/sails/active/route.ts`
 - Create: `packages/web/src/app/api/sails/active/route.test.ts`
 
@@ -1740,6 +1786,7 @@ git commit -m "feat(web): /api/sails/active per-category set"
 ## Task 13: New `/api/sails/[sailId]/region` route (TDD)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/sails/[sailId]/region/route.ts`
 - Create: `packages/web/src/app/api/sails/[sailId]/region/route.test.ts`
 
@@ -1882,6 +1929,7 @@ git commit -m "feat(web): /api/sails/[sailId]/region POST (replace cells)"
 ## Task 14: Drop `/api/crossover-map` route
 
 **Files:**
+
 - Delete: `packages/web/src/app/api/crossover-map/route.ts`, `route.test.ts`
 
 - [ ] **Step 1: Delete the route**
@@ -1912,6 +1960,7 @@ git commit -m "refactor(web): drop /api/crossover-map (replaced by region routes
 ## Task 15: Trim `/api/crossover-settings` response shape
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/crossover-settings/route.ts`
 - Modify: `packages/web/src/app/api/crossover-settings/route.test.ts`
 
@@ -1937,7 +1986,11 @@ export async function GET(): Promise<NextResponse> {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = (await req.json()) as Partial<CrossoverSettings>;
-  const required = ['recommendationStableSeconds', 'forecastIntervalMinutes', 'forecastDurationHours'] as const;
+  const required = [
+    'recommendationStableSeconds',
+    'forecastIntervalMinutes',
+    'forecastDurationHours',
+  ] as const;
   const merged: CrossoverSettings = {
     recommendationStableSeconds: body.recommendationStableSeconds ?? 30,
     forecastIntervalMinutes: body.forecastIntervalMinutes ?? 30,
@@ -2022,6 +2075,7 @@ git commit -m "refactor(web): trim /api/crossover-settings to 3-field shape"
 ## Task 16: Fix `/inspect` exhaustive-switch arm for new payload
 
 **Files:**
+
 - Modify: `packages/web/src/app/inspect/page.tsx`
 
 - [ ] **Step 1: Locate the exhaustive switch**
@@ -2037,7 +2091,8 @@ if (sample.value.kind === 'sail_recommendation') {
   const v = sample.value;
   return (
     <span>
-      cell ({v.cellTwsKn} kn, {v.cellTwaDeg}°) — H:{v.valid.headsail.join('/') || '—'} M:{v.valid.main.join('/') || '—'} D:{v.valid.downwind.join('/') || '—'}
+      cell ({v.cellTwsKn} kn, {v.cellTwaDeg}°) — H:{v.valid.headsail.join('/') || '—'} M:
+      {v.valid.main.join('/') || '—'} D:{v.valid.downwind.join('/') || '—'}
     </span>
   );
 }
@@ -2063,6 +2118,7 @@ git commit -m "fix(web): inspect exhaustive switch for v3 sail_recommendation"
 ## Task 17: Rewrite `/sails` wardrobe page
 
 **Files:**
+
 - Modify: `packages/web/src/app/sails/page.tsx` (complete rewrite)
 - Delete (later in Task 18): `packages/web/src/app/sails/ForecastTimeline.tsx`, `RecommendationPanel.tsx`, `CrossoverChart.tsx`
 
@@ -2083,7 +2139,10 @@ const CATEGORIES: { key: SailCategory; label: string }[] = [
 ];
 
 function slug(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
 }
 
 export default function SailsPage() {
@@ -2218,7 +2277,11 @@ export default function SailsPage() {
         );
       })}
       <p className="text-sm text-gray-500">
-        Paint each sail's TWS/TWA region on the <a href="/sails/crossover" className="underline">crossover page</a>.
+        Paint each sail's TWS/TWA region on the{' '}
+        <a href="/sails/crossover" className="underline">
+          crossover page
+        </a>
+        .
       </p>
     </div>
   );
@@ -2247,6 +2310,7 @@ git commit -m "feat(web): /sails wardrobe page (atomic sails, category-grouped)"
 ## Task 18: New `CategoryRecommendation` component
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/CategoryRecommendation.tsx`
 - Delete: `packages/web/src/app/sails/RecommendationPanel.tsx`
 
@@ -2309,13 +2373,11 @@ export function CategoryRecommendation({ wardrobe }: { wardrobe: SailWardrobe })
           <div key={cat} className="border rounded p-2">
             <div className="text-sm font-medium flex items-center gap-2">
               {labels[cat]}
-              {change && (
-                <span className="bg-red-500 text-white text-xs px-1 rounded">change</span>
-              )}
+              {change && <span className="bg-red-500 text-white text-xs px-1 rounded">change</span>}
             </div>
             <div className="text-sm">
               <span className="text-gray-600">active:</span>{' '}
-              {active ? byId.get(active)?.name ?? active : '—'}
+              {active ? (byId.get(active)?.name ?? active) : '—'}
             </div>
             <div className="text-xs text-gray-600 flex flex-wrap gap-1 mt-1">
               {valid.length ? (
@@ -2354,6 +2416,7 @@ git commit -m "feat(web): CategoryRecommendation component (per-category live re
 ## Task 19: New chart components (`SailOverlayChart` view; `SailRegionEditor` edit)
 
 **Files:**
+
 - Create: `packages/web/src/app/sails/SailOverlayChart.tsx`
 - Create: `packages/web/src/app/sails/SailRegionEditor.tsx`
 - Delete: `packages/web/src/app/sails/CrossoverChart.tsx`
@@ -2365,11 +2428,7 @@ git commit -m "feat(web): CategoryRecommendation component (per-category live re
 'use client';
 
 import { useMemo } from 'react';
-import {
-  SAIL_GRID_TWS_BINS,
-  SAIL_GRID_TWA_BINS,
-  SAIL_GRID_TWA_STEP_DEG,
-} from '@g5000/core';
+import { SAIL_GRID_TWS_BINS, SAIL_GRID_TWA_BINS, SAIL_GRID_TWA_STEP_DEG } from '@g5000/core';
 import type { Sail, SailCategory, SailWardrobe } from '@g5000/db';
 import { colorForId } from '../../lib/config-color';
 
@@ -2436,8 +2495,12 @@ export function SailOverlayChart({ wardrobe, filterCategory = 'all', liveCell }:
           />
         )}
       </g>
-      <text x={10} y={10} fontSize={10}>TWA</text>
-      <text x={W} y={H + 20} fontSize={10}>TWS (kn)</text>
+      <text x={10} y={10} fontSize={10}>
+        TWA
+      </text>
+      <text x={W} y={H + 20} fontSize={10}>
+        TWS (kn)
+      </text>
     </svg>
   );
 }
@@ -2486,7 +2549,9 @@ export function SailRegionEditor({ sail, onSave }: Props) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm">Editing: <b>{sail.name}</b> ({cells.size} cells)</span>
+        <span className="text-sm">
+          Editing: <b>{sail.name}</b> ({cells.size} cells)
+        </span>
         <button
           disabled={!dirty}
           onClick={() => {
@@ -2558,6 +2623,7 @@ git commit -m "feat(web): SailOverlayChart (view) + SailRegionEditor (edit)"
 ## Task 20: Rewrite `/sails/crossover` page wiring
 
 **Files:**
+
 - Modify: `packages/web/src/app/sails/crossover/page.tsx`
 
 - [ ] **Step 1: Overwrite the file**
@@ -2589,8 +2655,9 @@ export default function CrossoverPage() {
 
   if (!wardrobe) return <div className="p-4">Loading…</div>;
 
-  const editSail: Sail | undefined =
-    editSailId ? wardrobe.sails.find((s) => s.id === editSailId) : undefined;
+  const editSail: Sail | undefined = editSailId
+    ? wardrobe.sails.find((s) => s.id === editSailId)
+    : undefined;
 
   async function saveRegion(sailId: string, cells: string[]) {
     const res = await fetch(`/api/sails/${sailId}/region`, {
@@ -2663,8 +2730,7 @@ export default function CrossoverPage() {
                     s.id === editSailId ? 'bg-blue-100' : ''
                   }`}
                 >
-                  {s.name}{' '}
-                  <span className="text-xs text-gray-400">({s.region.cells.length})</span>
+                  {s.name} <span className="text-xs text-gray-400">({s.region.cells.length})</span>
                 </button>
               ))}
           </div>
@@ -2748,6 +2814,7 @@ Wait for `ready on http://localhost:3000`.
 In a browser, open `http://localhost:3000/sails`.
 
 Confirm:
+
 - Three section headings (Headsails, Main / Reef, Downwind)
 - If the v2 → v3 migration found existing configs, atomic sails should be listed under each category
 - Add a new sail in one category — it persists across reload
@@ -2758,6 +2825,7 @@ Confirm:
 Navigate to `http://localhost:3000/sails/crossover`.
 
 Confirm:
+
 - Left rail: 3 recommendation cards (Headsail / Main / Downwind), all showing "waiting for wind…" or live values in demo mode
 - Center: SVG grid with axis labels (0–40 kn × 0–180°)
 - Right rail: list of sails grouped by category
@@ -2832,6 +2900,7 @@ Capture the URL printed by `gh pr create` and surface it to the user. STOP here 
 **Spec coverage:** each spec section has a task — domain model (Tasks 4, 6), grid (Task 2), pipeline (Tasks 8–9), API (Tasks 11–15), UI (Tasks 17–20), routing cleanup (Task 10), tests (every TDD step), migration (Task 6).
 
 **Risk flags for the executor:**
+
 - Task 7 touches `ConfigStore` deeply — if the existing `open()` method differs structurally from the snippet, adapt the snippet to fit the actual control flow rather than copying verbatim.
 - Task 9's `wardrobeAndSettings()` helper assumes `sails$` / `settings$` are `BehaviorSubject`-like. The tests pass them as `BehaviorSubject` instances. The real `ConfigStore.sails$` is backed by a `BehaviorSubject`, so production behavior matches.
 - The Pi migration runs on first boot after `main` is updated. If `crossover_map` table no longer exists at that point, the `try/catch` in Task 7 step 2 returns `legacyMap = null` (intended).

@@ -55,7 +55,11 @@ export async function POST(req: Request): Promise<Response> {
     let anchorAt: number;
     if (body.resetToNow) {
       anchorAt = Math.floor(Date.now() / 1000);
-    } else if (typeof body.anchorAt === 'number' && Number.isFinite(body.anchorAt) && body.anchorAt > 0) {
+    } else if (
+      typeof body.anchorAt === 'number' &&
+      Number.isFinite(body.anchorAt) &&
+      body.anchorAt > 0
+    ) {
       anchorAt = body.anchorAt;
     } else {
       return Response.json(

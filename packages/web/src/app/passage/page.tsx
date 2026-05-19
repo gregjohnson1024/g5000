@@ -50,8 +50,7 @@ function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): 
   const p2 = toRad(lat2);
   const dp = toRad(lat2 - lat1);
   const dl = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
   return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
@@ -121,8 +120,7 @@ function Sparkline({
   const padY = (yMax - yMin) * 0.1 || 1;
   const yLo = yMin - padY;
   const yHi = yMax + padY;
-  const px = (x: number): number =>
-    ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
+  const px = (x: number): number => ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
   const py = (y: number): number =>
     height - 12 - ((y - yLo) / Math.max(0.0001, yHi - yLo)) * (height - 24);
   const path = series
@@ -285,9 +283,7 @@ export default function PassagePage() {
 
           {eta && <BermudaTile eta={eta} />}
 
-          {log && (
-            <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />
-          )}
+          {log && <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />}
 
           <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <DistanceTile label="Last 1 h" valueNm={stats.d1hM * M_TO_NM} hours={1} />
@@ -513,9 +509,7 @@ function EnginePanel({ tz }: { tz: TzMode }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-        Engines
-      </h2>
+      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Engines</h2>
 
       {error && (
         <div className="text-rose-400 text-xs bg-rose-900/20 border border-rose-800 rounded p-2">
@@ -600,7 +594,11 @@ function EnginePanel({ tz }: { tz: TzMode }) {
               className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 disabled:opacity-40"
             />
             <span className="text-[10px] text-slate-500 font-mono">
-              ≡ {fmtTimestamp(useNow ? Date.now() / 1000 : whenAnchor, tz === 'utc' ? 'local' : 'utc')}
+              ≡{' '}
+              {fmtTimestamp(
+                useNow ? Date.now() / 1000 : whenAnchor,
+                tz === 'utc' ? 'local' : 'utc',
+              )}
             </span>
           </label>
           <button
@@ -630,22 +628,18 @@ function EnginePanel({ tz }: { tz: TzMode }) {
                 </tr>
               </thead>
               <tbody>
-                {[...entries]
-                  .reverse()
-                  .map((e) => (
-                    <tr key={e.t} className="border-t border-slate-800">
-                      <td className="py-1 pr-2 text-slate-300">
-                        {fmtTimestamp(e.t, tz)}
-                      </td>
-                      <td className="py-1 pr-2 text-slate-200">
-                        {e.port.on ? `on${e.port.rpm ? ` ${e.port.rpm} rpm` : ''}` : 'off'}
-                      </td>
-                      <td className="py-1 pr-2 text-slate-200">
-                        {e.stbd.on ? `on${e.stbd.rpm ? ` ${e.stbd.rpm} rpm` : ''}` : 'off'}
-                      </td>
-                      <td className="py-1 pr-2 text-slate-400">{e.note ?? ''}</td>
-                    </tr>
-                  ))}
+                {[...entries].reverse().map((e) => (
+                  <tr key={e.t} className="border-t border-slate-800">
+                    <td className="py-1 pr-2 text-slate-300">{fmtTimestamp(e.t, tz)}</td>
+                    <td className="py-1 pr-2 text-slate-200">
+                      {e.port.on ? `on${e.port.rpm ? ` ${e.port.rpm} rpm` : ''}` : 'off'}
+                    </td>
+                    <td className="py-1 pr-2 text-slate-200">
+                      {e.stbd.on ? `on${e.stbd.rpm ? ` ${e.stbd.rpm} rpm` : ''}` : 'off'}
+                    </td>
+                    <td className="py-1 pr-2 text-slate-400">{e.note ?? ''}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -800,9 +794,7 @@ function DistanceTile({
   return (
     <div
       className={`rounded p-4 flex flex-col gap-1 border ${
-        highlight
-          ? 'bg-amber-900/20 border-amber-700'
-          : 'bg-slate-900 border-slate-800'
+        highlight ? 'bg-amber-900/20 border-amber-700' : 'bg-slate-900 border-slate-800'
       }`}
     >
       <div className="text-xs uppercase tracking-wider text-slate-400">{label}</div>
@@ -810,9 +802,7 @@ function DistanceTile({
         <div className="text-3xl font-mono text-slate-100">{valueNm.toFixed(1)}</div>
         <div className="text-sm text-slate-400">NM</div>
       </div>
-      <div className="text-base text-slate-400 font-mono">
-        avg {avgKn.toFixed(2)} NM/h
-      </div>
+      <div className="text-base text-slate-400 font-mono">avg {avgKn.toFixed(2)} NM/h</div>
     </div>
   );
 }
@@ -859,9 +849,7 @@ function LogTile({
       ? `since ${weekdayFor(log.anchorAt, tz)} ${fmtTimestamp(log.anchorAt, tz)}`
       : 'no anchor set';
   const elapsedText =
-    log.anchorAt !== null
-      ? ` · ${fmtDuration(Date.now() / 1000 - log.anchorAt)} elapsed`
-      : '';
+    log.anchorAt !== null ? ` · ${fmtDuration(Date.now() / 1000 - log.anchorAt)} elapsed` : '';
   return (
     <section className="bg-slate-900 border border-emerald-700 rounded p-4 space-y-3">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -886,11 +874,7 @@ function LogTile({
         </button>
       </div>
       {log.anchorAt !== null && (
-        <CumulativeSparkline
-          anchorAt={log.anchorAt}
-          history={log.history}
-          tz={tz}
-        />
+        <CumulativeSparkline anchorAt={log.anchorAt} history={log.history} tz={tz} />
       )}
     </section>
   );
@@ -929,10 +913,8 @@ function CumulativeSparkline({
   const yMax = Math.max(...ys);
   const padY = yMax * 0.1 || 1;
   const yHi = yMax + padY;
-  const px = (x: number): number =>
-    ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
-  const py = (y: number): number =>
-    height - 12 - (y / Math.max(0.0001, yHi)) * (height - 24);
+  const px = (x: number): number => ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
+  const py = (y: number): number => height - 12 - (y / Math.max(0.0001, yHi)) * (height - 24);
   const path = series
     .map((d, i) => {
       const x = px(d.t);
@@ -983,9 +965,7 @@ function EtaTile({
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
           <div className="text-xs uppercase tracking-wider text-amber-400">ETA</div>
-          <div className="text-lg font-semibold text-slate-100">
-            {eta.destinationLabel}
-          </div>
+          <div className="text-lg font-semibold text-slate-100">{eta.destinationLabel}</div>
           <div className="text-xs text-slate-500 font-mono">
             {fmtLatLonDmm(eta.destinationLat, eta.destinationLon)}
           </div>
@@ -1002,7 +982,9 @@ function EtaTile({
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm font-mono">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">Avg speed (last 3 h)</div>
+          <div className="text-xs uppercase tracking-wider text-slate-500">
+            Avg speed (last 3 h)
+          </div>
           <div className="text-xl text-slate-100">
             {eta.avgSpeedKn3h !== null ? `${eta.avgSpeedKn3h.toFixed(2)} kn` : '—'}
           </div>

@@ -1,378 +1,161 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type {
-  PolarMode,
-  PolarRevision,
-  PolarTable,
-  SailConfig,
-  SailWardrobe,
-} from '@g5000/db';
-import { PolarHeatmap } from '../polars/PolarHeatmap';
+import { useEffect, useState } from 'react';
+import type { Sail, SailCategory, SailWardrobe } from '@g5000/db';
 
-// Tiny client-safe fallback used only when no revision has been resolved yet.
-// In normal operation boot-time migration guarantees a revision-0 exists, so
-// `resolvePolar` returns the resolved table on the first render after fetch.
-// We avoid importing DEFAULT_POLARS from '@g5000/db' because that pulls
-// `config-store.js` (better-sqlite3) into the client bundle.
-const EMPTY_POLAR: PolarTable = {
-  twsBins: [],
-  twaBins: [],
-  boatSpeed: [],
-};
+const CATEGORIES: { key: SailCategory; label: string }[] = [
+  { key: 'headsail', label: 'Headsails' },
+  { key: 'main', label: 'Main / Reef' },
+  { key: 'downwind', label: 'Downwind' },
+];
 
-function resolvePolar(
-  cfg: SailConfig,
-  mode: PolarMode,
-  revisions: Record<string, PolarRevision>,
-): PolarTable {
-  const refId = cfg.modes[mode]?.activeRevisionId ?? cfg.modes.default?.activeRevisionId;
-  if (!refId) return cfg.polar ?? EMPTY_POLAR;
-  return revisions[refId]?.table ?? cfg.polar ?? EMPTY_POLAR;
+function slug(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
 }
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
-  const [revisionsById, setRevisionsById] = useState<Record<string, PolarRevision>>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedCell, setSelectedCell] = useState<{ twsIdx: number; twaIdx: number } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importBusy, setImportBusy] = useState(false);
+  const [draftName, setDraftName] = useState<Record<SailCategory, string>>({
+    headsail: '',
+    main: '',
+    downwind: '',
+  });
+  const [draftArea, setDraftArea] = useState<Record<SailCategory, string>>({
+    headsail: '',
+    main: '',
+    downwind: '',
+  });
 
-  const reload = useCallback(async () => {
-    try {
-      const [wardrobeRes, revisionsRes] = await Promise.all([
-        fetch('/api/sails', { cache: 'no-store' }),
-        fetch('/api/polar/revisions', { cache: 'no-store' }),
-      ]);
-      if (!wardrobeRes.ok) throw new Error(`GET /api/sails: ${wardrobeRes.status}`);
-      if (!revisionsRes.ok) {
-        throw new Error(`GET /api/polar/revisions: ${revisionsRes.status}`);
-      }
-      const body = (await wardrobeRes.json()) as SailWardrobe;
-      const revBody = (await revisionsRes.json()) as { revisions: PolarRevision[] };
-      const byId: Record<string, PolarRevision> = {};
-      for (const r of revBody.revisions) byId[r.id] = r;
-      setWardrobe(body);
-      setRevisionsById(byId);
-      setErr(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  }, []);
-
+  async function reload() {
+    setWardrobe(await (await fetch('/api/sails')).json());
+  }
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, []);
 
-  const writeWardrobe = async (w: SailWardrobe) => {
-    const res = await fetch('/api/sails', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(w),
-    });
+  async function save(next: SailWardrobe) {
+    const res = await fetch('/api/sails', { method: 'PUT', body: JSON.stringify(next) });
     if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`PUT failed: ${res.status} ${t}`);
-    }
-    await reload();
-  };
-
-  const setActive = async (id: string) => {
-    const res = await fetch('/api/sails/active', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ configId: id }),
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      setErr(`activate failed: ${res.status} ${t}`);
+      const body = await res.json();
+      alert(`Save failed: ${body.error ?? res.statusText}`);
       return;
     }
-    await reload();
-  };
+    setWardrobe(next);
+  }
 
-  const addConfig = async () => {
-    if (!wardrobe) return;
-    const baseId = `config-${Date.now()}`;
-    const base = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId)!;
-    const baseRevId =
-      base.modes[wardrobe.activeMode]?.activeRevisionId ??
-      base.modes.default?.activeRevisionId;
-    const newCfg: SailConfig = {
-      id: baseId,
-      name: `New config (${wardrobe.configs.length + 1})`,
-      modes: baseRevId ? { [wardrobe.activeMode]: { activeRevisionId: baseRevId } } : {},
+  if (!wardrobe) return <div className="p-4">Loading…</div>;
+
+  async function addSail(cat: SailCategory) {
+    const name = draftName[cat].trim();
+    if (!name) return;
+    const id = slug(name);
+    if (wardrobe!.sails.some((s) => s.id === id)) {
+      alert(`Sail "${id}" already exists.`);
+      return;
+    }
+    const areaSqM = draftArea[cat] ? Number(draftArea[cat]) : undefined;
+    const newSail: Sail = {
+      id,
+      name,
+      category: cat,
+      region: { cells: [] },
+      ...(Number.isFinite(areaSqM) && areaSqM ? { areaSqM } : {}),
     };
-    try {
-      await writeWardrobe({
-        ...wardrobe,
-        configs: [...wardrobe.configs, newCfg],
-      });
-      setEditingId(baseId);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
+    await save({ ...wardrobe!, sails: [...wardrobe!.sails, newSail] });
+    setDraftName({ ...draftName, [cat]: '' });
+    setDraftArea({ ...draftArea, [cat]: '' });
+  }
 
-  const deleteConfig = async (id: string) => {
-    if (!wardrobe) return;
-    if (wardrobe.configs.length === 1) {
-      setErr('Cannot delete the last config');
-      return;
-    }
-    if (id === wardrobe.activeConfigId) {
-      setErr('Cannot delete the active config (switch first)');
-      return;
-    }
-    if (!confirm(`Delete config "${id}"?`)) return;
-    try {
-      await writeWardrobe({
-        ...wardrobe,
-        configs: wardrobe.configs.filter((c) => c.id !== id),
-      });
-      if (editingId === id) setEditingId(null);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
+  async function deleteSail(sailId: string) {
+    if (!confirm(`Delete sail "${sailId}"? Its region will be lost.`)) return;
+    await save({ ...wardrobe!, sails: wardrobe!.sails.filter((s) => s.id !== sailId) });
+  }
 
-  const updateConfig = async (id: string, patch: Partial<SailConfig>) => {
-    if (!wardrobe) return;
-    try {
-      await writeWardrobe({
-        ...wardrobe,
-        configs: wardrobe.configs.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-      });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const applyPolarChange = async (configId: string, polar: PolarTable) => {
-    const mode: PolarMode = wardrobe?.activeMode ?? 'default';
-    const createRes = await fetch('/api/polar/revisions', {
+  async function setActive(cat: SailCategory, sailId: string | null) {
+    await fetch('/api/sails/active', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        sailConfigId: configId,
-        mode,
-        lineage: { kind: 'manual_edit', source: 'sails-page' },
-        table: polar,
-      }),
+      body: JSON.stringify({ category: cat, sailId }),
     });
-    if (!createRes.ok) {
-      setErr(`save polar failed: ${createRes.status} ${await createRes.text()}`);
-      return;
-    }
-    const { id: newRevId } = (await createRes.json()) as { id: string };
-    const activateRes = await fetch('/api/polar/active', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sailConfigId: configId, mode, revisionId: newRevId }),
-    });
-    if (!activateRes.ok) {
-      setErr(`activate polar failed: ${activateRes.status} ${await activateRes.text()}`);
-      return;
-    }
     await reload();
-  };
-
-  const handleImport = async (file: File, configId: string) => {
-    setImportBusy(true);
-    try {
-      const text = await file.text();
-      const res = await fetch(`/api/sails/import?configId=${encodeURIComponent(configId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/csv' },
-        body: text,
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`Import failed: ${res.status} ${t}`);
-      }
-      await reload();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setImportBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+  }
 
   return (
-    <main className="p-6 space-y-6">
-      <div className="mb-3">
-        <a
-          href="/sails/crossover"
-          className="text-sm underline text-amber-300 hover:text-amber-200"
-        >
-          Sail-crossover chart →
-        </a>
-      </div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Sail wardrobe</h1>
-        <button
-          onClick={addConfig}
-          className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium"
-        >
-          Add config
-        </button>
-      </div>
-      {err && <div className="text-red-400 text-sm">{err}</div>}
-
-      {!wardrobe && !err && <p className="text-slate-400">Loading…</p>}
-
-      {wardrobe && (
-        <div className="space-y-2">
-          {wardrobe.configs.map((c) => {
-            const isActive = c.id === wardrobe.activeConfigId;
-            const isEditing = c.id === editingId;
-            return (
-              <div
-                key={c.id}
-                className={`border rounded p-3 ${
-                  isActive ? 'border-amber-500' : 'border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setActive(c.id)}
-                      className={`px-2 py-1 rounded text-xs font-mono ${
-                        isActive ? 'bg-amber-600 text-slate-900' : 'bg-slate-700 text-slate-300'
-                      }`}
-                    >
-                      {isActive ? 'ACTIVE' : 'Make active'}
-                    </button>
-                    <div>
-                      <div className="text-base font-semibold">{c.name}</div>
-                      <div className="text-xs text-slate-500 font-mono">{c.id}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setEditingId(isEditing ? null : c.id)}
-                      className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-xs"
-                    >
-                      {isEditing ? 'Close' : 'Edit'}
-                    </button>
-                    <button
-                      onClick={() => deleteConfig(c.id)}
-                      disabled={isActive || wardrobe.configs.length === 1}
-                      className="px-2 py-1 bg-red-900 text-red-200 rounded text-xs disabled:opacity-30"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-
-                {isEditing && (
-                  <div className="mt-4 space-y-3 border-t border-slate-800 pt-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="block text-sm">
-                        <span className="text-slate-400">Name:</span>
-                        <input
-                          type="text"
-                          value={c.name}
-                          onChange={(e) => updateConfig(c.id, { name: e.target.value })}
-                          className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
-                        />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="text-slate-400">Main:</span>
-                        <input
-                          type="text"
-                          placeholder="Full / Reef 1 / Reef 2 / None"
-                          value={c.mainState ?? ''}
-                          onChange={(e) =>
-                            updateConfig(c.id, { mainState: e.target.value || undefined })
-                          }
-                          className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
-                        />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="text-slate-400">Headsail:</span>
-                        <input
-                          type="text"
-                          placeholder="J1 / J2 / Storm / None"
-                          value={c.headsail ?? ''}
-                          onChange={(e) =>
-                            updateConfig(c.id, { headsail: e.target.value || undefined })
-                          }
-                          className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
-                        />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="text-slate-400">Downwind sail:</span>
-                        <input
-                          type="text"
-                          placeholder="A2 / A3 / Code 0 / None"
-                          value={c.downwindSail ?? ''}
-                          onChange={(e) =>
-                            updateConfig(c.id, { downwindSail: e.target.value || undefined })
-                          }
-                          className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
-                        />
-                      </label>
-                      <label className="block text-sm">
-                        <span className="text-slate-400">Daggerboard:</span>
-                        <select
-                          value={c.daggerboard ?? ''}
-                          onChange={(e) =>
-                            updateConfig(c.id, {
-                              daggerboard: (e.target.value as 'down' | 'half' | 'up') || undefined,
-                            })
-                          }
-                          className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded text-slate-200"
-                        >
-                          <option value="">— (unset)</option>
-                          <option value="down">Down</option>
-                          <option value="half">Half</option>
-                          <option value="up">Up</option>
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="flex items-center gap-3">
+    <div className="p-4 space-y-6">
+      <h1 className="text-2xl font-semibold">Sail Wardrobe</h1>
+      {CATEGORIES.map(({ key, label }) => {
+        const sailsInCat = wardrobe.sails.filter((s) => s.category === key);
+        return (
+          <section key={key}>
+            <h2 className="text-lg font-medium mb-2">{label}</h2>
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left">Name</th>
+                  <th className="text-left">Area (m²)</th>
+                  <th className="text-left">Cells</th>
+                  <th className="text-left">Active</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sailsInCat.map((sail) => (
+                  <tr key={sail.id}>
+                    <td>{sail.name}</td>
+                    <td>{sail.areaSqM ?? ''}</td>
+                    <td>{sail.region.cells.length}</td>
+                    <td>
                       <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv,.txt,.pol"
-                        id={`import-${c.id}`}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) void handleImport(f, c.id);
-                        }}
-                        className="hidden"
+                        type="radio"
+                        name={`active-${key}`}
+                        checked={wardrobe.active[key] === sail.id}
+                        onChange={() => setActive(key, sail.id)}
                       />
-                      <label
-                        htmlFor={`import-${c.id}`}
-                        className={`px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium cursor-pointer text-sm ${importBusy ? 'opacity-50' : ''}`}
-                      >
-                        {importBusy ? 'Importing…' : 'Import CSV for this config'}
-                      </label>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="text-sm uppercase tracking-wider text-slate-400">
-                        Polar grid
-                      </h3>
-                      <PolarHeatmap
-                        polar={resolvePolar(c, wardrobe.activeMode, revisionsById)}
-                        selected={selectedCell ?? undefined}
-                        onSelect={(cell) => setSelectedCell(cell)}
-                        onChange={(updated) => applyPolarChange(c.id, updated)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </main>
+                    </td>
+                    <td>
+                      <button onClick={() => deleteSail(sail.id)} className="text-red-500">
+                        delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td>
+                    <input
+                      value={draftName[key]}
+                      onChange={(e) => setDraftName({ ...draftName, [key]: e.target.value })}
+                      placeholder="new sail name"
+                      className="border px-1"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={draftArea[key]}
+                      onChange={(e) => setDraftArea({ ...draftArea, [key]: e.target.value })}
+                      placeholder="m²"
+                      className="border px-1 w-20"
+                    />
+                  </td>
+                  <td colSpan={3}>
+                    <button onClick={() => addSail(key)} className="text-blue-500">
+                      add
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        );
+      })}
+      <p className="text-sm text-gray-500">
+        Paint each sail&apos;s TWS/TWA region on the{' '}
+        <a href="/sails/crossover" className="underline">
+          crossover page
+        </a>
+        .
+      </p>
+    </div>
   );
 }

@@ -1,10 +1,5 @@
 import { format } from 'node:util';
-import {
-  setLogStream,
-  type LogEntry,
-  type LogLevel,
-  type LogStream,
-} from '@g5000/core';
+import { setLogStream, type LogEntry, type LogLevel, type LogStream } from '@g5000/core';
 
 const MAX_BUFFER = 500;
 

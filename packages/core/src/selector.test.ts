@@ -125,7 +125,12 @@ describe('subscribeSelected', () => {
     const received: Sample[] = [];
     const config: SourcePriorityConfig = [];
 
-    subscribeSelected(bus, 'wind.apparent.angle', () => config, (s) => received.push(s));
+    subscribeSelected(
+      bus,
+      'wind.apparent.angle',
+      () => config,
+      (s) => received.push(s),
+    );
 
     bus.publish(sample('wind.apparent.angle', 'a', 1, 1n));
     bus.publish(sample('wind.apparent.angle', 'b', 2, 2n));
@@ -145,7 +150,12 @@ describe('subscribeSelected', () => {
       },
     ];
 
-    subscribeSelected(bus, 'wind.apparent.angle', () => config, (s) => received.push(s));
+    subscribeSelected(
+      bus,
+      'wind.apparent.angle',
+      () => config,
+      (s) => received.push(s),
+    );
 
     // Demo is the only known source initially, so it temporarily wins (no
     // n2k publish has arrived yet — it can't be the winner if it doesn't
@@ -205,7 +215,12 @@ describe('subscribeSelected', () => {
       },
     ];
 
-    subscribeSelected(bus, 'wind.apparent.angle', () => config, (s) => received.push(s));
+    subscribeSelected(
+      bus,
+      'wind.apparent.angle',
+      () => config,
+      (s) => received.push(s),
+    );
 
     bus.publish(sample('wind.apparent.angle', 'demo', 1, 1_000_000_000n));
     // Next sample is 5 seconds later — but it itself is fresh against its
@@ -230,7 +245,12 @@ describe('subscribeSelected', () => {
       },
     ];
 
-    subscribeSelected(bus, 'wind.apparent.angle', () => config, (s) => received.push(s));
+    subscribeSelected(
+      bus,
+      'wind.apparent.angle',
+      () => config,
+      (s) => received.push(s),
+    );
 
     bus.publish(sample('wind.apparent.angle', '0183:port1', 1, 1n));
     bus.publish(sample('wind.apparent.angle', 'demo', 2, 2n));
@@ -249,7 +269,12 @@ describe('subscribeSelected', () => {
       },
     ];
 
-    subscribeSelected(bus, 'wind.**', () => config, (s) => received.push(s));
+    subscribeSelected(
+      bus,
+      'wind.**',
+      () => config,
+      (s) => received.push(s),
+    );
 
     bus.publish(sample('wind.apparent.angle', 'n2k:127250@dev0x10', 1, 1_000_000_000n));
     bus.publish(sample('wind.true.speed', 'demo', 2, 1_100_000_000n));
@@ -270,7 +295,12 @@ describe('subscribeSelected', () => {
     const received: Sample[] = [];
     const config: SourcePriorityConfig = [];
 
-    const unsub = subscribeSelected(bus, 'wind.**', () => config, (s) => received.push(s));
+    const unsub = subscribeSelected(
+      bus,
+      'wind.**',
+      () => config,
+      (s) => received.push(s),
+    );
     bus.publish(sample('wind.apparent.angle', 'demo', 1, 1n));
     unsub();
     bus.publish(sample('wind.apparent.angle', 'demo', 2, 2n));

@@ -1,12 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { Subject, EMPTY, BehaviorSubject } from 'rxjs';
 import { createDriverHub } from './driver-hub.js';
-import type {
-  RawCanFrame,
-  Raw0183Sentence,
-  WireDriver,
-  DriverHealth,
-} from './wire-driver.js';
+import type { RawCanFrame, Raw0183Sentence, WireDriver, DriverHealth } from './wire-driver.js';
 import { _resetSharedBusForTests, getSharedBus } from '@g5000/core';
 
 function fakeDriver(): WireDriver & {

@@ -60,7 +60,9 @@ function validateGeoJson(buf: Buffer, levelName: string): void {
   const first = obj.features[0] as { geometry?: { type?: string } };
   const gt = first?.geometry?.type;
   if (gt !== 'Polygon' && gt !== 'MultiPolygon') {
-    throw new Error(`level ${levelName}: first feature geometry is ${gt}, expected Polygon|MultiPolygon`);
+    throw new Error(
+      `level ${levelName}: first feature geometry is ${gt}, expected Polygon|MultiPolygon`,
+    );
   }
 }
 

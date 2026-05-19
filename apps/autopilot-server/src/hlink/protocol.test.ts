@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  hlinkChecksum,
-  parseHlinkLine,
-  formatV,
-  formatP,
-} from './protocol.js';
+import { hlinkChecksum, parseHlinkLine, formatV, formatP } from './protocol.js';
 
 describe('hlinkChecksum', () => {
   it('matches the manual example: #OV,1,1,73 → 12', () => {

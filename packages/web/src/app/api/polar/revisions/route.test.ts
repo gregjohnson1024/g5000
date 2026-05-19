@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import { ConfigStore } from '@g5000/db';
+import { ulid } from 'ulid';
 import {
+  ConfigStore,
   setSharedConfigStore,
   _resetSharedConfigStoreForTests,
+  DEFAULT_POLARS,
+  type PolarTable,
+  type PolarRevision,
 } from '@g5000/db';
-import { DEFAULT_POLARS, type PolarTable } from '@g5000/db';
 import { GET, POST } from './route.js';
 
 let store: ConfigStore;
@@ -14,6 +17,19 @@ beforeEach(async () => {
   const path = `${tmpdir()}/polar-rev-api-${Date.now()}-${Math.random()}.db`;
   store = await ConfigStore.open(path);
   setSharedConfigStore(store);
+  // v3 fresh installs no longer seed a baseline migration revision — write
+  // one here so the GET tests have something to list.
+  const seed: PolarRevision = {
+    id: ulid(),
+    boatId: 'sula',
+    sailConfigId: 'default',
+    mode: 'default',
+    parentRevisionId: null,
+    createdAt: Math.floor(Date.now() / 1000),
+    lineage: { kind: 'migrated' },
+    table: DEFAULT_POLARS,
+  };
+  await store.createRevision(seed);
 });
 
 afterEach(async () => {
@@ -26,7 +42,7 @@ describe('GET /api/polar/revisions', () => {
     const res = await GET(new Request('http://x/api/polar/revisions'));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { revisions: Array<{ id: string }> };
-    expect(body.revisions.length).toBeGreaterThanOrEqual(1); // migration's revision-0
+    expect(body.revisions.length).toBeGreaterThanOrEqual(1);
   });
 
   it('filters by sailConfigId', async () => {
@@ -71,7 +87,14 @@ describe('POST /api/polar/revisions', () => {
           sailConfigId: 'default',
           mode: 'default',
           lineage: { kind: 'manual_edit' },
-          table: { twsBins: [5, 3], twaBins: [0, 1], boatSpeed: [[0, 0], [0, 0]] },
+          table: {
+            twsBins: [5, 3],
+            twaBins: [0, 1],
+            boatSpeed: [
+              [0, 0],
+              [0, 0],
+            ],
+          },
         }),
       }),
     );

@@ -14,11 +14,31 @@ export type ChannelValue =
   | {
       /** Active sail-crossover recommendation; payload published on Channels.SAIL_RECOMMENDATION. */
       kind: 'sail_recommendation';
-      recommendedConfigId: string | null;
-      activeConfigId: string;
-      cellTwsIdx: number;
-      cellTwaIdx: number;
+      /** Snapped TWS in knots (matches fixed grid; same as `twsIdx` since step=1). */
+      cellTwsKn: number;
+      /** Snapped TWA in degrees (twaIdx * 5). */
+      cellTwaDeg: number;
+      /** Valid sail ids per category for the current cell, sorted by area desc. */
+      valid: {
+        headsail: string[];
+        main: string[];
+        downwind: string[];
+      };
+      /** Currently hoisted sail per category (mirrors SailWardrobe.active). */
+      active: {
+        headsail?: string;
+        main?: string;
+        downwind?: string;
+      };
+      /** Active sail has been out of its region for ≥ stableSeconds. */
+      changeNeeded: {
+        headsail: boolean;
+        main: boolean;
+        downwind: boolean;
+      };
+      /** UNIX seconds when this cell was first observed. */
       enteredAt: number;
+      /** Hysteresis window from CrossoverSettings. */
       stableSeconds: number;
     };
 

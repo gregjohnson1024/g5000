@@ -22,9 +22,7 @@ export function AlarmBanner() {
         if (stopped) return;
         const body = await r.json();
         const active = (body.active ?? []) as AlarmRow[];
-        active.sort(
-          (a, b) => (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0),
-        );
+        active.sort((a, b) => (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0));
         setTopAlarm(active[0] ?? null);
         setExtraCount(Math.max(0, active.length - 1));
       } catch {

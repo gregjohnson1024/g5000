@@ -1,6 +1,6 @@
 import type { PlanInput, Route, RouteLeg, PlanOptions, LatLon, Isochrone } from './types.js';
 import { interpolateWind, interpolateCurrent } from '@g5000/grib';
-import { interpolatePolarSpeed, lookupConfigId } from '@g5000/compute';
+import { interpolatePolarSpeed } from '@g5000/compute';
 import { intersectsLand } from '@g5000/coastline';
 import {
   greatCircleBearing,
@@ -58,21 +58,14 @@ export function plan(input: PlanInput): Route {
     const next: FrontierNode[] = [];
     for (const n of frontier) {
       const bearingToDest = greatCircleBearing(n.pos, input.end);
-      const headings = expandFanIfStuck(
-        n,
-        bearingToDest,
-        fanRad,
-        resRad,
-        input,
-        stepSec,
-        o,
-      );
+      const headings = expandFanIfStuck(n, bearingToDest, fanRad, resRad, input, stepSec, o);
       for (const h of headings) {
         const child = propagate(n, h, input, stepSec, o);
         if (!child) continue;
-        if (o.avoidLand && intersectsLand(
-          input.coastline, n.pos.lat, n.pos.lon, child.pos.lat, child.pos.lon,
-        )) {
+        if (
+          o.avoidLand &&
+          intersectsLand(input.coastline, n.pos.lat, n.pos.lon, child.pos.lat, child.pos.lon)
+        ) {
           continue;
         }
         next.push(child);
@@ -101,8 +94,7 @@ export function plan(input: PlanInput): Route {
     // Track the best (most progress toward destination) for incomplete return.
     for (const n of frontier) {
       if (
-        greatCircleDistance(n.pos, input.end) <
-        greatCircleDistance(bestForReason.pos, input.end)
+        greatCircleDistance(n.pos, input.end) < greatCircleDistance(bestForReason.pos, input.end)
       ) {
         bestForReason = n;
       }
@@ -111,7 +103,7 @@ export function plan(input: PlanInput): Route {
     // Termination: any node within one step's reach of destination → close.
     for (const n of frontier) {
       const dGround = greatCircleDistance(n.pos, input.end);
-      if (dGround <= n.sogGround * stepSec || n.sogGround === 0 && dGround === 0) {
+      if (dGround <= n.sogGround * stepSec || (n.sogGround === 0 && dGround === 0)) {
         // Synthesize final leg pointing directly at destination.
         const finalHeading = greatCircleBearing(n.pos, input.end);
         const finalTime = n.t + (n.sogGround > 0 ? dGround / n.sogGround : 0);
@@ -152,9 +144,7 @@ function propagate(
   // Motor mode bypasses the polar — engine doesn't care about TWA. Wind
   // data is still read above so legs carry tws/twa for display and the
   // wind-field bbox still gates the planner's reach.
-  const bsp = o.motor
-    ? o.motorSpeed
-    : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+  const bsp = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
   if (bsp < 0.1) return null; // in-irons / no progress
 
   let vGroundX = Math.sin(heading) * bsp;
@@ -234,15 +224,6 @@ function assembleRoute(
     cur = cur.parent;
   }
   legs.reverse();
-  if (input.crossover) {
-    const validIds = new Set(input.crossover.wardrobe.configs.map((c) => c.id));
-    for (const leg of legs) {
-      const id = lookupConfigId(input.crossover.map, input.polar, leg.tws, leg.twa);
-      if (id !== null && validIds.has(id)) {
-        leg.configId = id;
-      }
-    }
-  }
   return {
     legs,
     start: legs[0]!.t,

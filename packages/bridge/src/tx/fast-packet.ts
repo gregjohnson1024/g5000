@@ -64,9 +64,7 @@ export function encodePgnToCanFrames(pgn: OutgoingPgn): RawCanFrame[] {
     frames.forEach((f, i) => {
       const frameNum = f.data[0]! & 0x1f;
       if (frameNum !== i) {
-        throw new Error(
-          `encodePgnToCanFrames: frame ${i} has frame# ${frameNum}, expected ${i}`,
-        );
+        throw new Error(`encodePgnToCanFrames: frame ${i} has frame# ${frameNum}, expected ${i}`);
       }
     });
   }

@@ -18,9 +18,7 @@ export function WindowHeatmap({
   onPick: (r: WindowResult) => void;
 }) {
   if (results.length === 0) return null;
-  const hours = results
-    .filter((r) => !r.incomplete)
-    .map((r) => (r.eta - r.departure) / 3600);
+  const hours = results.filter((r) => !r.incomplete).map((r) => (r.eta - r.departure) / 3600);
   const min = hours.length > 0 ? Math.min(...hours) : 0;
   const max = hours.length > 0 ? Math.max(...hours) : 1;
   const color = (h: number) => {

@@ -87,9 +87,7 @@ export default function LogsPage() {
               type="button"
               onClick={() => toggleLevel(lvl)}
               className={`px-2 py-1 rounded text-xs font-mono uppercase ${
-                levels[lvl]
-                  ? LEVEL_CHIP[lvl]
-                  : 'bg-slate-900 text-slate-500 line-through'
+                levels[lvl] ? LEVEL_CHIP[lvl] : 'bg-slate-900 text-slate-500 line-through'
               }`}
               title={`Toggle ${lvl} lines`}
             >
@@ -100,9 +98,7 @@ export default function LogsPage() {
             type="button"
             onClick={() => setAutoScroll((v) => !v)}
             className={`px-2 py-1 rounded text-xs font-mono ${
-              autoScroll
-                ? 'bg-emerald-700 text-emerald-100'
-                : 'bg-slate-800 text-slate-300'
+              autoScroll ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-800 text-slate-300'
             }`}
             title="Pause/resume auto-scroll"
           >
@@ -137,9 +133,7 @@ export default function LogsPage() {
               >
                 {e.level}
               </span>
-              <span className="text-slate-100 whitespace-pre-wrap break-all">
-                {e.message}
-              </span>
+              <span className="text-slate-100 whitespace-pre-wrap break-all">{e.message}</span>
             </div>
           ))
         )}

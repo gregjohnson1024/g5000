@@ -31,8 +31,7 @@ function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): 
   const p2 = toRad(lat2);
   const dp = toRad(lat2 - lat1);
   const dl = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
   return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 

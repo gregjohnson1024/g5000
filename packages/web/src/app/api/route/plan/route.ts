@@ -1,4 +1,4 @@
-import { plan, computeSailTimeline } from '@g5000/routing';
+import { plan } from '@g5000/routing';
 import { firstValueFrom } from 'rxjs';
 import { getSharedConfigStore } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
@@ -60,33 +60,23 @@ export async function POST(req: Request): Promise<Response> {
       currents = await loadCurrentFor(bbox, 120);
     }
     const coastline = await loadDefaultCoastline();
-    // v2 polar resolution: the polar table and its identity come from the
-    // ConfigStore — not the request body. polarId is the active revision id
-    // (a ULID), not the slot id. Falls back to 'default' only when the
-    // wardrobe has no active revision pointer at all.
+    // v3 polar resolution: activePolar$ resolves to the newest PolarRevision
+    // for (activeBoatId, activeMode). polarId is set to 'active' as a
+    // human-readable tag; identity tracking happens via revision rows.
     const store = getSharedConfigStore();
-    const wardrobe = await firstValueFrom(store.sails$);
-    const cfg = wardrobe.configs.find((c) => c.id === wardrobe.activeConfigId);
-    const polarId =
-      cfg?.modes[wardrobe.activeMode]?.activeRevisionId ??
-      cfg?.modes.default?.activeRevisionId ??
-      'default';
     const polar = await firstValueFrom(store.activePolar$);
-    const crossoverMap = await firstValueFrom(store.crossoverMap$);
     const route = plan({
       start: b.start,
       end: b.end,
       departure: b.departure,
       wind,
       polar,
-      polarId,
+      polarId: 'active',
       coastline,
       currents,
       options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents, captureIsochrones: true },
-      crossover: { map: crossoverMap, wardrobe },
     });
-    const sailTimeline = computeSailTimeline(route.legs);
-    return Response.json({ ok: true, route: { ...route, sailTimeline } });
+    return Response.json({ ok: true, route });
   } catch (err) {
     const e = err as { kind?: string; status?: number; retryable?: boolean; message?: string };
     return Response.json(

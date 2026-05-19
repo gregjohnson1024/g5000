@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import {
-  YdwgRawTcpDriver,
-  parseYdRawLine,
-  type YdwgSocket,
-} from './ydwg-raw-tcp-driver.js';
+import { YdwgRawTcpDriver, parseYdRawLine, type YdwgSocket } from './ydwg-raw-tcp-driver.js';
 
 /**
  * Fake socket — captures listeners and exposes a method to trigger each

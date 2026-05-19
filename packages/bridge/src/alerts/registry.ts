@@ -62,7 +62,8 @@ export function createAlertsRegistry(): AlertsRegistry & {
     acknowledge: async (req: AlertAcknowledgeRequest) => {
       const snap = byKey.get(req.key);
       if (!snap) return { ok: false, error: 'unknown alert key' };
-      if (!txer) return { ok: false, error: 'no alert transmitter registered (live N2K not online?)' };
+      if (!txer)
+        return { ok: false, error: 'no alert transmitter registered (live N2K not online?)' };
       try {
         // PGN 126984 — Alert Response. Echo the identifying fields from
         // the active alert; the issuer matches by these tuples and

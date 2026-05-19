@@ -13,9 +13,7 @@ export function pointInRing(p: Point, ring: Point[]): boolean {
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i]!;
     const [xj, yj] = ring[j]!;
-    const intersect =
-      yi > py !== yj > py &&
-      px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
@@ -42,8 +40,10 @@ export function segmentCrossesRing(a: Point, b: Point, ring: Point[]): boolean {
   // Cheap bbox prefilter
   const ringBbox = ringAabb(ring);
   const segBbox: [number, number, number, number] = [
-    Math.min(a[0], b[0]), Math.min(a[1], b[1]),
-    Math.max(a[0], b[0]), Math.max(a[1], b[1]),
+    Math.min(a[0], b[0]),
+    Math.min(a[1], b[1]),
+    Math.max(a[0], b[0]),
+    Math.max(a[1], b[1]),
   ];
   if (!bboxOverlap(ringBbox, segBbox)) return false;
   for (let i = 0; i < ring.length - 1; i++) {
@@ -55,7 +55,10 @@ export function segmentCrossesRing(a: Point, b: Point, ring: Point[]): boolean {
 }
 
 export function ringAabb(ring: Point[]): [number, number, number, number] {
-  let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+  let xmin = Infinity,
+    ymin = Infinity,
+    xmax = -Infinity,
+    ymax = -Infinity;
   for (const [x, y] of ring) {
     if (x < xmin) xmin = x;
     if (x > xmax) xmax = x;
@@ -83,7 +86,9 @@ function sign(n: number): -1 | 0 | 1 {
 }
 function onSegment(a: Point, b: Point, p: Point): boolean {
   return (
-    Math.min(a[0], b[0]) <= p[0] && p[0] <= Math.max(a[0], b[0]) &&
-    Math.min(a[1], b[1]) <= p[1] && p[1] <= Math.max(a[1], b[1])
+    Math.min(a[0], b[0]) <= p[0] &&
+    p[0] <= Math.max(a[0], b[0]) &&
+    Math.min(a[1], b[1]) <= p[1] &&
+    p[1] <= Math.max(a[1], b[1])
   );
 }

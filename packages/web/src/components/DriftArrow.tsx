@@ -148,7 +148,6 @@ export function DriftArrow({ map, p, scaleNmPerKt = 5 }: DriftArrowProps) {
       ],
     });
     ensuredRef.current = true;
-
   }, [map, p, scaleNmPerKt]);
   // Layer cleanup intentionally not registered — same reasoning as
   // CogExtension. The parent Map calls map.remove() on unmount.

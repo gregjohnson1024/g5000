@@ -5,7 +5,14 @@ import { homedir } from 'node:os';
 import { mkdir, readFile } from 'node:fs/promises';
 import next from 'next';
 import { SerialPort } from 'serialport';
-import { getSharedBus, createAlarmsRegistry, setSharedAlarms, createRaceState, setSharedRaceState, getSharedCogStats } from '@g5000/core';
+import {
+  getSharedBus,
+  createAlarmsRegistry,
+  setSharedAlarms,
+  createRaceState,
+  setSharedRaceState,
+  getSharedCogStats,
+} from '@g5000/core';
 import type { BaseSourceHandle } from '@g5000/core';
 import {
   ConfigStore,
@@ -541,8 +548,12 @@ async function main(): Promise<void> {
     // Sail-crossover pipeline — publishes sail.recommendation based on the
     // active crossover map + current TWS/TWA. Consumes calibrated wind off
     // the bus, same as the polar pipeline, so it runs in live and demo.
-    const stopSailCrossover = startSailCrossoverPipeline({ bus, store });
-    teardown.push(async () => stopSailCrossover());
+    const stopSailCrossover = startSailCrossoverPipeline({
+      bus,
+      sails$: store.sails$,
+      settings$: store.crossoverSettings$,
+    });
+    teardown.push(async () => stopSailCrossover.unsubscribe());
     // eslint-disable-next-line no-console
     console.log('[autopilot] sail-crossover pipeline online');
 
@@ -646,7 +657,14 @@ async function main(): Promise<void> {
   }, 200);
   teardown.push(async () => clearInterval(cogConcentrationPoll));
 
-  const raceHandle = startRaceComputePipeline(bus, raceState, polarRef, currentFieldRef, waypointsRef, cogConcentrationRef);
+  const raceHandle = startRaceComputePipeline(
+    bus,
+    raceState,
+    polarRef,
+    currentFieldRef,
+    waypointsRef,
+    cogConcentrationRef,
+  );
   teardown.push(async () => raceHandle.dispose());
 
   // Persist on every mutation (debounced 500 ms).

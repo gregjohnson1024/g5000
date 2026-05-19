@@ -46,11 +46,7 @@ interface TargetsResponse {
  * dedicated /ais page handles. The chart's purpose is situational
  * awareness only.
  */
-export function AisTargets({
-  map,
-  pollMs = 2000,
-  cogExtensionMinutes = 360,
-}: AisTargetsProps) {
+export function AisTargets({ map, pollMs = 2000, cogExtensionMinutes = 360 }: AisTargetsProps) {
   useEffect(() => {
     if (!map) return;
     let cancelled = false;
@@ -129,18 +125,8 @@ export function AisTargets({
           paint: {
             'circle-radius': 5,
             // Stale targets render hollow + dim; fresh ones solid grey.
-            'circle-color': [
-              'case',
-              ['get', 'stale'],
-              'rgba(0,0,0,0)',
-              '#94a3b8',
-            ],
-            'circle-stroke-color': [
-              'case',
-              ['get', 'stale'],
-              '#64748b',
-              '#0f172a',
-            ],
+            'circle-color': ['case', ['get', 'stale'], 'rgba(0,0,0,0)', '#94a3b8'],
+            'circle-stroke-color': ['case', ['get', 'stale'], '#64748b', '#0f172a'],
             'circle-stroke-width': 1.2,
             'circle-opacity': ['case', ['get', 'stale'], 0.6, 1],
           },

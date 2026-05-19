@@ -48,7 +48,9 @@ describe('SourceModeController', () => {
       const makeBaseHandle = () => {
         baseRunning = true;
         return {
-          teardown: async () => { baseRunning = false; },
+          teardown: async () => {
+            baseRunning = false;
+          },
           restart: async () => makeBaseHandle(),
         };
       };
@@ -81,7 +83,9 @@ describe('SourceModeController', () => {
       const c = createSourceModeController({ bus: new Bus(), sessionsDir: dir });
       await c.setLiveOrDemo('live');
       c.setBaseSource({
-        teardown: async () => { baseRunning = false; },
+        teardown: async () => {
+          baseRunning = false;
+        },
       });
 
       await c.startReplay({ sessionId: 'fixture', paceMode: 'asap' });
@@ -202,7 +206,11 @@ describe('SourceModeController', () => {
         live: async () => ({ teardown: async () => {} }),
         demo: async () => {
           demoRunning = true;
-          return { teardown: async () => { demoRunning = false; } };
+          return {
+            teardown: async () => {
+              demoRunning = false;
+            },
+          };
         },
       });
       await c.setLiveOrDemo('demo');

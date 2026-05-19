@@ -34,7 +34,10 @@ export async function loadCoastlineFromGeojson(
   const index = new RBush<RBushEntry>();
   index.load(
     polygons.map((p) => ({
-      minX: p.bbox[0], minY: p.bbox[1], maxX: p.bbox[2], maxY: p.bbox[3],
+      minX: p.bbox[0],
+      minY: p.bbox[1],
+      maxX: p.bbox[2],
+      maxY: p.bbox[3],
       polygon: p,
     })),
   );
