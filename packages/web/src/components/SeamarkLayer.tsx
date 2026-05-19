@@ -27,7 +27,8 @@ export function SeamarkLayer({
 }) {
   useEffect(() => {
     if (!map) return;
-    const ensure = (): void => {
+    const tryEnsure = (): void => {
+      if (!map.isStyleLoaded()) return;
       if (!map.getSource(SOURCE_ID)) {
         map.addSource(SOURCE_ID, {
           type: 'raster',
@@ -51,8 +52,19 @@ export function SeamarkLayer({
         );
       }
     };
-    if (map.isStyleLoaded()) ensure();
-    else map.once('load', ensure);
+
+    // `'load'` is one-shot and may already be in the past by the time the
+    // chart page's onLoad callback hands us the map instance — so
+    // `map.once('load', ...)` would never fire. `'styledata'` fires on every
+    // style change and any time the style first becomes ready; we use it as
+    // a retry signal. tryEnsure() is idempotent (the getSource/getLayer guards
+    // make repeated calls cheap), so leaving the listener registered after
+    // the layer is added does no harm.
+    tryEnsure();
+    map.on('styledata', tryEnsure);
+    return () => {
+      map.off('styledata', tryEnsure);
+    };
   }, [map, visible]);
 
   useEffect(() => {
