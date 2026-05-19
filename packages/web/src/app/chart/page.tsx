@@ -20,7 +20,9 @@ import { WindOverlay, type WindGrid, type WindModel } from '../../components/Win
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
+import { SeamarkLayer } from '../../components/SeamarkLayer';
 import { CogExtension } from '../../components/CogExtension';
+import { LayersControl, type LayersState } from './LayersControl';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
@@ -342,6 +344,28 @@ function ChartPageInner() {
     }
   }, [route, restored]);
 
+  // Layer visibility — which chart overlays are currently on. Seamarks
+  // default on so the chart shows navigation marks on first visit.
+  const [layers, setLayers] = useState<LayersState>(() => {
+    if (typeof window === 'undefined') return { seamarks: true };
+    try {
+      const raw = window.localStorage.getItem('chart:layers');
+      if (!raw) return { seamarks: true };
+      const parsed = JSON.parse(raw) as Partial<LayersState>;
+      return { seamarks: parsed.seamarks ?? true };
+    } catch {
+      return { seamarks: true };
+    }
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('chart:layers', JSON.stringify(layers));
+    } catch {
+      /* private-mode / quota exceeded — ignore */
+    }
+  }, [layers]);
+
   // Load a saved plan via the ?plan=<id> URL param so /plans → click name
   // takes you to the chart with that route already overlaid. Runs once
   // when the param is present.
@@ -526,6 +550,11 @@ function ChartPageInner() {
         />
         <LaylinesLayer map={mapInstance} />
         <StartLineLayer map={mapInstance} />
+        <SeamarkLayer map={mapInstance} visible={layers.seamarks} />
+        <LayersControl
+          state={layers}
+          onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+        />
         <div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
           {livePos && (
             <button
