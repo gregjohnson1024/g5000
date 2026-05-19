@@ -61,7 +61,7 @@ New component at `packages/web/src/app/chart/LayersControl.tsx`:
 - Behaviour: click opens a popover (~140 px wide) with a vertical list of labelled checkboxes.
 - v1 has one row: **Seamarks**.
 - Click-outside or button-toggle dismisses.
-- Props: `layers: Record<string, boolean>`, `onToggle: (key: string) => void`. Caller owns state.
+- Props: `state: LayersState`, `onToggle: (key: keyof LayersState) => void`, where `LayersState` is an interface exported from the same file (v1: `{ seamarks: boolean }`). Caller owns state.
 - Designed to accept additional rows later by extending an internal config array — no structural changes needed for E3 (ENC), ROI overlay, current overlay toggle, etc.
 
 ### Persistence
