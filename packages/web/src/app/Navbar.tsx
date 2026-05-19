@@ -21,7 +21,6 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/tracker', label: 'Tracker' },
   { href: '/ais', label: 'AIS' },
   { href: '/polars', label: 'Polars' },
-  { href: '/sails', label: 'Sails' },
   { href: '/forecast', label: 'Forecast' },
   { href: '/marks-and-routes', label: 'Marks & routes' },
   { href: '/tracks', label: 'Tracks' },
@@ -56,7 +55,10 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
   },
   {
     label: 'Boat',
-    items: [{ href: '/boat', label: 'Boat' }],
+    items: [
+      { href: '/boat', label: 'Boat' },
+      { href: '/sails', label: 'Sails' },
+    ],
   },
   {
     label: 'Diagnostics',
