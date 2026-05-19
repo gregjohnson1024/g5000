@@ -1,5 +1,5 @@
 export type {
-  LatLon, RouteLeg, Route, PlanOptions, PlanInput, SailTimelineSegment,
+  LatLon, RouteLeg, Route, PlanOptions, PlanInput,
 } from './types.js';
 export {
   greatCircleBearing,
@@ -12,4 +12,3 @@ export { decomposeWind, twaFromWindAndHeading } from './wind.js';
 export { generateHeadingFan } from './fan.js';
 export { pruneByBearingBucket, type FrontierNode } from './prune.js';
 export { plan } from './plan.js';
-export { computeSailTimeline } from './sail-timeline.js';

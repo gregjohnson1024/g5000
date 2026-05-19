@@ -19,10 +19,6 @@ export interface RouteLeg {
   bsp: number;
   /** Over-ground speed (m/s). With currents off, equals bsp. */
   sogGround: number;
-  /** Recommended sail configuration for this leg, from the crossover map.
-   *  Absent when no crossover input was provided OR the leg's cell is empty
-   *  in the map. */
-  configId?: string;
 }
 
 export interface Isochrone {
@@ -71,15 +67,6 @@ export interface PlanOptions {
   motorSpeed?: number;             // default 2.572 (5 kn)
 }
 
-export interface SailTimelineSegment {
-  fromLegIdx: number;
-  toLegIdx: number;
-  configId: string;
-  startTime: number;
-  endTime: number;
-  durationHours: number;
-}
-
 export interface PlanInput {
   start: LatLon;
   end: LatLon;
@@ -91,11 +78,4 @@ export interface PlanInput {
   coastline: Coastline;
   currents?: CurrentField;
   options?: PlanOptions;
-  /** When set, the planner decorates each leg with the recommended
-   *  configId from the crossover map. Has no effect on the route geometry —
-   *  polar selection is unchanged (single polar per boat+mode). */
-  crossover?: {
-    map: import('@g5000/db').CrossoverMap;
-    wardrobe: import('@g5000/db').SailWardrobe;
-  };
 }
