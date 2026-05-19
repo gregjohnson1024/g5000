@@ -27,43 +27,46 @@ export function SeamarkLayer({
 }) {
   useEffect(() => {
     if (!map) return;
-    const tryEnsure = (): void => {
-      if (!map.isStyleLoaded()) return;
-      if (!map.getSource(SOURCE_ID)) {
-        map.addSource(SOURCE_ID, {
-          type: 'raster',
-          tiles: ['/api/seamark-tiles/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '© OpenSeaMap (CC-BY-SA)',
-        });
-      }
-      if (!map.getLayer(LAYER_ID)) {
-        const beforeId = map.getLayer('__above-wind__')
-          ? '__above-wind__'
-          : undefined;
-        map.addLayer(
-          {
-            id: LAYER_ID,
+    // The chart page hands us `map` from inside Map.tsx's `onLoad` callback,
+    // which fires during the map's `'load'` event — so the style is already
+    // initialized and addSource/addLayer are safe. We do NOT gate on
+    // `map.isStyleLoaded()`: that helper can stay false indefinitely while
+    // other layers (wind, currents) are still loading their sources, and
+    // tryEnsure would never fire. Wrap in try/catch to survive an HMR race
+    // where the map has been torn down between renders.
+    const ensure = (): void => {
+      try {
+        if (!map.getSource(SOURCE_ID)) {
+          map.addSource(SOURCE_ID, {
             type: 'raster',
-            source: SOURCE_ID,
-            layout: { visibility: visible ? 'visible' : 'none' },
-          },
-          beforeId,
-        );
+            tiles: ['/api/seamark-tiles/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenSeaMap (CC-BY-SA)',
+          });
+        }
+        if (!map.getLayer(LAYER_ID)) {
+          const beforeId = map.getLayer('__above-wind__')
+            ? '__above-wind__'
+            : undefined;
+          map.addLayer(
+            {
+              id: LAYER_ID,
+              type: 'raster',
+              source: SOURCE_ID,
+              layout: { visibility: visible ? 'visible' : 'none' },
+            },
+            beforeId,
+          );
+        }
+      } catch {
+        /* style torn down mid-render; the next styledata event retries */
       }
     };
 
-    // `'load'` is one-shot and may already be in the past by the time the
-    // chart page's onLoad callback hands us the map instance — so
-    // `map.once('load', ...)` would never fire. `'styledata'` fires on every
-    // style change and any time the style first becomes ready; we use it as
-    // a retry signal. tryEnsure() is idempotent (the getSource/getLayer guards
-    // make repeated calls cheap), so leaving the listener registered after
-    // the layer is added does no harm.
-    tryEnsure();
-    map.on('styledata', tryEnsure);
+    ensure();
+    map.on('styledata', ensure);
     return () => {
-      map.off('styledata', tryEnsure);
+      map.off('styledata', ensure);
     };
   }, [map, visible]);
 
