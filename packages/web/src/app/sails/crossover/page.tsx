@@ -1,113 +1,110 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type {
-  CrossoverMap,
-  CrossoverSettings,
-  PolarTable,
-  SailWardrobe,
-} from '@g5000/db';
-import { CrossoverChart } from '../CrossoverChart';
-import { ForecastTimeline } from '../ForecastTimeline';
-import { RecommendationPanel } from '../RecommendationPanel';
-import { SettingsDrawer } from '../SettingsDrawer';
+import type { Sail, SailCategory, SailWardrobe } from '@g5000/db';
+import { CategoryRecommendation } from '../CategoryRecommendation';
+import { SailOverlayChart } from '../SailOverlayChart';
+import { SailRegionEditor } from '../SailRegionEditor';
 
-export default function SailsPage() {
+type Mode = 'view' | 'edit';
+
+export default function CrossoverPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
-  const [polar, setPolar] = useState<PolarTable | null>(null);
-  const [map, setMap] = useState<CrossoverMap | null>(null);
-  const [settings, setSettings] = useState<CrossoverSettings | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>('view');
+  const [filter, setFilter] = useState<SailCategory | 'all'>('all');
+  const [editSailId, setEditSailId] = useState<string | null>(null);
 
   async function reload() {
-    try {
-      const [wRes, pRes, mRes, sRes] = await Promise.all([
-        fetch('/api/sails', { cache: 'no-store' }),
-        fetch('/api/polar/active', { cache: 'no-store' }),
-        fetch('/api/crossover-map', { cache: 'no-store' }),
-        fetch('/api/crossover-settings', { cache: 'no-store' }),
-      ]);
-      if (!wRes.ok) {
-        setErr(`GET /api/sails: ${wRes.status}`);
-        return;
-      }
-      const wJ = (await wRes.json()) as SailWardrobe;
-      const pJ = (await pRes.json()) as {
-        ok: boolean;
-        polar?: PolarTable;
-        error?: { message: string };
-      };
-      const mJ = (await mRes.json()) as {
-        ok: boolean;
-        map?: CrossoverMap;
-        error?: { message: string };
-      };
-      const sJ = (await sRes.json()) as {
-        ok: boolean;
-        settings?: CrossoverSettings;
-        error?: { message: string };
-      };
-      if (!pJ.ok || !mJ.ok || !sJ.ok) {
-        setErr(
-          pJ.error?.message ?? mJ.error?.message ?? sJ.error?.message ?? 'load failed',
-        );
-        return;
-      }
-      setWardrobe(wJ);
-      setPolar(pJ.polar ?? null);
-      setMap(mJ.map ?? null);
-      setSettings(sJ.settings ?? null);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
+    setWardrobe(await (await fetch('/api/sails')).json());
   }
-
   useEffect(() => {
     void reload();
   }, []);
 
-  async function saveMap(next: CrossoverMap) {
-    const res = await fetch('/api/crossover-map', {
+  if (!wardrobe) return <div className="p-4">Loading…</div>;
+
+  const editSail: Sail | undefined = editSailId
+    ? wardrobe.sails.find((s) => s.id === editSailId)
+    : undefined;
+
+  async function saveRegion(sailId: string, cells: string[]) {
+    const res = await fetch(`/api/sails/${sailId}/region`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(next),
+      body: JSON.stringify({ cells }),
     });
     if (!res.ok) {
-      const j = (await res.json()) as { error?: { message?: string } };
-      throw new Error(j.error?.message ?? `HTTP ${res.status}`);
+      const body = await res.json();
+      alert(`Save failed: ${body.error ?? res.statusText}`);
+      return;
     }
     await reload();
   }
 
-  async function saveSettings(next: CrossoverSettings) {
-    const res = await fetch('/api/crossover-settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(next),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    await reload();
-  }
-
-  if (err) return <div className="p-4 text-rose-300">Error: {err}</div>;
-  if (!wardrobe || !polar || !map || !settings)
-    return <div className="p-4 text-slate-400">Loading…</div>;
-
   return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-start justify-between">
-        <h1 className="text-xl text-slate-100">Sails</h1>
-        <SettingsDrawer initial={settings} onSave={saveSettings} />
-      </div>
-      <RecommendationPanel wardrobe={wardrobe} />
-      <CrossoverChart
-        wardrobe={wardrobe}
-        polar={polar}
-        initial={map}
-        settings={settings}
-        onSave={saveMap}
-      />
-      <ForecastTimeline wardrobe={wardrobe} />
+    <div className="grid grid-cols-[260px_1fr_220px] gap-4 p-4">
+      <aside>
+        <CategoryRecommendation wardrobe={wardrobe} />
+      </aside>
+      <main>
+        <div className="flex gap-2 mb-2 text-sm">
+          <button
+            onClick={() => setMode('view')}
+            className={mode === 'view' ? 'underline font-medium' : ''}
+          >
+            View all
+          </button>
+          <button
+            onClick={() => setMode('edit')}
+            className={mode === 'edit' ? 'underline font-medium' : ''}
+          >
+            Edit one
+          </button>
+          {mode === 'view' && (
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as SailCategory | 'all')}
+              className="border ml-4"
+            >
+              <option value="all">All categories</option>
+              <option value="headsail">Headsails only</option>
+              <option value="main">Main only</option>
+              <option value="downwind">Downwind only</option>
+            </select>
+          )}
+        </div>
+        {mode === 'view' && <SailOverlayChart wardrobe={wardrobe} filterCategory={filter} />}
+        {mode === 'edit' && editSail && (
+          <SailRegionEditor sail={editSail} onSave={(cells) => saveRegion(editSail.id, cells)} />
+        )}
+        {mode === 'edit' && !editSail && (
+          <div className="text-sm text-gray-500">Pick a sail to edit →</div>
+        )}
+      </main>
+      <aside>
+        <h3 className="text-sm font-medium">Sails</h3>
+        {(['headsail', 'main', 'downwind'] as SailCategory[]).map((cat) => (
+          <div key={cat} className="mt-2">
+            <div className="text-xs text-gray-500">{cat}</div>
+            {wardrobe.sails
+              .filter((s) => s.category === cat)
+              .map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    setMode('edit');
+                    setEditSailId(s.id);
+                  }}
+                  className={`block w-full text-left px-1 ${
+                    s.id === editSailId ? 'bg-blue-100' : ''
+                  }`}
+                >
+                  {s.name}{' '}
+                  <span className="text-xs text-gray-400">({s.region.cells.length})</span>
+                </button>
+              ))}
+          </div>
+        ))}
+      </aside>
     </div>
   );
 }
