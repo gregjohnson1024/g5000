@@ -28,6 +28,7 @@ const MAX_AGE_MS = 30 * 24 * 3600 * 1000; // 30 days
 const USER_AGENT = 'g5000-marine-router/1.0 (https://g5000.sulabassana.net)';
 
 function tilePath(z: string, x: string, y: string): string {
+  // Strip any `.png` suffix Next.js might pass through, then re-add.
   const yBase = y.replace(/\.png$/, '');
   return join(SEAMARK_CACHE_ROOT, z, x, `${yBase}.png`);
 }
@@ -73,7 +74,7 @@ async function fetchAndCache(
       await mkdir(dirname(diskPath), { recursive: true });
       await writeFile(diskPath, buf);
     } catch {
-      /* serving the response is more important than caching */
+      /* ignore — serving the response is more important than caching */
     }
   })();
   return new Response(new Uint8Array(buf), {
