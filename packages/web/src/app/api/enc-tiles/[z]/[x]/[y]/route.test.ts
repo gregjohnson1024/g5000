@@ -65,6 +65,17 @@ describe('enc-tiles route', () => {
     expect(Array.from(body)).toEqual([1, 2, 3]);
   });
 
+  it('does not cache when upstream returns 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not found', { status: 404 }));
+    const res = await GET(
+      new Request('http://x/api/enc-tiles/15/9892/12226'),
+      makeCtx('15', '9892', '12226'),
+    );
+    expect(res.status).toBe(404);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(existsSync(join(TMP_ROOT, 'enc-cache', '15', '9892', '12226.png'))).toBe(false);
+  });
+
   it('returns transparent 1x1 PNG with x-cache EMPTY for z<2', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res = await GET(
