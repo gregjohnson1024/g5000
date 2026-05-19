@@ -1,66 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-
-interface Settings {
-  shiftThresholdDeg: number;
-  ocsLookAheadSec: number;
-  laylineDistanceNm: number;
-  integrateCurrent: boolean;
-}
-
-interface FieldDef {
-  key: 'shiftThresholdDeg' | 'ocsLookAheadSec' | 'laylineDistanceNm';
-  label: string;
-  unit: string;
-  min: number;
-  max: number;
-  step: number;
-  defaultValue: number;
-}
-
-const NUMBER_FIELDS: FieldDef[] = [
-  {
-    key: 'shiftThresholdDeg',
-    label: 'Wind shift threshold',
-    unit: '°',
-    min: 1,
-    max: 30,
-    step: 1,
-    defaultValue: 7,
-  },
-  {
-    key: 'ocsLookAheadSec',
-    label: 'OCS look-ahead',
-    unit: 's',
-    min: 3,
-    max: 60,
-    step: 1,
-    defaultValue: 10,
-  },
-  {
-    key: 'laylineDistanceNm',
-    label: 'Layline distance',
-    unit: 'NM',
-    min: 1,
-    max: 15,
-    step: 1,
-    defaultValue: 5,
-  },
-];
-
-function isInRange(field: FieldDef, value: number): boolean {
-  return Number.isFinite(value) && value >= field.min && value <= field.max;
-}
-
-function isModified(a: Settings, b: Settings): boolean {
-  return (
-    a.shiftThresholdDeg !== b.shiftThresholdDeg ||
-    a.ocsLookAheadSec !== b.ocsLookAheadSec ||
-    a.laylineDistanceNm !== b.laylineDistanceNm ||
-    a.integrateCurrent !== b.integrateCurrent
-  );
-}
+import {
+  NUMBER_FIELDS,
+  isModified,
+  mergeWithDefaults,
+  validateAll,
+  type Settings,
+} from './race-settings-defs';
 
 export function RaceSettings(): React.ReactElement {
   const [open, setOpen] = useState(false);
@@ -77,14 +24,7 @@ export function RaceSettings(): React.ReactElement {
       const r = await fetch('/api/race/state', { cache: 'no-store' });
       if (!r.ok) return;
       const j = (await r.json()) as { settings?: Partial<Settings> };
-      const s = j.settings;
-      if (!s) return;
-      const merged: Settings = {
-        shiftThresholdDeg: s.shiftThresholdDeg ?? 7,
-        ocsLookAheadSec: s.ocsLookAheadSec ?? 10,
-        laylineDistanceNm: s.laylineDistanceNm ?? 5,
-        integrateCurrent: s.integrateCurrent ?? true,
-      };
+      const merged = mergeWithDefaults(j.settings);
       setSaved(merged);
       setDraft(merged);
     } catch {
@@ -100,13 +40,7 @@ export function RaceSettings(): React.ReactElement {
 
   // Defensive: even though number inputs have min/max, paste/keyboard
   // can sneak out-of-range values past the spinner clamp.
-  const validationErrors: string[] =
-    draft === null
-      ? []
-      : NUMBER_FIELDS.flatMap((f) =>
-          isInRange(f, draft[f.key]) ? [] : [`${f.label} must be ${f.min}–${f.max} ${f.unit}`],
-        );
-
+  const validationErrors: string[] = draft === null ? [] : validateAll(draft);
   const canSave = modified && validationErrors.length === 0 && !busy;
 
   const save = useCallback(async () => {
