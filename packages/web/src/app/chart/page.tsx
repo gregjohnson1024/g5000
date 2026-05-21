@@ -23,6 +23,9 @@ import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer } from '../../components/EncLayer';
 import { CogExtension } from '../../components/CogExtension';
 import { LayersControl, type LayersState } from './LayersControl';
+import { ChartFollowControl } from './ChartFollowControl';
+import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
+import { useChartCamera } from './use-chart-camera';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
@@ -52,6 +55,7 @@ function ChartPageInner() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [livePos, setLivePos] = useState<LivePos | null>(null);
+  const camera = useChartCamera({ map: mapInstance, livePos });
   const [windHours, setWindHours] = useState(0);
   const [windModel, setWindModel] = useState<WindModel>('gfs');
   // Default off — at the user's request. Wind overlay is heavy and most
@@ -556,26 +560,19 @@ function ChartPageInner() {
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
         />
-        <div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
-          {livePos && (
-            <button
-              type="button"
-              onClick={() => {
-                if (mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: [livePos.lon, livePos.lat],
-                    zoom: Math.max(mapRef.current.getZoom(), 9),
-                    speed: 1.4,
-                  });
-                }
-              }}
-              className="px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
-              title="Pan map to boat's current position"
-            >
-              ⊕ Center on boat
-            </button>
-          )}
-        </div>
+        <ChartFollowControl
+          follow={camera.follow}
+          orientation={camera.orientation}
+          hasFix={livePos !== null}
+          onToggleFollow={camera.toggleFollow}
+          onCycleOrientation={camera.cycleOrientation}
+        />
+        <OffscreenVesselIndicator
+          map={mapInstance}
+          livePos={livePos}
+          visible={!camera.follow}
+          onTap={camera.enterFollow}
+        />
         <CursorReadout cursor={cursorLatLon} boat={livePos} />
       </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
