@@ -127,8 +127,9 @@ const camera = useChartCamera({ map: mapInstance, livePos });
 | `packages/web/src/app/chart/use-chart-camera.ts` | new — follow/orientation state, persistence, map.on subscriptions, easeTo calls | ~140 |
 | `packages/web/src/app/chart/ChartFollowControl.tsx` | new — two buttons, stateless | ~90 |
 | `packages/web/src/app/chart/OffscreenVesselIndicator.tsx` | new — pill that anchors to viewport edge | ~110 |
-| `packages/web/src/app/chart/page.tsx` | modified — drop inline center-on-boat block, mount the new pieces, pass `cog` and `hdg` through `livePos` | ~30 changed |
-| `packages/web/src/components/LiveBoatMarker.tsx` | modified — extend `LivePos` shape to include `cog` and `hdg` (already available in the boat's bus feed via the SSE this component subscribes to) | ~10 changed |
+| `packages/web/src/app/chart/page.tsx` | modified — drop inline center-on-boat block, mount the new pieces | ~30 changed |
+
+`LiveBoatMarker.tsx` is **not** modified — its existing `LivePos` shape already carries `cog` and `hdg` (in radians), which is exactly what the hook needs.
 
 No new dependencies. No backend, no bus channels, no DB, no compute pipeline.
 
