@@ -3,22 +3,28 @@ import { useEffect, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 
 /**
- * Small floating pill that appears while MapLibre has tiles in flight.
- * Anchors top-center of the chart canvas.
+ * Small floating pill that appears while MapLibre has BASEMAP / CHART
+ * tiles in flight. Anchors top-center of the chart canvas.
  *
- * Uses two MapLibre events:
- *   - `sourcedataloading` fires when any source begins loading tiles
- *   - `idle` fires when no more tiles / sprites / glyphs are pending
+ * Filters to the two raster tile sources we care about:
+ *   - `osm` (OSM basemap, defined in Map.tsx)
+ *   - `noaa-enc` (NOAA NCDS overlay, defined in EncLayer.tsx)
  *
- * The `idle` event is a clean "everything done" signal — much simpler
- * than counting individual tile loads.
+ * The map's `idle` event clears the indicator. We deliberately ignore
+ * `sourcedataloading` from every other source (AIS, wind, currents,
+ * route, etc.) which fire on routine polling and would flash the pill
+ * constantly with no actual tile loading happening.
  */
+const TILE_SOURCE_IDS = new Set(['osm', 'noaa-enc']);
+
 export function MapLoadingIndicator({ map }: { map: maplibregl.Map | null }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!map) return;
-    const onLoading = (): void => setLoading(true);
+    const onLoading = (e: { sourceId?: string }): void => {
+      if (e.sourceId && TILE_SOURCE_IDS.has(e.sourceId)) setLoading(true);
+    };
     const onIdle = (): void => setLoading(false);
     map.on('sourcedataloading', onLoading);
     map.on('idle', onIdle);
