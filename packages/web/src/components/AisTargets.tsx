@@ -231,23 +231,22 @@ export function AisTargets({ map, pollMs = 2000, cogExtensionMinutes = 360 }: Ai
       }
       nameMarkers.clear();
       // Best-effort teardown — leaving stale layers around when the
-      // component unmounts during HMR would clutter the map.
+      // component unmounts during HMR would clutter the map. Wrap the
+      // getLayer/getSource probes too, not just the removes: when the
+      // map's style is mid-teardown during HMR, getLayer itself throws
+      // (`this.style.getLayer` on undefined style).
       for (const id of [TARGET_CIRCLE_ID, COG_LAYER_ID]) {
-        if (map.getLayer(id)) {
-          try {
-            map.removeLayer(id);
-          } catch {
-            /* style torn down */
-          }
+        try {
+          if (map.getLayer(id)) map.removeLayer(id);
+        } catch {
+          /* style torn down */
         }
       }
       for (const id of [TARGET_SOURCE_ID, COG_SOURCE_ID]) {
-        if (map.getSource(id)) {
-          try {
-            map.removeSource(id);
-          } catch {
-            /* style torn down */
-          }
+        try {
+          if (map.getSource(id)) map.removeSource(id);
+        } catch {
+          /* style torn down */
         }
       }
     };
