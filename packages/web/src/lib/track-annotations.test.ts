@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { openPeriodStart, type TrackAnnotation } from './tracks';
+import { openPeriodStart, type TrackAnnotation } from './track-annotations';
 
 function a(tsMs: number, label: string, kind: TrackAnnotation['kind']): TrackAnnotation {
   return { tsMs, label, kind };

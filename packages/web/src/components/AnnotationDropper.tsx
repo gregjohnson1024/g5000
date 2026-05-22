@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { openPeriodStart, type TrackAnnotation } from '../lib/tracks';
+import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
 
 const POLL_MS = 30_000;
 
