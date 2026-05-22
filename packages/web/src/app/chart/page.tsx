@@ -23,6 +23,7 @@ import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer } from '../../components/EncLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { CogExtension } from '../../components/CogExtension';
+import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { LayersControl, type LayersState } from './LayersControl';
 import { ChartFollowControl } from './ChartFollowControl';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
@@ -567,6 +568,7 @@ function ChartPageInner() {
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
         />
+        <AnnotationDropper position="top-2 right-14" />
         <ChartFollowControl
           follow={camera.follow}
           orientation={camera.orientation}

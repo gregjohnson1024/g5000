@@ -8,6 +8,7 @@ import { HelmTile } from './HelmTile';
 import { MobButton } from './MobButton';
 import { SailRecommendationTile } from './SailRecommendationTile';
 import { AudibleAlarm } from '../../components/AudibleAlarm';
+import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { RaceMiniTimer } from './RaceMiniTimer';
 import { RaceTiles } from '../../components/RaceTiles';
 
@@ -260,7 +261,7 @@ export default function HelmPage() {
   }, []);
 
   return (
-    <main className="p-4 min-h-screen bg-black">
+    <main className="p-4 min-h-screen bg-black relative">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
         <div className="flex items-center gap-3">
@@ -424,6 +425,7 @@ export default function HelmPage() {
       <RaceTiles />
       <MobButton />
       <AudibleAlarm />
+      <AnnotationDropper position="top-2 right-2" />
     </main>
   );
 }
