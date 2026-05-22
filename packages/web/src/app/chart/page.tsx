@@ -349,28 +349,33 @@ function ChartPageInner() {
     }
   }, [route, restored]);
 
-  // Layer visibility — only the NOAA chart toggle in v1. Default off
-  // so first-time visitors see the OSM basemap. Persists to
-  // localStorage so the choice survives reloads.
-  const [layers, setLayers] = useState<LayersState>(() => {
-    if (typeof window === 'undefined') return { enc: false, buoys: false };
+  // Layer visibility — persists to localStorage so the choice survives
+  // reloads. Hydrated AFTER first render (not via lazy `useState` init)
+  // so server and client agree on the initial paint — otherwise the
+  // popover button text and styling diverge when localStorage has a
+  // prior-session value, tripping React 19 hydration enforcement.
+  const [layers, setLayers] = useState<LayersState>({ enc: false, buoys: false });
+  const [layersHydrated, setLayersHydrated] = useState(false);
+  useEffect(() => {
     try {
       const raw = window.localStorage.getItem('chart:layers');
-      if (!raw) return { enc: false, buoys: false };
-      const parsed = JSON.parse(raw) as Partial<LayersState>;
-      return { enc: parsed.enc ?? false, buoys: parsed.buoys ?? false };
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<LayersState>;
+        setLayers({ enc: parsed.enc ?? false, buoys: parsed.buoys ?? false });
+      }
     } catch {
-      return { enc: false, buoys: false };
+      /* corrupt JSON / private mode — fall back to defaults */
     }
-  });
+    setLayersHydrated(true);
+  }, []);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!layersHydrated) return;
     try {
       window.localStorage.setItem('chart:layers', JSON.stringify(layers));
     } catch {
       /* private-mode / quota exceeded — ignore */
     }
-  }, [layers]);
+  }, [layers, layersHydrated]);
 
   // Load a saved plan via the ?plan=<id> URL param so /plans → click name
   // takes you to the chart with that route already overlaid. Runs once
