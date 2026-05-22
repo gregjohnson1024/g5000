@@ -71,6 +71,9 @@ export interface TrackMeta {
 
 export interface Track extends TrackMeta {
   points: TrackPoint[];
+  /** Hand-dropped markers in chronological order. Absent on older files;
+   * `getTrack` always normalises to []. */
+  annotations?: TrackAnnotation[];
 }
 
 async function ensureDir(): Promise<void> {
@@ -200,6 +203,29 @@ export async function appendPoint(id: string, pt: TrackPoint): Promise<Track | n
   t.points.push(pt);
   await writeTrack(t);
   return t;
+}
+
+/**
+ * Append a TrackAnnotation to the active track at `id`. The annotation's
+ * `tsMs` should be set by the caller (the API route uses `Date.now()`).
+ * Returns the updated track, or null if the id doesn't exist. Throws if
+ * the track is already ended.
+ */
+export async function appendAnnotation(
+  id: string,
+  ann: TrackAnnotation,
+): Promise<Track | null> {
+  const t = await getTrack(id);
+  if (!t) return null;
+  if (t.endedAt !== null) {
+    throw new Error(`track ${id} is ended; cannot append annotation`);
+  }
+  const next: Track = {
+    ...t,
+    annotations: [...(t.annotations ?? []), ann],
+  };
+  await writeTrack(next);
+  return next;
 }
 
 export async function updateTrack(
