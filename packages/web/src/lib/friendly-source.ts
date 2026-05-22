@@ -1,8 +1,9 @@
 /**
  * Human-readable labels for the raw `Sample.source` strings emitted by the
- * bridge (e.g. `n2k:127250@0x11` → "Heading · 0x11"). Used on the /sources
+ * bridge (e.g. `n2k:127250@0x11` → "Heading · 0x11"). Used on the /sensors
  * page so users don't have to memorize PGN numbers.
  */
+import { fmtLatLonDmm } from './format-coords';
 
 /** Canonical N2K PGN → friendly label. Add entries here as channels land. */
 const PGN_LABELS: Record<number, string> = {
@@ -84,9 +85,7 @@ export function formatChannelValue(v: unknown): string {
   if (o.kind === 'geo' && o.value && typeof o.value === 'object') {
     const g = o.value as { lat?: number; lon?: number };
     if (typeof g.lat === 'number' && typeof g.lon === 'number') {
-      const latH = g.lat >= 0 ? 'N' : 'S';
-      const lonH = g.lon >= 0 ? 'E' : 'W';
-      return `${Math.abs(g.lat).toFixed(4)}°${latH} ${Math.abs(g.lon).toFixed(4)}°${lonH}`;
+      return fmtLatLonDmm(g.lat, g.lon);
     }
   }
   return JSON.stringify(o.value);
