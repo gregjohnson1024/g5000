@@ -89,6 +89,10 @@ export function AnnotationDropper({
     async (label: string, kind: TrackAnnotation['kind']): Promise<void> => {
       if (!state.trackId || submitting) return;
       setSubmitting(true);
+      // Always close the panel on any click outcome — success, error, or
+      // network failure. The flash message tells the user which happened.
+      setOpen(false);
+      setCustomLabel('');
       try {
         const res = await fetch('/api/tracks/active/annotation', {
           method: 'POST',
@@ -96,17 +100,19 @@ export function AnnotationDropper({
           body: JSON.stringify({ label, kind }),
         });
         if (!res.ok) {
-          setFlash(`✗ Failed: ${res.status}`);
-          window.setTimeout(() => setFlash(null), 1500);
+          setFlash(`✗ ${label} failed: HTTP ${res.status}`);
+          window.setTimeout(() => setFlash(null), 2500);
           return;
         }
         const body = (await res.json()) as DropperState;
         setState(body);
         const time = new Date().toISOString().slice(11, 19) + 'Z';
         setFlash(`✓ Marked: ${label} at ${time}`);
-        window.setTimeout(() => setFlash(null), 1000);
-        setOpen(false);
-        setCustomLabel('');
+        window.setTimeout(() => setFlash(null), 1500);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setFlash(`✗ ${label} failed: ${msg}`);
+        window.setTimeout(() => setFlash(null), 2500);
       } finally {
         setSubmitting(false);
       }
