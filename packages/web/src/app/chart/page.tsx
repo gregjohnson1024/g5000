@@ -22,6 +22,7 @@ import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer } from '../../components/EncLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
+import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { LayersControl, type LayersState } from './LayersControl';
 import { ChartFollowControl } from './ChartFollowControl';
@@ -581,6 +582,7 @@ function ChartPageInner() {
           onTap={camera.enterFollow}
         />
         <CursorReadout cursor={cursorLatLon} boat={livePos} />
+        <TileLoadingIndicator map={mapInstance} />
       </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
         <div className="flex items-center justify-between">
