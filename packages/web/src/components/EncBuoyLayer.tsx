@@ -21,7 +21,9 @@ const EMPTY_COLLECTION: GeoJSON.FeatureCollection = {
  * Drawn beneath the `__above-wind__` z-order sentinel installed by Map.tsx,
  * so wind / AIS / route / range-rings render on top.
  *
- * v1 scope: no fetching yet — see EncBuoyLayer-fetch in the follow-up task.
+ * On moveend, fetches the current viewport bbox from the proxy (250 ms
+ * debounced, gated at zoom >= 9). Aborts in-flight fetches on pan or
+ * unmount; transient failures leave the previous data on the map.
  */
 export function EncBuoyLayer({
   map,
