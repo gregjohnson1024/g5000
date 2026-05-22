@@ -95,5 +95,58 @@ export function EncBuoyLayer({
     map.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none');
   }, [map, visible]);
 
+  useEffect(() => {
+    if (!map) return;
+    if (!visible) return;
+
+    const MIN_ZOOM = 9;
+    const DEBOUNCE_MS = 250;
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    let aborter: AbortController | null = null;
+
+    const refresh = async (): Promise<void> => {
+      if (map.getZoom() < MIN_ZOOM) {
+        const src = map.getSource(SOURCE_ID);
+        if (src && 'setData' in src && typeof src.setData === 'function') {
+          src.setData(EMPTY_COLLECTION);
+        }
+        return;
+      }
+      aborter?.abort();
+      aborter = new AbortController();
+      const b = map.getBounds();
+      const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+        .map((n) => n.toFixed(3))
+        .join(',');
+      try {
+        const r = await fetch(`/api/enc-features?class=buoys&bbox=${bbox}`, {
+          signal: aborter.signal,
+        });
+        if (!r.ok) return;
+        const data = (await r.json()) as GeoJSON.FeatureCollection;
+        const src = map.getSource(SOURCE_ID);
+        if (src && 'setData' in src && typeof src.setData === 'function') {
+          src.setData(data);
+        }
+      } catch {
+        /* aborted or upstream blip — leave previous data in place */
+      }
+    };
+
+    const schedule = (): void => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(refresh, DEBOUNCE_MS);
+    };
+
+    schedule();
+    map.on('moveend', schedule);
+
+    return () => {
+      map.off('moveend', schedule);
+      if (pending) clearTimeout(pending);
+      aborter?.abort();
+    };
+  }, [map, visible]);
+
   return null;
 }
