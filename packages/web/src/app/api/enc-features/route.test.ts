@@ -12,7 +12,7 @@ function makeFeature(id: number, lon: number, lat: number, colour: string): unkn
   };
 }
 
-function mockUpstream(featuresByLayer: Record<number, unknown[]>): ReturnType<typeof vi.spyOn> {
+function mockUpstream(featuresByLayer: Record<number, unknown[]>) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input);
     const layerMatch = url.match(/\/encdirect\/enc_coastal\/MapServer\/(\d+)\/query/);
