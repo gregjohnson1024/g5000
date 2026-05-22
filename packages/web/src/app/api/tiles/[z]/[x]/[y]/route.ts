@@ -48,6 +48,7 @@ async function serveFromDisk(path: string): Promise<Response | null> {
         'content-type': 'image/png',
         'cache-control': 'public, max-age=2592000', // 30 days, browser side
         'x-cache': 'HIT',
+        'access-control-allow-origin': '*',
       },
     });
   } catch {
@@ -65,6 +66,7 @@ async function fetchAndCache(z: string, x: string, y: string, diskPath: string):
   if (!r.ok) {
     return new Response(`upstream tile ${url} → ${r.status}`, {
       status: r.status === 404 ? 404 : 502,
+      headers: { 'access-control-allow-origin': '*' },
     });
   }
   const buf = Buffer.from(await r.arrayBuffer());
@@ -84,6 +86,7 @@ async function fetchAndCache(z: string, x: string, y: string, diskPath: string):
       'content-type': 'image/png',
       'cache-control': 'public, max-age=2592000',
       'x-cache': 'MISS',
+      'access-control-allow-origin': '*',
     },
   });
 }
@@ -94,7 +97,10 @@ export async function GET(
 ): Promise<Response> {
   const { z, x, y } = await ctx.params;
   if (!/^\d{1,2}$/.test(z) || !/^\d{1,7}$/.test(x) || !/^\d{1,7}(\.png)?$/.test(y)) {
-    return new Response('bad tile coords', { status: 400 });
+    return new Response('bad tile coords', {
+      status: 400,
+      headers: { 'access-control-allow-origin': '*' },
+    });
   }
   const path = tilePath(z, x, y);
   const fromDisk = await serveFromDisk(path);

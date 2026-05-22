@@ -59,6 +59,7 @@ function emptyResponse(): Response {
       'content-type': 'image/png',
       'cache-control': 'public, max-age=2592000',
       'x-cache': 'EMPTY',
+      'access-control-allow-origin': '*',
     },
   });
 }
@@ -74,6 +75,7 @@ async function serveFromDisk(path: string): Promise<Response | null> {
         'content-type': 'image/png',
         'cache-control': 'public, max-age=2592000',
         'x-cache': 'HIT',
+        'access-control-allow-origin': '*',
       },
     });
   } catch {
@@ -99,6 +101,7 @@ async function fetchAndCache(
   if (!r.ok) {
     return new Response(`upstream tile ${url} → ${r.status}`, {
       status: r.status === 404 ? 404 : 502,
+      headers: { 'access-control-allow-origin': '*' },
     });
   }
   const buf = Buffer.from(await r.arrayBuffer());
@@ -116,6 +119,7 @@ async function fetchAndCache(
       'content-type': 'image/png',
       'cache-control': 'public, max-age=2592000',
       'x-cache': 'MISS',
+      'access-control-allow-origin': '*',
     },
   });
 }
@@ -126,7 +130,10 @@ export async function GET(
 ): Promise<Response> {
   const { z, x, y } = await ctx.params;
   if (!/^\d{1,2}$/.test(z) || !/^\d{1,7}$/.test(x) || !/^\d{1,7}(\.png)?$/.test(y)) {
-    return new Response('bad tile coords', { status: 400 });
+    return new Response('bad tile coords', {
+      status: 400,
+      headers: { 'access-control-allow-origin': '*' },
+    });
   }
   const zNum = Number(z);
   if (zNum < MIN_Z || zNum > MAX_Z) {
