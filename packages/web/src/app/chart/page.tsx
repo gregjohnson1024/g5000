@@ -21,6 +21,7 @@ import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer } from '../../components/EncLayer';
+import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { CogExtension } from '../../components/CogExtension';
 import { LayersControl, type LayersState } from './LayersControl';
 import { ChartFollowControl } from './ChartFollowControl';
@@ -352,14 +353,14 @@ function ChartPageInner() {
   // so first-time visitors see the OSM basemap. Persists to
   // localStorage so the choice survives reloads.
   const [layers, setLayers] = useState<LayersState>(() => {
-    if (typeof window === 'undefined') return { enc: false };
+    if (typeof window === 'undefined') return { enc: false, buoys: false };
     try {
       const raw = window.localStorage.getItem('chart:layers');
-      if (!raw) return { enc: false };
+      if (!raw) return { enc: false, buoys: false };
       const parsed = JSON.parse(raw) as Partial<LayersState>;
-      return { enc: parsed.enc ?? false };
+      return { enc: parsed.enc ?? false, buoys: parsed.buoys ?? false };
     } catch {
-      return { enc: false };
+      return { enc: false, buoys: false };
     }
   });
   useEffect(() => {
@@ -556,6 +557,7 @@ function ChartPageInner() {
         {/* <LaylinesLayer map={mapInstance} />  disabled — not currently useful */}
         <StartLineLayer map={mapInstance} />
         <EncLayer map={mapInstance} visible={layers.enc} />
+        <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         <LayersControl
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
