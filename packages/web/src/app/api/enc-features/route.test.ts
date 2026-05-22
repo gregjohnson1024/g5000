@@ -50,7 +50,10 @@ describe('enc-features route — happy path', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toMatch(/application\/geo\+json|application\/json/);
-    const body = (await res.json()) as { type: string; features: { properties: { colourCode: number } }[] };
+    const body = (await res.json()) as {
+      type: string;
+      features: { properties: { colourCode: number } }[];
+    };
     expect(body.type).toBe('FeatureCollection');
     expect(body.features).toHaveLength(5);
     expect(fetchSpy).toHaveBeenCalledTimes(4);
@@ -72,7 +75,9 @@ describe('enc-features route — happy path', () => {
 
     // All four layers were queried with the same bbox.
     for (const id of BUOY_LAYER_IDS) {
-      const called = fetchSpy.mock.calls.some((c) => String(c[0]).includes(`/MapServer/${id}/query`));
+      const called = fetchSpy.mock.calls.some((c) =>
+        String(c[0]).includes(`/MapServer/${id}/query`),
+      );
       expect(called, `layer ${id} should be queried`).toBe(true);
     }
   });
@@ -146,9 +151,7 @@ describe('enc-features route — validation and errors', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res1 = await GET(new Request('http://x/api/enc-features?class=buoys'));
     expect(res1.status).toBe(400);
-    const res2 = await GET(
-      new Request('http://x/api/enc-features?class=buoys&bbox=garbage'),
-    );
+    const res2 = await GET(new Request('http://x/api/enc-features?class=buoys&bbox=garbage'));
     expect(res2.status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
