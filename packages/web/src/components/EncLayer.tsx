@@ -81,5 +81,28 @@ export function EncLayer({
     map.setLayoutProperty(LAYER_ID, 'visibility', visible ? 'visible' : 'none');
   }, [map, visible]);
 
+  // Periodically reload the source while visible, so tiles that previously
+  // timed out (our proxy served a transparent PNG with x-cache: TIMEOUT)
+  // get re-requested. MapLibre's in-memory tile cache is independent of
+  // HTTP cache headers, so without this the slow tiles would stay blank
+  // forever until the user pans/zooms away and back. Successful tiles
+  // hit our server-side disk cache and return instantly, so the cost is
+  // just the slow tiles being re-attempted.
+  useEffect(() => {
+    if (!map || !visible) return;
+    const RELOAD_MS = 60_000;
+    const id = window.setInterval(() => {
+      try {
+        const src = map.getSource(SOURCE_ID) as
+          | { reload?: () => void }
+          | undefined;
+        src?.reload?.();
+      } catch {
+        /* map may be torn down mid-tick; ignore */
+      }
+    }, RELOAD_MS);
+    return () => window.clearInterval(id);
+  }, [map, visible]);
+
   return null;
 }
