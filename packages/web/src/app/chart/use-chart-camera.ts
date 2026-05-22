@@ -77,32 +77,42 @@ export function useChartCamera({
   map: maplibregl.Map | null;
   livePos: LivePos | null;
 }): ChartCameraHandle {
-  const [follow, setFollow] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    return readFollowFromStorage(window.localStorage.getItem('chart:follow'));
-  });
-  const [orientation, setOrientation] = useState<Orientation>(() => {
-    if (typeof window === 'undefined') return 'north';
-    return readOrientationFromStorage(window.localStorage.getItem('chart:orientation'));
-  });
-
-  // Persist
+  // Init to defaults so SSR and the client's first render agree; hydrate
+  // from localStorage in an effect once mounted. The `hydrated` flag gates
+  // the persist effects so the defaults don't clobber the stored value
+  // during the brief window between first render and the hydration effect.
+  const [follow, setFollow] = useState<boolean>(true);
+  const [orientation, setOrientation] = useState<Orientation>('north');
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    try {
+      setFollow(readFollowFromStorage(window.localStorage.getItem('chart:follow')));
+      setOrientation(
+        readOrientationFromStorage(window.localStorage.getItem('chart:orientation')),
+      );
+    } catch {
+      /* private-mode / corrupt — keep defaults */
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist (gated until after the hydration pass to avoid clobbering)
+  useEffect(() => {
+    if (!hydrated) return;
     try {
       window.localStorage.setItem('chart:follow', JSON.stringify(follow));
     } catch {
       /* private-mode / quota — ignore */
     }
-  }, [follow]);
+  }, [follow, hydrated]);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!hydrated) return;
     try {
       window.localStorage.setItem('chart:orientation', orientation);
     } catch {
       /* ignore */
     }
-  }, [orientation]);
+  }, [orientation, hydrated]);
 
   // Stale-closure-safe refs for use inside map event handlers
   const followRef = useRef(follow);
