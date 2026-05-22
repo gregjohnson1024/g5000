@@ -48,7 +48,7 @@ async function fetchLayer(layerId: number, bbox: Bbox): Promise<GeoJsonFeature[]
     throw new Error(`upstream layer ${layerId} → ${res.status}`);
   }
   const body = (await res.json()) as Partial<FeatureCollection>;
-  return Array.isArray(body.features) ? (body.features as GeoJsonFeature[]) : [];
+  return Array.isArray(body.features) ? body.features : [];
 }
 
 function annotate(features: GeoJsonFeature[]): GeoJsonFeature[] {
