@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
 
-const POLL_MS = 30_000;
+const POLL_MS = 5_000;
 
 interface DropperState {
   trackId: string | null;
@@ -27,7 +27,10 @@ const QUICK_BUTTONS: Array<{ label: string; row: number }> = [
  * Floating widget for dropping labelled annotations on the active track.
  *
  * Mounted on /chart and /helm. Polls GET /api/tracks/active/annotation
- * every 30 s; the response also updates after every successful POST.
+ * every 5 s, plus an immediate refetch whenever the tab becomes visible
+ * (so navigating between /chart and /helm sees fresh state without
+ * waiting for the next poll). The response also updates after every
+ * successful POST.
  *
  * When an open period exists, the collapsed pill turns amber and shows
  * the elapsed minutes; the expanded panel promotes a prominent "End
@@ -56,7 +59,7 @@ export function AnnotationDropper({
     return () => window.clearInterval(id);
   }, []);
 
-  // Initial fetch + 30 s poll.
+  // Initial fetch + 5 s poll + on-visibility-change refetch.
   useEffect(() => {
     let alive = true;
     const tick = async (): Promise<void> => {
@@ -71,9 +74,14 @@ export function AnnotationDropper({
     };
     void tick();
     const id = window.setInterval(() => void tick(), POLL_MS);
+    const onVis = (): void => {
+      if (document.visibilityState === 'visible') void tick();
+    };
+    document.addEventListener('visibilitychange', onVis);
     return () => {
       alive = false;
       window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
 

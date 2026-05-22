@@ -568,7 +568,7 @@ function ChartPageInner() {
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
         />
-        <AnnotationDropper position="top-2 right-14" />
+        <AnnotationDropper position="top-2 right-28" />
         <ChartFollowControl
           follow={camera.follow}
           orientation={camera.orientation}
