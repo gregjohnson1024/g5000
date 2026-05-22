@@ -110,12 +110,60 @@ Channels are dotted strings (e.g. `wind.true.angle`, `nav.gps.position`). Subscr
 
 Tests sit next to source as `*.test.ts(x)` in `packages/*/src/**`, `packages/*/test/**`, `apps/*/src/**`. Vitest uses `pool: 'forks'` (because of `better-sqlite3`). Integration tests for GRIB live in `packages/grib/src/parse-grib2.integration.test.ts`. Property tests use fast-check in `packages/routing`.
 
+**Known environmental failures** (treat as the baseline, not regressions):
+
+- `packages/routing/test/integration/bermuda-newport.test.ts` — needs the coastline data file under `packages/coastline/data/`, which is gitignored. Fetch with `npm run fetch --workspace @g5000/coastline` to make this pass locally.
+- `packages/web/src/app/api/position/route.test.ts` and other route tests that hit `getSharedConfigStore()` — fail because `ConfigStore` is only initialised by `autopilot-server`'s boot, not by `vitest`. These tests need a setup harness; right now they're red in isolation.
+- `packages/grib/...` parse-grib2 integration — requires `wgrib2` on `$PATH`.
+
+If `npm test` shows ~4 failed / ~690+ passed, that's the expected baseline; do not block a merge on these. Any other failure is a regression and IS blocking.
+
 ## Conventions
 
 - Prettier: 100 cols, single quotes, trailing commas all, 2-space.
 - All times on the UI are UTC. Never mix UTC and local on the same panel.
 - Lat/lon display format is compact DMM: `33 42.232n 66 25.240w` (lowercase hemisphere glued to the minute, no symbols).
 - Discovery/audit docs use Verified / Reported / Unidentified tiers — don't overstate properties (see `docs/ops/network-map.md` for the rule and tone).
+
+## Chart page (`/chart`)
+
+`packages/web/src/app/chart/page.tsx` is the chartplotter view. It mounts a stack of layer components on top of a shared `<Map>` from `packages/web/src/components/Map.tsx`. The Map ships with an empty `__above-wind__` background layer as a **z-order sentinel**: wind / current overlays add with `beforeId: '__above-wind__'` (so they sit between OSM and the sentinel); annotation layers (AIS, route, range rings, laylines, waypoints, boat marker) append normally and end up above the sentinel. One rule, no `moveLayer` fights.
+
+Currently mounted, top of OSM basemap upwards:
+
+- **OSM basemap** (raster), served via the same-origin proxy at `/api/tiles/[z]/[x]/[y]` which caches PNGs under `~/.g5000-router/tile-cache/`.
+- **`<EncLayer/>`** — NOAA NCDS paper-chart raster, served via `/api/enc-tiles/[z]/[x]/[y]` with disk cache under `~/.g5000-router/enc-cache/`. Off by default; toggle via the top-right `NOAA` button. Translates standard XYZ → NOAA grid: `noaa_z = std_z - 2` and ArcGIS row/col order `/tile/{z}/{y}/{x}`. Outside z=2..18 (NOAA's coverage), the proxy serves a transparent 1×1 PNG with `x-cache: EMPTY` to keep MapLibre quiet. US waters only.
+- **`__above-wind__` sentinel** (invisible, always present).
+- **`<WindOverlay/>`** / **`<CurrentOverlay/>`** (mutually exclusive via the model toggle), **`<GulfStreamLayer/>`**.
+- **`<AisTargets/>`**, **`<RoutePolyline/>`**, **`<CogExtension/>`**, **`<WaypointsLayer/>`**, **`<StartLineLayer/>`**, **`<LiveBoatMarker/>`**, **`<ForecastRoi/>`**.
+
+Disabled / preserved-but-unmounted (one-line revert):
+
+- **`<LaylinesLayer/>`** — commented out around line ~551 with `disabled — not currently useful`. Code intact at `packages/web/src/components/LaylinesLayer.tsx`.
+- **`<SeamarkLayer/>`** + the **`/api/seamark-tiles/[z]/[x]/[y]`** proxy — both files still in the tree but unmounted. The OpenSeaMap overlay didn't pull its weight; flipping back on is a one-line JSX restore.
+
+**Chart UI controls and localStorage keys:**
+
+- **Top-left:** `<ChartFollowControl/>` — two-button stack from `useChartCamera` hook. Follow toggle (sticky state, NOT a one-shot recenter) and Orientation cycle (`N` → `↑COG` → `↑HDG`). Course/heading orientations also push a 30% top padding so the boat sits at lower-third → implicit lookahead.
+- **Top-right:** `<LayersControl/>` — single `NOAA` toggle button. If this ever grows to 2+ overlays again, revert to a popover layout.
+- **Bottom corners on demand:** `<OffscreenVesselIndicator/>` — amber pill anchored to the viewport edge closest to the (off-screen) boat. Tap = re-enter follow mode. Renders only when `follow=false` AND `livePos` is outside the viewport bounds.
+
+| localStorage key | Shape | Default | Owner |
+|---|---|---|---|
+| `chart:camera` | `{ lat, lon, zoom }` | first-fix-driven | page.tsx |
+| `chart:settings` | UI prefs | UI prefs | page.tsx |
+| `chart:planState` | in-progress route | empty | page.tsx |
+| `chart:layers` | `{ enc: boolean }` | `{ enc: false }` | page.tsx |
+| `chart:follow` | `boolean` | `true` | `useChartCamera` |
+| `chart:orientation` | `'north' \| 'course' \| 'heading'` | `'north'` | `useChartCamera` |
+
+### MapLibre traps (read before adding a layer)
+
+- **Do NOT gate `addSource`/`addLayer` on `map.isStyleLoaded()`.** That helper can stay `false` indefinitely while other sources are still loading. The chart page hands child layer components the map from inside `Map.tsx`'s `onLoad` callback — by that point the style is initialised and add* calls are safe. Wrap in `try/catch` and use `map.on('styledata', ensure)` as a retry signal. See `SeamarkLayer.tsx` / `EncLayer.tsx` for the canonical pattern.
+- **Distinguishing user pans from programmatic moves:** MapLibre's `dragend`, `movestart`, etc. fire for BOTH user gestures and our own `easeTo`/`flyTo` calls. The discriminator is `e.originalEvent` — `undefined` means programmatic, a real `MouseEvent` / `TouchEvent` means user gesture. The follow-mode exit handler in `useChartCamera` uses this to avoid exiting follow on its own recenters.
+- **Bearing changes need a dead-band.** COG and HDG arrive at ~1 Hz with sensor noise. Re-easing the bearing on every tiny wiggle looks bad. `useChartCamera` uses a 3° dead-band via `wrapBearingDelta` (which correctly handles the 0/360 seam).
+- **`LivePos` carries radians for `cog` and `hdg`.** MapLibre's `setBearing` and `easeTo({ bearing })` take degrees. Convert before applying.
+- **Same-origin tile proxies are the pattern.** All three tile types (`/api/tiles`, `/api/seamark-tiles`, `/api/enc-tiles`) follow the same shape: regex-validate `z`/`x`/`y`, serve from disk if fresh, otherwise fetch upstream, write to disk best-effort, stream the response. 30-day max-age, `x-cache: HIT | MISS | EMPTY`, transparent 1×1 PNG for off-coverage zooms. If you add another raster overlay, copy one of these as a starting point.
 
 ## Branching model
 
