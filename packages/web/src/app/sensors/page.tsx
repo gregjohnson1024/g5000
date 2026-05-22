@@ -49,7 +49,7 @@ export default function SensorsPage() {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch('/api/sources/config', { cache: 'no-store' });
+        const res = await fetch('/api/config/source-priority', { cache: 'no-store' });
         if (!res.ok) throw new Error(`GET config: ${res.status}`);
         const body = (await res.json()) as SourcePriorityRule[];
         if (alive) setRules(body);
@@ -65,7 +65,7 @@ export default function SensorsPage() {
   const onSaveRules = useCallback(async (next: SourcePriorityRule[]): Promise<void> => {
     setSaving(true);
     try {
-      const res = await fetch('/api/sources/config', {
+      const res = await fetch('/api/config/source-priority', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(next),
