@@ -92,10 +92,26 @@ async function fetchAndCache(
   const url =
     `https://gis.charttools.noaa.gov/arcgis/rest/services/` +
     `MarineChart_Services/NOAACharts/MapServer/tile/${noaaZ}/${yBase}/${x}`;
-  const r = await fetch(url, {
-    headers: { 'user-agent': USER_AGENT },
-    signal: AbortSignal.timeout(15_000),
-  });
+  let r: Response;
+  try {
+    r = await fetch(url, {
+      headers: { 'user-agent': USER_AGENT },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    // AbortError on timeout, DNS / connection refused, etc. Serve a
+    // transparent placeholder so MapLibre doesn't keep retrying a
+    // broken tile — the rest of the chart stays usable. Don't cache;
+    // a transient upstream blip shouldn't poison the disk for 30 days.
+    return new Response(new Uint8Array(TRANSPARENT_PNG), {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'cache-control': 'no-store',
+        'x-cache': 'EMPTY-TIMEOUT',
+      },
+    });
+  }
   if (!r.ok) {
     return new Response(`upstream tile ${url} → ${r.status}`, {
       status: r.status === 404 ? 404 : 502,
