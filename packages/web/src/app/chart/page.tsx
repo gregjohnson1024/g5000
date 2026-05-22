@@ -24,6 +24,7 @@ import { EncLayer } from '../../components/EncLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { CogExtension } from '../../components/CogExtension';
 import { AnnotationDropper } from '../../components/AnnotationDropper';
+import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { LayersControl, type LayersState } from './LayersControl';
 import { ChartFollowControl } from './ChartFollowControl';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
@@ -568,6 +569,7 @@ function ChartPageInner() {
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
         />
+        <MapLoadingIndicator map={mapInstance} />
         <AnnotationDropper position="top-2 right-28" />
         <ChartFollowControl
           follow={camera.follow}
