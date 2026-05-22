@@ -43,7 +43,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     label: 'Network',
     items: [
       { href: '/devices', label: 'Devices' },
-      { href: '/sources', label: 'Sources' },
+      { href: '/sensors', label: 'Sensors' },
       { href: '/sniff', label: 'Sniff' },
       { href: '/damping', label: 'Damping' },
       { href: '/inspect', label: 'Inspect' },
