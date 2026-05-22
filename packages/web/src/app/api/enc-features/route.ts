@@ -99,7 +99,16 @@ export async function GET(req: Request): Promise<Response> {
       },
     });
   }
-  const layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
+  let layers: GeoJsonFeature[][];
+  try {
+    layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: 'upstream', detail: msg }), {
+      status: 502,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   const features = annotate(layers.flat());
   const body: FeatureCollection = { type: 'FeatureCollection', features };
   cache.set(key, { ts: Date.now(), body });

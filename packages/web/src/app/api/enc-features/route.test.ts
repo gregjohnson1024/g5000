@@ -131,3 +131,42 @@ describe('enc-features route — happy path', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('enc-features route — validation and errors', () => {
+  it('returns 400 for an unknown class', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res = await GET(
+      new Request('http://x/api/enc-features?class=lights&bbox=-71.5,41.3,-71.2,41.6'),
+    );
+    expect(res.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for a missing or malformed bbox', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res1 = await GET(new Request('http://x/api/enc-features?class=buoys'));
+    expect(res1.status).toBe(400);
+    const res2 = await GET(
+      new Request('http://x/api/enc-features?class=buoys&bbox=garbage'),
+    );
+    expect(res2.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when any upstream layer fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      // Layer 5 fails; others succeed empty.
+      if (url.includes('/MapServer/5/')) return new Response('boom', { status: 500 });
+      return new Response(JSON.stringify({ type: 'FeatureCollection', features: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const res = await GET(
+      new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6'),
+    );
+    expect(res.status).toBe(502);
+  });
+});
