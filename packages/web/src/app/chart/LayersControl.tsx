@@ -45,15 +45,25 @@ export function LayersControl({
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={onCount > 0 ? `Layers (${onCount} on)` : 'Layers'}
+        title="Chart layers"
         onClick={() => setOpen((v) => !v)}
         className={
-          'px-3 h-9 rounded border text-sm font-medium ' +
+          'relative w-9 h-9 rounded border flex items-center justify-center ' +
           (onCount > 0
             ? 'bg-zinc-100 text-zinc-900 border-zinc-100 hover:bg-zinc-200'
             : 'bg-zinc-900/85 text-zinc-100 border-zinc-700 hover:bg-zinc-800')
         }
       >
-        Layers {onCount > 0 ? `(${onCount})` : ''}
+        <LayersIcon />
+        {onCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full text-[10px] font-bold leading-[1.1rem] text-center bg-amber-500 text-zinc-900 border border-amber-700"
+          >
+            {onCount}
+          </span>
+        ) : null}
       </button>
       {open ? (
         <div
@@ -66,6 +76,26 @@ export function LayersControl({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function LayersIcon(): React.ReactElement {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m12 2 9 5-9 5-9-5z" />
+      <path d="m3 12 9 5 9-5" />
+      <path d="m3 17 9 5 9-5" />
+    </svg>
   );
 }
 
