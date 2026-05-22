@@ -94,10 +94,27 @@ async function fetchAndCache(
   const url =
     `https://gis.charttools.noaa.gov/arcgis/rest/services/` +
     `MarineChart_Services/NOAACharts/MapServer/tile/${noaaZ}/${yBase}/${x}`;
-  const r = await fetch(url, {
-    headers: { 'user-agent': USER_AGENT },
-    signal: AbortSignal.timeout(15_000),
-  });
+  // NOAA's NCDS tile service is dynamic-render and can be very slow on
+  // cold tiles — keep the timeout generous. On timeout or any network
+  // error, fall back to a transparent tile so MapLibre renders a blank
+  // patch (not a broken-image icon) and retries on the next zoom/pan.
+  let r: Response;
+  try {
+    r = await fetch(url, {
+      headers: { 'user-agent': USER_AGENT },
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch {
+    return new Response(new Uint8Array(TRANSPARENT_PNG), {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'cache-control': 'public, max-age=60',
+        'x-cache': 'TIMEOUT',
+        'access-control-allow-origin': '*',
+      },
+    });
+  }
   if (!r.ok) {
     return new Response(`upstream tile ${url} → ${r.status}`, {
       status: r.status === 404 ? 404 : 502,
