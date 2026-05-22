@@ -505,6 +505,7 @@ function ChartPageInner() {
                 }
               : undefined
           }
+          hidden={!windOn}
         />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer

@@ -39,6 +39,8 @@ interface ForecastRoiProps {
   /** Optional fallback bbox to seed the ROI when /api/settings has none.
    *  Typically a small box around the boat's current position. */
   defaultBbox?: Bbox;
+  /** Hide the overlay when true; show when false. Defaults to false. */
+  hidden?: boolean;
 }
 
 /**
@@ -52,7 +54,7 @@ interface ForecastRoiProps {
  * other tabs that complete a refresh tell us to re-read settings. We
  * don't write to that channel ourselves — only refresh handlers do.
  */
-export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
+export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiProps) {
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'refreshing' | 'error'>('idle');
   const [statusText, setStatusText] = useState<string | null>(null);
@@ -150,6 +152,22 @@ export function ForecastRoi({ map, defaultBbox }: ForecastRoiProps) {
     const src = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
     if (src) src.setData(polygonFromBbox(bbox));
   }, [map, bbox]);
+
+  // Visibility control: toggle the layers' visibility based on hidden prop.
+  useEffect(() => {
+    if (!map) return;
+    const vis = hidden ? 'none' : 'visible';
+    try {
+      if (map.getLayer(FILL_LAYER_ID)) {
+        map.setLayoutProperty(FILL_LAYER_ID, 'visibility', vis);
+      }
+      if (map.getLayer(OUTLINE_LAYER_ID)) {
+        map.setLayoutProperty(OUTLINE_LAYER_ID, 'visibility', vis);
+      }
+    } catch {
+      /* map torn down between effects; ignore */
+    }
+  }, [map, hidden]);
 
   // Corner markers. Created/torn-down with the map; their positions are
   // updated imperatively on every render via setLngLat (cheap).
