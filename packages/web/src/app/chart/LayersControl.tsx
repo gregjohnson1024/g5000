@@ -1,24 +1,22 @@
 'use client';
+import { useEffect, useRef, useState } from 'react';
 
 export interface LayersState {
   enc: boolean;
+  buoys: boolean;
 }
 
 /**
- * Top-right toggle button on /chart for the NOAA NCDS chart overlay.
+ * Top-right popover for chart overlays. The button shows "Layers" plus
+ * a tally of how many overlays are on; the panel reveals one row per
+ * toggle. Two toggles today: NOAA raster chart, and the NOAA vector
+ * buoys layer.
  *
- * When `state.enc` is true, the button shows a filled background to
- * indicate the NOAA chart is on top of the OSM basemap. When false,
- * it's outlined and the chart shows plain OSM.
+ * If the panel ever drops back to a single toggle, collapse this back
+ * to a single button — same logic that drove the previous single-button
+ * shape.
  *
- * This was previously a popover hosting a Seamarks row plus the
- * NOAA row. The seamarks layer turned out not to be useful in
- * practice, so the popover collapsed to a single toggle. If a
- * second toggle ever lands again, this component goes back to the
- * popover shape — for now, single button is the right scope.
- *
- * The caller (chart/page.tsx) owns state and persists it to
- * localStorage under `chart:layers`.
+ * State lives in chart/page.tsx and persists to `chart:layers`.
  */
 export function LayersControl({
   state,
@@ -26,22 +24,74 @@ export function LayersControl({
 }: {
   state: LayersState;
   onToggle: (key: keyof LayersState) => void;
-}) {
-  const on = state.enc;
+}): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent): void => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const onCount = (state.enc ? 1 : 0) + (state.buoys ? 1 : 0);
+
+  return (
+    <div ref={wrapRef} className="absolute top-2 right-2 z-10">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={
+          'px-3 h-9 rounded border text-sm font-medium ' +
+          (onCount > 0
+            ? 'bg-zinc-100 text-zinc-900 border-zinc-100 hover:bg-zinc-200'
+            : 'bg-zinc-900/85 text-zinc-100 border-zinc-700 hover:bg-zinc-800')
+        }
+      >
+        Layers {onCount > 0 ? `(${onCount})` : ''}
+      </button>
+      {open ? (
+        <div
+          role="dialog"
+          aria-label="Chart layers"
+          className="mt-2 w-44 rounded border border-zinc-700 bg-zinc-900/95 text-zinc-100 p-2 shadow-lg"
+        >
+          <Row label="NOAA chart" pressed={state.enc} onClick={() => onToggle('enc')} />
+          <Row label="Buoys" pressed={state.buoys} onClick={() => onToggle('buoys')} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Row({
+  label,
+  pressed,
+  onClick,
+}: {
+  label: string;
+  pressed: boolean;
+  onClick: () => void;
+}): React.ReactElement {
   return (
     <button
       type="button"
-      aria-label="Toggle NOAA chart overlay"
-      aria-pressed={on}
-      onClick={() => onToggle('enc')}
+      aria-pressed={pressed}
+      onClick={onClick}
       className={
-        'absolute top-2 right-2 z-10 px-3 h-9 rounded border text-sm font-medium ' +
-        (on
-          ? 'bg-zinc-100 text-zinc-900 border-zinc-100 hover:bg-zinc-200'
-          : 'bg-zinc-900/85 text-zinc-100 border-zinc-700 hover:bg-zinc-800')
+        'w-full flex items-center justify-between px-2 py-1.5 rounded text-sm ' +
+        (pressed ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-200 hover:bg-zinc-800')
       }
     >
-      NOAA
+      <span>{label}</span>
+      <span aria-hidden="true" className={pressed ? 'opacity-100' : 'opacity-30'}>
+        ●
+      </span>
     </button>
   );
 }
