@@ -11,7 +11,7 @@ export function parseBbox(raw: string | null | undefined): Bbox | null {
   if (!raw) return null;
   const parts = raw.split(',');
   if (parts.length !== 4) return null;
-  const nums = parts.map((p) => Number(p));
+  const nums = parts.map((p) => (p.trim() === '' ? NaN : Number(p)));
   if (nums.some((n) => !Number.isFinite(n))) return null;
   const [lonMin, latMin, lonMax, latMax] = nums as [number, number, number, number];
   if (lonMin < -180 || lonMax > 180 || latMin < -90 || latMax > 90) return null;

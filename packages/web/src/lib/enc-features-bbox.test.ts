@@ -16,6 +16,9 @@ describe('parseBbox', () => {
     expect(parseBbox('1,2,3')).toBeNull();
     expect(parseBbox('a,b,c,d')).toBeNull();
     expect(parseBbox('-71.5,41.3,-71.2,41.6,extra')).toBeNull();
+    expect(parseBbox(',1,2,3')).toBeNull();
+    expect(parseBbox('1,,2,3')).toBeNull();
+    expect(parseBbox(' , , , ')).toBeNull();
   });
 
   it('rejects out-of-range or inverted bboxes', () => {
@@ -32,6 +35,15 @@ describe('parseBbox', () => {
     expect(parseBbox('-80,40,-70,42')).toBeNull(); // 10° wide
     expect(parseBbox('-80,40,-79,46')).toBeNull(); // 6° tall
     expect(parseBbox('-80,40,-75.5,44.5')).not.toBeNull(); // 4.5°×4.5° OK
+  });
+
+  it('pins the 5° span guard at the exact boundary', () => {
+    // exactly 5° span on both axes — accepted (the guard is strict >)
+    expect(parseBbox('-75,40,-70,45')).not.toBeNull();
+    // 5.01° on lon — rejected
+    expect(parseBbox('-75,40,-69.99,45')).toBeNull();
+    // 5.01° on lat — rejected
+    expect(parseBbox('-75,40,-70,45.01')).toBeNull();
   });
 });
 
