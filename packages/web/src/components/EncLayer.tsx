@@ -44,7 +44,7 @@ export function EncLayer({
             type: 'raster',
             tiles: ['/api/enc-tiles/{z}/{x}/{y}.png'],
             tileSize: 256,
-            minzoom: 2,
+            minzoom: 7,
             maxzoom: 18,
             attribution: 'NOAA / Office of Coast Survey',
           });
