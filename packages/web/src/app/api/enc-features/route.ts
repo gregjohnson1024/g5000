@@ -1,4 +1,4 @@
-import { parseBbox, type Bbox } from '../../../lib/enc-features-bbox';
+import { parseBbox, quantizeBbox, bboxKey, type Bbox } from '../../../lib/enc-features-bbox';
 import { parsePrimaryColour } from '../../../lib/enc-colours';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +9,7 @@ const ENC_DIRECT_BASE =
 const BUOY_LAYER_IDS = [4, 5, 6, 7] as const;
 const USER_AGENT = 'g5000-marine-router/1.0 (https://g5000.sulabassana.net)';
 const FETCH_TIMEOUT_MS = 12_000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface GeoJsonFeature {
   type: 'Feature';
@@ -19,6 +20,17 @@ interface GeoJsonFeature {
 interface FeatureCollection {
   type: 'FeatureCollection';
   features: GeoJsonFeature[];
+}
+
+interface CacheEntry {
+  ts: number;
+  body: FeatureCollection;
+}
+
+const cache = new Map<string, CacheEntry>();
+
+function cacheKey(klass: string, bbox: Bbox): string {
+  return `${klass}:${bboxKey(quantizeBbox(bbox))}`;
 }
 
 function buildQueryUrl(layerId: number, bbox: Bbox): string {
@@ -75,14 +87,28 @@ export async function GET(req: Request): Promise<Response> {
       headers: { 'content-type': 'application/json' },
     });
   }
-  const layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, bbox)));
+  const key = cacheKey(klass, bbox);
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+    return new Response(JSON.stringify(hit.body), {
+      status: 200,
+      headers: {
+        'content-type': 'application/geo+json',
+        'cache-control': 'public, max-age=300',
+        'x-cache': 'HIT',
+      },
+    });
+  }
+  const layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
   const features = annotate(layers.flat());
   const body: FeatureCollection = { type: 'FeatureCollection', features };
+  cache.set(key, { ts: Date.now(), body });
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: {
       'content-type': 'application/geo+json',
       'cache-control': 'public, max-age=300',
+      'x-cache': 'MISS',
     },
   });
 }

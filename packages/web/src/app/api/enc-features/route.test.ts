@@ -95,4 +95,39 @@ describe('enc-features route — happy path', () => {
     expect(body.features).toHaveLength(3);
     expect(fetchSpy).toHaveBeenCalledTimes(4); // still all four layers queried
   });
+
+  it('serves a cache hit without hitting upstream on a repeat request', async () => {
+    const fetchSpy = mockUpstream({ 4: [], 5: [], 6: [], 7: [] });
+
+    const req = () =>
+      new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6');
+
+    const first = await GET(req());
+    expect(first.headers.get('x-cache')).toBe('MISS');
+    expect(fetchSpy).toHaveBeenCalledTimes(4); // 4 layers
+
+    fetchSpy.mockClear();
+    const second = await GET(req());
+    expect(second.status).toBe(200);
+    expect(second.headers.get('x-cache')).toBe('HIT');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses the same cache entry for slightly-different bboxes that quantise the same', async () => {
+    const fetchSpy = mockUpstream({ 4: [], 5: [], 6: [], 7: [] });
+
+    const first = await GET(
+      new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6'),
+    );
+    expect(first.headers.get('x-cache')).toBe('MISS');
+    fetchSpy.mockClear();
+
+    // Same 0.1° quantised bounds (lonMin floors to -71.5, latMin floors to 41.3,
+    // lonMax ceils to -71.2, latMax ceils to 41.6).
+    const second = await GET(
+      new Request('http://x/api/enc-features?class=buoys&bbox=-71.49,41.31,-71.21,41.59'),
+    );
+    expect(second.headers.get('x-cache')).toBe('HIT');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
