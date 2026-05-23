@@ -55,8 +55,14 @@ scope** here.
 
 ## Data model
 
-Two `(id, value JSON)` tables in `config.db`, matching the existing
-ConfigStore convention.
+Two new ConfigStore tables in `config.db`. **Note the actual ConfigStore
+pattern:** each table holds a *single* row (keyed by the internal `SINGLETON`
+id) whose `value` is the whole collection as one JSON blob — exactly how
+`sailWardrobe` stores its list of sails. So `waypoints` is one blob holding
+`Waypoint[]` and `routes` is one blob holding `Route[]`. ConfigStore gains
+typed getters/setters/observables for each (mirroring `sails$` / `setSails`);
+per-item CRUD is read-modify-write of the whole collection in the web-lib
+accessors.
 
 ### `waypoints`
 
@@ -108,16 +114,19 @@ inline points. Resolving a route to coordinates is done by joining against the
   `getSharedConfigStore()` instead of `fs`, and add a parallel `routes.ts`.
   Each entity is stored as one JSON blob keyed by id, per the
   `(id, value JSON)` convention.
-- **One-time migration on boot:** if `data/waypoints.json` exists, read it,
-  upsert each waypoint into the `waypoints` table, then rename the file to
-  `data/waypoints.json.migrated`. Idempotent (the rename means it runs once).
+- **One-time migration at app boot:** waypoints today live at
+  `${G5000_ROUTER_ROOT}/waypoints.json` (default `~/.g5000-router/waypoints.json`
+  — the router root, **not** the app's `data/` dir). At boot, if that file
+  exists and the ConfigStore `waypoints` table is still empty, read the file,
+  write the list via `setWaypoints`, then rename the file to
+  `waypoints.json.migrated`. Idempotent (empty-table guard + rename).
 - **Seeds stay immortal:** the 4 hardcoded seeds are reseeded on missing id so
   an empty store still contains Newport / Block Island / Nantucket / Moore Bros.
 - Routes start empty (no seeds).
-- **Pi note:** today's deploy already moved `data/` to `apps/g5000/data/`, so
-  `waypoints.json` (if present) is at `apps/g5000/data/waypoints.json`; the
-  migration reads from the app's CWD-relative `data/` and needs no extra Pi
-  steps beyond a normal deploy + restart.
+- **Pi note:** `~/.g5000-router/` is a persistent disk cache that was **not**
+  touched by today's app-dir rename, so the Pi's `waypoints.json` is intact at
+  its original path. A normal deploy + restart runs the migration once; no
+  extra Pi steps.
 
 ## API surface
 
