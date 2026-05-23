@@ -20,11 +20,13 @@ import { WindOverlay, type WindGrid, type WindModel } from '../../components/Win
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
-import { EncLayer } from '../../components/EncLayer';
+import { EncLayer, NOAA_MIN_ZOOM, refreshEncTiles } from '../../components/EncLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { CogExtension } from '../../components/CogExtension';
 import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
+import { ZoomIndicator } from '../../components/ZoomIndicator';
+import { TileGridOverlay } from '../../components/TileGridOverlay';
 import { LayersControl, type LayersState } from './LayersControl';
 import { ChartFollowControl } from './ChartFollowControl';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
@@ -356,14 +358,24 @@ function ChartPageInner() {
   // so server and client agree on the initial paint — otherwise the
   // popover button text and styling diverge when localStorage has a
   // prior-session value, tripping React 19 hydration enforcement.
-  const [layers, setLayers] = useState<LayersState>({ enc: false, buoys: false });
+  const [layers, setLayers] = useState<LayersState>({
+    osm: true,
+    enc: false,
+    buoys: false,
+    tileGrid: false,
+  });
   const [layersHydrated, setLayersHydrated] = useState(false);
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem('chart:layers');
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<LayersState>;
-        setLayers({ enc: parsed.enc ?? false, buoys: parsed.buoys ?? false });
+        setLayers({
+          osm: parsed.osm ?? true,
+          enc: parsed.enc ?? false,
+          buoys: parsed.buoys ?? false,
+          tileGrid: parsed.tileGrid ?? false,
+        });
       }
     } catch {
       /* corrupt JSON / private mode — fall back to defaults */
@@ -378,6 +390,24 @@ function ChartPageInner() {
       /* private-mode / quota exceeded — ignore */
     }
   }, [layers, layersHydrated]);
+
+  // OSM basemap visibility. The layer is mounted unconditionally inside
+  // Map.tsx's initial style; we just flip its `visibility` layout property.
+  // When OSM is hidden the `__bg-black__` background layer underneath shows
+  // through, giving true black instead of MapLibre default grey.
+  useEffect(() => {
+    const map = mapInstance;
+    if (!map) return;
+    const apply = (): void => {
+      if (!map.getLayer('osm')) return;
+      map.setLayoutProperty('osm', 'visibility', layers.osm ? 'visible' : 'none');
+    };
+    apply();
+    map.on('styledata', apply);
+    return () => {
+      map.off('styledata', apply);
+    };
+  }, [mapInstance, layers.osm]);
 
   // Load a saved plan via the ?plan=<id> URL param so /plans → click name
   // takes you to the chart with that route already overlaid. Runs once
@@ -566,11 +596,18 @@ function ChartPageInner() {
         <StartLineLayer map={mapInstance} />
         <EncLayer map={mapInstance} visible={layers.enc} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
+        <TileGridOverlay map={mapInstance} visible={layers.tileGrid} />
         <LayersControl
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+          onRefreshNoaa={() => refreshEncTiles(mapInstance)}
         />
         <MapLoadingIndicator map={mapInstance} />
+        <ZoomIndicator
+          map={mapInstance}
+          noaaFloor={NOAA_MIN_ZOOM}
+          noaaEnabled={layers.enc}
+        />
         <AnnotationDropper position="top-2 right-28" />
         <ChartFollowControl
           follow={camera.follow}
