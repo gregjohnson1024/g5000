@@ -32,7 +32,7 @@ export async function POST(req: Request): Promise<Response> {
   }
   try {
     const route = await createRoute({
-      name: body.name,
+      name: body.name.trim(),
       waypointIds: body.waypointIds as string[],
       notes: typeof body.notes === 'string' ? body.notes : undefined,
       id: typeof body.id === 'string' ? body.id : undefined,
@@ -40,7 +40,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ ok: true, route }, { status: 201 });
   } catch (e) {
     return Response.json(
-      { ok: false, error: { message: e instanceof Error ? e.message : 'create failed' } },
+      { ok: false, error: { message: e instanceof Error ? e.message : String(e) } },
       { status: 400 },
     );
   }

@@ -35,7 +35,7 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     return Response.json({ ok: true, route });
   } catch (e) {
     return Response.json(
-      { ok: false, error: { message: e instanceof Error ? e.message : 'update failed' } },
+      { ok: false, error: { message: e instanceof Error ? e.message : String(e) } },
       { status: 400 },
     );
   }
