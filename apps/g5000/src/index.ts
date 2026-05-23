@@ -52,6 +52,7 @@ import {
   type WireDriver,
   type OutgoingPgn,
 } from '@g5000/bridge';
+import { migrateWaypointsJson } from './migrate-waypoints.js';
 import { startDemoInjector } from './demo-injector.js';
 import { startShipLogAuto } from './ship-log-auto.js';
 import { startSogStats } from './sog-stats.js';
@@ -150,6 +151,9 @@ async function main(): Promise<void> {
   const store = await ConfigStore.open(CONFIG_DB_PATH);
   setSharedConfigStore(store);
   teardown.push(() => store.close());
+  // One-time migration: import legacy ~/.g5000-router/waypoints.json into
+  // ConfigStore if the store is empty and the file exists.
+  await migrateWaypointsJson(store, path.join(SOCKETCAN_ROOT, 'waypoints.json'));
   // eslint-disable-next-line no-console
   console.log(`[autopilot] config db: ${CONFIG_DB_PATH}`);
   // eslint-disable-next-line no-console
