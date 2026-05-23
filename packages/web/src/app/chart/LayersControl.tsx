@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import type { ChartModel } from './model-layer';
 
 export interface LayersState {
   /** OSM raster basemap. Defaults true. Off → pure black underneath (handy
@@ -9,13 +10,16 @@ export interface LayersState {
   buoys: boolean;
   /** Debug: draw the boundary + z/x/y label of every visible tile. */
   tileGrid: boolean;
+  /** Mutually-exclusive forecast/current overlay. 'none' = no model overlay. */
+  model: ChartModel;
 }
 
 /**
  * Top-right popover for chart overlays. The button shows "Layers" plus
  * a tally of how many overlays are on; the panel reveals one row per
  * toggle. Two toggles today: NOAA raster chart, and the NOAA vector
- * buoys layer.
+ * buoys layer. A mutually-exclusive radio group selects the model
+ * overlay (None / GFS / ECMWF / CMEMS).
  *
  * If the panel ever drops back to a single toggle, collapse this back
  * to a single button — same logic that drove the previous single-button
@@ -26,10 +30,12 @@ export interface LayersState {
 export function LayersControl({
   state,
   onToggle,
+  onSelectModel,
   onRefreshNoaa,
 }: {
   state: LayersState;
-  onToggle: (key: keyof LayersState) => void;
+  onToggle: (key: 'osm' | 'enc' | 'buoys' | 'tileGrid') => void;
+  onSelectModel: (model: ChartModel) => void;
   /** Optional handler for the "Refresh NOAA tiles" action — invalidates
    * MapLibre's in-memory tile cache so newly-seeded disk tiles render. */
   onRefreshNoaa?: () => void;
@@ -46,7 +52,8 @@ export function LayersControl({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
-  const onCount = (state.enc ? 1 : 0) + (state.buoys ? 1 : 0);
+  const onCount =
+    (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
 
   return (
     <div ref={wrapRef} className="absolute top-2 right-2 z-10">
@@ -88,6 +95,15 @@ export function LayersControl({
             pressed={state.tileGrid}
             onClick={() => onToggle('tileGrid')}
           />
+          <div className="mt-1 pt-1 border-t border-zinc-700">
+            <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">
+              Model overlay
+            </div>
+            <ModelRow label="None" active={state.model === 'none'} onClick={() => onSelectModel('none')} />
+            <ModelRow label="GFS (wind)" active={state.model === 'gfs'} onClick={() => onSelectModel('gfs')} />
+            <ModelRow label="ECMWF (wind)" active={state.model === 'ecmwf'} onClick={() => onSelectModel('ecmwf')} />
+            <ModelRow label="CMEMS (currents)" active={state.model === 'cmems'} onClick={() => onSelectModel('cmems')} />
+          </div>
           {onRefreshNoaa && state.enc ? (
             <button
               type="button"
@@ -146,6 +162,34 @@ function Row({
       <span>{label}</span>
       <span aria-hidden="true" className={pressed ? 'opacity-100' : 'opacity-30'}>
         ●
+      </span>
+    </button>
+  );
+}
+
+function ModelRow({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}): React.ReactElement {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={
+        'w-full flex items-center justify-between px-2 py-1.5 rounded text-sm ' +
+        (active ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-200 hover:bg-zinc-800')
+      }
+    >
+      <span>{label}</span>
+      <span aria-hidden="true" className={active ? 'opacity-100' : 'opacity-30'}>
+        {active ? '◉' : '○'}
       </span>
     </button>
   );
