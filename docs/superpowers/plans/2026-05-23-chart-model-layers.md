@@ -9,6 +9,7 @@
 **Tech Stack:** TypeScript (ESM, strict), Next.js 16 App Router, React 19, MapLibre, vitest. Spec: `docs/superpowers/specs/2026-05-23-chart-model-layers-design.md`.
 
 **Key current line refs in `packages/web/src/app/chart/page.tsx` (968 lines — will shift as you edit; locate by symbol):**
+
 - state: `windModel` (63), `windOn` (66), `displayModel` (101)
 - `chart:settings` hydrate/persist (175–207)
 - `route`/`attachRoute` (212, 221); `chart:planState` (327, 343); `?plan=` loader → `setRoute` (424)
@@ -28,10 +29,12 @@
 ## File structure
 
 **Create:**
+
 - `packages/web/src/app/chart/model-layer.ts` — `ChartModel` type + `modelLayerView()` pure helper.
 - `packages/web/src/app/chart/model-layer.test.ts`
 
 **Modify:**
+
 - `packages/web/src/app/chart/LayersControl.tsx` — add `model` to `LayersState`, a radio group, `onSelectModel`, badge count.
 - `packages/web/src/app/chart/page.tsx` — rewire gating to `model`; remove `windOn`/`displayModel`/`windModel`; remove plan widgets; remove GulfStreamLayer mount.
 
@@ -42,12 +45,14 @@
 ## Task 1: `modelLayerView` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/model-layer.ts`
 - Test: `packages/web/src/app/chart/model-layer.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 `packages/web/src/app/chart/model-layer.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { modelLayerView } from './model-layer';
@@ -98,6 +103,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Implement the helper**
 
 `packages/web/src/app/chart/model-layer.ts`:
+
 ```ts
 /** The single mutually-exclusive chart model overlay selection. */
 export type ChartModel = 'none' | 'gfs' | 'ecmwf' | 'cmems';
@@ -148,11 +154,13 @@ git commit -m "feat(web): modelLayerView helper for chart model layers"
 ## Task 2: LayersControl model radio group
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 
 - [ ] **Step 1: Extend `LayersState` + props**
 
 Add `model` to the interface and a `ChartModel` import:
+
 ```ts
 import type { ChartModel } from './model-layer';
 
@@ -167,6 +175,7 @@ export interface LayersState {
 ```
 
 Add an `onSelectModel` prop to the component signature (alongside `state`, `onToggle`, `onRefreshNoaa`):
+
 ```ts
   onSelectModel,
 }: {
@@ -175,31 +184,45 @@ Add an `onSelectModel` prop to the component signature (alongside `state`, `onTo
   onSelectModel: (model: ChartModel) => void;
   onRefreshNoaa?: () => void;
 ```
+
 > Note: `onToggle`'s key is narrowed to the four booleans (model is set via `onSelectModel`, not toggled). Update the page's `onToggle` call site accordingly in Task 3.
 
 - [ ] **Step 2: Count the active model in the badge**
 
 Change the count so an active model counts as one enabled layer:
+
 ```ts
-const onCount =
-  (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
+const onCount = (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
 ```
 
 - [ ] **Step 3: Add the radio group to the popover**
 
 Inside the popover `<div role="dialog">`, after the existing `Row` toggles (the Tile-grid row) and before the Refresh-NOAA button, add a mutually-exclusive model group using a small local `ModelRow` (radio-style: only one pressed):
+
 ```tsx
-          <div className="mt-1 pt-1 border-t border-zinc-700">
-            <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">
-              Model overlay
-            </div>
-            <ModelRow label="None" active={state.model === 'none'} onClick={() => onSelectModel('none')} />
-            <ModelRow label="GFS (wind)" active={state.model === 'gfs'} onClick={() => onSelectModel('gfs')} />
-            <ModelRow label="ECMWF (wind)" active={state.model === 'ecmwf'} onClick={() => onSelectModel('ecmwf')} />
-            <ModelRow label="CMEMS (currents)" active={state.model === 'cmems'} onClick={() => onSelectModel('cmems')} />
-          </div>
+<div className="mt-1 pt-1 border-t border-zinc-700">
+  <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">Model overlay</div>
+  <ModelRow label="None" active={state.model === 'none'} onClick={() => onSelectModel('none')} />
+  <ModelRow
+    label="GFS (wind)"
+    active={state.model === 'gfs'}
+    onClick={() => onSelectModel('gfs')}
+  />
+  <ModelRow
+    label="ECMWF (wind)"
+    active={state.model === 'ecmwf'}
+    onClick={() => onSelectModel('ecmwf')}
+  />
+  <ModelRow
+    label="CMEMS (currents)"
+    active={state.model === 'cmems'}
+    onClick={() => onSelectModel('cmems')}
+  />
+</div>
 ```
+
 And add the `ModelRow` component (mirror `Row`, but render a radio dot and use `aria-checked`/`role="radio"`):
+
 ```tsx
 function ModelRow({
   label,
@@ -247,6 +270,7 @@ git commit -m "feat(web): LayersControl model overlay radio group"
 ## Task 3: Rewire chart page gating to `model`
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 This is the core change, all in one file. Locate edits by symbol (line refs in the header are hints).
@@ -290,6 +314,7 @@ Expected: passes. Fix every dangling reference the removals expose (any leftover
 - [ ] **Step 7: Smoke + commit**
 
 Smoke (dev server on :3000):
+
 - `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/chart` → 200.
 
 ```bash
@@ -302,6 +327,7 @@ git commit -m "feat(web): chart model layers — None|GFS|ECMWF|CMEMS exclusive 
 ## Task 4: Remove load-a-plan widgets (keep `?plan=` display)
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 - [ ] **Step 1: Remove the widgets**
@@ -336,6 +362,7 @@ git commit -m "refactor(web): remove load-a-plan widgets from chart (keep ?plan=
 ## Task 5: Remove the Gulf Stream boundary drawing
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 - [ ] **Step 1: Unmount it**

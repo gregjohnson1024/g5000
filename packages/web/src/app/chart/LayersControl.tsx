@@ -52,8 +52,7 @@ export function LayersControl({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
-  const onCount =
-    (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
+  const onCount = (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
 
   return (
     <div ref={wrapRef} className="absolute top-2 right-2 z-10">
@@ -99,10 +98,26 @@ export function LayersControl({
             <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">
               Model overlay
             </div>
-            <ModelRow label="None" active={state.model === 'none'} onClick={() => onSelectModel('none')} />
-            <ModelRow label="GFS (wind)" active={state.model === 'gfs'} onClick={() => onSelectModel('gfs')} />
-            <ModelRow label="ECMWF (wind)" active={state.model === 'ecmwf'} onClick={() => onSelectModel('ecmwf')} />
-            <ModelRow label="CMEMS (currents)" active={state.model === 'cmems'} onClick={() => onSelectModel('cmems')} />
+            <ModelRow
+              label="None"
+              active={state.model === 'none'}
+              onClick={() => onSelectModel('none')}
+            />
+            <ModelRow
+              label="GFS (wind)"
+              active={state.model === 'gfs'}
+              onClick={() => onSelectModel('gfs')}
+            />
+            <ModelRow
+              label="ECMWF (wind)"
+              active={state.model === 'ecmwf'}
+              onClick={() => onSelectModel('ecmwf')}
+            />
+            <ModelRow
+              label="CMEMS (currents)"
+              active={state.model === 'cmems'}
+              onClick={() => onSelectModel('cmems')}
+            />
           </div>
           {onRefreshNoaa && state.enc ? (
             <button

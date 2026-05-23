@@ -41,8 +41,8 @@ All in `packages/web/src/app/chart/page.tsx` unless noted.
   count badge. Persisted under `chart:layers`. Page wires `state`/`onToggle`/
   `onRefreshNoaa` (~523–527).
 - **localStorage:** `chart:settings` = `{ windOn, windModel, windHours,
-  displayModel, showIsochrones }`; `chart:layers` = `{ osm, enc, buoys,
-  tileGrid }`.
+displayModel, showIsochrones }`; `chart:layers` = `{ osm, enc, buoys,
+tileGrid }`.
 - **Z-order:** `WindOverlay`/`CurrentOverlay` add with `beforeId='__above-wind__'`;
   overlays are always mounted and toggle via a `hidden` prop that empties their
   GeoJSON sources.
@@ -63,6 +63,7 @@ All in `packages/web/src/app/chart/page.tsx` unless noted.
 ## Changes
 
 ### A. Remove load-a-plan widgets
+
 - Delete the `SavedPlanLoader` component definition and its mount.
 - Delete the plan-info sidebar panel (ETA/distance/model/incomplete).
 - Delete the `RouteTimeline` mount (leave `RouteTimeline.tsx` + `SavedPlanLoader`
@@ -72,10 +73,12 @@ All in `packages/web/src/app/chart/page.tsx` unless noted.
   uses `setError`).
 
 ### B. Remove Gulf Stream drawing
+
 - Remove the `<GulfStreamLayer/>` mount and its import. Leave
   `GulfStreamLayer.tsx` and the `/api/gulf-stream/north-wall` route in place.
 
 ### C. Model-layer selector (the core change)
+
 - **State:** introduce `model: 'none' | 'gfs' | 'ecmwf' | 'cmems'` as a field of
   the `chart:layers` `LayersState`. Remove `windOn` and `displayModel` (and the
   separate `windModel`) state. The wind-overlay model and the forecast-hour
@@ -98,6 +101,7 @@ All in `packages/web/src/app/chart/page.tsx` unless noted.
 - **Remove** the old sidebar "Model display" checkbox and the `<select>`.
 
 ### D. Persistence
+
 - `chart:layers` becomes `{ osm, enc, buoys, tileGrid, model }`, default
   `model: 'none'`. Hydrate/persist alongside the existing layer fields.
 - Drop `windOn`/`displayModel` from `chart:settings` writes. `windHours` and
@@ -110,6 +114,7 @@ The chart is React/MapLibre UI with little pure logic. Extract the
 `model → { windHidden, currentHidden, roiHidden, windModel }` derivation into a
 small pure helper and unit-test it (None/GFS/ECMWF/CMEMS cases). Otherwise
 verify via dev-server smoke:
+
 - `/chart` → 200.
 - Selecting GFS/ECMWF shows the wind overlay (+ ROI + timeline); CMEMS shows the
   current overlay (+ Refresh CMEMS button); None shows a clean basemap.

@@ -230,10 +230,7 @@ function ChartPageInner() {
   useEffect(() => {
     if (!settingsHydrated) return;
     try {
-      localStorage.setItem(
-        'chart:settings',
-        JSON.stringify({ windHours, showIsochrones }),
-      );
+      localStorage.setItem('chart:settings', JSON.stringify({ windHours, showIsochrones }));
     } catch {
       /* quota / private-mode; ignore */
     }
@@ -627,8 +624,8 @@ function ChartPageInner() {
               if (list.length === 0) {
                 return (
                   <div className="text-xs text-amber-300">
-                    {activeWindModel.toUpperCase()} forecast cache is stale (all valid times in the past).
-                    Refresh on{' '}
+                    {activeWindModel.toUpperCase()} forecast cache is stale (all valid times in the
+                    past). Refresh on{' '}
                     <a href="/forecast" className="underline">
                       Forecast
                     </a>
