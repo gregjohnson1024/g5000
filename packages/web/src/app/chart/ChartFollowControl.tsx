@@ -28,13 +28,11 @@ export function ChartFollowControl({
   const orientationLabel =
     orientation === 'north' ? 'N' : orientation === 'course' ? '↑COG' : '↑HDG';
 
-  const baseBtn =
-    'px-3 py-1.5 text-sm rounded border shadow w-[110px] text-left';
+  const baseBtn = 'px-3 py-1.5 text-sm rounded border shadow w-[110px] text-left';
   const enabledFollow = follow
     ? 'bg-slate-100 text-slate-900 border-slate-100 hover:bg-slate-200'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
-  const enabledOrientation =
-    'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
+  const enabledOrientation = 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
   const disabled = 'bg-slate-900/40 text-slate-500 border-slate-800 cursor-not-allowed';
 
   return (

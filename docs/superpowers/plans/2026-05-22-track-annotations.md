@@ -14,18 +14,18 @@
 
 ## File Structure
 
-| File | Purpose | Status |
-|---|---|---|
-| `packages/web/src/lib/tracks.ts` | Add `TrackAnnotation` interface, extend `Track` with optional `annotations`, add `appendAnnotation(id, ann)` helper, add pure `openPeriodStart(annotations)` helper. | modify |
-| `packages/web/src/lib/tracks.test.ts` | Vitest for `openPeriodStart` covering empty / events-only / single-open / closed / nested-then-open. | new |
-| `packages/web/src/app/api/tracks/active/annotation/route.ts` | GET (lightweight: annotations + trackId) and POST (validate body, stamp tsMs, append, return updated list). | new |
-| `packages/web/src/app/api/tracks/active/annotation/route.test.ts` | Vitest for GET (with/without active) and POST (happy path, validation, no-active-track). | new |
-| `packages/web/src/app/api/tracks/[id]/slice/route.ts` | GET ?from=&to= → `{ points, annotations }` filtered to inclusive range. | new |
-| `packages/web/src/app/api/tracks/[id]/slice/route.test.ts` | Vitest for inclusive bounds, missing-params 400, missing-track 404. | new |
-| `packages/web/src/components/AnnotationDropper.tsx` | Floating widget: collapsed pill + expandable panel of quick buttons + custom-text input. Polls GET endpoint every 30 s. | new |
-| `packages/web/src/app/chart/page.tsx` | Mount `<AnnotationDropper>` top-right (right-14 to clear NOAA button). | modify |
-| `packages/web/src/app/helm/page.tsx` | Mount `<AnnotationDropper>` top-right. | modify |
-| `packages/web/src/app/tracks/page.tsx` | Annotations disclosure + slice viewer (inline panel + Download JSON). | modify |
+| File                                                              | Purpose                                                                                                                                                              | Status |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `packages/web/src/lib/tracks.ts`                                  | Add `TrackAnnotation` interface, extend `Track` with optional `annotations`, add `appendAnnotation(id, ann)` helper, add pure `openPeriodStart(annotations)` helper. | modify |
+| `packages/web/src/lib/tracks.test.ts`                             | Vitest for `openPeriodStart` covering empty / events-only / single-open / closed / nested-then-open.                                                                 | new    |
+| `packages/web/src/app/api/tracks/active/annotation/route.ts`      | GET (lightweight: annotations + trackId) and POST (validate body, stamp tsMs, append, return updated list).                                                          | new    |
+| `packages/web/src/app/api/tracks/active/annotation/route.test.ts` | Vitest for GET (with/without active) and POST (happy path, validation, no-active-track).                                                                             | new    |
+| `packages/web/src/app/api/tracks/[id]/slice/route.ts`             | GET ?from=&to= → `{ points, annotations }` filtered to inclusive range.                                                                                              | new    |
+| `packages/web/src/app/api/tracks/[id]/slice/route.test.ts`        | Vitest for inclusive bounds, missing-params 400, missing-track 404.                                                                                                  | new    |
+| `packages/web/src/components/AnnotationDropper.tsx`               | Floating widget: collapsed pill + expandable panel of quick buttons + custom-text input. Polls GET endpoint every 30 s.                                              | new    |
+| `packages/web/src/app/chart/page.tsx`                             | Mount `<AnnotationDropper>` top-right (right-14 to clear NOAA button).                                                                                               | modify |
+| `packages/web/src/app/helm/page.tsx`                              | Mount `<AnnotationDropper>` top-right.                                                                                                                               | modify |
+| `packages/web/src/app/tracks/page.tsx`                            | Annotations disclosure + slice viewer (inline panel + Download JSON).                                                                                                | modify |
 
 No bus channels, no DB schema, no new dependencies.
 
@@ -34,6 +34,7 @@ No bus channels, no DB schema, no new dependencies.
 ## Task 1: `openPeriodStart` pure helper + tests
 
 **Files:**
+
 - Modify: `packages/web/src/lib/tracks.ts`
 - Create: `packages/web/src/lib/tracks.test.ts`
 
@@ -67,10 +68,7 @@ describe('openPeriodStart', () => {
 
   it('returns null when periodStart is followed by periodEnd', () => {
     expect(
-      openPeriodStart([
-        a(10, 'Start period', 'periodStart'),
-        a(20, 'End period', 'periodEnd'),
-      ]),
+      openPeriodStart([a(10, 'Start period', 'periodStart'), a(20, 'End period', 'periodEnd')]),
     ).toBeNull();
   });
 
@@ -89,12 +87,7 @@ describe('openPeriodStart', () => {
   it('uses array order — does not re-sort by tsMs', () => {
     // Defensive: callers pass annotations in insertion order; we trust them.
     const start = a(100, 'Start period', 'periodStart');
-    expect(
-      openPeriodStart([
-        a(50, 'End period', 'periodEnd'),
-        start,
-      ]),
-    ).toEqual(start);
+    expect(openPeriodStart([a(50, 'End period', 'periodEnd'), start])).toEqual(start);
   });
 });
 ```
@@ -153,9 +146,11 @@ npm run typecheck --workspace @g5000/web
 ```
 
 Expected: clean. If stale-dist errors mention `@g5000/db` or `@g5000/core`:
+
 ```bash
 npx tsc -b packages/core packages/db packages/compute packages/bridge packages/grib packages/routing packages/coastline
 ```
+
 then re-typecheck.
 
 - [ ] **Step 6: Commit**
@@ -179,6 +174,7 @@ task."
 ## Task 2: Extend `Track` + `appendAnnotation` helper
 
 **Files:**
+
 - Modify: `packages/web/src/lib/tracks.ts`
 
 Add the optional `annotations` field to `Track` and an `appendAnnotation` helper that mirrors `appendPoint`'s shape: read, mutate, write atomically.
@@ -215,10 +211,7 @@ After the existing `appendPoint` function in `packages/web/src/lib/tracks.ts`, a
  * Returns the updated track, or null if the id doesn't exist. Throws if
  * the track is already ended.
  */
-export async function appendAnnotation(
-  id: string,
-  ann: TrackAnnotation,
-): Promise<Track | null> {
+export async function appendAnnotation(id: string, ann: TrackAnnotation): Promise<Track | null> {
   const t = await getTrack(id);
   if (!t) return null;
   if (t.endedAt !== null) {
@@ -266,6 +259,7 @@ read as if it were empty."
 ## Task 3: `POST` / `GET` `/api/tracks/active/annotation`
 
 **Files:**
+
 - Create: `packages/web/src/app/api/tracks/active/annotation/route.ts`
 - Create: `packages/web/src/app/api/tracks/active/annotation/route.test.ts`
 
@@ -524,6 +518,7 @@ Returns 404 when no active track exists, 400 on validation failure."
 ## Task 4: `GET /api/tracks/[id]/slice`
 
 **Files:**
+
 - Create: `packages/web/src/app/api/tracks/[id]/slice/route.ts`
 - Create: `packages/web/src/app/api/tracks/[id]/slice/route.test.ts`
 
@@ -540,16 +535,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 let TMP_ROOT: string;
-let GET: (
-  req: Request,
-  ctx: { params: Promise<{ id: string }> },
-) => Promise<Response>;
+let GET: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
 
 let createTrack: (label?: string) => Promise<{ id: string }>;
-let appendPoint: (
-  id: string,
-  pt: { t: number; lat: number; lon: number },
-) => Promise<unknown>;
+let appendPoint: (id: string, pt: { t: number; lat: number; lon: number }) => Promise<unknown>;
 let appendAnnotation: (
   id: string,
   ann: { tsMs: number; label: string; kind: 'event' | 'periodStart' | 'periodEnd' },
@@ -633,10 +622,7 @@ describe('GET /api/tracks/[id]/slice', () => {
 
   it('returns 400 when from is missing', async () => {
     const t = await createTrack('test');
-    const res = await GET(
-      new Request(`http://x/api/tracks/${t.id}/slice?to=100000`),
-      ctx(t.id),
-    );
+    const res = await GET(new Request(`http://x/api/tracks/${t.id}/slice?to=100000`), ctx(t.id));
     expect(res.status).toBe(400);
   });
 
@@ -716,9 +702,7 @@ export async function GET(
     const tsMs = p.t * 1000;
     return tsMs >= from && tsMs <= to;
   });
-  const annotations = (t.annotations ?? []).filter(
-    (a) => a.tsMs >= from && a.tsMs <= to,
-  );
+  const annotations = (t.annotations ?? []).filter((a) => a.tsMs >= from && a.tsMs <= to);
   return Response.json({ points, annotations });
 }
 ```
@@ -757,6 +741,7 @@ empty arrays when from > to."
 ## Task 5: `<AnnotationDropper>` component
 
 **Files:**
+
 - Create: `packages/web/src/components/AnnotationDropper.tsx`
 
 The floating widget. Polls GET every 30 s. On POST success, updates local state from the response.
@@ -812,8 +797,7 @@ export function AnnotationDropper({
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [customLabel, setCustomLabel] = useState('');
-  const [customKind, setCustomKind] =
-    useState<TrackAnnotation['kind']>('event');
+  const [customKind, setCustomKind] = useState<TrackAnnotation['kind']>('event');
   const [submitting, setSubmitting] = useState(false);
   const [tickMs, setTickMs] = useState<number>(() => Date.now());
 
@@ -882,8 +866,8 @@ export function AnnotationDropper({
   const pillTitle = disabled
     ? 'No active track — wait for GPS'
     : open_
-    ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
-    : 'Drop a marker on the active track';
+      ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
+      : 'Drop a marker on the active track';
   const pillClass = open_
     ? 'bg-amber-500/85 text-slate-900 border-amber-600 hover:bg-amber-400'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
@@ -971,9 +955,7 @@ export function AnnotationDropper({
               />
               <select
                 value={customKind}
-                onChange={(e) =>
-                  setCustomKind(e.target.value as TrackAnnotation['kind'])
-                }
+                onChange={(e) => setCustomKind(e.target.value as TrackAnnotation['kind'])}
                 disabled={submitting}
                 className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-1 py-1 rounded disabled:opacity-40"
               >
@@ -1028,6 +1010,7 @@ the top."
 ## Task 6: Mount on `/chart` and `/helm`
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 - Modify: `packages/web/src/app/helm/page.tsx`
 
@@ -1095,6 +1078,7 @@ git commit -m "feat(web): mount AnnotationDropper on /chart and /helm
 ## Task 7: `/tracks` page annotations + slice viewer
 
 **Files:**
+
 - Modify: `packages/web/src/app/tracks/page.tsx`
 
 Add an "Annotations" disclosure per track that lists annotations chronologically with icons, plus a "View slice" inline panel for each completed period.
@@ -1127,9 +1111,7 @@ In the page component, add per-track expanded-state and loaded-annotations state
 
 ```tsx
 const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-const [loadedAnnotations, setLoadedAnnotations] = useState<
-  Record<string, TrackAnnotation[]>
->({});
+const [loadedAnnotations, setLoadedAnnotations] = useState<Record<string, TrackAnnotation[]>>({});
 const [openSlice, setOpenSlice] = useState<{
   trackId: string;
   fromMs: number;
@@ -1145,7 +1127,10 @@ const toggleExpand = async (id: string): Promise<void> => {
   if (nowOpen && !loadedAnnotations[id]) {
     const res = await fetch(`/api/tracks/${id}`);
     if (!res.ok) return;
-    const body = (await res.json()) as { ok: boolean; track: { annotations?: TrackAnnotation[] } | null };
+    const body = (await res.json()) as {
+      ok: boolean;
+      track: { annotations?: TrackAnnotation[] } | null;
+    };
     setLoadedAnnotations((m) => ({ ...m, [id]: body.track?.annotations ?? [] }));
   }
 };
@@ -1188,102 +1173,99 @@ Then in the per-track render (inside the existing track list iteration), add an 
   className="text-xs text-slate-400 hover:text-slate-200 mt-1"
 >
   {expanded[t.id] ? '▼' : '▶'} Annotations
-</button>
-{expanded[t.id] && (
-  <div className="mt-2 pl-3 border-l border-slate-800 space-y-1">
-    {(loadedAnnotations[t.id] ?? []).length === 0 ? (
-      <div className="text-xs text-slate-500">No annotations.</div>
-    ) : (
-      (loadedAnnotations[t.id] ?? []).map((ann, idx, arr) => {
-        const icon = ann.kind === 'event' ? '●' : ann.kind === 'periodStart' ? '▶' : '■';
-        const relMin = Math.round((ann.tsMs - new Date(t.startedAt).getTime()) / 60_000);
-        const matchingEnd =
-          ann.kind === 'periodStart'
-            ? arr.slice(idx + 1).find((a) => a.kind === 'periodEnd')
-            : null;
-        return (
-          <div key={`${ann.tsMs}-${ann.label}`} className="text-xs text-slate-300">
-            <span className="font-mono text-slate-500 w-12 inline-block">+{relMin}m</span>
-            <span className="mr-2">{icon}</span>
-            <span>{ann.label}</span>
-            {matchingEnd && (
-              <button
-                type="button"
-                onClick={() =>
-                  void loadSlice(
-                    t.id,
-                    ann.tsMs,
-                    matchingEnd.tsMs,
-                    ann.label,
-                    matchingEnd.label,
-                  )
-                }
-                className="ml-2 text-slate-400 hover:text-slate-200 underline"
-              >
-                View slice ({Math.round((matchingEnd.tsMs - ann.tsMs) / 60_000)} min)
-              </button>
-            )}
-            {ann.kind === 'periodStart' && !matchingEnd && (
-              <span className="ml-2 text-amber-400">open — drop an End period to close</span>
-            )}
-          </div>
-        );
-      })
-    )}
-  </div>
-)}
+</button>;
+{
+  expanded[t.id] && (
+    <div className="mt-2 pl-3 border-l border-slate-800 space-y-1">
+      {(loadedAnnotations[t.id] ?? []).length === 0 ? (
+        <div className="text-xs text-slate-500">No annotations.</div>
+      ) : (
+        (loadedAnnotations[t.id] ?? []).map((ann, idx, arr) => {
+          const icon = ann.kind === 'event' ? '●' : ann.kind === 'periodStart' ? '▶' : '■';
+          const relMin = Math.round((ann.tsMs - new Date(t.startedAt).getTime()) / 60_000);
+          const matchingEnd =
+            ann.kind === 'periodStart'
+              ? arr.slice(idx + 1).find((a) => a.kind === 'periodEnd')
+              : null;
+          return (
+            <div key={`${ann.tsMs}-${ann.label}`} className="text-xs text-slate-300">
+              <span className="font-mono text-slate-500 w-12 inline-block">+{relMin}m</span>
+              <span className="mr-2">{icon}</span>
+              <span>{ann.label}</span>
+              {matchingEnd && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void loadSlice(t.id, ann.tsMs, matchingEnd.tsMs, ann.label, matchingEnd.label)
+                  }
+                  className="ml-2 text-slate-400 hover:text-slate-200 underline"
+                >
+                  View slice ({Math.round((matchingEnd.tsMs - ann.tsMs) / 60_000)} min)
+                </button>
+              )}
+              {ann.kind === 'periodStart' && !matchingEnd && (
+                <span className="ml-2 text-amber-400">open — drop an End period to close</span>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
 ```
 
 Add the slice-viewer panel at the bottom of the page render (still inside the page component's returned JSX, but outside any per-track block):
 
 ```tsx
-{openSlice && (
-  <div className="fixed inset-0 z-30 bg-slate-950/80 flex items-center justify-center p-4">
-    <div className="bg-slate-900 border border-slate-700 rounded shadow-xl p-4 max-w-xl w-full space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-100">
-          Slice: {openSlice.fromLabel} → {openSlice.toLabel}
-        </h2>
-        <button
-          type="button"
-          onClick={() => setOpenSlice(null)}
-          className="text-slate-400 hover:text-slate-200 text-xs"
-        >
-          ✕
-        </button>
-      </div>
-      {sliceData === null ? (
-        <div className="text-sm text-slate-400">Loading…</div>
-      ) : (
-        <>
-          <div className="text-sm text-slate-300 space-y-1">
-            <div>
-              Duration:{' '}
-              <span className="font-mono">
-                {Math.round((openSlice.toMs - openSlice.fromMs) / 60_000)} min
-              </span>
-            </div>
-            <div>
-              Points:{' '}
-              <span className="font-mono">{sliceData.points.length}</span>
-            </div>
-            <div>
-              Annotations in range:{' '}
-              <span className="font-mono">{sliceData.annotations.length}</span>
-            </div>
-          </div>
+{
+  openSlice && (
+    <div className="fixed inset-0 z-30 bg-slate-950/80 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded shadow-xl p-4 max-w-xl w-full space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-100">
+            Slice: {openSlice.fromLabel} → {openSlice.toLabel}
+          </h2>
           <button
             type="button"
-            onClick={downloadSlice}
-            className="w-full px-3 py-2 text-sm rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+            onClick={() => setOpenSlice(null)}
+            className="text-slate-400 hover:text-slate-200 text-xs"
           >
-            Download JSON
+            ✕
           </button>
-        </>
-      )}
+        </div>
+        {sliceData === null ? (
+          <div className="text-sm text-slate-400">Loading…</div>
+        ) : (
+          <>
+            <div className="text-sm text-slate-300 space-y-1">
+              <div>
+                Duration:{' '}
+                <span className="font-mono">
+                  {Math.round((openSlice.toMs - openSlice.fromMs) / 60_000)} min
+                </span>
+              </div>
+              <div>
+                Points: <span className="font-mono">{sliceData.points.length}</span>
+              </div>
+              <div>
+                Annotations in range:{' '}
+                <span className="font-mono">{sliceData.annotations.length}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={downloadSlice}
+              className="w-full px-3 py-2 text-sm rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+            >
+              Download JSON
+            </button>
+          </>
+        )}
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 - [ ] **Step 3: Typecheck**
@@ -1321,6 +1303,7 @@ the /api/tracks/[id]/slice endpoint."
 ## Task 8: Manual verification
 
 **Files:**
+
 - Modify: none.
 
 End-to-end smoke on the local dev server.
@@ -1342,12 +1325,14 @@ Open `http://localhost:3000/chart`. Confirm the dropper pill renders at the top-
 - [ ] **Step 3: Drop an event marker**
 
 Click pill → panel expands. Click `Tack`. Confirm:
+
 - Flash banner: `✓ Marked: Tack at HH:MM:SSZ`.
 - Panel collapses, pill returns to `+ marker`.
 
 - [ ] **Step 4: Start and end a period**
 
 Open the dropper. Click `Start period`. Confirm:
+
 - Pill turns amber, label becomes `⏺ open period — 0 min`.
 - Wait 1 minute; label becomes `⏺ open period — 1 min` (driven by the 1 Hz tick).
 - Open the panel again. The `End period (1 min)` button is prominent at the TOP, amber.
@@ -1364,11 +1349,13 @@ Navigate to `/helm`. Confirm the dropper renders top-right with the same state a
 - [ ] **Step 7: /tracks annotations disclosure + slice**
 
 Navigate to `/tracks`. Find the active track. Click its `▶ Annotations` button to expand. Confirm:
+
 - All annotations dropped above appear in order with icons (●/▶/■).
 - The paired `Start period → End period` shows a `View slice (1 min)` link.
 - Unpaired periods (if any) show `open — drop an End period to close`.
 
 Click `View slice`. Confirm:
+
 - Modal opens with duration / point count / annotations count.
 - `Download JSON` triggers a browser file download with name like `track-001-slice-<from>-<to>.json`. Open the file and confirm it has the expected shape (`{ points: [...], annotations: [...] }`).
 

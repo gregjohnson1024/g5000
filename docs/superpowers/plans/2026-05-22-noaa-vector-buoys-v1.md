@@ -36,23 +36,24 @@ Verified non-goals for v1:
 
 ## File structure
 
-| File | Action | Responsibility |
-|---|---|---|
-| `packages/web/src/lib/enc-features-bbox.ts` | create | `parseBbox(raw)`, `quantizeBbox(b)`, `bboxKey(b)` — pure helpers for parsing the `?bbox=` query string and producing a stable cache key. |
-| `packages/web/src/lib/enc-features-bbox.test.ts` | create | Vitest unit tests for the parsing/quantising helpers. |
-| `packages/web/src/lib/enc-colours.ts` | create | `parsePrimaryColour(raw)` — extracts the leading numeric token from an S-57 COLOUR string, returns 0 if absent/invalid. |
-| `packages/web/src/lib/enc-colours.test.ts` | create | Vitest unit tests for COLOUR parsing. |
-| `packages/web/src/app/api/enc-features/route.ts` | create | The GET route handler: validates `class` + `bbox`, fans out to the four Coastal buoy layers in parallel, merges features, attaches `colourCode`, returns a `FeatureCollection`. In-memory cache. |
-| `packages/web/src/app/api/enc-features/route.test.ts` | create | Vitest covering: bad params (400), happy path (200 with merged features), cache hit (no upstream fetch), upstream 5xx (502). |
-| `packages/web/src/components/EncBuoyLayer.tsx` | create | MapLibre source/layer pair. Watches `moveend`, debounces 250 ms, zoom-gates ≥ 9, fetches `/api/enc-features?class=buoys&bbox=...`, updates the GeoJSON source. Paint expression colours circles by `colourCode`. |
-| `packages/web/src/app/chart/LayersControl.tsx` | modify | Rebuild as a popover ("Layers" button + panel with two checkbox rows: NOAA chart, Buoys). `LayersState` becomes `{ enc: boolean; buoys: boolean }`. |
-| `packages/web/src/app/chart/page.tsx` | modify | Add `buoys` to `LayersState` shape, update the `chart:layers` localStorage migration, mount `<EncBuoyLayer map={mapInstance} visible={layers.buoys}/>` next to `<EncLayer/>`. |
+| File                                                  | Action | Responsibility                                                                                                                                                                                                   |
+| ----------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/web/src/lib/enc-features-bbox.ts`           | create | `parseBbox(raw)`, `quantizeBbox(b)`, `bboxKey(b)` — pure helpers for parsing the `?bbox=` query string and producing a stable cache key.                                                                         |
+| `packages/web/src/lib/enc-features-bbox.test.ts`      | create | Vitest unit tests for the parsing/quantising helpers.                                                                                                                                                            |
+| `packages/web/src/lib/enc-colours.ts`                 | create | `parsePrimaryColour(raw)` — extracts the leading numeric token from an S-57 COLOUR string, returns 0 if absent/invalid.                                                                                          |
+| `packages/web/src/lib/enc-colours.test.ts`            | create | Vitest unit tests for COLOUR parsing.                                                                                                                                                                            |
+| `packages/web/src/app/api/enc-features/route.ts`      | create | The GET route handler: validates `class` + `bbox`, fans out to the four Coastal buoy layers in parallel, merges features, attaches `colourCode`, returns a `FeatureCollection`. In-memory cache.                 |
+| `packages/web/src/app/api/enc-features/route.test.ts` | create | Vitest covering: bad params (400), happy path (200 with merged features), cache hit (no upstream fetch), upstream 5xx (502).                                                                                     |
+| `packages/web/src/components/EncBuoyLayer.tsx`        | create | MapLibre source/layer pair. Watches `moveend`, debounces 250 ms, zoom-gates ≥ 9, fetches `/api/enc-features?class=buoys&bbox=...`, updates the GeoJSON source. Paint expression colours circles by `colourCode`. |
+| `packages/web/src/app/chart/LayersControl.tsx`        | modify | Rebuild as a popover ("Layers" button + panel with two checkbox rows: NOAA chart, Buoys). `LayersState` becomes `{ enc: boolean; buoys: boolean }`.                                                              |
+| `packages/web/src/app/chart/page.tsx`                 | modify | Add `buoys` to `LayersState` shape, update the `chart:layers` localStorage migration, mount `<EncBuoyLayer map={mapInstance} visible={layers.buoys}/>` next to `<EncLayer/>`.                                    |
 
 ## Tasks
 
 ### Task 1: bbox parser + cache-key helpers
 
 **Files:**
+
 - Create: `packages/web/src/lib/enc-features-bbox.ts`
 - Test: `packages/web/src/lib/enc-features-bbox.test.ts`
 
@@ -173,6 +174,7 @@ git commit -m "feat(web): bbox parse/quantize helpers for NOAA vector feature qu
 ### Task 2: S-57 COLOUR parser
 
 **Files:**
+
 - Create: `packages/web/src/lib/enc-colours.ts`
 - Test: `packages/web/src/lib/enc-colours.test.ts`
 
@@ -256,6 +258,7 @@ git commit -m "feat(web): S-57 COLOUR attribute parser"
 ### Task 3: enc-features route handler (single-class happy path)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/enc-features/route.ts`
 - Test: `packages/web/src/app/api/enc-features/route.test.ts`
 
@@ -317,7 +320,10 @@ describe('enc-features route — happy path', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toMatch(/application\/geo\+json|application\/json/);
-    const body = (await res.json()) as { type: string; features: { properties: { colourCode: number } }[] };
+    const body = (await res.json()) as {
+      type: string;
+      features: { properties: { colourCode: number } }[];
+    };
     expect(body.type).toBe('FeatureCollection');
     expect(body.features).toHaveLength(5);
     expect(fetchSpy).toHaveBeenCalledTimes(4);
@@ -328,7 +334,9 @@ describe('enc-features route — happy path', () => {
 
     // All four layers were queried with the same bbox.
     for (const id of BUOY_LAYER_IDS) {
-      const called = fetchSpy.mock.calls.some((c) => String(c[0]).includes(`/MapServer/${id}/query`));
+      const called = fetchSpy.mock.calls.some((c) =>
+        String(c[0]).includes(`/MapServer/${id}/query`),
+      );
       expect(called, `layer ${id} should be queried`).toBe(true);
     }
   });
@@ -449,6 +457,7 @@ git commit -m "feat(web): /api/enc-features proxy — Coastal buoys (4 layers, p
 ### Task 4: In-memory cache with TTL
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/enc-features/route.ts`
 - Modify: `packages/web/src/app/api/enc-features/route.test.ts`
 
@@ -457,40 +466,39 @@ git commit -m "feat(web): /api/enc-features proxy — Coastal buoys (4 layers, p
 Append inside `describe('enc-features route — happy path', ...)`:
 
 ```ts
-  it('serves a cache hit without hitting upstream on a repeat request', async () => {
-    const fetchSpy = mockUpstream({ 4: [], 5: [], 6: [], 7: [] });
+it('serves a cache hit without hitting upstream on a repeat request', async () => {
+  const fetchSpy = mockUpstream({ 4: [], 5: [], 6: [], 7: [] });
 
-    const req = () =>
-      new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6');
+  const req = () => new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6');
 
-    const first = await GET(req());
-    expect(first.headers.get('x-cache')).toBe('MISS');
-    expect(fetchSpy).toHaveBeenCalledTimes(4); // 4 layers
+  const first = await GET(req());
+  expect(first.headers.get('x-cache')).toBe('MISS');
+  expect(fetchSpy).toHaveBeenCalledTimes(4); // 4 layers
 
-    fetchSpy.mockClear();
-    const second = await GET(req());
-    expect(second.status).toBe(200);
-    expect(second.headers.get('x-cache')).toBe('HIT');
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
+  fetchSpy.mockClear();
+  const second = await GET(req());
+  expect(second.status).toBe(200);
+  expect(second.headers.get('x-cache')).toBe('HIT');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
 
-  it('uses the same cache entry for slightly-different bboxes that quantise the same', async () => {
-    const fetchSpy = mockUpstream({ 4: [], 5: [], 6: [], 7: [] });
+it('uses the same cache entry for slightly-different bboxes that quantise the same', async () => {
+  const fetchSpy = mockUpstream({ 4: [], 5: [], 6: [], 7: [] });
 
-    const first = await GET(
-      new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6'),
-    );
-    expect(first.headers.get('x-cache')).toBe('MISS');
-    fetchSpy.mockClear();
+  const first = await GET(
+    new Request('http://x/api/enc-features?class=buoys&bbox=-71.5,41.3,-71.2,41.6'),
+  );
+  expect(first.headers.get('x-cache')).toBe('MISS');
+  fetchSpy.mockClear();
 
-    // Same 0.1° quantised bounds (lonMin floors to -71.5, latMin floors to 41.3,
-    // lonMax ceils to -71.1, latMax ceils to 41.7).
-    const second = await GET(
-      new Request('http://x/api/enc-features?class=buoys&bbox=-71.499,41.31,-71.18,41.61'),
-    );
-    expect(second.headers.get('x-cache')).toBe('HIT');
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
+  // Same 0.1° quantised bounds (lonMin floors to -71.5, latMin floors to 41.3,
+  // lonMax ceils to -71.1, latMax ceils to 41.7).
+  const second = await GET(
+    new Request('http://x/api/enc-features?class=buoys&bbox=-71.499,41.31,-71.18,41.61'),
+  );
+  expect(second.headers.get('x-cache')).toBe('HIT');
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
 ```
 
 - [ ] **Step 2: Run the tests; verify the new ones fail**
@@ -524,30 +532,30 @@ function cacheKey(klass: string, bbox: Bbox): string {
 Replace the body of the `GET` handler (the lines from `const layers = await Promise.all…` through the final `return`) with:
 
 ```ts
-  const key = cacheKey(klass, bbox);
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
-    return new Response(JSON.stringify(hit.body), {
-      status: 200,
-      headers: {
-        'content-type': 'application/geo+json',
-        'cache-control': 'public, max-age=300',
-        'x-cache': 'HIT',
-      },
-    });
-  }
-  const layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
-  const features = annotate(layers.flat());
-  const body: FeatureCollection = { type: 'FeatureCollection', features };
-  cache.set(key, { ts: Date.now(), body });
-  return new Response(JSON.stringify(body), {
+const key = cacheKey(klass, bbox);
+const hit = cache.get(key);
+if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+  return new Response(JSON.stringify(hit.body), {
     status: 200,
     headers: {
       'content-type': 'application/geo+json',
       'cache-control': 'public, max-age=300',
-      'x-cache': 'MISS',
+      'x-cache': 'HIT',
     },
   });
+}
+const layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
+const features = annotate(layers.flat());
+const body: FeatureCollection = { type: 'FeatureCollection', features };
+cache.set(key, { ts: Date.now(), body });
+return new Response(JSON.stringify(body), {
+  status: 200,
+  headers: {
+    'content-type': 'application/geo+json',
+    'cache-control': 'public, max-age=300',
+    'x-cache': 'MISS',
+  },
+});
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -565,6 +573,7 @@ git commit -m "feat(web): in-memory cache (5 min TTL, 0.1° bbox quantisation) f
 ### Task 5: Input validation and upstream error handling
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/enc-features/route.test.ts`
 - Modify: `packages/web/src/app/api/enc-features/route.ts`
 
@@ -587,9 +596,7 @@ describe('enc-features route — validation and errors', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res1 = await GET(new Request('http://x/api/enc-features?class=buoys'));
     expect(res1.status).toBe(400);
-    const res2 = await GET(
-      new Request('http://x/api/enc-features?class=buoys&bbox=garbage'),
-    );
+    const res2 = await GET(new Request('http://x/api/enc-features?class=buoys&bbox=garbage'));
     expect(res2.status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -623,16 +630,16 @@ Expected: The two 400 tests pass (already handled in Task 3); the 502 test FAILS
 Wrap the `Promise.all` in a `try/catch` inside `GET`:
 
 ```ts
-  let layers: GeoJsonFeature[][];
-  try {
-    layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: 'upstream', detail: msg }), {
-      status: 502,
-      headers: { 'content-type': 'application/json' },
-    });
-  }
+let layers: GeoJsonFeature[][];
+try {
+  layers = await Promise.all(BUOY_LAYER_IDS.map((id) => fetchLayer(id, quantizeBbox(bbox))));
+} catch (err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return new Response(JSON.stringify({ error: 'upstream', detail: msg }), {
+    status: 502,
+    headers: { 'content-type': 'application/json' },
+  });
+}
 ```
 
 (Replace the existing un-wrapped `const layers = await Promise.all(...)` line.)
@@ -652,6 +659,7 @@ git commit -m "feat(web): /api/enc-features validation + 502 on upstream error"
 ### Task 6: EncBuoyLayer — skeleton
 
 **Files:**
+
 - Create: `packages/web/src/components/EncBuoyLayer.tsx`
 
 This task adds the component with empty source + paint scaffolding, mounted but not yet fetching. Fetching is added in Task 7. We do **not** write a unit test for this component — MapLibre's runtime objects are hard to mock and the existing `EncLayer.tsx` (and `SeamarkLayer.tsx`) have no unit tests either. Coverage is via the manual chart-page verification in Task 10.
@@ -718,19 +726,32 @@ export function EncBuoyLayer({
                 'circle-color': [
                   'match',
                   ['get', 'colourCode'],
-                  1, '#f5f5f5',
-                  2, '#222222',
-                  3, '#dd2222',
-                  4, '#22aa22',
-                  5, '#1166cc',
-                  6, '#e6c200',
-                  7, '#888888',
-                  8, '#7a4d22',
-                  9, '#dd9933',
-                  10, '#8855aa',
-                  11, '#ee7722',
-                  12, '#c33388',
-                  13, '#dd88aa',
+                  1,
+                  '#f5f5f5',
+                  2,
+                  '#222222',
+                  3,
+                  '#dd2222',
+                  4,
+                  '#22aa22',
+                  5,
+                  '#1166cc',
+                  6,
+                  '#e6c200',
+                  7,
+                  '#888888',
+                  8,
+                  '#7a4d22',
+                  9,
+                  '#dd9933',
+                  10,
+                  '#8855aa',
+                  11,
+                  '#ee7722',
+                  12,
+                  '#c33388',
+                  13,
+                  '#dd88aa',
                   '#888888',
                 ],
               },
@@ -776,6 +797,7 @@ git commit -m "feat(web): EncBuoyLayer skeleton (empty source, S-57 colour paint
 ### Task 7: EncBuoyLayer — bbox-driven fetch with debounce + zoom gate
 
 **Files:**
+
 - Modify: `packages/web/src/components/EncBuoyLayer.tsx`
 
 - [ ] **Step 1: Add the fetch effect to the component**
@@ -783,58 +805,58 @@ git commit -m "feat(web): EncBuoyLayer skeleton (empty source, S-57 colour paint
 Add a third `useEffect` after the visibility effect:
 
 ```tsx
-  useEffect(() => {
-    if (!map) return;
-    if (!visible) return;
+useEffect(() => {
+  if (!map) return;
+  if (!visible) return;
 
-    const MIN_ZOOM = 9;
-    const DEBOUNCE_MS = 250;
-    let pending: ReturnType<typeof setTimeout> | null = null;
-    let aborter: AbortController | null = null;
+  const MIN_ZOOM = 9;
+  const DEBOUNCE_MS = 250;
+  let pending: ReturnType<typeof setTimeout> | null = null;
+  let aborter: AbortController | null = null;
 
-    const refresh = async (): Promise<void> => {
-      if (map.getZoom() < MIN_ZOOM) {
-        const src = map.getSource(SOURCE_ID);
-        if (src && 'setData' in src && typeof src.setData === 'function') {
-          src.setData(EMPTY_COLLECTION);
-        }
-        return;
+  const refresh = async (): Promise<void> => {
+    if (map.getZoom() < MIN_ZOOM) {
+      const src = map.getSource(SOURCE_ID);
+      if (src && 'setData' in src && typeof src.setData === 'function') {
+        src.setData(EMPTY_COLLECTION);
       }
-      aborter?.abort();
-      aborter = new AbortController();
-      const b = map.getBounds();
-      const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
-        .map((n) => n.toFixed(3))
-        .join(',');
-      try {
-        const r = await fetch(`/api/enc-features?class=buoys&bbox=${bbox}`, {
-          signal: aborter.signal,
-        });
-        if (!r.ok) return;
-        const data = (await r.json()) as GeoJSON.FeatureCollection;
-        const src = map.getSource(SOURCE_ID);
-        if (src && 'setData' in src && typeof src.setData === 'function') {
-          src.setData(data);
-        }
-      } catch {
-        /* aborted or upstream blip — leave previous data in place */
+      return;
+    }
+    aborter?.abort();
+    aborter = new AbortController();
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+      .map((n) => n.toFixed(3))
+      .join(',');
+    try {
+      const r = await fetch(`/api/enc-features?class=buoys&bbox=${bbox}`, {
+        signal: aborter.signal,
+      });
+      if (!r.ok) return;
+      const data = (await r.json()) as GeoJSON.FeatureCollection;
+      const src = map.getSource(SOURCE_ID);
+      if (src && 'setData' in src && typeof src.setData === 'function') {
+        src.setData(data);
       }
-    };
+    } catch {
+      /* aborted or upstream blip — leave previous data in place */
+    }
+  };
 
-    const schedule = (): void => {
-      if (pending) clearTimeout(pending);
-      pending = setTimeout(refresh, DEBOUNCE_MS);
-    };
+  const schedule = (): void => {
+    if (pending) clearTimeout(pending);
+    pending = setTimeout(refresh, DEBOUNCE_MS);
+  };
 
-    schedule();
-    map.on('moveend', schedule);
+  schedule();
+  map.on('moveend', schedule);
 
-    return () => {
-      map.off('moveend', schedule);
-      if (pending) clearTimeout(pending);
-      aborter?.abort();
-    };
-  }, [map, visible]);
+  return () => {
+    map.off('moveend', schedule);
+    if (pending) clearTimeout(pending);
+    aborter?.abort();
+  };
+}, [map, visible]);
 ```
 
 - [ ] **Step 2: Verify typecheck passes**
@@ -852,9 +874,10 @@ git commit -m "feat(web): EncBuoyLayer fetches /api/enc-features on moveend (deb
 ### Task 8: LayersControl — popover with two toggles
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 
-Replaces the single-button NOAA control with a popover, per CLAUDE.md: *"If this ever grows to 2+ overlays again, revert to a popover layout."*
+Replaces the single-button NOAA control with a popover, per CLAUDE.md: _"If this ever grows to 2+ overlays again, revert to a popover layout."_
 
 - [ ] **Step 1: Rewrite the component**
 
@@ -977,6 +1000,7 @@ git commit -m "feat(web): LayersControl popover with NOAA chart + Buoys toggles"
 ### Task 9: Chart page wire-up
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 - [ ] **Step 1: Update the layers-state initializer**
@@ -984,17 +1008,17 @@ git commit -m "feat(web): LayersControl popover with NOAA chart + Buoys toggles"
 Find the `useState<LayersState>(() => { ... })` block near the top of `ChartPageInner` (the one that reads `chart:layers` from localStorage). Replace its body with:
 
 ```tsx
-  const [layers, setLayers] = useState<LayersState>(() => {
-    if (typeof window === 'undefined') return { enc: false, buoys: false };
-    try {
-      const raw = window.localStorage.getItem('chart:layers');
-      if (!raw) return { enc: false, buoys: false };
-      const parsed = JSON.parse(raw) as Partial<LayersState>;
-      return { enc: parsed.enc ?? false, buoys: parsed.buoys ?? false };
-    } catch {
-      return { enc: false, buoys: false };
-    }
-  });
+const [layers, setLayers] = useState<LayersState>(() => {
+  if (typeof window === 'undefined') return { enc: false, buoys: false };
+  try {
+    const raw = window.localStorage.getItem('chart:layers');
+    if (!raw) return { enc: false, buoys: false };
+    const parsed = JSON.parse(raw) as Partial<LayersState>;
+    return { enc: parsed.enc ?? false, buoys: parsed.buoys ?? false };
+  } catch {
+    return { enc: false, buoys: false };
+  }
+});
 ```
 
 - [ ] **Step 2: Import EncBuoyLayer**
@@ -1087,7 +1111,7 @@ git commit -m "fix(web): <specific issue from manual verification>"
 
 **Cross-cutting notes:**
 
-- Existing `EncLayer` and `SeamarkLayer` patterns are mirrored exactly: `try/catch` around add*, `styledata` retry, beforeId `__above-wind__`. The component placement and useEffect shape match.
+- Existing `EncLayer` and `SeamarkLayer` patterns are mirrored exactly: `try/catch` around add\*, `styledata` retry, beforeId `__above-wind__`. The component placement and useEffect shape match.
 - The route handler matches the project's `enc-tiles` test style — `vi.spyOn(globalThis, 'fetch')`, `vi.resetModules()`, dynamic import inside `beforeEach`. No new test infrastructure.
 - The CLAUDE.md zone-of-responsibility rule (chart-page localStorage keys, `__above-wind__` sentinel, popover-when-2+) is honoured.
 - Risk: zero new dependencies, zero changes to `next.config.ts`, zero changes to `serverExternalPackages`. The proxy is a leaf API route. Reverting is `git revert` of the nine commits — no schema or persistence changes to roll back.

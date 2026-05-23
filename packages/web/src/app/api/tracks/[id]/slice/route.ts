@@ -42,8 +42,6 @@ export async function GET(
     const tsMs = p.t * 1000;
     return tsMs >= from && tsMs <= to;
   });
-  const annotations = (t.annotations ?? []).filter(
-    (a) => a.tsMs >= from && a.tsMs <= to,
-  );
+  const annotations = (t.annotations ?? []).filter((a) => a.tsMs >= from && a.tsMs <= to);
   return Response.json({ points, annotations });
 }

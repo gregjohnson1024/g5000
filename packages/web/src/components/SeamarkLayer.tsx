@@ -18,13 +18,7 @@ const LAYER_ID = 'osm-seamark-layer';
  * Map.tsx, so wind / AIS / route / range-rings / laylines all sit
  * above the seamark layer.
  */
-export function SeamarkLayer({
-  map,
-  visible,
-}: {
-  map: maplibregl.Map | null;
-  visible: boolean;
-}) {
+export function SeamarkLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
   useEffect(() => {
     if (!map) return;
     // The chart page hands us `map` from inside Map.tsx's `onLoad` callback,
@@ -45,9 +39,7 @@ export function SeamarkLayer({
           });
         }
         if (!map.getLayer(LAYER_ID)) {
-          const beforeId = map.getLayer('__above-wind__')
-            ? '__above-wind__'
-            : undefined;
+          const beforeId = map.getLayer('__above-wind__') ? '__above-wind__' : undefined;
           map.addLayer(
             {
               id: LAYER_ID,

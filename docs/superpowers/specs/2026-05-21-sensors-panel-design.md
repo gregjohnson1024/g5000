@@ -16,15 +16,15 @@ Today, when a measurement looks wrong, the user has to triangulate between three
 
 ## Sensor cards
 
-| Sensor card | Channels | Cal page | Directly used by |
-|---|---|---|---|
-| Heading (compass) | `boat.heading.magnetic`, `boat.heading.true`, `nav.magvar` | `/damping` (heading section) | True wind · Layline angles · COG–HDG comparison · Polar % · AIS bearing |
-| Speed through water (BSP) | `boat.speed.water` | `/damping` (BSP section) | True wind · VMG · Polar % · Current estimate · Sail-timeline ETA |
-| Apparent wind | `wind.apparent.angle`, `wind.apparent.speed` | `/damping` (AWS-AWA section) | True wind · Polars/targets · Race wind-shift detector · Sail crossover · VMC |
-| GPS | `nav.gps.position`, `nav.gps.cog`, `nav.gps.cog.magnetic`, `nav.gps.sog` | (no cal page) | SOG · COG · VMC · Distance/ETA · Route plan · AIS CPA · Anchor watch · Live boat marker · Track recorder · Start-line geometry |
-| Depth | `nav.depth` | (depth offset is on `/settings`) | Anchor watch · Shallow alarm |
-| Motion (IMU) | `motion.heel`, `motion.pitch`, `motion.yaw`, `motion.rateOfTurn` | (no cal page) | *(display-only; no downstream consumers today)* |
-| Battery | `electrical.battery.voltage` | (no cal page) | Low-battery alarm (when configured) |
+| Sensor card               | Channels                                                                 | Cal page                         | Directly used by                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Heading (compass)         | `boat.heading.magnetic`, `boat.heading.true`, `nav.magvar`               | `/damping` (heading section)     | True wind · Layline angles · COG–HDG comparison · Polar % · AIS bearing                                                        |
+| Speed through water (BSP) | `boat.speed.water`                                                       | `/damping` (BSP section)         | True wind · VMG · Polar % · Current estimate · Sail-timeline ETA                                                               |
+| Apparent wind             | `wind.apparent.angle`, `wind.apparent.speed`                             | `/damping` (AWS-AWA section)     | True wind · Polars/targets · Race wind-shift detector · Sail crossover · VMC                                                   |
+| GPS                       | `nav.gps.position`, `nav.gps.cog`, `nav.gps.cog.magnetic`, `nav.gps.sog` | (no cal page)                    | SOG · COG · VMC · Distance/ETA · Route plan · AIS CPA · Anchor watch · Live boat marker · Track recorder · Start-line geometry |
+| Depth                     | `nav.depth`                                                              | (depth offset is on `/settings`) | Anchor watch · Shallow alarm                                                                                                   |
+| Motion (IMU)              | `motion.heel`, `motion.pitch`, `motion.yaw`, `motion.rateOfTurn`         | (no cal page)                    | _(display-only; no downstream consumers today)_                                                                                |
+| Battery                   | `electrical.battery.voltage`                                             | (no cal page)                    | Low-battery alarm (when configured)                                                                                            |
 
 The Motion card is included even though nothing currently consumes its channels. The value is diagnostic: the card answers "is my IMU alive and what is it reading right now" without forcing the user to hunt for an N2K live-frame inspector.
 
@@ -59,15 +59,15 @@ The page itself is a single scrolling column of cards, in the order listed in th
 
 ### File scope
 
-| File | Action | Approx LOC |
-|---|---|---|
-| `packages/web/src/app/sensors/page.tsx` | new — page shell; polls `/api/sources/observed`; renders one `<SensorCard>` per entry in `SENSOR_DEFS` | ~120 |
-| `packages/web/src/app/sensors/sensor-definitions.ts` | new — static `SENSOR_DEFS: SensorDef[]` with the table contents; exported type `SensorDef` | ~100 |
-| `packages/web/src/app/sensors/SensorCard.tsx` | new — renders one sensor's card: live values, freshness dot, source line, used-by list, ops links, collapsed priority editor | ~130 |
-| `packages/web/src/app/sensors/SourcePriorityEditor.tsx` | new — extracted from today's `/sources/page.tsx`; takes a list of channels and the full priority config, renders the rule editors for just those channels, persists via existing `/api/sources/config` route | ~280 |
-| `packages/web/src/app/sources/page.tsx` | delete — absorbed | -794 net |
-| `packages/web/src/app/Navbar.tsx` | modify — rename the link from "Sources" → "Sensors", point at `/sensors` | ~2 changed |
-| `packages/web/src/app/sources/page.test.tsx` (if it exists) | delete | — |
+| File                                                        | Action                                                                                                                                                                                                       | Approx LOC |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| `packages/web/src/app/sensors/page.tsx`                     | new — page shell; polls `/api/sources/observed`; renders one `<SensorCard>` per entry in `SENSOR_DEFS`                                                                                                       | ~120       |
+| `packages/web/src/app/sensors/sensor-definitions.ts`        | new — static `SENSOR_DEFS: SensorDef[]` with the table contents; exported type `SensorDef`                                                                                                                   | ~100       |
+| `packages/web/src/app/sensors/SensorCard.tsx`               | new — renders one sensor's card: live values, freshness dot, source line, used-by list, ops links, collapsed priority editor                                                                                 | ~130       |
+| `packages/web/src/app/sensors/SourcePriorityEditor.tsx`     | new — extracted from today's `/sources/page.tsx`; takes a list of channels and the full priority config, renders the rule editors for just those channels, persists via existing `/api/sources/config` route | ~280       |
+| `packages/web/src/app/sources/page.tsx`                     | delete — absorbed                                                                                                                                                                                            | -794 net   |
+| `packages/web/src/app/Navbar.tsx`                           | modify — rename the link from "Sources" → "Sensors", point at `/sensors`                                                                                                                                     | ~2 changed |
+| `packages/web/src/app/sources/page.test.tsx` (if it exists) | delete                                                                                                                                                                                                       | —          |
 
 No backend changes. Reuses `/api/sources/observed` (polled) and `/api/sources/config` (GET/PUT) exactly as `/sources` does today.
 

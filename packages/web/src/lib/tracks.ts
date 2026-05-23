@@ -188,10 +188,7 @@ export async function appendPoint(id: string, pt: TrackPoint): Promise<Track | n
  * Returns the updated track, or null if the id doesn't exist. Throws if
  * the track is already ended.
  */
-export async function appendAnnotation(
-  id: string,
-  ann: TrackAnnotation,
-): Promise<Track | null> {
+export async function appendAnnotation(id: string, ann: TrackAnnotation): Promise<Track | null> {
   const t = await getTrack(id);
   if (!t) return null;
   if (t.endedAt !== null) {

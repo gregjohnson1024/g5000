@@ -363,7 +363,13 @@ describe('ConfigStore', () => {
 
     it('round-trips routes', async () => {
       const rts: Route[] = [
-        { id: 'r1', name: 'R1', waypointIds: ['a', 'b'], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+        {
+          id: 'r1',
+          name: 'R1',
+          waypointIds: ['a', 'b'],
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
       ];
       await store.setRoutes(rts);
       expect(store.getRoutes()).toEqual(rts);

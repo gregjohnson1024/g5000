@@ -2,10 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SENSOR_DEFS } from './sensor-definitions';
 import { SensorCard } from './SensorCard';
-import type {
-  ObservedEntry,
-  SourcePriorityRule,
-} from './SourcePriorityEditor';
+import type { ObservedEntry, SourcePriorityRule } from './SourcePriorityEditor';
 
 interface ObservedResponse {
   entries: ObservedEntry[];
@@ -86,9 +83,8 @@ export default function SensorsPage() {
       <header>
         <h1 className="text-xl font-semibold text-slate-100">Sensors</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Live readings for connected sensors. Expand a card&apos;s
-          &ldquo;Source priorities&rdquo; section to edit which sources feed
-          which channels.
+          Live readings for connected sensors. Expand a card&apos;s &ldquo;Source priorities&rdquo;
+          section to edit which sources feed which channels.
         </p>
       </header>
 

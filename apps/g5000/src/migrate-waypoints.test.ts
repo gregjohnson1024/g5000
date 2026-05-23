@@ -20,9 +20,12 @@ afterEach(async () => {
 describe('migrateWaypointsJson', () => {
   it('imports waypoints and renames the file', async () => {
     const file = path.join(dir, 'waypoints.json');
-    writeFileSync(file, JSON.stringify([
-      { id: 'foo', name: 'Foo', lat: 41, lon: -71, createdAt: '2026-01-01T00:00:00.000Z' },
-    ]));
+    writeFileSync(
+      file,
+      JSON.stringify([
+        { id: 'foo', name: 'Foo', lat: 41, lon: -71, createdAt: '2026-01-01T00:00:00.000Z' },
+      ]),
+    );
     await migrateWaypointsJson(store, file);
     expect(store.getWaypoints().find((w) => w.id === 'foo')).toBeDefined();
     expect(existsSync(file)).toBe(false);
@@ -30,9 +33,14 @@ describe('migrateWaypointsJson', () => {
   });
 
   it('no-ops when the store already has waypoints', async () => {
-    await store.setWaypoints([{ id: 'x', name: 'X', lat: 0, lon: 0, createdAt: '2026-01-01T00:00:00.000Z' }]);
+    await store.setWaypoints([
+      { id: 'x', name: 'X', lat: 0, lon: 0, createdAt: '2026-01-01T00:00:00.000Z' },
+    ]);
     const file = path.join(dir, 'waypoints.json');
-    writeFileSync(file, JSON.stringify([{ id: 'foo', name: 'Foo', lat: 1, lon: 1, createdAt: 'x' }]));
+    writeFileSync(
+      file,
+      JSON.stringify([{ id: 'foo', name: 'Foo', lat: 1, lon: 1, createdAt: 'x' }]),
+    );
     await migrateWaypointsJson(store, file);
     expect(store.getWaypoints().map((w) => w.id)).toEqual(['x']);
     expect(existsSync(file)).toBe(true);

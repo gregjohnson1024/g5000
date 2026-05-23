@@ -1,8 +1,5 @@
 'use client';
-import {
-  friendlySourceLabel,
-  formatChannelValue,
-} from '../../lib/friendly-source';
+import { friendlySourceLabel, formatChannelValue } from '../../lib/friendly-source';
 import { freshnessOf, type Freshness } from './freshness';
 import type { SensorDef } from './sensor-definitions';
 import {
@@ -32,13 +29,7 @@ const DOT_COLOR: Record<Freshness, string> = {
  * and slices to its own channels. The freshness dot tracks the most-recent
  * sample across this sensor's channels.
  */
-export function SensorCard({
-  def,
-  observed,
-  rules,
-  saving,
-  onSaveRules,
-}: SensorCardProps) {
+export function SensorCard({ def, observed, rules, saving, onSaveRules }: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
@@ -57,7 +48,10 @@ export function SensorCard({
     <section className="border border-slate-800 rounded bg-slate-900/40 p-4 space-y-3">
       <header className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-          <span aria-hidden="true" className={`inline-block w-2 h-2 rounded-full ${DOT_COLOR[dot]}`} />
+          <span
+            aria-hidden="true"
+            className={`inline-block w-2 h-2 rounded-full ${DOT_COLOR[dot]}`}
+          />
           {def.label}
         </h2>
       </header>

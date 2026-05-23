@@ -102,8 +102,7 @@ export async function POST(req: Request): Promise<Response> {
         ok: false,
         error: {
           kind: 'unavailable',
-          message:
-            'DriverHub not initialised — g5000 app is starting up or in a test harness',
+          message: 'DriverHub not initialised — g5000 app is starting up or in a test harness',
         },
       },
       { status: 503 },

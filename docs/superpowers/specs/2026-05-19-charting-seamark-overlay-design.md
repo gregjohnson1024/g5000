@@ -78,12 +78,12 @@ New component at `packages/web/src/app/chart/LayersControl.tsx`:
 
 ## File scope
 
-| File | Action | Approx LOC |
-|---|---|---|
-| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.ts` | new | ~80 |
-| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.test.ts` | new — written from scratch; the OSM proxy has no existing test to mirror | ~60 |
-| `packages/web/src/app/chart/LayersControl.tsx` | new | ~80 |
-| `packages/web/src/app/chart/page.tsx` | modified — add source/layer, mount `<LayersControl/>`, wire localStorage | ~30 added |
+| File                                                               | Action                                                                   | Approx LOC |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------ | ---------- |
+| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.ts`      | new                                                                      | ~80        |
+| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.test.ts` | new — written from scratch; the OSM proxy has no existing test to mirror | ~60        |
+| `packages/web/src/app/chart/LayersControl.tsx`                     | new                                                                      | ~80        |
+| `packages/web/src/app/chart/page.tsx`                              | modified — add source/layer, mount `<LayersControl/>`, wire localStorage | ~30 added  |
 
 No package boundary changes. No new dependencies. No schema or config-DB changes. No bus channels. No compute. No backend autopilot-server work.
 

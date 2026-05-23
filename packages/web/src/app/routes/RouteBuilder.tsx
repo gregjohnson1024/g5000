@@ -113,9 +113,7 @@ export default function RouteBuilder({
 
   return (
     <div className="border border-slate-800 rounded p-4 bg-slate-900/30 space-y-4">
-      <h2 className="text-base font-semibold">
-        {initial?.id ? 'Edit route' : 'New route'}
-      </h2>
+      <h2 className="text-base font-semibold">{initial?.id ? 'Edit route' : 'New route'}</h2>
 
       {error && <p className="text-rose-400 text-sm">{error}</p>}
 
@@ -206,9 +204,11 @@ export default function RouteBuilder({
           placeholder="Filter by name…"
           className="block w-full max-w-sm px-2 py-1 bg-slate-900 border border-slate-700 rounded text-sm font-mono"
         />
-        {filteredWaypoints.length === 0 && pickerQuery.trim() === '' && presentIds.size === allWaypoints.length && (
-          <p className="text-slate-500 text-xs">All waypoints already added.</p>
-        )}
+        {filteredWaypoints.length === 0 &&
+          pickerQuery.trim() === '' &&
+          presentIds.size === allWaypoints.length && (
+            <p className="text-slate-500 text-xs">All waypoints already added.</p>
+          )}
         {filteredWaypoints.length === 0 && pickerQuery.trim() !== '' && (
           <p className="text-slate-500 text-xs">No matching waypoints.</p>
         )}
@@ -264,7 +264,9 @@ export default function RouteBuilder({
             <div className="flex gap-2">
               <button
                 onClick={() => void handleCreateWaypoint()}
-                disabled={newWpBusy || newWpName.trim().length === 0 || newWpPaste.trim().length === 0}
+                disabled={
+                  newWpBusy || newWpName.trim().length === 0 || newWpPaste.trim().length === 0
+                }
                 className="px-3 py-1 text-sm bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
               >
                 Create &amp; add

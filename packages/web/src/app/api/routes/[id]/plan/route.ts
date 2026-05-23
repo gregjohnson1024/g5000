@@ -29,8 +29,12 @@ export async function POST(req: Request, { params }: Ctx): Promise<Response> {
     );
   }
 
-  let opts: { model?: 'GFS' | 'ECMWF'; departure?: number; useCurrents?: boolean; options?: Record<string, unknown> } =
-    {};
+  let opts: {
+    model?: 'GFS' | 'ECMWF';
+    departure?: number;
+    useCurrents?: boolean;
+    options?: Record<string, unknown>;
+  } = {};
   try {
     opts = (await req.json()) as typeof opts;
   } catch {

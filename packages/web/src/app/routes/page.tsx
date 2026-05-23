@@ -113,7 +113,11 @@ export default function RoutesPage() {
         // when a motor-mode UI is added. For now use router defaults.
         body: JSON.stringify({}),
       });
-      const j = (await res.json()) as { ok: boolean; route?: unknown; error?: { message?: string } };
+      const j = (await res.json()) as {
+        ok: boolean;
+        route?: unknown;
+        error?: { message?: string };
+      };
       if (!j.ok) {
         const msg = j.error?.message ?? 'plan failed';
         setPlanMessages((prev) => ({ ...prev, [route.id]: `Error: ${msg}` }));
@@ -148,9 +152,8 @@ export default function RoutesPage() {
     }
   };
 
-  const editingRoute = builderMode && builderMode !== 'new'
-    ? routes.find((r) => r.id === builderMode)
-    : undefined;
+  const editingRoute =
+    builderMode && builderMode !== 'new' ? routes.find((r) => r.id === builderMode) : undefined;
 
   const handleBuilderSaved = async (): Promise<void> => {
     setBuilderMode(null);
@@ -243,7 +246,9 @@ export default function RoutesPage() {
                       <button
                         onClick={() => void handlePlan(route)}
                         disabled={isBusy || builderMode !== null || route.waypointIds.length < 2}
-                        title={route.waypointIds.length < 2 ? 'Needs at least 2 waypoints' : 'Plan route'}
+                        title={
+                          route.waypointIds.length < 2 ? 'Needs at least 2 waypoints' : 'Plan route'
+                        }
                         className="px-2 py-1 text-xs bg-sky-800 hover:bg-sky-700 text-sky-100 rounded disabled:opacity-50"
                       >
                         {isBusy ? 'Planning…' : 'Plan'}

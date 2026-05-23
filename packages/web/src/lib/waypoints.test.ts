@@ -3,7 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ConfigStore, setSharedConfigStore } from '@g5000/db';
-import { listWaypoints, createWaypoint, updateWaypoint, deleteWaypoint, SEED_WAYPOINT_IDS } from './waypoints';
+import {
+  listWaypoints,
+  createWaypoint,
+  updateWaypoint,
+  deleteWaypoint,
+  SEED_WAYPOINT_IDS,
+} from './waypoints';
 
 let dir: string;
 let store: ConfigStore;

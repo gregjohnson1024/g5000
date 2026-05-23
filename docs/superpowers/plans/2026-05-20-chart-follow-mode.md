@@ -14,15 +14,15 @@
 
 ## File Structure
 
-| File | Purpose | Status |
-|---|---|---|
-| `packages/web/src/app/chart/use-chart-camera.ts` | Hook: follow + orientation state, localStorage, map subscriptions, easeTo calls. Exports pure helpers `cycleOrientation` and `wrapBearingDelta` for testing. | new |
-| `packages/web/src/app/chart/use-chart-camera.test.ts` | Vitest covering the pure helpers and localStorage initializers. | new |
-| `packages/web/src/app/chart/ChartFollowControl.tsx` | Two stacked buttons (Follow toggle + Orientation cycle). Stateless. | new |
-| `packages/web/src/app/chart/OffscreenVesselIndicator.tsx` | Edge-anchored pill with bearing arrow + distance. Subscribes to map `move` + `livePos`. | new |
-| `packages/web/src/app/chart/offscreen-vessel-edge.ts` | Pure edge-projection math (clamp boat's projected pixel position to viewport rectangle, choose closest edge). | new |
-| `packages/web/src/app/chart/offscreen-vessel-edge.test.ts` | Vitest for the edge math. | new |
-| `packages/web/src/app/chart/page.tsx` | Replace the inline center-on-boat button block with the new components + hook. | modified |
+| File                                                       | Purpose                                                                                                                                                      | Status   |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `packages/web/src/app/chart/use-chart-camera.ts`           | Hook: follow + orientation state, localStorage, map subscriptions, easeTo calls. Exports pure helpers `cycleOrientation` and `wrapBearingDelta` for testing. | new      |
+| `packages/web/src/app/chart/use-chart-camera.test.ts`      | Vitest covering the pure helpers and localStorage initializers.                                                                                              | new      |
+| `packages/web/src/app/chart/ChartFollowControl.tsx`        | Two stacked buttons (Follow toggle + Orientation cycle). Stateless.                                                                                          | new      |
+| `packages/web/src/app/chart/OffscreenVesselIndicator.tsx`  | Edge-anchored pill with bearing arrow + distance. Subscribes to map `move` + `livePos`.                                                                      | new      |
+| `packages/web/src/app/chart/offscreen-vessel-edge.ts`      | Pure edge-projection math (clamp boat's projected pixel position to viewport rectangle, choose closest edge).                                                | new      |
+| `packages/web/src/app/chart/offscreen-vessel-edge.test.ts` | Vitest for the edge math.                                                                                                                                    | new      |
+| `packages/web/src/app/chart/page.tsx`                      | Replace the inline center-on-boat button block with the new components + hook.                                                                               | modified |
 
 `packages/web/src/components/LiveBoatMarker.tsx` is **not** modified — `LivePos` already exposes `cog`/`hdg` in radians.
 
@@ -31,6 +31,7 @@
 ## Task 1: Pure helpers + tests
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/use-chart-camera.ts` (helpers only in this task; full hook in Task 2)
 - Create: `packages/web/src/app/chart/use-chart-camera.test.ts`
 
@@ -168,9 +169,11 @@ npm run typecheck --workspace @g5000/web
 Expected: clean.
 
 If stale-dist errors mention `@g5000/db` or `@g5000/core`:
+
 ```bash
 npx tsc -b packages/core packages/db packages/compute packages/bridge packages/grib packages/routing packages/coastline
 ```
+
 then re-typecheck.
 
 - [ ] **Step 6: Commit**
@@ -191,6 +194,7 @@ on missing / bad input."
 ## Task 2: useChartCamera hook (full implementation)
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/use-chart-camera.ts`
 
 Layer the React hook on top of the pure helpers from Task 1.
@@ -318,12 +322,12 @@ export function useChartCamera({
     if (!map) return;
     let target = 0;
     if (orientation === 'course' && livePos?.cog != null) {
-      target = ((livePos.cog * RAD_TO_DEG) % 360 + 360) % 360;
+      target = (((livePos.cog * RAD_TO_DEG) % 360) + 360) % 360;
     } else if (orientation === 'heading' && livePos?.hdg != null) {
-      target = ((livePos.hdg * RAD_TO_DEG) % 360 + 360) % 360;
+      target = (((livePos.hdg * RAD_TO_DEG) % 360) + 360) % 360;
     } else if (orientation === 'heading' && livePos?.cog != null) {
       // Heading source missing — fall back to course
-      target = ((livePos.cog * RAD_TO_DEG) % 360 + 360) % 360;
+      target = (((livePos.cog * RAD_TO_DEG) % 360) + 360) % 360;
     }
     if (wrapBearingDelta(target, lastAppliedBearingRef.current) < BEARING_DEADBAND_DEG) {
       return;
@@ -334,10 +338,7 @@ export function useChartCamera({
 
   const toggleFollow = useCallback(() => setFollow((v) => !v), []);
   const enterFollow = useCallback(() => setFollow(true), []);
-  const cycleOrientationCb = useCallback(
-    () => setOrientation((o) => cycleOrientation(o)),
-    [],
-  );
+  const cycleOrientationCb = useCallback(() => setOrientation((o) => cycleOrientation(o)), []);
 
   return {
     follow,
@@ -385,6 +386,7 @@ third — that's the lookahead."
 ## Task 3: ChartFollowControl visual component
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/ChartFollowControl.tsx`
 
 Two stacked buttons. Stateless. No automated test (visual smoke covers it).
@@ -424,13 +426,11 @@ export function ChartFollowControl({
   const orientationLabel =
     orientation === 'north' ? 'N' : orientation === 'course' ? '↑COG' : '↑HDG';
 
-  const baseBtn =
-    'px-3 py-1.5 text-sm rounded border shadow w-[110px] text-left';
+  const baseBtn = 'px-3 py-1.5 text-sm rounded border shadow w-[110px] text-left';
   const enabledFollow = follow
     ? 'bg-slate-100 text-slate-900 border-slate-100 hover:bg-slate-200'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
-  const enabledOrientation =
-    'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
+  const enabledOrientation = 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
   const disabled = 'bg-slate-900/40 text-slate-500 border-slate-800 cursor-not-allowed';
 
   return (
@@ -486,6 +486,7 @@ layout doesn't pop in on first fix."
 ## Task 4: OffscreenVesselIndicator edge-projection math + tests
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/offscreen-vessel-edge.ts`
 - Create: `packages/web/src/app/chart/offscreen-vessel-edge.test.ts`
 
@@ -540,7 +541,7 @@ describe('computeOffscreenAnchor', () => {
     expect(a!.y).toBe(600 - PAD);
   });
 
-  it('reports the boat\'s screen-space bearing in degrees, clockwise from up', () => {
+  it("reports the boat's screen-space bearing in degrees, clockwise from up", () => {
     // boat off to the right at same y as center: bearing should be 90°
     const a = computeOffscreenAnchor({
       projected: { x: 1200, y: 300 },
@@ -649,6 +650,7 @@ viewport so the caller can hide the indicator."
 ## Task 5: OffscreenVesselIndicator component
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/OffscreenVesselIndicator.tsx`
 
 Visual component that uses the Task 4 math and subscribes to map move + livePos.
@@ -783,6 +785,7 @@ mode."
 ## Task 6: Wire chart page
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 Replace the existing inline center-on-boat button block with the new components. Wire up the hook.
@@ -812,26 +815,26 @@ const camera = useChartCamera({ map: mapInstance, livePos });
 Find this block, currently around lines 559–578:
 
 ```tsx
-        <div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
-          {livePos && (
-            <button
-              type="button"
-              onClick={() => {
-                if (mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: [livePos.lon, livePos.lat],
-                    zoom: Math.max(mapRef.current.getZoom(), 9),
-                    speed: 1.4,
-                  });
-                }
-              }}
-              className="px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
-              title="Pan map to boat's current position"
-            >
-              ⊕ Center on boat
-            </button>
-          )}
-        </div>
+<div className="absolute top-3 left-3 flex flex-col gap-2 items-start">
+  {livePos && (
+    <button
+      type="button"
+      onClick={() => {
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [livePos.lon, livePos.lat],
+            zoom: Math.max(mapRef.current.getZoom(), 9),
+            speed: 1.4,
+          });
+        }
+      }}
+      className="px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded shadow"
+      title="Pan map to boat's current position"
+    >
+      ⊕ Center on boat
+    </button>
+  )}
+</div>
 ```
 
 Replace it ENTIRELY with:
@@ -900,6 +903,7 @@ Toggle orientation to course/heading-up for an implicit lookahead
 ## Task 7: Manual verification
 
 **Files:**
+
 - Modify: none.
 
 End-to-end smoke before declaring done.
@@ -931,6 +935,7 @@ Click the pill. Follow button switches back to filled, the chart re-centers on t
 - [ ] **Step 5: Cycle orientation**
 
 Click the orientation button. Label cycles "N" → "↑COG" → "↑HDG" → "N". In course/heading modes:
+
 - The map rotates so COG/HDG points up.
 - The boat sits at ~30% from the bottom of the viewport (lookahead).
 

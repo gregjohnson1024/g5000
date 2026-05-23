@@ -23,7 +23,8 @@ export async function migrateWaypointsJson(store: ConfigStore, file: string): Pr
   if (!Array.isArray(parsed)) return;
   const valid = parsed.filter(
     (w): w is Waypoint =>
-      typeof w === 'object' && w !== null &&
+      typeof w === 'object' &&
+      w !== null &&
       typeof (w as Waypoint).id === 'string' &&
       typeof (w as Waypoint).lat === 'number' &&
       typeof (w as Waypoint).lon === 'number',

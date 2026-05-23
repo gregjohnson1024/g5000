@@ -45,7 +45,7 @@ scope** here.
    (the Expedition / Adrena model — no orphan inline points), with a
    **create-on-the-fly** "+ New waypoint" affordance inside the builder.
 3. **Route builder UX:** list/form-based, **no map**, for v1. (A simple
-   chart-based way to define routes *and* waypoints is a desired future
+   chart-based way to define routes _and_ waypoints is a desired future
    direction — see Future work — but is out of scope here.)
 4. **Persistence:** move **both** waypoints and routes into `ConfigStore`
    (`config.db`) now, rather than adding a parallel `routes.json`.
@@ -56,7 +56,7 @@ scope** here.
 ## Data model
 
 Two new ConfigStore tables in `config.db`. **Note the actual ConfigStore
-pattern:** each table holds a *single* row (keyed by the internal `SINGLETON`
+pattern:** each table holds a _single_ row (keyed by the internal `SINGLETON`
 id) whose `value` is the whole collection as one JSON blob — exactly how
 `sailWardrobe` stores its list of sails. So `waypoints` is one blob holding
 `Waypoint[]` and `routes` is one blob holding `Route[]`. ConfigStore gains
@@ -87,8 +87,8 @@ interface Route {
   name: string;
   waypointIds: string[]; // ordered references into the waypoints table
   notes?: string;
-  createdAt: string;  // ISO 8601
-  updatedAt: string;  // ISO 8601
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
 }
 ```
 
@@ -174,7 +174,7 @@ in-use-by-route error when applicable.
 ## Chart changes
 
 - **Remove** `PlanControls`, the `onMapClick` start/end picking, and the
-  now-dead `start` / `end` / `chart:planState` *definition* plumbing.
+  now-dead `start` / `end` / `chart:planState` _definition_ plumbing.
 - **Keep** `RoutePolyline` and the `?plan=<id>` load path — the chart still
   **displays** a plan/route when one is loaded; it just no longer **defines**
   one.
@@ -195,7 +195,7 @@ in-use-by-route error when applicable.
 ## Out of scope (future work)
 
 - **Chart-based route/waypoint definition** — a simple way to define routes
-  *and* waypoints directly on `/chart`. Explicitly desired later; deliberately
+  _and_ waypoints directly on `/chart`. Explicitly desired later; deliberately
   not in this change.
 - **Leg-by-leg weather routing** — "Plan" honoring intermediate waypoints with
   chained ETAs.

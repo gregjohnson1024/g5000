@@ -4,16 +4,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 let TMP_ROOT: string;
-let GET: (
-  req: Request,
-  ctx: { params: Promise<{ id: string }> },
-) => Promise<Response>;
+let GET: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
 
 let createTrack: (label?: string) => Promise<{ id: string }>;
-let appendPoint: (
-  id: string,
-  pt: { t: number; lat: number; lon: number },
-) => Promise<unknown>;
+let appendPoint: (id: string, pt: { t: number; lat: number; lon: number }) => Promise<unknown>;
 let appendAnnotation: (
   id: string,
   ann: { tsMs: number; label: string; kind: 'event' | 'periodStart' | 'periodEnd' },
@@ -95,10 +89,7 @@ describe('GET /api/tracks/[id]/slice', () => {
 
   it('returns 400 when from is missing', async () => {
     const t = await createTrack('test');
-    const res = await GET(
-      new Request(`http://x/api/tracks/${t.id}/slice?to=100000`),
-      ctx(t.id),
-    );
+    const res = await GET(new Request(`http://x/api/tracks/${t.id}/slice?to=100000`), ctx(t.id));
     expect(res.status).toBe(400);
   });
 

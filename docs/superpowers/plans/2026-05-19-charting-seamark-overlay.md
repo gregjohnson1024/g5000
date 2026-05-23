@@ -14,13 +14,13 @@
 
 ## File Structure
 
-| File | Purpose | Status |
-|---|---|---|
-| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.ts` | Same-origin OpenSeaMap tile proxy with disk cache | new |
-| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.test.ts` | Vitest covering cache miss, hit, 404 passthrough, bad coords | new |
-| `packages/web/src/components/SeamarkLayer.tsx` | MapLibre source + raster layer; visibility prop | new |
-| `packages/web/src/app/chart/LayersControl.tsx` | Top-right popover with the Seamarks toggle | new |
-| `packages/web/src/app/chart/page.tsx` | Mount `<SeamarkLayer/>` + `<LayersControl/>`; localStorage state | modified |
+| File                                                               | Purpose                                                          | Status   |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------- | -------- |
+| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.ts`      | Same-origin OpenSeaMap tile proxy with disk cache                | new      |
+| `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.test.ts` | Vitest covering cache miss, hit, 404 passthrough, bad coords     | new      |
+| `packages/web/src/components/SeamarkLayer.tsx`                     | MapLibre source + raster layer; visibility prop                  | new      |
+| `packages/web/src/app/chart/LayersControl.tsx`                     | Top-right popover with the Seamarks toggle                       | new      |
+| `packages/web/src/app/chart/page.tsx`                              | Mount `<SeamarkLayer/>` + `<LayersControl/>`; localStorage state | modified |
 
 The seamark **layer component** lives under `packages/web/src/components/` to match the pattern of `GulfStreamLayer`, `WindOverlay`, `CurrentOverlay`, `LaylinesLayer`, etc. — those are reusable layer wrappers.
 
@@ -31,6 +31,7 @@ The **LayersControl popover** lives under `packages/web/src/app/chart/` because 
 ## Task 1: Tile proxy route (`/api/seamark-tiles/[z]/[x]/[y]`)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.ts`
 - Test: `packages/web/src/app/api/seamark-tiles/[z]/[x]/[y]/route.test.ts`
 
@@ -47,7 +48,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 let TMP_ROOT: string;
-let GET: (req: Request, ctx: { params: Promise<{ z: string; x: string; y: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ z: string; x: string; y: string }> },
+) => Promise<Response>;
 
 function makeCtx(z: string, x: string, y: string) {
   return { params: Promise.resolve({ z, x, y }) };
@@ -69,11 +73,16 @@ afterEach(() => {
 describe('seamark-tiles route', () => {
   it('fetches from upstream on a cache miss and writes the tile to disk', async () => {
     const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
+      );
 
-    const res = await GET(new Request('http://x/api/seamark-tiles/12/1234/5678'), makeCtx('12', '1234', '5678'));
+    const res = await GET(
+      new Request('http://x/api/seamark-tiles/12/1234/5678'),
+      makeCtx('12', '1234', '5678'),
+    );
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/png');
@@ -93,7 +102,10 @@ describe('seamark-tiles route', () => {
     writeFileSync(join(tileDir, '5678.png'), Buffer.from([1, 2, 3]));
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-    const res = await GET(new Request('http://x/api/seamark-tiles/12/1234/5678'), makeCtx('12', '1234', '5678'));
+    const res = await GET(
+      new Request('http://x/api/seamark-tiles/12/1234/5678'),
+      makeCtx('12', '1234', '5678'),
+    );
 
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('HIT');
@@ -104,20 +116,31 @@ describe('seamark-tiles route', () => {
 
   it('does not cache when upstream returns 404', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not found', { status: 404 }));
-    const res = await GET(new Request('http://x/api/seamark-tiles/12/1234/5678'), makeCtx('12', '1234', '5678'));
+    const res = await GET(
+      new Request('http://x/api/seamark-tiles/12/1234/5678'),
+      makeCtx('12', '1234', '5678'),
+    );
     expect(res.status).toBe(404);
     await new Promise((r) => setTimeout(r, 50));
     expect(existsSync(join(TMP_ROOT, 'seamark-cache', '12', '1234', '5678.png'))).toBe(false);
   });
 
   it('rejects bad tile coords', async () => {
-    const res = await GET(new Request('http://x/api/seamark-tiles/abc/1/1'), makeCtx('abc', '1', '1'));
+    const res = await GET(
+      new Request('http://x/api/seamark-tiles/abc/1/1'),
+      makeCtx('abc', '1', '1'),
+    );
     expect(res.status).toBe(400);
   });
 
   it('accepts a .png suffix on y', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([0x89]), { status: 200 }));
-    const res = await GET(new Request('http://x/api/seamark-tiles/12/1234/5678.png'), makeCtx('12', '1234', '5678.png'));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new Uint8Array([0x89]), { status: 200 }),
+    );
+    const res = await GET(
+      new Request('http://x/api/seamark-tiles/12/1234/5678.png'),
+      makeCtx('12', '1234', '5678.png'),
+    );
     expect(res.status).toBe(200);
   });
 });
@@ -188,12 +211,7 @@ async function serveFromDisk(path: string): Promise<Response | null> {
   }
 }
 
-async function fetchAndCache(
-  z: string,
-  x: string,
-  y: string,
-  diskPath: string,
-): Promise<Response> {
+async function fetchAndCache(z: string, x: string, y: string, diskPath: string): Promise<Response> {
   const yBase = y.replace(/\.png$/, '');
   const url = `https://tiles.openseamap.org/seamark/${z}/${x}/${yBase}.png`;
   const r = await fetch(url, {
@@ -272,6 +290,7 @@ on /chart."
 ## Task 2: SeamarkLayer React component
 
 **Files:**
+
 - Create: `packages/web/src/components/SeamarkLayer.tsx`
 
 Manages the MapLibre source and raster layer. Adds the layer once when `map` is available; flips visibility via `setLayoutProperty` when the `visible` prop changes. Drawn below the `__above-wind__` z-order sentinel so AIS, route, range rings, and laylines render on top of it.
@@ -301,13 +320,7 @@ const LAYER_ID = 'osm-seamark-layer';
  * Map.tsx, so wind / AIS / route / range-rings / laylines all sit
  * above the seamark layer.
  */
-export function SeamarkLayer({
-  map,
-  visible,
-}: {
-  map: maplibregl.Map | null;
-  visible: boolean;
-}) {
+export function SeamarkLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
   useEffect(() => {
     if (!map) return;
     const ensure = (): void => {
@@ -371,6 +384,7 @@ on top."
 ## Task 3: LayersControl popover
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/LayersControl.tsx`
 
 A small button anchored top-right of the chart canvas. Click opens a popover with a vertical list of toggle rows. v1 has one row: Seamarks. Designed to add more rows later (ENC, ROI flag, etc.) without structural changes — the popover renders a list from a static config array inside the file.
@@ -423,10 +437,7 @@ export function LayersControl({
   }, [open]);
 
   return (
-    <div
-      ref={ref}
-      className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1"
-    >
+    <div ref={ref} className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
       <button
         type="button"
         aria-label="Layers"
@@ -457,11 +468,7 @@ export function LayersControl({
               key={key}
               className="flex items-center gap-2 px-1 py-1 cursor-pointer hover:bg-zinc-800 rounded"
             >
-              <input
-                type="checkbox"
-                checked={state[key]}
-                onChange={() => onToggle(key)}
-              />
+              <input type="checkbox" checked={state[key]} onChange={() => onToggle(key)} />
               <span className="text-sm">{label}</span>
             </label>
           ))}
@@ -496,6 +503,7 @@ rows later without restructuring. Caller owns state."
 ## Task 4: Wire into `/chart`
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 Add localStorage-backed state for the layers object, mount `<SeamarkLayer/>` keyed off the map instance, and mount `<LayersControl/>` as a sibling of the `<Map/>` inside a positioned wrapper.
@@ -617,6 +625,7 @@ toggle. Closes the operational gap left by coastline-only chart."
 ## Task 5: Manual verification
 
 **Files:**
+
 - Modify: none.
 
 End-to-end smoke before declaring this done. None of these need automation — they're the kinds of checks the spec lists as Manual.

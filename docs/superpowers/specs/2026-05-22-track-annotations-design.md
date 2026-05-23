@@ -57,22 +57,25 @@ Returns the most recent `periodStart` if there is no later `periodEnd`, otherwis
 A small pill anchored top-right of the host page. Positioned at `top-2 right-14` on `/chart` to clear the existing `<LayersControl>` NOAA button at `top-2 right-2`. On `/helm` it sits at `top-2 right-2` (no collision).
 
 ### Collapsed state
+
 - No active track / no GPS fix: pill is disabled, label `+ marker`, tooltip "No active track — wait for GPS".
 - Active track, no open period: pill enabled, label `+ marker`.
 - Active track, open period: pill enabled, amber background, label `⏺ open period — 4 min` (where the duration is `now - open.tsMs`, formatted as minutes).
 
 ### Expanded state
+
 Click the pill to expand a panel containing five rows of buttons + a custom-text input.
 
-| Row | Buttons | kind |
-|---|---|---|
-| Manoeuvres | Tack · Gybe · Reef in · Reef out | `event` |
-| Main / jib | Main up · Main down · J1 · J2 · J3 | `event` |
-| Spinnaker | Spinnaker up · Spinnaker down | `event` |
-| Test period | Start period · **End period** (prominent when open period exists) | `periodStart` / `periodEnd` |
-| Custom | text input + kind toggle (event / period start / period end) + Add button | as toggled |
+| Row         | Buttons                                                                   | kind                        |
+| ----------- | ------------------------------------------------------------------------- | --------------------------- |
+| Manoeuvres  | Tack · Gybe · Reef in · Reef out                                          | `event`                     |
+| Main / jib  | Main up · Main down · J1 · J2 · J3                                        | `event`                     |
+| Spinnaker   | Spinnaker up · Spinnaker down                                             | `event`                     |
+| Test period | Start period · **End period** (prominent when open period exists)         | `periodStart` / `periodEnd` |
+| Custom      | text input + kind toggle (event / period start / period end) + Add button | as toggled                  |
 
 When an open period exists, the "End period" button:
+
 - Sits at the TOP of the panel (above the manoeuvre row).
 - Renders in amber with bold weight.
 - Label includes the elapsed duration: `End period (4 min)`.
@@ -114,29 +117,31 @@ No editing/deleting from this page in v1.
 
 ## File scope
 
-| File | Action |
-|---|---|
-| `packages/web/src/lib/tracks.ts` | modify — add `TrackAnnotation` type, extend `Track` with optional `annotations`, add `appendAnnotation(id, ann)` helper, add `openPeriodStart(annotations)` pure helper |
-| `packages/web/src/lib/tracks.test.ts` | new (or extend existing if any) — test `openPeriodStart` across the obvious cases (empty, only events, single open, paired, two periods one open) |
-| `packages/web/src/app/api/tracks/active/annotation/route.ts` | new — GET (lightweight) + POST |
-| `packages/web/src/app/api/tracks/active/annotation/route.test.ts` | new — vitest covering POST happy path, POST validation, POST no-active-track, GET both with-track and no-track |
-| `packages/web/src/app/api/tracks/[id]/slice/route.ts` | new — GET slice handler |
-| `packages/web/src/app/api/tracks/[id]/slice/route.test.ts` | new — vitest covering inclusive bounds, missing params → 400, missing track → 404 |
-| `packages/web/src/components/AnnotationDropper.tsx` | new — floating widget |
-| `packages/web/src/app/chart/page.tsx` | modify — mount `<AnnotationDropper>` |
-| `packages/web/src/app/helm/page.tsx` | modify — mount `<AnnotationDropper>` |
-| `packages/web/src/app/tracks/page.tsx` | modify — annotations disclosure + slice viewer |
+| File                                                              | Action                                                                                                                                                                  |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/web/src/lib/tracks.ts`                                  | modify — add `TrackAnnotation` type, extend `Track` with optional `annotations`, add `appendAnnotation(id, ann)` helper, add `openPeriodStart(annotations)` pure helper |
+| `packages/web/src/lib/tracks.test.ts`                             | new (or extend existing if any) — test `openPeriodStart` across the obvious cases (empty, only events, single open, paired, two periods one open)                       |
+| `packages/web/src/app/api/tracks/active/annotation/route.ts`      | new — GET (lightweight) + POST                                                                                                                                          |
+| `packages/web/src/app/api/tracks/active/annotation/route.test.ts` | new — vitest covering POST happy path, POST validation, POST no-active-track, GET both with-track and no-track                                                          |
+| `packages/web/src/app/api/tracks/[id]/slice/route.ts`             | new — GET slice handler                                                                                                                                                 |
+| `packages/web/src/app/api/tracks/[id]/slice/route.test.ts`        | new — vitest covering inclusive bounds, missing params → 400, missing track → 404                                                                                       |
+| `packages/web/src/components/AnnotationDropper.tsx`               | new — floating widget                                                                                                                                                   |
+| `packages/web/src/app/chart/page.tsx`                             | modify — mount `<AnnotationDropper>`                                                                                                                                    |
+| `packages/web/src/app/helm/page.tsx`                              | modify — mount `<AnnotationDropper>`                                                                                                                                    |
+| `packages/web/src/app/tracks/page.tsx`                            | modify — annotations disclosure + slice viewer                                                                                                                          |
 
 No new dependencies. No bus channels. No new DB tables.
 
 ## Testing
 
 ### Automated
+
 - `openPeriodStart` (pure): empty array → null; only events → null; single `periodStart` no end → that one; `periodStart` + `periodEnd` → null; two periods, second open → second one's start; closed period followed by another `periodStart` → that newest start.
 - Slice route: from/to inclusive boundaries; from > to → empty arrays; non-numeric params → 400; missing track → 404.
 - Annotation POST route: happy path appends and returns updated list; missing body fields → 400; no active track → 404; invalid `kind` → 400.
 
 ### Manual
+
 1. Load `/chart`. Confirm the dropper pill renders top-right and doesn't overlap the NOAA button.
 2. Click pill → panel expands. Click "Tack" → flash "✓ Marked: Tack at ..." and panel collapses.
 3. Click "Start period" → flash; collapsed pill changes to amber "⏺ open period — 0 min".

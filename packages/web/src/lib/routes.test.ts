@@ -3,7 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ConfigStore, setSharedConfigStore } from '@g5000/db';
-import { listRoutes, createRoute, updateRoute, deleteRoute, routesUsingWaypoint } from './routes.js';
+import {
+  listRoutes,
+  createRoute,
+  updateRoute,
+  deleteRoute,
+  routesUsingWaypoint,
+} from './routes.js';
 
 let dir: string;
 let store: ConfigStore;
@@ -31,7 +37,9 @@ describe('routes lib', () => {
   });
 
   it('rejects unknown waypoint ids', async () => {
-    await expect(createRoute({ name: 'Bad', waypointIds: ['a', 'ghost'] })).rejects.toThrow(/unknown waypoint/i);
+    await expect(createRoute({ name: 'Bad', waypointIds: ['a', 'ghost'] })).rejects.toThrow(
+      /unknown waypoint/i,
+    );
   });
 
   it('updates and deletes', async () => {

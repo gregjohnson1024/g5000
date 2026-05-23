@@ -29,9 +29,11 @@ afterEach(() => {
 describe('seamark-tiles route', () => {
   it('fetches from upstream on a cache miss and writes the tile to disk', async () => {
     const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
+      );
 
     const res = await GET(
       new Request('http://x/api/seamark-tiles/12/1234/5678'),
@@ -69,9 +71,7 @@ describe('seamark-tiles route', () => {
   });
 
   it('does not cache when upstream returns 404', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('not found', { status: 404 }),
-    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('not found', { status: 404 }));
     const res = await GET(
       new Request('http://x/api/seamark-tiles/12/1234/5678'),
       makeCtx('12', '1234', '5678'),

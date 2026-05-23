@@ -26,13 +26,7 @@ export const NOAA_MIN_ZOOM = 2;
  * tops out at standard XYZ z=18 (their z=16) — minzoom/maxzoom
  * on the source keep MapLibre from requesting outside that band.
  */
-export function EncLayer({
-  map,
-  visible,
-}: {
-  map: maplibregl.Map | null;
-  visible: boolean;
-}) {
+export function EncLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
   useEffect(() => {
     if (!map) return;
     // Same pattern as SeamarkLayer's post-fix form: do NOT gate on
@@ -54,9 +48,7 @@ export function EncLayer({
           });
         }
         if (!map.getLayer(LAYER_ID)) {
-          const beforeId = map.getLayer('__above-wind__')
-            ? '__above-wind__'
-            : undefined;
+          const beforeId = map.getLayer('__above-wind__') ? '__above-wind__' : undefined;
           map.addLayer(
             {
               id: LAYER_ID,

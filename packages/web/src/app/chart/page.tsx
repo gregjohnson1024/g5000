@@ -526,11 +526,7 @@ function ChartPageInner() {
           onRefreshNoaa={() => refreshEncTiles(mapInstance)}
         />
         <MapLoadingIndicator map={mapInstance} />
-        <ZoomIndicator
-          map={mapInstance}
-          noaaFloor={NOAA_MIN_ZOOM}
-          noaaEnabled={layers.enc}
-        />
+        <ZoomIndicator map={mapInstance} noaaFloor={NOAA_MIN_ZOOM} noaaEnabled={layers.enc} />
         <AnnotationDropper position="top-2 right-28" />
         <ChartFollowControl
           follow={camera.follow}

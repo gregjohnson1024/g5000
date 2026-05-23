@@ -35,8 +35,7 @@ export function ZoomIndicator({
 
   if (zoom === null) return null;
 
-  const belowFloor =
-    noaaEnabled && typeof noaaFloor === 'number' && zoom < noaaFloor;
+  const belowFloor = noaaEnabled && typeof noaaFloor === 'number' && zoom < noaaFloor;
 
   return (
     <div

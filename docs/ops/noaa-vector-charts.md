@@ -6,25 +6,25 @@ This document describes the two realistic paths for adding NOAA **vector** chart
 
 NOAA's authoritative chart data is published in **S-57**, the IHO Transfer Standard for Digital Hydrographic Data. An S-57 dataset is a set of "cells" — `.000` binary files — each covering a named geographic area at one of six **usage bands**:
 
-| Band | Name | Typical scale | Typical use |
-|---|---|---|---|
-| 1 | Overview | < 1 : 1,500,000 | Ocean planning |
-| 2 | General | 1 : 350,000 – 1,500,000 | Coastal overview |
-| 3 | Coastal | 1 : 90,000 – 350,000 | Coastwise navigation |
-| 4 | Approach | 1 : 22,000 – 90,000 | Approaches |
-| 5 | Harbour | 1 : 4,000 – 22,000 | Harbour and pilotage |
-| 6 | Berthing | > 1 : 4,000 | Docking |
+| Band | Name     | Typical scale           | Typical use          |
+| ---- | -------- | ----------------------- | -------------------- |
+| 1    | Overview | < 1 : 1,500,000         | Ocean planning       |
+| 2    | General  | 1 : 350,000 – 1,500,000 | Coastal overview     |
+| 3    | Coastal  | 1 : 90,000 – 350,000    | Coastwise navigation |
+| 4    | Approach | 1 : 22,000 – 90,000     | Approaches           |
+| 5    | Harbour  | 1 : 4,000 – 22,000      | Harbour and pilotage |
+| 6    | Berthing | > 1 : 4,000             | Docking              |
 
 A cell file name encodes the producer (`US…`), the band digit (1–6), and a producer-area code. `US5RI21M.000` is a harbour-band cell covering part of Rhode Island. NOAA publishes weekly updates.
 
 NOAA distributes this same data through **four delivery surfaces**, two raster and two vector:
 
-| Surface | Format | What we use today |
-|---|---|---|
-| Maritime Chart Service (MCS) rendered tiles | Raster PNG, S-52-symbolised server-side | **Yes — `EncLayer.tsx`** via `/api/enc-tiles` |
-| NOAA NCDS / Marine Chart Services cached raster | Raster PNG, pre-rendered | (same proxy can hit this) |
-| **ENC Direct ArcGIS feature services** | **Vector — Esri features, also returns GeoJSON** | No |
-| **S-57 cell downloads** | **Vector — raw `.000` binary** | No |
+| Surface                                         | Format                                           | What we use today                             |
+| ----------------------------------------------- | ------------------------------------------------ | --------------------------------------------- |
+| Maritime Chart Service (MCS) rendered tiles     | Raster PNG, S-52-symbolised server-side          | **Yes — `EncLayer.tsx`** via `/api/enc-tiles` |
+| NOAA NCDS / Marine Chart Services cached raster | Raster PNG, pre-rendered                         | (same proxy can hit this)                     |
+| **ENC Direct ArcGIS feature services**          | **Vector — Esri features, also returns GeoJSON** | No                                            |
+| **S-57 cell downloads**                         | **Vector — raw `.000` binary**                   | No                                            |
 
 The first two are pixels. The latter two are features and are what "NOAA vector charts" means in this doc.
 

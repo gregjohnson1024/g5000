@@ -14,21 +14,22 @@
 
 ## File Structure
 
-| File | Purpose | Status |
-|---|---|---|
-| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.ts` | XYZ → NOAA proxy with disk cache and transparent z-clamp | new |
-| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.test.ts` | Vitest: MISS / HIT / EMPTY (z-clamp) / bad coords / ArcGIS URL shape | new |
-| `packages/web/src/components/EncLayer.tsx` | MapLibre raster source + layer; visibility prop | new |
-| `packages/web/src/app/chart/LayersControl.tsx` | Rewrite — single button, no popover; `LayersState = { enc }` | modified |
-| `packages/web/src/app/chart/page.tsx` | Drop SeamarkLayer import+mount, swap state shape, mount EncLayer | modified |
-| `packages/web/src/components/SeamarkLayer.tsx` | Untouched — left in tree, unmounted | preserved |
-| `packages/web/src/app/api/seamark-tiles/*` | Untouched — left in tree, unrequested | preserved |
+| File                                                           | Purpose                                                              | Status    |
+| -------------------------------------------------------------- | -------------------------------------------------------------------- | --------- |
+| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.ts`      | XYZ → NOAA proxy with disk cache and transparent z-clamp             | new       |
+| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.test.ts` | Vitest: MISS / HIT / EMPTY (z-clamp) / bad coords / ArcGIS URL shape | new       |
+| `packages/web/src/components/EncLayer.tsx`                     | MapLibre raster source + layer; visibility prop                      | new       |
+| `packages/web/src/app/chart/LayersControl.tsx`                 | Rewrite — single button, no popover; `LayersState = { enc }`         | modified  |
+| `packages/web/src/app/chart/page.tsx`                          | Drop SeamarkLayer import+mount, swap state shape, mount EncLayer     | modified  |
+| `packages/web/src/components/SeamarkLayer.tsx`                 | Untouched — left in tree, unmounted                                  | preserved |
+| `packages/web/src/app/api/seamark-tiles/*`                     | Untouched — left in tree, unrequested                                | preserved |
 
 ---
 
 ## Task 1: Tile proxy (`/api/enc-tiles/[z]/[x]/[y]`)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.ts`
 - Test: `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.test.ts`
 
@@ -47,7 +48,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 let TMP_ROOT: string;
-let GET: (req: Request, ctx: { params: Promise<{ z: string; x: string; y: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ z: string; x: string; y: string }> },
+) => Promise<Response>;
 
 function makeCtx(z: string, x: string, y: string) {
   return { params: Promise.resolve({ z, x, y }) };
@@ -69,9 +73,11 @@ afterEach(() => {
 describe('enc-tiles route', () => {
   it('translates std XYZ to NOAA z-2 with ArcGIS y/x order on cache miss', async () => {
     const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff]);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
+      );
 
     const res = await GET(
       new Request('http://x/api/enc-tiles/15/9892/12226'),
@@ -110,10 +116,7 @@ describe('enc-tiles route', () => {
 
   it('returns transparent 1x1 PNG with x-cache EMPTY for z<2', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const res = await GET(
-      new Request('http://x/api/enc-tiles/1/0/0'),
-      makeCtx('1', '0', '0'),
-    );
+    const res = await GET(new Request('http://x/api/enc-tiles/1/0/0'), makeCtx('1', '0', '0'));
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('EMPTY');
     expect(res.headers.get('content-type')).toBe('image/png');
@@ -126,20 +129,14 @@ describe('enc-tiles route', () => {
 
   it('returns transparent 1x1 PNG for z>18', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const res = await GET(
-      new Request('http://x/api/enc-tiles/19/0/0'),
-      makeCtx('19', '0', '0'),
-    );
+    const res = await GET(new Request('http://x/api/enc-tiles/19/0/0'), makeCtx('19', '0', '0'));
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('EMPTY');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('rejects bad tile coords with 400', async () => {
-    const res = await GET(
-      new Request('http://x/api/enc-tiles/abc/1/1'),
-      makeCtx('abc', '1', '1'),
-    );
+    const res = await GET(new Request('http://x/api/enc-tiles/abc/1/1'), makeCtx('abc', '1', '1'));
     expect(res.status).toBe(400);
   });
 
@@ -209,12 +206,11 @@ const MAX_Z = 18;
 // Minimal 1x1 fully-transparent PNG (67 bytes). Pre-encoded as a
 // constant so we never re-encode at request time.
 const TRANSPARENT_PNG = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
-  0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
-  0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+  0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+  0x42, 0x60, 0x82,
 ]);
 
 function tilePath(z: string, x: string, y: string): string {
@@ -325,9 +321,11 @@ npm run typecheck --workspace @g5000/web
 ```
 
 Expected: no errors. If you see stale-dist errors mentioning `@g5000/db` or `@g5000/core`, run:
+
 ```bash
 npx tsc -b packages/core packages/db packages/compute packages/bridge packages/grib packages/routing packages/coastline
 ```
+
 then re-run the typecheck.
 
 - [ ] **Step 6: Commit**
@@ -348,6 +346,7 @@ x-cache: EMPTY so MapLibre stops logging 404s on off-coverage tiles."
 ## Task 2: EncLayer React component
 
 **Files:**
+
 - Create: `packages/web/src/components/EncLayer.tsx`
 
 Thin wrapper around a MapLibre raster source + layer. Same shape as the (already-shipped) `SeamarkLayer` after its `isStyleLoaded`-free fix. No automated test — consistent with other layer components.
@@ -379,13 +378,7 @@ const LAYER_ID = 'noaa-enc-layer';
  * tops out at standard XYZ z=18 (their z=16) — minzoom/maxzoom
  * on the source keep MapLibre from requesting outside that band.
  */
-export function EncLayer({
-  map,
-  visible,
-}: {
-  map: maplibregl.Map | null;
-  visible: boolean;
-}) {
+export function EncLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
   useEffect(() => {
     if (!map) return;
     // Same pattern as SeamarkLayer's post-fix form: do NOT gate on
@@ -407,9 +400,7 @@ export function EncLayer({
           });
         }
         if (!map.getLayer(LAYER_ID)) {
-          const beforeId = map.getLayer('__above-wind__')
-            ? '__above-wind__'
-            : undefined;
+          const beforeId = map.getLayer('__above-wind__') ? '__above-wind__' : undefined;
           map.addLayer(
             {
               id: LAYER_ID,
@@ -469,6 +460,7 @@ signal."
 ## Task 3: Rewrite LayersControl as a single toggle button
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 
 Replace the popover-with-checkboxes with a single rectangular toggle button labeled "NOAA". Same public prop shape so the chart-page wire-up only needs a state-shape swap.
@@ -553,9 +545,11 @@ references the old { seamarks } shape; that fix is Task 4."
 ## Task 4: Wire chart page — drop SeamarkLayer, swap state, mount EncLayer
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 Three edits in `page.tsx`:
+
 1. Drop the `SeamarkLayer` import on line 23.
 2. Replace the `layers` state initializer (lines 349–367) so it reads/writes the `{ enc }` shape.
 3. Inside the chart wrapper around line 553, drop the `<SeamarkLayer/>` mount and add `<EncLayer/>` instead.
@@ -581,28 +575,28 @@ Leave the `LayersControl` / `LayersState` import on line 25 unchanged — those 
 Find the existing block starting at "Layer visibility — which chart overlays are currently on. Seamarks default on so..." (around line 347). Replace it entirely with:
 
 ```tsx
-  // Layer visibility — only the NOAA chart toggle in v1. Default off
-  // so first-time visitors see the OSM basemap. Persists to
-  // localStorage so the choice survives reloads.
-  const [layers, setLayers] = useState<LayersState>(() => {
-    if (typeof window === 'undefined') return { enc: false };
-    try {
-      const raw = window.localStorage.getItem('chart:layers');
-      if (!raw) return { enc: false };
-      const parsed = JSON.parse(raw) as Partial<LayersState>;
-      return { enc: parsed.enc ?? false };
-    } catch {
-      return { enc: false };
-    }
-  });
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('chart:layers', JSON.stringify(layers));
-    } catch {
-      /* private-mode / quota exceeded — ignore */
-    }
-  }, [layers]);
+// Layer visibility — only the NOAA chart toggle in v1. Default off
+// so first-time visitors see the OSM basemap. Persists to
+// localStorage so the choice survives reloads.
+const [layers, setLayers] = useState<LayersState>(() => {
+  if (typeof window === 'undefined') return { enc: false };
+  try {
+    const raw = window.localStorage.getItem('chart:layers');
+    if (!raw) return { enc: false };
+    const parsed = JSON.parse(raw) as Partial<LayersState>;
+    return { enc: parsed.enc ?? false };
+  } catch {
+    return { enc: false };
+  }
+});
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem('chart:layers', JSON.stringify(layers));
+  } catch {
+    /* private-mode / quota exceeded — ignore */
+  }
+}, [layers]);
 ```
 
 - [ ] **Step 3: Swap the SeamarkLayer mount for EncLayer**
@@ -610,7 +604,7 @@ Find the existing block starting at "Layer visibility — which chart overlays a
 Find the existing `<SeamarkLayer map={mapInstance} visible={layers.seamarks} />` line (around line 553). Replace it with:
 
 ```tsx
-        <EncLayer map={mapInstance} visible={layers.enc} />
+<EncLayer map={mapInstance} visible={layers.enc} />
 ```
 
 Leave the surrounding `<LayersControl ... />` block untouched — its props are unchanged.
@@ -657,6 +651,7 @@ top-right to overlay the NOAA NCDS chart."
 ## Task 5: Manual verification
 
 **Files:**
+
 - Modify: none.
 
 End-to-end smoke on the local dev server before declaring this done.
@@ -689,6 +684,7 @@ curl -sSI http://localhost:3000/api/enc-tiles/20/0/0.png | head -6
 - [ ] **Step 3: Fresh-profile browser check**
 
 In an incognito window, navigate to `http://localhost:3000/chart`. Confirm:
+
 - The chart loads with the plain OSM basemap.
 - A `NOAA` toggle button is visible top-right of the map (outlined; not pressed).
 - No `<SeamarkLayer>` button or popover is present.
@@ -696,6 +692,7 @@ In an incognito window, navigate to `http://localhost:3000/chart`. Confirm:
 - [ ] **Step 4: Toggle on**
 
 Click the NOAA button. Confirm:
+
 - The button fills (light background, dark text).
 - The OSM basemap is replaced by the NOAA chart rendering.
 - Newport entrance shows depth soundings, lit-buoy symbols with light characteristic labels, and harbour limits.

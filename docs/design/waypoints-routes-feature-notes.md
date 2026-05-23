@@ -21,7 +21,7 @@ The single most generally useful concept in the guide. A tag is a free-form stri
 We have no tagging concept today. The shape is small:
 
 - Add `tags: string[]` to `Waypoint`, to a new `Route`, and to the existing session-log/track records.
-- Persist a global tag dictionary in `ConfigStore` (key `tags`) — `Array<{ id: string, name: string, color?: string, createdAt: string }>`. The dictionary is the canonical list; the per-entity `tags: string[]` stores tag *ids* not names so renaming a tag doesn't orphan references.
+- Persist a global tag dictionary in `ConfigStore` (key `tags`) — `Array<{ id: string, name: string, color?: string, createdAt: string }>`. The dictionary is the canonical list; the per-entity `tags: string[]` stores tag _ids_ not names so renaming a tag doesn't orphan references.
 - Surface filter chips on `/marks-and-routes` and the future routes view.
 
 Worth doing even before the rest of the route work lands — tags retrofit cleanly onto the existing four-waypoint store.

@@ -63,6 +63,7 @@ For a single-boat install (Sula) this is overkill. But if g5000 ever gets a seco
 ### Dashboard page (manual p15)
 
 A single "everything you need to know at a glance" page combining:
+
 - Selected sensor readings (heading, depth, wind angle/speed, GPS, SOG) with status dots.
 - Data-recording status and one-click event-marker buttons (overlap with the recording profiles item above).
 - CPU and N2K load gauges.
@@ -73,6 +74,7 @@ A single "everything you need to know at a glance" page combining:
 ### Heel-corrected / mast-rotated / leeway-corrected wind toggles (manual p17)
 
 Hercules exposes three independent corrections as user-visible toggles, each computed when the relevant additional sensor (heel, mast rotation sensor, leeway) is available:
+
 - Heel correction adjusts AWA to compensate for mast tilt.
 - Mast-rotation correction adjusts AWA when a rotating-mast boat changes mast angle.
 - Leeway correction adjusts AWA against the leeway angle estimate.
@@ -82,6 +84,7 @@ We compute true wind from AWA/AWS/BSP/HDG but don't expose these per-correction 
 ### Start-line "bias advantage in meters" (manual p24)
 
 Their start-line panel shows:
+
 - Distance behind line (BTL)
 - Distance to port end / Distance to starboard end
 - Line bias (degrees, with port/starboard indicator)
@@ -98,7 +101,7 @@ Hercules WTP exposes a Python scripting SDK so users can define custom variables
 
 ### Mobile app + cloud upload
 
-Hercules ships a B&G mobile app that pairs via QR code and uses Navico's cloud for recording uploads and account management. We are deliberately self-hosted (the Pi *is* the box; Cloudflare tunnel is the public face). No cloud strategy needed. The mobile UX is already covered by the web UI being responsive.
+Hercules ships a B&G mobile app that pairs via QR code and uses Navico's cloud for recording uploads and account management. We are deliberately self-hosted (the Pi _is_ the box; Cloudflare tunnel is the public face). No cloud strategy needed. The mobile UX is already covered by the web UI being responsive.
 
 ### microSD recording path
 

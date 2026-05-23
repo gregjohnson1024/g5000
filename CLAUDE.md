@@ -146,18 +146,18 @@ Disabled / preserved-but-unmounted (one-line revert):
 - **Top-right:** `<LayersControl/>` — single `NOAA` toggle button. If this ever grows to 2+ overlays again, revert to a popover layout.
 - **Bottom corners on demand:** `<OffscreenVesselIndicator/>` — amber pill anchored to the viewport edge closest to the (off-screen) boat. Tap = re-enter follow mode. Renders only when `follow=false` AND `livePos` is outside the viewport bounds.
 
-| localStorage key | Shape | Default | Owner |
-|---|---|---|---|
-| `chart:camera` | `{ lat, lon, zoom }` | first-fix-driven | page.tsx |
-| `chart:settings` | UI prefs | UI prefs | page.tsx |
-| `chart:planState` | in-progress route | empty | page.tsx |
-| `chart:layers` | `{ enc: boolean }` | `{ enc: false }` | page.tsx |
-| `chart:follow` | `boolean` | `true` | `useChartCamera` |
-| `chart:orientation` | `'north' \| 'course' \| 'heading'` | `'north'` | `useChartCamera` |
+| localStorage key    | Shape                              | Default          | Owner            |
+| ------------------- | ---------------------------------- | ---------------- | ---------------- |
+| `chart:camera`      | `{ lat, lon, zoom }`               | first-fix-driven | page.tsx         |
+| `chart:settings`    | UI prefs                           | UI prefs         | page.tsx         |
+| `chart:planState`   | in-progress route                  | empty            | page.tsx         |
+| `chart:layers`      | `{ enc: boolean }`                 | `{ enc: false }` | page.tsx         |
+| `chart:follow`      | `boolean`                          | `true`           | `useChartCamera` |
+| `chart:orientation` | `'north' \| 'course' \| 'heading'` | `'north'`        | `useChartCamera` |
 
 ### MapLibre traps (read before adding a layer)
 
-- **Do NOT gate `addSource`/`addLayer` on `map.isStyleLoaded()`.** That helper can stay `false` indefinitely while other sources are still loading. The chart page hands child layer components the map from inside `Map.tsx`'s `onLoad` callback — by that point the style is initialised and add* calls are safe. Wrap in `try/catch` and use `map.on('styledata', ensure)` as a retry signal. See `SeamarkLayer.tsx` / `EncLayer.tsx` for the canonical pattern.
+- **Do NOT gate `addSource`/`addLayer` on `map.isStyleLoaded()`.** That helper can stay `false` indefinitely while other sources are still loading. The chart page hands child layer components the map from inside `Map.tsx`'s `onLoad` callback — by that point the style is initialised and add\* calls are safe. Wrap in `try/catch` and use `map.on('styledata', ensure)` as a retry signal. See `SeamarkLayer.tsx` / `EncLayer.tsx` for the canonical pattern.
 - **Distinguishing user pans from programmatic moves:** MapLibre's `dragend`, `movestart`, etc. fire for BOTH user gestures and our own `easeTo`/`flyTo` calls. The discriminator is `e.originalEvent` — `undefined` means programmatic, a real `MouseEvent` / `TouchEvent` means user gesture. The follow-mode exit handler in `useChartCamera` uses this to avoid exiting follow on its own recenters.
 - **Bearing changes need a dead-band.** COG and HDG arrive at ~1 Hz with sensor noise. Re-easing the bearing on every tiny wiggle looks bad. `useChartCamera` uses a 3° dead-band via `wrapBearingDelta` (which correctly handles the 0/360 seam).
 - **`LivePos` carries radians for `cog` and `hdg`.** MapLibre's `setBearing` and `easeTo({ bearing })` take degrees. Convert before applying.

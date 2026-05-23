@@ -127,9 +127,7 @@ function lon2tile(lon, z) {
 }
 function lat2tile(lat, z) {
   const r = (lat * Math.PI) / 180;
-  return Math.floor(
-    ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z,
-  );
+  return Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z);
 }
 
 function enumerate(bbox, minz, maxz) {

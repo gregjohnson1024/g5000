@@ -21,10 +21,7 @@ describe('openPeriodStart', () => {
 
   it('returns null when periodStart is followed by periodEnd', () => {
     expect(
-      openPeriodStart([
-        a(10, 'Start period', 'periodStart'),
-        a(20, 'End period', 'periodEnd'),
-      ]),
+      openPeriodStart([a(10, 'Start period', 'periodStart'), a(20, 'End period', 'periodEnd')]),
     ).toBeNull();
   });
 
@@ -42,11 +39,6 @@ describe('openPeriodStart', () => {
 
   it('uses array order — does not re-sort by tsMs', () => {
     const start = a(100, 'Start period', 'periodStart');
-    expect(
-      openPeriodStart([
-        a(50, 'End period', 'periodEnd'),
-        start,
-      ]),
-    ).toEqual(start);
+    expect(openPeriodStart([a(50, 'End period', 'periodEnd'), start])).toEqual(start);
   });
 });

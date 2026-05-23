@@ -47,8 +47,7 @@ export function AnnotationDropper({
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [customLabel, setCustomLabel] = useState('');
-  const [customKind, setCustomKind] =
-    useState<TrackAnnotation['kind']>('event');
+  const [customKind, setCustomKind] = useState<TrackAnnotation['kind']>('event');
   const [submitting, setSubmitting] = useState(false);
   const [tickMs, setTickMs] = useState<number>(() => Date.now());
 
@@ -128,8 +127,8 @@ export function AnnotationDropper({
   const pillTitle = disabled
     ? 'No active track — wait for GPS'
     : open_
-    ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
-    : 'Drop a marker on the active track';
+      ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
+      : 'Drop a marker on the active track';
   const pillClass = open_
     ? 'bg-amber-500/85 text-slate-900 border-amber-600 hover:bg-amber-400'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
@@ -217,9 +216,7 @@ export function AnnotationDropper({
               />
               <select
                 value={customKind}
-                onChange={(e) =>
-                  setCustomKind(e.target.value as TrackAnnotation['kind'])
-                }
+                onChange={(e) => setCustomKind(e.target.value as TrackAnnotation['kind'])}
                 disabled={submitting}
                 className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-1 py-1 rounded disabled:opacity-40"
               >

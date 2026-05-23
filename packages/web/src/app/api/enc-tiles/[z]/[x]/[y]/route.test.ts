@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 let TMP_ROOT: string;
-let GET: (req: Request, ctx: { params: Promise<{ z: string; x: string; y: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ z: string; x: string; y: string }> },
+) => Promise<Response>;
 
 function makeCtx(z: string, x: string, y: string) {
   return { params: Promise.resolve({ z, x, y }) };
@@ -26,9 +29,11 @@ afterEach(() => {
 describe('enc-tiles route', () => {
   it('translates std XYZ to NOAA z-2 with ArcGIS y/x order on cache miss', async () => {
     const pngBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff]);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(pngBytes, { status: 200, headers: { 'content-type': 'image/png' } }),
+      );
 
     const res = await GET(
       new Request('http://x/api/enc-tiles/15/9892/12226'),
@@ -94,10 +99,7 @@ describe('enc-tiles route', () => {
 
   it('returns transparent 1x1 PNG with x-cache EMPTY for z<2', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const res = await GET(
-      new Request('http://x/api/enc-tiles/1/0/0'),
-      makeCtx('1', '0', '0'),
-    );
+    const res = await GET(new Request('http://x/api/enc-tiles/1/0/0'), makeCtx('1', '0', '0'));
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('EMPTY');
     expect(res.headers.get('content-type')).toBe('image/png');
@@ -110,20 +112,14 @@ describe('enc-tiles route', () => {
 
   it('returns transparent 1x1 PNG for z>18', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const res = await GET(
-      new Request('http://x/api/enc-tiles/19/0/0'),
-      makeCtx('19', '0', '0'),
-    );
+    const res = await GET(new Request('http://x/api/enc-tiles/19/0/0'), makeCtx('19', '0', '0'));
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('EMPTY');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('rejects bad tile coords with 400', async () => {
-    const res = await GET(
-      new Request('http://x/api/enc-tiles/abc/1/1'),
-      makeCtx('abc', '1', '1'),
-    );
+    const res = await GET(new Request('http://x/api/enc-tiles/abc/1/1'), makeCtx('abc', '1', '1'));
     expect(res.status).toBe(400);
   });
 

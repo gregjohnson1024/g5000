@@ -87,9 +87,7 @@ export function useChartCamera({
   useEffect(() => {
     try {
       setFollow(readFollowFromStorage(window.localStorage.getItem('chart:follow')));
-      setOrientation(
-        readOrientationFromStorage(window.localStorage.getItem('chart:orientation')),
-      );
+      setOrientation(readOrientationFromStorage(window.localStorage.getItem('chart:orientation')));
     } catch {
       /* private-mode / corrupt — keep defaults */
     }
@@ -176,10 +174,7 @@ export function useChartCamera({
 
   const toggleFollow = useCallback(() => setFollow((v) => !v), []);
   const enterFollow = useCallback(() => setFollow(true), []);
-  const cycleOrientationCb = useCallback(
-    () => setOrientation((o) => cycleOrientation(o)),
-    [],
-  );
+  const cycleOrientationCb = useCallback(() => setOrientation((o) => cycleOrientation(o)), []);
 
   return {
     follow,

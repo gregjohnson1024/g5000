@@ -52,12 +52,7 @@ async function serveFromDisk(path: string): Promise<Response | null> {
   }
 }
 
-async function fetchAndCache(
-  z: string,
-  x: string,
-  y: string,
-  diskPath: string,
-): Promise<Response> {
+async function fetchAndCache(z: string, x: string, y: string, diskPath: string): Promise<Response> {
   const yBase = y.replace(/\.png$/, '');
   const url = `https://tiles.openseamap.org/seamark/${z}/${x}/${yBase}.png`;
   const r = await fetch(url, {

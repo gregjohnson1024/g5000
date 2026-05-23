@@ -97,13 +97,13 @@ The unused `SeamarkLayer` import in `chart/page.tsx` is also removed (lint/tsc w
 
 ## File scope
 
-| File | Action | Approx LOC |
-|---|---|---|
-| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.ts` | new — XYZ→NOAA z+y/x translate, disk cache, transparent z-clamp | ~120 |
-| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.test.ts` | new — vitest covering MISS/HIT/EMPTY/bad coords | ~90 |
-| `packages/web/src/components/EncLayer.tsx` | new — MapLibre source + raster layer, visibility prop | ~75 |
-| `packages/web/src/app/chart/LayersControl.tsx` | rewrite — single button, no popover; LayersState = { enc } | ~60 (down from ~90) |
-| `packages/web/src/app/chart/page.tsx` | modified — drop SeamarkLayer + import; update state; mount EncLayer | ~5 changed |
+| File                                                           | Action                                                              | Approx LOC          |
+| -------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------- |
+| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.ts`      | new — XYZ→NOAA z+y/x translate, disk cache, transparent z-clamp     | ~120                |
+| `packages/web/src/app/api/enc-tiles/[z]/[x]/[y]/route.test.ts` | new — vitest covering MISS/HIT/EMPTY/bad coords                     | ~90                 |
+| `packages/web/src/components/EncLayer.tsx`                     | new — MapLibre source + raster layer, visibility prop               | ~75                 |
+| `packages/web/src/app/chart/LayersControl.tsx`                 | rewrite — single button, no popover; LayersState = { enc }          | ~60 (down from ~90) |
+| `packages/web/src/app/chart/page.tsx`                          | modified — drop SeamarkLayer + import; update state; mount EncLayer | ~5 changed          |
 
 ## Testing
 

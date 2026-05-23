@@ -1,13 +1,6 @@
 import { Channels } from '@g5000/core';
 
-export type SensorId =
-  | 'heading'
-  | 'bsp'
-  | 'apparent-wind'
-  | 'gps'
-  | 'depth'
-  | 'motion'
-  | 'battery';
+export type SensorId = 'heading' | 'bsp' | 'apparent-wind' | 'gps' | 'depth' | 'motion' | 'battery';
 
 export interface SensorDef {
   /** Stable id, used as React key and for persisted card-open state. */
@@ -35,32 +28,16 @@ export const SENSOR_DEFS: SensorDef[] = [
   {
     id: 'heading',
     label: 'Heading',
-    channels: [
-      Channels.Boat.HeadingMagnetic,
-      Channels.Boat.HeadingTrue,
-      Channels.Nav.MagVar,
-    ],
+    channels: [Channels.Boat.HeadingMagnetic, Channels.Boat.HeadingTrue, Channels.Nav.MagVar],
     calPage: { label: 'Damping / heading offset', href: '/damping' },
-    usedBy: [
-      'True wind',
-      'Layline angles',
-      'COG–HDG comparison',
-      'Polar %',
-      'AIS bearing display',
-    ],
+    usedBy: ['True wind', 'Layline angles', 'COG–HDG comparison', 'Polar %', 'AIS bearing display'],
   },
   {
     id: 'bsp',
     label: 'Speed through water (BSP)',
     channels: [Channels.Boat.SpeedWater],
     calPage: { label: 'Damping / BSP cal', href: '/damping' },
-    usedBy: [
-      'True wind',
-      'VMG',
-      'Polar %',
-      'Current estimate',
-      'Sail-timeline ETA',
-    ],
+    usedBy: ['True wind', 'VMG', 'Polar %', 'Current estimate', 'Sail-timeline ETA'],
   },
   {
     id: 'apparent-wind',
@@ -78,12 +55,7 @@ export const SENSOR_DEFS: SensorDef[] = [
   {
     id: 'gps',
     label: 'GPS',
-    channels: [
-      Channels.Nav.Position,
-      Channels.Nav.Cog,
-      Channels.Nav.CogMagnetic,
-      Channels.Nav.Sog,
-    ],
+    channels: [Channels.Nav.Position, Channels.Nav.Cog, Channels.Nav.CogMagnetic, Channels.Nav.Sog],
     usedBy: [
       'SOG',
       'COG',

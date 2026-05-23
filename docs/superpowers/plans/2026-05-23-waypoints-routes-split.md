@@ -15,6 +15,7 @@
 ## File structure
 
 **Create:**
+
 - `packages/db/src/waypoints-routes-types.ts` — `Waypoint`, `Route` interfaces.
 - `packages/db/src/waypoints-routes-types.test.ts` — (none; types only — skip).
 - `packages/web/src/lib/routes.ts` — route CRUD + referential integrity, ConfigStore-backed.
@@ -30,6 +31,7 @@
 - `apps/g5000/src/migrate-waypoints.test.ts`
 
 **Modify:**
+
 - `packages/db/src/schema.ts` — add `waypoints`, `routes` tables.
 - `packages/db/src/config-store.ts` — CREATE TABLE lines + load + getters/setters for waypoints & routes.
 - `packages/db/src/config-store.test.ts` — add waypoints/routes round-trip tests.
@@ -42,6 +44,7 @@
 - `apps/g5000/src/index.ts` — call the migration after ConfigStore opens.
 
 **Delete (after `/waypoints` lands):**
+
 - The waypoint UI sections inside the old `marks-and-routes/page.tsx` (replaced by redirect).
 
 ---
@@ -49,6 +52,7 @@
 ## Task 1: Define Waypoint + Route types in @g5000/db
 
 **Files:**
+
 - Create: `packages/db/src/waypoints-routes-types.ts`
 - Modify: `packages/db/src/index.ts`
 
@@ -106,6 +110,7 @@ git commit -m "feat(db): Waypoint + Route types"
 ## Task 2: Add waypoints + routes tables to ConfigStore
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 - Modify: `packages/db/src/config-store.ts`
 - Test: `packages/db/src/config-store.test.ts`
@@ -184,7 +189,7 @@ export const routes = sqliteTable('routes', {
 
 - [ ] **Step 4: Add CREATE TABLE lines**
 
-In `packages/db/src/config-store.ts`, inside the `raw.exec(\`...\`)` block (around line 137, next to `passage_log`), add:
+In `packages/db/src/config-store.ts`, inside the `raw.exec(\`...\`)`block (around line 137, next to`passage_log`), add:
 
 ```sql
       CREATE TABLE IF NOT EXISTS waypoints (id TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -196,19 +201,23 @@ In `packages/db/src/config-store.ts`, inside the `raw.exec(\`...\`)` block (arou
 In `config-store.ts`:
 
 1. Import the tables and types at top:
+
 ```ts
 import { waypoints as waypointsTable, routes as routesTable } from './schema.js';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
 ```
 
 2. In the static `open()` method, after the other `loadOrInsert` calls, load both (they use the same `SINGLETON` id and the local `loadOrInsert<T>(table, default)` helper):
+
 ```ts
 const waypointsValue = loadOrInsert<Waypoint[]>(waypointsTable, []);
 const routesValue = loadOrInsert<Route[]>(routesTable, []);
 ```
+
 Pass `waypointsValue` and `routesValue` into the `ConfigStore` constructor call (extend the constructor signature accordingly — match how `sailWardrobe`'s value is threaded through).
 
 3. Add private fields + init in the constructor:
+
 ```ts
 private readonly waypoints$$: BehaviorSubject<Waypoint[]>;
 private readonly routes$$: BehaviorSubject<Route[]>;
@@ -218,6 +227,7 @@ this.routes$$ = new BehaviorSubject<Route[]>(routesValue);
 ```
 
 4. Add public accessors (place near `sails$` / `setSails`):
+
 ```ts
 get waypoints$(): Observable<Waypoint[]> {
   return this.waypoints$$.asObservable();
@@ -260,6 +270,7 @@ git commit -m "feat(db): waypoints + routes ConfigStore tables"
 ## Task 3: Refactor web-lib waypoints accessor to ConfigStore
 
 **Files:**
+
 - Modify: `packages/web/src/lib/waypoints.ts`
 - Test: `packages/web/src/lib/waypoints.test.ts`
 
@@ -375,6 +386,7 @@ git commit -m "refactor(web): waypoints lib backed by ConfigStore"
 ## Task 4: Boot-time migration of legacy waypoints.json
 
 **Files:**
+
 - Create: `apps/g5000/src/migrate-waypoints.ts`
 - Test: `apps/g5000/src/migrate-waypoints.test.ts`
 - Modify: `apps/g5000/src/index.ts`
@@ -423,7 +435,10 @@ describe('migrateWaypointsJson', () => {
       { id: 'x', name: 'X', lat: 0, lon: 0, createdAt: '2026-01-01T00:00:00.000Z' },
     ]);
     const file = path.join(dir, 'waypoints.json');
-    writeFileSync(file, JSON.stringify([{ id: 'foo', name: 'Foo', lat: 1, lon: 1, createdAt: 'x' }]));
+    writeFileSync(
+      file,
+      JSON.stringify([{ id: 'foo', name: 'Foo', lat: 1, lon: 1, createdAt: 'x' }]),
+    );
     await migrateWaypointsJson(store, file);
     expect(store.getWaypoints().map((w) => w.id)).toEqual(['x']);
     expect(existsSync(file)).toBe(true); // untouched
@@ -516,6 +531,7 @@ git commit -m "feat(app): migrate legacy waypoints.json into ConfigStore at boot
 ## Task 5: Routes web-lib accessor + referential integrity
 
 **Files:**
+
 - Create: `packages/web/src/lib/routes.ts`
 - Test: `packages/web/src/lib/routes.test.ts`
 
@@ -606,7 +622,11 @@ async function write(list: Route[]): Promise<void> {
 }
 
 function assertWaypointsExist(waypointIds: string[]): void {
-  const known = new Set(getSharedConfigStore().getWaypoints().map((w) => w.id));
+  const known = new Set(
+    getSharedConfigStore()
+      .getWaypoints()
+      .map((w) => w.id),
+  );
   const unknown = waypointIds.filter((id) => !known.has(id));
   if (unknown.length > 0) {
     throw new Error(`unknown waypoint id(s): ${unknown.join(', ')}`);
@@ -690,6 +710,7 @@ git commit -m "feat(web): routes lib with referential integrity"
 ## Task 6: Waypoint DELETE guard (in-use-by-route)
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/waypoints/[id]/route.ts`
 
 - [ ] **Step 1: Add the guard to DELETE**
@@ -735,6 +756,7 @@ git commit -m "feat(web): block deleting a waypoint used by a route (409)"
 ## Task 7: Routes API — list/create/get/update/delete
 
 **Files:**
+
 - Create: `packages/web/src/app/api/routes/route.ts`
 - Create: `packages/web/src/app/api/routes/[id]/route.ts`
 
@@ -851,6 +873,7 @@ git commit -m "feat(web): /api/routes CRUD endpoints"
 ## Task 8: Routes "Plan" endpoint (first → last)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/routes/[id]/plan/route.ts`
 
 **Context:** Reuse the existing weather router. The chart's old `onPlan` POSTed `{ start, end, departure, model, polarId, polar, useCurrents }` to `/api/route/plan`. This endpoint resolves the route's first + last waypoint to coordinates and forwards the same request shape, defaulting departure=now and fetching the active polar from `/api/wardrobe/active` server-side.
@@ -870,7 +893,8 @@ interface Ctx {
 export async function POST(req: Request, { params }: Ctx): Promise<Response> {
   const { id } = await params;
   const route = await getRoute(id);
-  if (!route) return Response.json({ ok: false, error: { message: 'route not found' } }, { status: 404 });
+  if (!route)
+    return Response.json({ ok: false, error: { message: 'route not found' } }, { status: 404 });
   if (route.waypointIds.length < 2) {
     return Response.json(
       { ok: false, error: { message: 'route needs at least 2 waypoints to plan' } },
@@ -937,6 +961,7 @@ git commit -m "feat(web): POST /api/routes/[id]/plan — weather-route first→l
 ## Task 9: `/waypoints` page (move waypoint UI)
 
 **Files:**
+
 - Create: `packages/web/src/app/waypoints/page.tsx`
 
 - [ ] **Step 1: Create the page**
@@ -963,6 +988,7 @@ git commit -m "feat(web): /waypoints page (waypoint CRUD)"
 ## Task 10: `/routes` page + RouteBuilder
 
 **Files:**
+
 - Create: `packages/web/src/app/routes/RouteBuilder.tsx`
 - Create: `packages/web/src/app/routes/page.tsx`
 - Test: `packages/web/src/app/routes/reorder.test.ts`
@@ -1050,6 +1076,7 @@ git commit -m "feat(web): /routes page + route builder"
 ## Task 11: Navigation + /marks-and-routes redirect
 
 **Files:**
+
 - Modify: `packages/web/src/app/Navbar.tsx`
 - Modify: `packages/web/src/app/marks-and-routes/page.tsx`
 
@@ -1100,6 +1127,7 @@ git commit -m "feat(web): split nav into Waypoints + Routes; redirect old path"
 ## Task 12: Chart cleanup — remove plan-definition flow
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 - (Leave `packages/web/src/components/PlanControls.tsx` in the tree, unmounted — one-line revert if ever needed, matching the SeamarkLayer/LaylinesLayer precedent in CLAUDE.md.)
 
@@ -1112,7 +1140,7 @@ git commit -m "feat(web): split nav into Waypoints + Routes; redirect old path"
 - Remove the start/end readout UI (lines ~871-924) and the start/end-as-markers additions (lines ~550-551).
 - Remove the `start`/`end` state and the `onPlan` callback (lines 212-213, 461-480) and any now-unused `saving`/`savedMsg` plan-save state.
 - **KEEP** the `?plan=<id>` loader (lines 413-446) and `RoutePolyline` rendering — when a plan id is in the URL, the route still displays. The loader currently calls `setStart`/`setEnd` to seed markers (lines ~435-440); since start/end are gone, drop those two lines but keep `setRoute(j.plan.route)`.
-- Remove now-dead `chart:planState` write/restore for the *in-progress definition* (the localStorage seeding for start/end). Keep camera/layers/orientation localStorage keys untouched.
+- Remove now-dead `chart:planState` write/restore for the _in-progress definition_ (the localStorage seeding for start/end). Keep camera/layers/orientation localStorage keys untouched.
 
 - [ ] **Step 2: Typecheck**
 
@@ -1139,7 +1167,7 @@ git commit -m "refactor(web): chart is display-only — remove click-to-define p
 - [ ] **Step 1: Run the whole suite**
 
 Run: `npm test`
-Expected: the new waypoint/route/migration tests pass; total failures stay at the documented baseline (~4 env-only failures: coastline, getSharedConfigStore route tests, wgrib2). Any *new* failure is blocking.
+Expected: the new waypoint/route/migration tests pass; total failures stay at the documented baseline (~4 env-only failures: coastline, getSharedConfigStore route tests, wgrib2). Any _new_ failure is blocking.
 
 - [ ] **Step 2: Typecheck everything**
 

@@ -14,17 +14,17 @@
 
 ## File Structure
 
-| File | Purpose | Status |
-|---|---|---|
-| `packages/web/src/app/sensors/freshness.ts` | Pure `freshnessOf(ageMs)` helper returning `'green' \| 'yellow' \| 'red'` plus the threshold constants. | new |
-| `packages/web/src/app/sensors/freshness.test.ts` | Vitest covering the three branches and the `null` ageMs case. | new |
-| `packages/web/src/app/sensors/sensor-definitions.ts` | Exports `SENSOR_DEFS: SensorDef[]` + the `SensorDef` interface. Static data only. | new |
-| `packages/web/src/app/sensors/sensor-definitions.test.ts` | Vitest: every listed channel exists in `Channels` constants from `@g5000/core`; sensor ids are unique. | new |
-| `packages/web/src/app/sensors/SourcePriorityEditor.tsx` | The rule-editor portion of today's `/sources/page.tsx`, extracted as a standalone component scoped to a subset of channels. Stateless w.r.t. the API: parent owns `rules` and `onSave`. | new |
-| `packages/web/src/app/sensors/SensorCard.tsx` | One card: header + freshness dot + live values + source line + used-by list + ops links + `<details>`-collapsed editor. | new |
-| `packages/web/src/app/sensors/page.tsx` | Page shell: polls `/api/sources/observed` and `/api/devices`, loads `/api/sources/config`, renders one `<SensorCard>` per `SENSOR_DEFS` entry. | new |
-| `packages/web/src/app/sources/page.tsx` | Delete after `/sensors` is verified. | deleted |
-| `packages/web/src/app/Navbar.tsx` | One-line update: `{ href: '/sources', label: 'Sources' }` → `{ href: '/sensors', label: 'Sensors' }`. | modified |
+| File                                                      | Purpose                                                                                                                                                                                 | Status   |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `packages/web/src/app/sensors/freshness.ts`               | Pure `freshnessOf(ageMs)` helper returning `'green' \| 'yellow' \| 'red'` plus the threshold constants.                                                                                 | new      |
+| `packages/web/src/app/sensors/freshness.test.ts`          | Vitest covering the three branches and the `null` ageMs case.                                                                                                                           | new      |
+| `packages/web/src/app/sensors/sensor-definitions.ts`      | Exports `SENSOR_DEFS: SensorDef[]` + the `SensorDef` interface. Static data only.                                                                                                       | new      |
+| `packages/web/src/app/sensors/sensor-definitions.test.ts` | Vitest: every listed channel exists in `Channels` constants from `@g5000/core`; sensor ids are unique.                                                                                  | new      |
+| `packages/web/src/app/sensors/SourcePriorityEditor.tsx`   | The rule-editor portion of today's `/sources/page.tsx`, extracted as a standalone component scoped to a subset of channels. Stateless w.r.t. the API: parent owns `rules` and `onSave`. | new      |
+| `packages/web/src/app/sensors/SensorCard.tsx`             | One card: header + freshness dot + live values + source line + used-by list + ops links + `<details>`-collapsed editor.                                                                 | new      |
+| `packages/web/src/app/sensors/page.tsx`                   | Page shell: polls `/api/sources/observed` and `/api/devices`, loads `/api/sources/config`, renders one `<SensorCard>` per `SENSOR_DEFS` entry.                                          | new      |
+| `packages/web/src/app/sources/page.tsx`                   | Delete after `/sensors` is verified.                                                                                                                                                    | deleted  |
+| `packages/web/src/app/Navbar.tsx`                         | One-line update: `{ href: '/sources', label: 'Sources' }` → `{ href: '/sensors', label: 'Sensors' }`.                                                                                   | modified |
 
 No backend changes. The page reuses the existing `/api/sources/observed`, `/api/sources/config`, and `/api/devices` endpoints unchanged.
 
@@ -33,6 +33,7 @@ No backend changes. The page reuses the existing `/api/sources/observed`, `/api/
 ## Task 1: Freshness helper + tests
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/freshness.ts`
 - Create: `packages/web/src/app/sensors/freshness.test.ts`
 
@@ -116,9 +117,11 @@ npm run typecheck --workspace @g5000/web
 ```
 
 Expected: clean. If stale-dist errors mention `@g5000/db` or `@g5000/core`:
+
 ```bash
 npx tsc -b packages/core packages/db packages/compute packages/bridge packages/grib packages/routing packages/coastline
 ```
+
 then re-typecheck.
 
 - [ ] **Step 6: Commit**
@@ -138,6 +141,7 @@ later if a slow-cadence sensor reads yellow during normal operation."
 ## Task 2: Sensor definitions + tests
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/sensor-definitions.ts`
 - Create: `packages/web/src/app/sensors/sensor-definitions.test.ts`
 
@@ -218,14 +222,7 @@ Create `packages/web/src/app/sensors/sensor-definitions.ts`:
 ```ts
 import { Channels } from '@g5000/core';
 
-export type SensorId =
-  | 'heading'
-  | 'bsp'
-  | 'apparent-wind'
-  | 'gps'
-  | 'depth'
-  | 'motion'
-  | 'battery';
+export type SensorId = 'heading' | 'bsp' | 'apparent-wind' | 'gps' | 'depth' | 'motion' | 'battery';
 
 export interface SensorDef {
   /** Stable id, used as React key and for persisted card-open state. */
@@ -253,32 +250,16 @@ export const SENSOR_DEFS: SensorDef[] = [
   {
     id: 'heading',
     label: 'Heading',
-    channels: [
-      Channels.Boat.HeadingMagnetic,
-      Channels.Boat.HeadingTrue,
-      Channels.Nav.MagVar,
-    ],
+    channels: [Channels.Boat.HeadingMagnetic, Channels.Boat.HeadingTrue, Channels.Nav.MagVar],
     calPage: { label: 'Damping / heading offset', href: '/damping' },
-    usedBy: [
-      'True wind',
-      'Layline angles',
-      'COG–HDG comparison',
-      'Polar %',
-      'AIS bearing display',
-    ],
+    usedBy: ['True wind', 'Layline angles', 'COG–HDG comparison', 'Polar %', 'AIS bearing display'],
   },
   {
     id: 'bsp',
     label: 'Speed through water (BSP)',
     channels: [Channels.Boat.SpeedWater],
     calPage: { label: 'Damping / BSP cal', href: '/damping' },
-    usedBy: [
-      'True wind',
-      'VMG',
-      'Polar %',
-      'Current estimate',
-      'Sail-timeline ETA',
-    ],
+    usedBy: ['True wind', 'VMG', 'Polar %', 'Current estimate', 'Sail-timeline ETA'],
   },
   {
     id: 'apparent-wind',
@@ -296,12 +277,7 @@ export const SENSOR_DEFS: SensorDef[] = [
   {
     id: 'gps',
     label: 'GPS',
-    channels: [
-      Channels.Nav.Position,
-      Channels.Nav.Cog,
-      Channels.Nav.CogMagnetic,
-      Channels.Nav.Sog,
-    ],
+    channels: [Channels.Nav.Position, Channels.Nav.Cog, Channels.Nav.CogMagnetic, Channels.Nav.Sog],
     usedBy: [
       'SOG',
       'COG',
@@ -375,6 +351,7 @@ sensor ids are unique."
 ## Task 3: Extract SourcePriorityEditor component
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/SourcePriorityEditor.tsx`
 - Reference (do NOT modify yet): `packages/web/src/app/sources/page.tsx`
 
@@ -410,14 +387,19 @@ Behaviour to preserve from today's `/sources/page.tsx`:
 - [ ] **Step 1: Read the existing /sources/page.tsx top-to-bottom**
 
 Run:
+
 ```bash
 sed -n '1,200p' packages/web/src/app/sources/page.tsx
 ```
+
 then
+
 ```bash
 sed -n '201,400p' packages/web/src/app/sources/page.tsx
 ```
+
 through to line 794. Identify:
+
 - Type definitions (lines 23–50 in the current file).
 - Constants (lines 52–54).
 - State management for `rules` / `draft` / `busy` / `err` / `savedFlash`.
@@ -487,7 +469,9 @@ export function SourcePriorityEditor({
     return Array.from(set).sort();
   };
 
-  const save = async (mutator: (rules: SourcePriorityRule[]) => SourcePriorityRule[]): Promise<void> => {
+  const save = async (
+    mutator: (rules: SourcePriorityRule[]) => SourcePriorityRule[],
+  ): Promise<void> => {
     const next = mutator(rules);
     await onSave(next);
   };
@@ -503,10 +487,7 @@ export function SourcePriorityEditor({
           knownSources={knownSourcesForChannel(channel)}
           saving={saving}
           onCreate={() =>
-            save((r) => [
-              ...r,
-              { channelPattern: channel, sources: [], freshnessSeconds: 5 },
-            ])
+            save((r) => [...r, { channelPattern: channel, sources: [], freshnessSeconds: 5 }])
           }
           onUpdate={(next) =>
             save((r) => {
@@ -517,9 +498,7 @@ export function SourcePriorityEditor({
               return copy;
             })
           }
-          onDelete={() =>
-            save((r) => r.filter((x) => x.channelPattern !== channel))
-          }
+          onDelete={() => save((r) => r.filter((x) => x.channelPattern !== channel))}
         />
       ))}
     </div>
@@ -648,9 +627,7 @@ function ChannelRuleRow({
           className="bg-slate-800 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs disabled:opacity-40"
         >
           <option value="">
-            {availableForPicker.length === 0
-              ? '(no other observed sources)'
-              : 'select a source…'}
+            {availableForPicker.length === 0 ? '(no other observed sources)' : 'select a source…'}
           </option>
           {availableForPicker.map((s) => (
             <option key={s} value={s}>
@@ -716,6 +693,7 @@ today's /sources page; the next task wires it into SensorCard."
 ## Task 4: SensorCard component
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/SensorCard.tsx`
 
 One card. Header + freshness dot + live values + source line + "Directly used by" + Ops links + the collapsed-by-default priority editor.
@@ -726,10 +704,7 @@ Create `packages/web/src/app/sensors/SensorCard.tsx`:
 
 ```tsx
 'use client';
-import {
-  friendlySourceLabel,
-  formatChannelValue,
-} from '../../lib/friendly-source';
+import { friendlySourceLabel, formatChannelValue } from '../../lib/friendly-source';
 import { freshnessOf, type Freshness } from './freshness';
 import type { SensorDef } from './sensor-definitions';
 import {
@@ -759,13 +734,7 @@ const DOT_COLOR: Record<Freshness, string> = {
  * and slices to its own channels. The freshness dot tracks the most-recent
  * sample across this sensor's channels.
  */
-export function SensorCard({
-  def,
-  observed,
-  rules,
-  saving,
-  onSaveRules,
-}: SensorCardProps) {
+export function SensorCard({ def, observed, rules, saving, onSaveRules }: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
@@ -784,7 +753,10 @@ export function SensorCard({
     <section className="border border-slate-800 rounded bg-slate-900/40 p-4 space-y-3">
       <header className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-          <span aria-hidden="true" className={`inline-block w-2 h-2 rounded-full ${DOT_COLOR[dot]}`} />
+          <span
+            aria-hidden="true"
+            className={`inline-block w-2 h-2 rounded-full ${DOT_COLOR[dot]}`}
+          />
           {def.label}
         </h2>
       </header>
@@ -892,6 +864,7 @@ minimum age across all of the sensor's channels."
 ## Task 5: /sensors page + delete /sources
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/page.tsx`
 - Delete: `packages/web/src/app/sources/page.tsx`
 
@@ -906,10 +879,7 @@ Create `packages/web/src/app/sensors/page.tsx`:
 import { useCallback, useEffect, useState } from 'react';
 import { SENSOR_DEFS } from './sensor-definitions';
 import { SensorCard } from './SensorCard';
-import type {
-  ObservedEntry,
-  SourcePriorityRule,
-} from './SourcePriorityEditor';
+import type { ObservedEntry, SourcePriorityRule } from './SourcePriorityEditor';
 
 interface ObservedResponse {
   entries: ObservedEntry[];
@@ -990,9 +960,8 @@ export default function SensorsPage() {
       <header>
         <h1 className="text-xl font-semibold text-slate-100">Sensors</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Live readings for connected sensors. Expand a card&apos;s
-          &ldquo;Source priorities&rdquo; section to edit which sources feed
-          which channels.
+          Live readings for connected sensors. Expand a card&apos;s &ldquo;Source priorities&rdquo;
+          section to edit which sources feed which channels.
         </p>
       </header>
 
@@ -1067,6 +1036,7 @@ are untouched."
 ## Task 6: Update Navbar
 
 **Files:**
+
 - Modify: `packages/web/src/app/Navbar.tsx`
 
 One-line change: the link from "Sources" → "Sensors" at the new path.
@@ -1138,6 +1108,7 @@ Points the navbar entry that used to land on /sources at the new
 ## Task 7: Manual verification
 
 **Files:**
+
 - Modify: none.
 
 End-to-end smoke on the local dev server.
@@ -1168,6 +1139,7 @@ Visit `http://localhost:3000/sources` directly — expected: Next.js 404 page (s
 - [ ] **Step 4: Card content**
 
 For at least the Heading card:
+
 - Live values rendered for `boat.heading.magnetic`, `boat.heading.true`, `nav.magvar` (any with no source show "—").
 - Source line shows a friendly source label and "last update X.X s ago".
 - "Directly used by" lists five items.
@@ -1189,6 +1161,7 @@ Pick a card whose sensor you can disconnect (or wait for a quiet channel). Confi
 - [ ] **Step 7: Other pages still work**
 
 Quick smoke-check that nothing else broke:
+
 - `/chart` loads, basemap renders, NOAA toggle visible.
 - `/helm` tiles render.
 - `/race` panel renders.

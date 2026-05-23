@@ -9,7 +9,7 @@
 Three tightly-coupled chart-page UX upgrades that together turn `/chart` from a "static map you sometimes recenter" into a follow-the-boat plotter with optional course-up lookahead:
 
 1. **Follow mode as a state, not an action.** The existing top-left "Center on boat" button becomes a sticky toggle. When on, the chart re-centers on every position update. Any user-initiated pan exits follow mode automatically.
-2. **Orientation cycle button.** A second button below the follow toggle cycles through *North up → Course up → Heading up → North up*. Course-up and Heading-up rotate the map AND nudge the center so the vessel sits in the lower-third of the viewport — that's the lookahead.
+2. **Orientation cycle button.** A second button below the follow toggle cycles through _North up → Course up → Heading up → North up_. Course-up and Heading-up rotate the map AND nudge the center so the vessel sits in the lower-third of the viewport — that's the lookahead.
 3. **Off-screen vessel indicator.** When follow mode is OFF and the vessel has been panned out of the visible area, a small pill appears on the viewport edge in the direction of the vessel, with a bearing arrow. Tap → re-enter follow mode + recenter.
 
 All three states (follow on/off, orientation mode) persist in `localStorage` under existing `chart:*` keys.
@@ -25,12 +25,14 @@ All three states (follow on/off, orientation mode) persist in `localStorage` und
 **State:** a boolean `follow` held in React state on the chart page, persisted to `localStorage` under `chart:follow` (default `true` — first-time visitors land on a chart that follows the boat).
 
 **Entering follow:**
+
 - Tap the follow button.
 - Tap the off-screen vessel indicator (it re-centers AND enters follow in one tap).
 
 **Exiting follow:**
+
 - Tap the follow button while in follow.
-- Any user-initiated map pan. (Programmatic recenters caused by follow itself must NOT exit; see *Programmatic-move filtering* below.)
+- Any user-initiated map pan. (Programmatic recenters caused by follow itself must NOT exit; see _Programmatic-move filtering_ below.)
 
 **Behaviour while in follow:** every position update from `LiveBoatMarker.onUpdate` triggers `map.easeTo({ center: [lon, lat], duration: 300 })`. `easeTo` (smooth interpolation) is preferred over `setCenter` (snap) — at the typical 1 Hz GPS update rate, snaps look jittery. 300 ms feels live without lagging behind.
 
@@ -47,9 +49,10 @@ This is the canonical MapLibre pattern for telling user input from programmatic 
 
 **Modes (the union type):** `'north' | 'course' | 'heading'`. Held in React state, persisted to `localStorage` under `chart:orientation` (default `'north'`).
 
-**Cycle:** the orientation button label shows the *current* mode (`N`, `↑COG`, `↑HDG`). Each tap advances to the next mode.
+**Cycle:** the orientation button label shows the _current_ mode (`N`, `↑COG`, `↑HDG`). Each tap advances to the next mode.
 
 **Sources:**
+
 - `north`: bearing = 0.
 - `course`: bearing = current COG in degrees true. COG comes from `LiveBoatMarker`'s existing `onUpdate` callback (we'll extend it to include `cog` — it doesn't pass it today). Falls back to `'north'` when COG is unavailable.
 - `heading`: bearing = current heading. Heading isn't currently piped through `LiveBoatMarker`; we'll subscribe via the same SSE feed that `LiveBoatMarker` uses, or expose heading on the existing `livePos` state shape. If heading is unavailable, falls back to course; if course is also unavailable, north.
@@ -62,9 +65,9 @@ This is the canonical MapLibre pattern for telling user input from programmatic 
 
 Two stacked buttons in the same top-left container that currently holds Center-on-boat (page.tsx lines 559–578). Both render as compact dark pills, ~36×36 px square. Visual state:
 
-| Button | Off state | On state |
-|---|---|---|
-| Follow | outlined dark, ⊕ glyph, label "Follow" | filled dark with light fg, ⊙ glyph |
+| Button      | Off state                                                 | On state                                                              |
+| ----------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| Follow      | outlined dark, ⊕ glyph, label "Follow"                    | filled dark with light fg, ⊙ glyph                                    |
 | Orientation | outlined dark, current mode label (`N` / `↑COG` / `↑HDG`) | n/a (orientation is always set, button always shows the current mode) |
 
 The orientation button's job is just to cycle. It's not a toggle.
@@ -78,6 +81,7 @@ When `livePos` is null (no GPS fix yet), both buttons render disabled-state (gre
 **Where it renders:** a small pill (~32px tall, ~80–120 px wide) docked to the viewport edge closest to the vessel. The closest-edge logic projects the boat position onto screen space using `map.project(LngLat)`, then clamps the projected point to the viewport rectangle. The clamped point is the pill's anchor.
 
 **What it contains:**
+
 - A small triangle/chevron pointing at the boat's direction (computed from the un-clamped projection vector).
 - Distance to the boat in NM, e.g. "12.4 NM →".
 
@@ -89,14 +93,14 @@ When `livePos` is null (no GPS fix yet), both buttons render disabled-state (gre
 
 Three new files; one modified.
 
-| File | Purpose | Status |
-|---|---|---|
-| `packages/web/src/app/chart/ChartFollowControl.tsx` | The Follow + Orientation buttons. Stateless, props-driven. | new |
-| `packages/web/src/app/chart/OffscreenVesselIndicator.tsx` | The corner pill. Subscribes to map move + position. | new |
-| `packages/web/src/app/chart/use-chart-camera.ts` | Custom hook that owns the follow/orientation state, persistence, the map subscriptions, and the `easeTo` calls. The chart page consumes the hook and forwards state to the two visual components. | new |
-| `packages/web/src/app/chart/page.tsx` | Replace the inline center-on-boat button with `<ChartFollowControl/>` and `<OffscreenVesselIndicator/>`. Wire up the hook. | modified |
+| File                                                      | Purpose                                                                                                                                                                                           | Status   |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `packages/web/src/app/chart/ChartFollowControl.tsx`       | The Follow + Orientation buttons. Stateless, props-driven.                                                                                                                                        | new      |
+| `packages/web/src/app/chart/OffscreenVesselIndicator.tsx` | The corner pill. Subscribes to map move + position.                                                                                                                                               | new      |
+| `packages/web/src/app/chart/use-chart-camera.ts`          | Custom hook that owns the follow/orientation state, persistence, the map subscriptions, and the `easeTo` calls. The chart page consumes the hook and forwards state to the two visual components. | new      |
+| `packages/web/src/app/chart/page.tsx`                     | Replace the inline center-on-boat button with `<ChartFollowControl/>` and `<OffscreenVesselIndicator/>`. Wire up the hook.                                                                        | modified |
 
-Splitting the *logic* (`use-chart-camera.ts`) from the *visual components* keeps each file small enough to hold in context. The hook is the only piece with non-trivial logic: state machine, MapLibre subscriptions, persistence, and the COG/heading dead-band.
+Splitting the _logic_ (`use-chart-camera.ts`) from the _visual components_ keeps each file small enough to hold in context. The hook is the only piece with non-trivial logic: state machine, MapLibre subscriptions, persistence, and the COG/heading dead-band.
 
 ### Why a hook instead of putting it all in page.tsx
 
@@ -122,12 +126,12 @@ const camera = useChartCamera({ map: mapInstance, livePos });
 
 ## File scope
 
-| File | Action | Approx LOC |
-|---|---|---|
-| `packages/web/src/app/chart/use-chart-camera.ts` | new — follow/orientation state, persistence, map.on subscriptions, easeTo calls | ~140 |
-| `packages/web/src/app/chart/ChartFollowControl.tsx` | new — two buttons, stateless | ~90 |
-| `packages/web/src/app/chart/OffscreenVesselIndicator.tsx` | new — pill that anchors to viewport edge | ~110 |
-| `packages/web/src/app/chart/page.tsx` | modified — drop inline center-on-boat block, mount the new pieces | ~30 changed |
+| File                                                      | Action                                                                          | Approx LOC  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------- |
+| `packages/web/src/app/chart/use-chart-camera.ts`          | new — follow/orientation state, persistence, map.on subscriptions, easeTo calls | ~140        |
+| `packages/web/src/app/chart/ChartFollowControl.tsx`       | new — two buttons, stateless                                                    | ~90         |
+| `packages/web/src/app/chart/OffscreenVesselIndicator.tsx` | new — pill that anchors to viewport edge                                        | ~110        |
+| `packages/web/src/app/chart/page.tsx`                     | modified — drop inline center-on-boat block, mount the new pieces               | ~30 changed |
 
 `LiveBoatMarker.tsx` is **not** modified — its existing `LivePos` shape already carries `cog` and `hdg` (in radians), which is exactly what the hook needs.
 
@@ -135,9 +139,9 @@ No new dependencies. No backend, no bus channels, no DB, no compute pipeline.
 
 ## Persistence keys
 
-| Key | Shape | Default |
-|---|---|---|
-| `chart:follow` | `boolean` | `true` |
+| Key                 | Shape                              | Default   |
+| ------------------- | ---------------------------------- | --------- |
+| `chart:follow`      | `boolean`                          | `true`    |
 | `chart:orientation` | `'north' \| 'course' \| 'heading'` | `'north'` |
 
 Both written on every change, read on mount with try/catch fallbacks. Same pattern as the existing `chart:camera`, `chart:layers`, etc.

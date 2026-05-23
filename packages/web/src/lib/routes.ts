@@ -3,7 +3,11 @@ import { getSharedConfigStore, type Route } from '@g5000/db';
 export type { Route };
 
 function slugify(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 async function read(): Promise<Route[]> {
@@ -14,7 +18,11 @@ async function write(list: Route[]): Promise<void> {
 }
 
 function assertWaypointsExist(waypointIds: string[]): void {
-  const known = new Set(getSharedConfigStore().getWaypoints().map((w) => w.id));
+  const known = new Set(
+    getSharedConfigStore()
+      .getWaypoints()
+      .map((w) => w.id),
+  );
   const unknown = waypointIds.filter((id) => !known.has(id));
   if (unknown.length > 0) {
     throw new Error(`unknown waypoint id(s): ${unknown.join(', ')}`);

@@ -71,10 +71,7 @@ export function SourcePriorityEditor({
           knownSources={knownSourcesForChannel(channel)}
           saving={saving}
           onCreate={() =>
-            save((r) => [
-              ...r,
-              { channelPattern: channel, sources: [], freshnessSeconds: 5 },
-            ])
+            save((r) => [...r, { channelPattern: channel, sources: [], freshnessSeconds: 5 }])
           }
           onUpdate={(next) =>
             save((r) => {
@@ -85,9 +82,7 @@ export function SourcePriorityEditor({
               return copy;
             })
           }
-          onDelete={() =>
-            save((r) => r.filter((x) => x.channelPattern !== channel))
-          }
+          onDelete={() => save((r) => r.filter((x) => x.channelPattern !== channel))}
         />
       ))}
     </div>
@@ -216,9 +211,7 @@ function ChannelRuleRow({
           className="bg-slate-800 border border-slate-700 text-slate-200 px-2 py-1 rounded text-xs disabled:opacity-40"
         >
           <option value="">
-            {availableForPicker.length === 0
-              ? '(no other observed sources)'
-              : 'select a source…'}
+            {availableForPicker.length === 0 ? '(no other observed sources)' : 'select a source…'}
           </option>
           {availableForPicker.map((s) => (
             <option key={s} value={s}>
