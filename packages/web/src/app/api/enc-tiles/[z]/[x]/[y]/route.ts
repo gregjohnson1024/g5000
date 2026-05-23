@@ -113,8 +113,20 @@ async function fetchAndCache(
     });
   }
   if (!r.ok) {
-    return new Response(`upstream tile ${url} → ${r.status}`, {
-      status: r.status === 404 ? 404 : 502,
+    if (r.status === 404) {
+      return new Response(`upstream tile ${url} → 404`, { status: 404 });
+    }
+    // NOAA's MapServer occasionally 5xxs under load. Treat the same as a
+    // network timeout: transparent placeholder, no disk write. Avoids the
+    // MapLibre retry storm + console spam, and the rest of the chart stays
+    // usable.
+    return new Response(new Uint8Array(TRANSPARENT_PNG), {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'cache-control': 'no-store',
+        'x-cache': 'EMPTY-UPSTREAM-5XX',
+      },
     });
   }
   const buf = Buffer.from(await r.arrayBuffer());
