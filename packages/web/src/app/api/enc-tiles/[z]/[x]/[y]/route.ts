@@ -116,9 +116,23 @@ async function fetchAndCache(
     });
   }
   if (!r.ok) {
-    return new Response(`upstream tile ${url} → ${r.status}`, {
-      status: r.status === 404 ? 404 : 502,
-      headers: { 'access-control-allow-origin': '*' },
+    if (r.status === 404) {
+      return new Response(`upstream tile ${url} → 404`, {
+        status: 404,
+        headers: { 'access-control-allow-origin': '*' },
+      });
+    }
+    // NOAA's MapServer occasionally 5xxs under load. Same pattern as the
+    // timeout branch above: transparent placeholder, no disk write, brief
+    // cache window so MapLibre's `?v=…` retry doesn't immediately re-hit.
+    return new Response(new Uint8Array(TRANSPARENT_PNG), {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'cache-control': 'public, max-age=60',
+        'x-cache': 'UPSTREAM-5XX',
+        'access-control-allow-origin': '*',
+      },
     });
   }
   const buf = Buffer.from(await r.arrayBuffer());

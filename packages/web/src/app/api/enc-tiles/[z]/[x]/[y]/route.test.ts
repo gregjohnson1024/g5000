@@ -76,6 +76,22 @@ describe('enc-tiles route', () => {
     expect(existsSync(join(TMP_ROOT, 'enc-cache', '15', '9892', '12226.png'))).toBe(false);
   });
 
+  it('maps upstream 5xx to transparent PNG with no disk write', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('bad gateway', { status: 502 }));
+    const res = await GET(
+      new Request('http://x/api/enc-tiles/15/9892/12226'),
+      makeCtx('15', '9892', '12226'),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-cache')).toBe('UPSTREAM-5XX');
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    const body = new Uint8Array(await res.arrayBuffer());
+    expect(Array.from(body.slice(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(existsSync(join(TMP_ROOT, 'enc-cache', '15', '9892', '12226.png'))).toBe(false);
+  });
+
   it('returns transparent 1x1 PNG with x-cache EMPTY for z<2', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res = await GET(
