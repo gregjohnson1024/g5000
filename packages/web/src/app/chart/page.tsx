@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
-import { PlanControls, type PlanRequest } from '../../components/PlanControls';
 import { attachRoute } from '../../components/RoutePolyline';
 import { RouteTimeline } from '../../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
@@ -35,8 +34,6 @@ import { useChartCamera } from './use-chart-camera';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
-
-type Pos = { lat: number; lon: number };
 
 /**
  * Minutes of travel projected ahead from each vessel's current position
@@ -209,16 +206,11 @@ function ChartPageInner() {
     }
   }, [settingsHydrated, windOn, windModel, windHours, displayModel, showIsochrones]);
 
-  const [start, setStart] = useState<Pos | undefined>();
-  const [end, setEnd] = useState<Pos | undefined>();
   const [waypoints, setWaypoints] = useState<
     Array<{ id: string; name: string; lat: number; lon: number }>
   >([]);
-  const [loading, setLoading] = useState(false);
   const [route, setRoute] = useState<Route | undefined>();
   const [error, setError] = useState<string | undefined>();
-  const [savedMsg, setSavedMsg] = useState<string | undefined>();
-  const [saving, setSaving] = useState(false);
 
   // Re-attach the route whenever it changes (planned, restored from
   // localStorage, isochrone-toggle, or map first comes online). attachRoute
@@ -430,83 +422,18 @@ function ChartPageInner() {
           return;
         }
         setRoute(j.plan.route);
-        // Seed start/end from the route's first/last leg so the markers
-        // on the chart reflect where this plan actually goes.
-        const legs = j.plan.route.legs;
-        if (legs.length > 0) {
-          const first = legs[0]!;
-          const last = legs[legs.length - 1]!;
-          setStart({ lat: first.lat, lon: first.lon });
-          setEnd({ lat: last.lat, lon: last.lon });
-        }
       } catch (e) {
         setError(String(e));
       }
     })();
   }, [planIdFromUrl]);
 
-  // Auto-preselect of start/end on mount has been removed at the user's
-  // request — the chart loads empty and the user picks start/end via map
-  // clicks, the "Use boat position" button, or a saved-plan load.
-
-  const onMapClick = (p: Pos) => {
-    if (!start) setStart(p);
-    else if (!end) setEnd(p);
-    else {
-      setStart(p);
-      setEnd(undefined);
-      setRoute(undefined);
-    }
-  };
-  const onPlan = async (req: PlanRequest) => {
-    setLoading(true);
-    setError(undefined);
-    try {
-      const res = await fetch('/api/route/plan', {
-        method: 'POST',
-        body: JSON.stringify(req),
-        headers: { 'content-type': 'application/json' },
-      });
-      const j = await res.json();
-      if (!j.ok) throw new Error(j.error?.message ?? 'plan failed');
-      setRoute(j.route);
-      // attach is handled by the effect on [route, mapInstance,
-      // showIsochrones] above — no need to call it inline here.
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-  const onSave = async () => {
-    if (!route) return;
-    const name = window.prompt('Plan name?');
-    if (!name || !name.trim()) return;
-    setSaving(true);
-    setSavedMsg(undefined);
-    try {
-      const res = await fetch('/api/plans', {
-        method: 'POST',
-        body: JSON.stringify({ name: name.trim(), route }),
-        headers: { 'content-type': 'application/json' },
-      });
-      const j = await res.json();
-      if (!j.ok) throw new Error(j.error?.message ?? 'save failed');
-      setSavedMsg(`Saved as ${name.trim()}`);
-      setTimeout(() => setSavedMsg(undefined), 3000);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
-    }
-  };
   return (
     <main className="grid grid-cols-[1fr_360px] h-full [&>div:first-child]:relative">
       <div className="relative">
         <Map
           center={{ lat: initialCamera.lat, lon: initialCamera.lon }}
           zoom={initialCamera.zoom}
-          onClick={onMapClick}
           onLoad={(m) => {
             mapRef.current = m;
             setMapInstance(m);
@@ -541,16 +468,11 @@ function ChartPageInner() {
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
           map={mapInstance}
-          marks={(() => {
-            const list: MarkLike[] = waypoints.map((w) => ({
-              lat: w.lat,
-              lon: w.lon,
-              name: w.name,
-            }));
-            if (start) list.push({ lat: start.lat, lon: start.lon, name: 'start', badge: 'S' });
-            if (end) list.push({ lat: end.lat, lon: end.lon, name: 'end', badge: 'E' });
-            return list;
-          })()}
+          marks={waypoints.map((w) => ({
+            lat: w.lat,
+            lon: w.lon,
+            name: w.name,
+          }))}
         />
         <WindOverlay
           map={mapInstance}
@@ -863,103 +785,7 @@ function ChartPageInner() {
             <span className="text-slate-300">Show isochrones</span>
           </label>
         </div>
-        <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-400 w-10">Start:</span>
-              <span className="font-mono text-slate-200 flex-1">
-                {start ? fmtLatLonDmm(start.lat, start.lon) : '— click map'}
-              </span>
-              {start && (
-                <button
-                  type="button"
-                  onClick={() => setStart(undefined)}
-                  className="text-[10px] px-1 py-0.5 bg-slate-800 hover:bg-slate-700 rounded"
-                  title="Clear start"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-            <div className="flex gap-1 items-center text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  if (livePos) setStart({ lat: livePos.lat, lon: livePos.lon });
-                }}
-                disabled={!livePos}
-                className="px-2 py-1 bg-slate-700 hover:bg-amber-600 hover:text-slate-900 rounded disabled:opacity-40"
-              >
-                Use boat position
-              </button>
-              <select
-                value=""
-                onChange={(e) => {
-                  const w = waypoints.find((x) => x.id === e.target.value);
-                  if (w) setStart({ lat: w.lat, lon: w.lon });
-                  e.currentTarget.value = '';
-                }}
-                className="bg-slate-900 border border-slate-700 rounded px-1 py-1 text-slate-200 flex-1"
-              >
-                <option value="">Waypoint…</option>
-                {waypoints.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="space-y-1 pt-1 border-t border-slate-800">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-400 w-10">End:</span>
-              <span className="font-mono text-slate-200 flex-1">
-                {end ? fmtLatLonDmm(end.lat, end.lon) : '— click map'}
-              </span>
-              {end && (
-                <button
-                  type="button"
-                  onClick={() => setEnd(undefined)}
-                  className="text-[10px] px-1 py-0.5 bg-slate-800 hover:bg-slate-700 rounded"
-                  title="Clear end"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-            <div className="flex gap-1 items-center text-xs">
-              <select
-                value=""
-                onChange={(e) => {
-                  const w = waypoints.find((x) => x.id === e.target.value);
-                  if (w) setEnd({ lat: w.lat, lon: w.lon });
-                  e.currentTarget.value = '';
-                }}
-                className="bg-slate-900 border border-slate-700 rounded px-1 py-1 text-slate-200 flex-1"
-              >
-                <option value="">Waypoint…</option>
-                {waypoints.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-        <PlanControls start={start} end={end} onPlan={onPlan} loading={loading} tz={tz} />
-        <SavedPlanLoader
-          onLoad={(plan) => {
-            setRoute(plan.route);
-            const legs = plan.route.legs;
-            if (legs.length > 0) {
-              const first = legs[0]!;
-              const last = legs[legs.length - 1]!;
-              setStart({ lat: first.lat, lon: first.lon });
-              setEnd({ lat: last.lat, lon: last.lon });
-            }
-          }}
-        />
+        <SavedPlanLoader onLoad={(plan) => setRoute(plan.route)} />
         {error && <div className="text-rose-400 text-xs">{error}</div>}
         {route && (
           <div className="text-xs text-slate-300">
@@ -971,17 +797,6 @@ function ChartPageInner() {
             {route.incomplete ? ` (incomplete: ${route.reason})` : ''}
           </div>
         )}
-        {route && (
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="w-full text-sm bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-400 text-white py-2 rounded"
-          >
-            {saving ? 'Saving…' : 'Save plan'}
-          </button>
-        )}
-        {savedMsg && <div className="text-xs text-emerald-400">{savedMsg}</div>}
         {route && <RouteTimeline route={route} />}
       </aside>
     </main>
@@ -1042,8 +857,8 @@ interface PlanRecord {
 
 /**
  * Dropdown of saved plans. Selecting one fetches the full plan and calls
- * `onLoad` so the parent can install the route + start/end markers on
- * the map. Reads from /api/plans on mount and refreshes on focus.
+ * `onLoad` so the parent can overlay the route on the map.
+ * Reads from /api/plans on mount and refreshes on focus.
  */
 function SavedPlanLoader({ onLoad }: { onLoad: (plan: PlanRecord) => void }) {
   const [items, setItems] = useState<PlanRecord[]>([]);
