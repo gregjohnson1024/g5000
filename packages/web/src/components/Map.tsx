@@ -49,6 +49,14 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
       },
       center: [center.lon, center.lat],
       zoom,
+      // This is a 2D chartplotter — overlays are screen-plane (boat marker,
+      // range rings, tile grid) and there's no terrain/extrusion/globe in
+      // play. MapLibre enables pitch gestures by default (for 3D use); turn
+      // them off so the camera can't tilt off straight-down. maxPitch:0 also
+      // blocks the keyboard pitch path (shift+arrow), not just the gestures.
+      pitchWithRotate: false,
+      touchPitch: false,
+      maxPitch: 0,
     });
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }), 'bottom-left');
     (window as unknown as { __g5kMap?: maplibregl.Map }).__g5kMap = map;
