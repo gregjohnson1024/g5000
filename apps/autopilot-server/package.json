@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "predev": "tsc -b ../../packages/core ../../packages/db ../../packages/compute ../../packages/bridge",
+    "predev": "node ../../scripts/dev-precheck.mjs && tsc -b ../../packages/core ../../packages/db ../../packages/compute ../../packages/bridge",
     "prebuild": "tsc -b ../../packages/core ../../packages/db ../../packages/compute ../../packages/bridge",
     "dev": "tsx watch --ignore '../../packages/web/.next/**' --ignore '../../packages/web/.turbo/**' --ignore 'data/**' src/index.ts",
     "start": "node dist/index.js",
