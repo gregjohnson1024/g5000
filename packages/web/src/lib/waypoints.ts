@@ -1,17 +1,6 @@
-import { promises as fs } from 'node:fs';
-import { dirname } from 'node:path';
-import { WAYPOINTS } from './paths';
+import { getSharedConfigStore, type Waypoint } from '@g5000/db';
 
-export interface Waypoint {
-  id: string;
-  name: string;
-  lat: number;
-  lon: number;
-  /** Optional free-form notes. */
-  notes?: string;
-  /** Set on create, ISO 8601. */
-  createdAt: string;
-}
+export type { Waypoint };
 
 const NANTUCKET: Waypoint = {
   id: 'nantucket',
@@ -61,54 +50,34 @@ const MOORE_BROS: Waypoint = {
 
 /**
  * Canonical seeded waypoints. On every read we ensure any seed whose
- * `id` is missing from the persisted file gets added back — so a fresh
+ * `id` is missing from the persisted store gets added back — so a fresh
  * install or a deployed Pi without these IDs picks them up automatically,
  * but a user-edited copy of "newport" (different coords/notes) is left
  * alone because the id collision is checked, not the content. Re-adding
  * a seed waypoint after manual deletion is the documented trade-off.
  */
-const SEED_WAYPOINTS: Waypoint[] = [NANTUCKET, NEWPORT, BLOCK_ISLAND, MOORE_BROS];
+const SEEDS: Waypoint[] = [NANTUCKET, NEWPORT, BLOCK_ISLAND, MOORE_BROS];
+export const SEED_WAYPOINT_IDS = SEEDS.map((w) => w.id);
 
-async function ensureSeeded(list: Waypoint[]): Promise<Waypoint[]> {
-  const known = new Set(list.map((w) => w.id));
-  const missing = SEED_WAYPOINTS.filter((w) => !known.has(w.id));
-  if (missing.length === 0) return list;
-  const merged = [...list, ...missing];
-  await writeWaypoints(merged);
-  return merged;
-}
-
+/** Read the store, union any missing seeds, persist if changed. */
 async function readWaypoints(): Promise<Waypoint[]> {
-  try {
-    const buf = await fs.readFile(WAYPOINTS, 'utf8');
-    const parsed = JSON.parse(buf) as unknown;
-    if (!Array.isArray(parsed)) return ensureSeeded([]);
-    const cleaned = parsed.filter(isWaypoint) as Waypoint[];
-    return ensureSeeded(cleaned);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      await writeWaypoints(SEED_WAYPOINTS);
-      return SEED_WAYPOINTS;
+  const store = getSharedConfigStore();
+  const current = store.getWaypoints();
+  const byId = new Map(current.map((w) => [w.id, w]));
+  let changed = false;
+  for (const seed of SEEDS) {
+    if (!byId.has(seed.id)) {
+      byId.set(seed.id, seed);
+      changed = true;
     }
-    throw err;
   }
+  const list = [...byId.values()];
+  if (changed) await store.setWaypoints(list);
+  return list;
 }
 
-async function writeWaypoints(wps: Waypoint[]): Promise<void> {
-  await fs.mkdir(dirname(WAYPOINTS), { recursive: true });
-  await fs.writeFile(WAYPOINTS, JSON.stringify(wps, null, 2), 'utf8');
-}
-
-function isWaypoint(v: unknown): v is Waypoint {
-  if (!v || typeof v !== 'object') return false;
-  const o = v as Record<string, unknown>;
-  return (
-    typeof o.id === 'string' &&
-    typeof o.name === 'string' &&
-    typeof o.lat === 'number' &&
-    typeof o.lon === 'number' &&
-    typeof o.createdAt === 'string'
-  );
+async function writeWaypoints(list: Waypoint[]): Promise<void> {
+  await getSharedConfigStore().setWaypoints(list);
 }
 
 export async function listWaypoints(): Promise<Waypoint[]> {
