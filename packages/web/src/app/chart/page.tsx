@@ -5,7 +5,6 @@ import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
 import { attachRoute } from '../../components/RoutePolyline';
-import { RouteTimeline } from '../../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
@@ -742,19 +741,7 @@ function ChartPageInner() {
             <span className="text-slate-300">Show isochrones</span>
           </label>
         </div>
-        <SavedPlanLoader onLoad={(plan) => setRoute(plan.route)} />
         {error && <div className="text-rose-400 text-xs">{error}</div>}
-        {route && (
-          <div className="text-xs text-slate-300">
-            ETA: {fmtHourLabel(route.end, tz)}
-            <br />
-            Distance: {(route.distance / 1852).toFixed(0)} NM
-            <br />
-            Model: {route.model}
-            {route.incomplete ? ` (incomplete: ${route.reason})` : ''}
-          </div>
-        )}
-        {route && <RouteTimeline route={route} />}
       </aside>
     </main>
   );
@@ -801,78 +788,6 @@ function LiveValues({ p }: { p: LivePos | null }) {
           {hdgDeg !== null ? `${hdgDeg.toFixed(0)}° T` : '—'}
         </span>
       </div>
-    </div>
-  );
-}
-
-interface PlanRecord {
-  id: string;
-  name: string;
-  createdAt: number;
-  route: Route;
-}
-
-/**
- * Dropdown of saved plans. Selecting one fetches the full plan and calls
- * `onLoad` so the parent can overlay the route on the map.
- * Reads from /api/plans on mount and refreshes on focus.
- */
-function SavedPlanLoader({ onLoad }: { onLoad: (plan: PlanRecord) => void }) {
-  const [items, setItems] = useState<PlanRecord[]>([]);
-  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
-  const refresh = (): void => {
-    void fetch('/api/plans', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j: { ok?: boolean; items?: PlanRecord[] }) => {
-        if (j.ok && Array.isArray(j.items))
-          setItems(j.items.sort((a, b) => b.createdAt - a.createdAt));
-      })
-      .catch(() => {
-        /* ignore */
-      });
-  };
-  useEffect(() => {
-    refresh();
-    const onFocus = (): void => refresh();
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, []);
-  const handleSelect = async (id: string): Promise<void> => {
-    if (!id) return;
-    setLoadingPlanId(id);
-    try {
-      const r = await fetch(`/api/plans/${id}`, { cache: 'no-store' });
-      const j = (await r.json()) as
-        | { ok: true; plan: PlanRecord }
-        | { ok: false; error?: { message?: string } };
-      if (j.ok) onLoad(j.plan);
-    } finally {
-      setLoadingPlanId(null);
-    }
-  };
-  if (items.length === 0) return null;
-  return (
-    <div className="space-y-1">
-      <label className="block text-xs text-slate-400">
-        Load saved plan
-        <select
-          value=""
-          disabled={loadingPlanId !== null}
-          onChange={(e) => {
-            const id = e.currentTarget.value;
-            e.currentTarget.value = '';
-            void handleSelect(id);
-          }}
-          className="block w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 mt-1 text-slate-200 disabled:opacity-50"
-        >
-          <option value="">— pick a saved plan —</option>
-          {items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} · {(p.route.distance / 1852).toFixed(0)} NM
-            </option>
-          ))}
-        </select>
-      </label>
     </div>
   );
 }
