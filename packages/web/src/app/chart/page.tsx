@@ -416,7 +416,7 @@ function ChartPageInner() {
   }, [planIdFromUrl]);
 
   return (
-    <main className="grid grid-cols-[1fr_360px] h-full [&>div:first-child]:relative">
+    <main className="grid grid-cols-[1fr_360px] flex-1 min-h-0 [&>div:first-child]:relative">
       <div className="relative">
         <Map
           center={{ lat: initialCamera.lat, lon: initialCamera.lon }}
