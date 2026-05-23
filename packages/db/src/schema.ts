@@ -139,3 +139,13 @@ export const crossoverSettings = sqliteTable('crossover_settings', {
   boatId: text('boat_id').primaryKey(),
   value: text('value').notNull(),
 });
+
+export const waypoints = sqliteTable('waypoints', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded Waypoint[]
+});
+
+export const routes = sqliteTable('routes', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded Route[]
+});

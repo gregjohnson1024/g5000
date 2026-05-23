@@ -19,14 +19,17 @@ import {
   type SailWardrobe,
   type SourcePriorityConfig,
 } from './defaults.js';
+import type { Waypoint, Route } from './waypoints-routes-types.js';
 
 describe('ConfigStore', () => {
   let dir: string;
+  let dbPath: string;
   let store: ConfigStore;
 
   beforeEach(async () => {
     dir = mkdtempSync(path.join(tmpdir(), 'g5000-cfg-'));
-    store = await ConfigStore.open(path.join(dir, 'config.db'));
+    dbPath = path.join(dir, 'config.db');
+    store = await ConfigStore.open(dbPath);
   });
 
   afterEach(async () => {
@@ -53,7 +56,7 @@ describe('ConfigStore', () => {
     await store.setBoatConfig({ ...DEFAULT_BOAT_CONFIG, magVarDeg: -12 });
     await store.close();
 
-    const reopened = await ConfigStore.open(path.join(dir, 'config.db'));
+    const reopened = await ConfigStore.open(dbPath);
     const cfg = await firstValueFrom(reopened.boatConfig$);
     expect(cfg.magVarDeg).toBe(-12);
     await reopened.close();
@@ -138,7 +141,7 @@ describe('ConfigStore', () => {
   it('persists damping config across reopens', async () => {
     await store.setDampingConfig({ 'boat.speed.water': 2.5, 'wind.true.speed': 3.0 });
     await store.close();
-    const reopened = await ConfigStore.open(path.join(dir, 'config.db'));
+    const reopened = await ConfigStore.open(dbPath);
     const c = await firstValueFrom(reopened.dampingConfig$);
     expect(c).toEqual({ 'boat.speed.water': 2.5, 'wind.true.speed': 3.0 });
     await reopened.close();
@@ -181,7 +184,7 @@ describe('ConfigStore', () => {
     ];
     await store.setSourcePriority(cfg);
     await store.close();
-    const reopened = await ConfigStore.open(path.join(dir, 'config.db'));
+    const reopened = await ConfigStore.open(dbPath);
     const c = await firstValueFrom(reopened.sourcePriority$);
     expect(c).toEqual(cfg);
     await reopened.close();
@@ -340,6 +343,40 @@ describe('ConfigStore', () => {
       const after = raw.prepare('SELECT COUNT(*) as n FROM tx_demo').get() as { n: number };
       expect(after.n).toBe(2);
       raw.close();
+    });
+  });
+
+  describe('ConfigStore waypoints + routes', () => {
+    it('defaults to empty lists', async () => {
+      expect(store.getWaypoints()).toEqual([]);
+      expect(store.getRoutes()).toEqual([]);
+    });
+
+    it('round-trips waypoints', async () => {
+      const wps: Waypoint[] = [
+        { id: 'a', name: 'A', lat: 41, lon: -71, createdAt: '2026-01-01T00:00:00.000Z' },
+      ];
+      await store.setWaypoints(wps);
+      expect(store.getWaypoints()).toEqual(wps);
+      expect(await firstValueFrom(store.waypoints$)).toEqual(wps);
+    });
+
+    it('round-trips routes', async () => {
+      const rts: Route[] = [
+        { id: 'r1', name: 'R1', waypointIds: ['a', 'b'], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+      ];
+      await store.setRoutes(rts);
+      expect(store.getRoutes()).toEqual(rts);
+      expect(await firstValueFrom(store.routes$)).toEqual(rts);
+    });
+
+    it('persists across reopen', async () => {
+      await store.setWaypoints([
+        { id: 'x', name: 'X', lat: 0, lon: 0, createdAt: '2026-01-01T00:00:00.000Z' },
+      ]);
+      await store.close();
+      store = await ConfigStore.open(dbPath);
+      expect(store.getWaypoints().map((w) => w.id)).toEqual(['x']);
     });
   });
 });

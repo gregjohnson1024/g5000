@@ -40,7 +40,10 @@ import {
   passageLog as passageLogTable,
   sailWardrobe,
   sourcePriorityConfig as sourcePriorityConfigTable,
+  waypoints as waypointsTable,
+  routes as routesTable,
 } from './schema.js';
+import type { Waypoint, Route } from './waypoints-routes-types.js';
 import {
   insertRevision,
   listRevisions as listRevisionsRepo,
@@ -70,6 +73,8 @@ export class ConfigStore {
     passageLog: BehaviorSubject<PassageLog>;
     polarRevisions: BehaviorSubject<Map<string, PolarRevision>>;
     crossoverSettings: BehaviorSubject<CrossoverSettings>;
+    waypoints: BehaviorSubject<Waypoint[]>;
+    routes: BehaviorSubject<Route[]>;
   };
 
   private readonly __activeBoatId: BoatId;
@@ -94,6 +99,8 @@ export class ConfigStore {
       passageLog: PassageLog;
       polarRevisions: Map<string, PolarRevision>;
       crossoverSettings: CrossoverSettings;
+      waypoints: Waypoint[];
+      routes: Route[];
     },
     activeBoatId: BoatId,
   ) {
@@ -110,6 +117,8 @@ export class ConfigStore {
       passageLog: new BehaviorSubject(initial.passageLog),
       polarRevisions: new BehaviorSubject(initial.polarRevisions),
       crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
+      waypoints: new BehaviorSubject(initial.waypoints),
+      routes: new BehaviorSubject(initial.routes),
     };
   }
 
@@ -189,6 +198,8 @@ export class ConfigStore {
         boat_id TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS waypoints (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS routes (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -345,6 +356,8 @@ export class ConfigStore {
       passageLog: passageLogValue,
       polarRevisions: revisionsMap,
       crossoverSettings: crossoverSettingsValue,
+      waypoints: loadOrInsert<Waypoint[]>(waypointsTable, []),
+      routes: loadOrInsert<Route[]>(routesTable, []),
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -457,6 +470,28 @@ export class ConfigStore {
       )
       .run(this.__activeBoatId, JSON.stringify(value));
     this.subjects.crossoverSettings.next(value);
+  }
+
+  get waypoints$(): Observable<Waypoint[]> {
+    return this.subjects.waypoints.asObservable();
+  }
+  getWaypoints(): Waypoint[] {
+    return this.subjects.waypoints.value;
+  }
+  async setWaypoints(value: Waypoint[]): Promise<void> {
+    this.upsert(waypointsTable, value);
+    this.subjects.waypoints.next(value);
+  }
+
+  get routes$(): Observable<Route[]> {
+    return this.subjects.routes.asObservable();
+  }
+  getRoutes(): Route[] {
+    return this.subjects.routes.value;
+  }
+  async setRoutes(value: Route[]): Promise<void> {
+    this.upsert(routesTable, value);
+    this.subjects.routes.next(value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
@@ -633,6 +668,8 @@ export class ConfigStore {
     this.subjects.passageLog.complete();
     this.subjects.polarRevisions.complete();
     this.subjects.crossoverSettings.complete();
+    this.subjects.waypoints.complete();
+    this.subjects.routes.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
