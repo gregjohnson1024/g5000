@@ -20,7 +20,7 @@ WatchdogSec=60
 # report ready and systemd would time out the start.
 NotifyAccess=all
 User=greg
-WorkingDirectory=/home/greg/autopilot/apps/autopilot-server
+WorkingDirectory=/home/greg/autopilot/apps/g5000
 ExecStart=/usr/bin/node dist/index.js
 Restart=on-failure
 RestartSec=5

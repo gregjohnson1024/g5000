@@ -19,20 +19,20 @@ npm run typecheck              # tsc -b across all project references
 npm run build                  # build every workspace; web uses `next build --webpack`
 npm run lint                   # prettier --check .
 npm run format                 # prettier --write .
-npm run dev --workspace @g5000/autopilot-server   # local dev: tsx watch, web mounted at :3000
+npm run dev --workspace @g5000/app   # local dev: tsx watch, web mounted at :3000
 npm run fetch --workspace @g5000/coastline        # one-shot: pull coastline data (gitignored)
 npm run bench --workspace @g5000/routing          # routing benchmarks
 ```
 
 Node ≥22, ESM-only, strict TypeScript (`noUncheckedIndexedAccess`, composite project refs).
 
-`autopilot-server`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under _Deployment_ is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
+`g5000 app`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under _Deployment_ is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
 
 **Known gotcha:** the top-level `tsconfig.json` still lists `apps/router` in its `references`. That dir was merged into `packages/web` and `tsc -b` reports `TS5083 Cannot read file …/apps/router/tsconfig.json`. Individual workspace builds (`npm run build`, `npm test`) work; only the orchestrated `tsc -b` stops at the missing ref. Remove the ref when convenient.
 
 ### Env-var gates
 
-Common runtime knobs (set on the autopilot-server process):
+Common runtime knobs (set on the g5000 app process):
 
 - `DEMO_MODE=1` — boot in demo mode (synthetic injector instead of NGT-1 / YDWG).
 - `REPLAY=path/to/session.jsonl.gz` + `REPLAY_MODE=asap|realtime` — boot in replay mode against a stored session.
@@ -51,13 +51,13 @@ Common runtime knobs (set on the autopilot-server process):
 
 ### One process, many roles
 
-`apps/autopilot-server` is the **only runtime artifact in production**. It boots in this order (see `src/index.ts`):
+`apps/g5000` is the **only runtime artifact in production**. It boots in this order (see `src/index.ts`):
 
 1. Opens the shared `ConfigStore` (SQLite via Drizzle), publishes the singleton on `globalThis`.
 2. Builds a `Bus` (RxJS-backed pub/sub) and a `SourceModeController` that swaps between **live**, **demo**, and **replay** base sources.
 3. Live mode opens NGT-1 (USB serial), YDWG-02 (TCP `192.168.1.100:1457`), and optional NMEA 0183 serial ports, runs the bridge, starts a session logger, and starts `startTrueWindPipeline`, `startPolarPipeline`, plus the rolling SOG/COG/HDG/motion stats workers.
 4. Starts the H-LINK TCP server (default :5050) so external tactical software can read bus data.
-5. Calls `next({ dev, dir: …/packages/web })` and serves the UI on the same HTTP listener (port 3000). **`packages/web` is not deployed independently** — `next start` is not used in prod; the autopilot-server custom-server pattern is.
+5. Calls `next({ dev, dir: …/packages/web })` and serves the UI on the same HTTP listener (port 3000). **`packages/web` is not deployed independently** — `next start` is not used in prod; the g5000 app custom-server pattern is.
 6. Notifies systemd ready, then heartbeats a `WATCHDOG=1` ping inside the configured `WatchdogSec`. If the event loop blocks, systemd SIGKILLs and restarts.
 
 ### Process-wide singletons live on `globalThis`
@@ -69,7 +69,7 @@ The `Bus`, `ConfigStore`, `DeviceRegistry`, and `AlertsRegistry` are all stored 
 - `@g5000/core` — `Bus`, channel pattern matching (`foo.*.bar`, `wind.**`), `Channels` constants, alerts/AIS/autopilot type plumbing, JSON-safe helpers, rolling-window stat libs. No I/O.
 - `@g5000/db` — Drizzle schema + `ConfigStore`. Every config table is `(id, value JSON)`; nested cal grids / polar tables don't get column-level typing.
 - `@g5000/bridge` — wire drivers (`Ngt1Driver`, `YdwgRawTcpDriver`, `SerialPort0183Driver`, `ReplayDriver`), N2K decoder, channel-mapper, true-wind TX (fast-packet split, NGT-1 only), session logger.
-- `@g5000/compute` — true-wind, polars, CPA/TCPA, current math, cal-tools. Pure functions + RxJS pipelines that read/write the `Bus`. **Race-day predicates (line geometry, laylines, VMC, OCS, wind-shift, polar targets, `sideOfLine`, `startRaceComputePipeline`) are exported from the `@g5000/compute/race` subpath, NOT the package root.** This is deliberate — `race/laylines.js` statically imports `@g5000/grib`, which uses `node:path`, and bundling that chain into client components breaks `next build --webpack`. Server consumers (`apps/autopilot-server`, `/api/race/*` routes) must `import { ... } from '@g5000/compute/race'`. The root export deliberately omits race.
+- `@g5000/compute` — true-wind, polars, CPA/TCPA, current math, cal-tools. Pure functions + RxJS pipelines that read/write the `Bus`. **Race-day predicates (line geometry, laylines, VMC, OCS, wind-shift, polar targets, `sideOfLine`, `startRaceComputePipeline`) are exported from the `@g5000/compute/race` subpath, NOT the package root.** This is deliberate — `race/laylines.js` statically imports `@g5000/grib`, which uses `node:path`, and bundling that chain into client components breaks `next build --webpack`. Server consumers (`apps/g5000`, `/api/race/*` routes) must `import { ... } from '@g5000/compute/race'`. The root export deliberately omits race.
 - `@g5000/grib` — GFS/ECMWF/RTOFS fetchers, GRIB2 parser, on-disk cache, interpolation.
 - `@g5000/coastline` — OSM coastline loader + spatial-index queries (rbush) for routing land-avoidance.
 - `@g5000/routing` — isochronic-fan router (`fan`, `prune`, `plan`), wind decomposition, geodesic geometry. Property-tested with fast-check.
@@ -98,7 +98,7 @@ Channels are dotted strings (e.g. `wind.true.angle`, `nav.gps.position`). Subscr
 
 ### Source mode
 
-`SourceModeController` (`apps/autopilot-server/src/source-mode-controller.ts`) is the single switch between **live** (real hardware), **demo** (synthetic injector — note: demo publishes calibrated wind directly, so the true-wind pipeline is _not_ started in demo mode), and **replay** (a session `.jsonl.gz` from `data/sessions/`). The web UI flips it via `/api/source-mode`. Code that needs to gate behaviour on mode should consult the controller, not poll the bus.
+`SourceModeController` (`apps/g5000/src/source-mode-controller.ts`) is the single switch between **live** (real hardware), **demo** (synthetic injector — note: demo publishes calibrated wind directly, so the true-wind pipeline is _not_ started in demo mode), and **replay** (a session `.jsonl.gz` from `data/sessions/`). The web UI flips it via `/api/source-mode`. Code that needs to gate behaviour on mode should consult the controller, not poll the bus.
 
 ### Persistence
 
@@ -113,7 +113,7 @@ Tests sit next to source as `*.test.ts(x)` in `packages/*/src/**`, `packages/*/t
 **Known environmental failures** (treat as the baseline, not regressions):
 
 - `packages/routing/test/integration/bermuda-newport.test.ts` — needs the coastline data file under `packages/coastline/data/`, which is gitignored. Fetch with `npm run fetch --workspace @g5000/coastline` to make this pass locally.
-- `packages/web/src/app/api/position/route.test.ts` and other route tests that hit `getSharedConfigStore()` — fail because `ConfigStore` is only initialised by `autopilot-server`'s boot, not by `vitest`. These tests need a setup harness; right now they're red in isolation.
+- `packages/web/src/app/api/position/route.test.ts` and other route tests that hit `getSharedConfigStore()` — fail because `ConfigStore` is only initialised by `g5000 app`'s boot, not by `vitest`. These tests need a setup harness; right now they're red in isolation.
 - `packages/grib/...` parse-grib2 integration — requires `wgrib2` on `$PATH`.
 
 If `npm test` shows ~4 failed / ~690+ passed, that's the expected baseline; do not block a merge on these. Any other failure is a regression and IS blocking.
@@ -195,9 +195,9 @@ Production runs on RPi5 `sula-bassana` reachable via Tailscale (`100.64.0.117`),
 
 The Pi pulls from `origin/main` only — see _Branching model_ above for the promote step that gets work from `develop` onto `main` before deploying. Skipping the promote step and trying to `git pull` on the Pi will silently no-op (Pi is already at main's tip) and your "deploy" won't actually ship the develop-side changes.
 
-Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge grib routing coastline` → build `autopilot-server` → build `web` → `systemctl restart g5000-autopilot`.
+Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge grib routing coastline` → build `g5000 app` → build `web` → `systemctl restart g5000-autopilot`.
 
-> **Note:** `grib` MUST be in that tsc step even though `autopilot-server` doesn't depend on it — `packages/web` imports types from `@g5000/grib` (e.g. `CurrentField` in `grib-context.ts`) and `next build` resolves those via the package's compiled `dist/*.d.ts`. Omit it and a stale `dist/types.d.ts` will make `next build` fail with confusing `Type "X" is not assignable to type "Y"` errors. Failed `next build` also wipes `.next/BUILD_ID`, which prevents the autopilot-server from booting on the next restart — so leaving `grib` out turns a build error into a production outage. The same trap applies to `routing` and `coastline`: `packages/web/src/app/api/route/plan/route.ts` imports `computeSailTimeline` from `@g5000/routing`, and `next build` resolves it through `dist/`. If `routing/dist/` is stale (the package was updated but its dist wasn't rebuilt), the web build fails with `'computeSailTimeline' is not exported from '@g5000/routing'` even though the symbol exists in source. Both packages must be in the rebuild chain.
+> **Note:** `grib` MUST be in that tsc step even though `g5000 app` doesn't depend on it — `packages/web` imports types from `@g5000/grib` (e.g. `CurrentField` in `grib-context.ts`) and `next build` resolves those via the package's compiled `dist/*.d.ts`. Omit it and a stale `dist/types.d.ts` will make `next build` fail with confusing `Type "X" is not assignable to type "Y"` errors. Failed `next build` also wipes `.next/BUILD_ID`, which prevents the g5000 app from booting on the next restart — so leaving `grib` out turns a build error into a production outage. The same trap applies to `routing` and `coastline`: `packages/web/src/app/api/route/plan/route.ts` imports `computeSailTimeline` from `@g5000/routing`, and `next build` resolves it through `dist/`. If `routing/dist/` is stale (the package was updated but its dist wasn't rebuilt), the web build fails with `'computeSailTimeline' is not exported from '@g5000/routing'` even though the symbol exists in source. Both packages must be in the rebuild chain.
 
 > **Stale-dist gotcha:** `tsc -b` is incremental — if it thinks nothing changed it skips work and leaves old `dist/` files in place. If you suspect a dist is stale (especially after rebases or branch swaps), `rm -rf packages/<name>/dist && npx tsc -b packages/<name> --force` is the nuclear option. The pattern that bit a recent deploy: `tsc -b packages/web` claimed clean on the Mac because `compute/dist/index.js` still had a removed export from before a refactor; the Pi's clean rebuild surfaced the real error.
 

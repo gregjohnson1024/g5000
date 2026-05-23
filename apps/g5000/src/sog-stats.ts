@@ -18,7 +18,7 @@ interface BufferEntry {
 
 /**
  * Subscribe to `nav.gps.sog` on the bus and maintain a rolling-window mean.
- * The buffer is in-memory in the autopilot-server (not persisted) so it
+ * The buffer is in-memory in the g5000 app (not persisted) so it
  * starts empty on every server restart; once running, it survives all
  * client navigation. Returns a `stop()` to unsubscribe — call from the
  * server's `stops[]` for clean shutdown.

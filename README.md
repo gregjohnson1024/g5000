@@ -32,7 +32,7 @@ See [CLAUDE.md](./CLAUDE.md) for the deep architecture overview — package grap
 
 ```
 apps/
-  autopilot-server/       # The single production runtime. Custom Node server that
+  g5000 app/       # The single production runtime. Custom Node server that
                           # mounts Next.js, wires the drivers + bus + compute
                           # pipelines, and runs an H-LINK TCP server alongside.
 packages/
@@ -58,13 +58,13 @@ docs/
 git clone https://github.com/gregjohnson1024/g5000.git
 cd g5000
 npm install
-npm run dev --workspace @g5000/autopilot-server    # custom Node server + Next on :3000
+npm run dev --workspace @g5000/app    # custom Node server + Next on :3000
 ```
 
 Without a boat on the local network, the NGT-1 / YDWG drivers fail to connect (logged, not fatal) and the UI is empty. To get synthetic data:
 
 ```bash
-DEMO_MODE=1 npm run dev --workspace @g5000/autopilot-server
+DEMO_MODE=1 npm run dev --workspace @g5000/app
 ```
 
 Or flip the toggle at `/settings` after the server is up.
@@ -83,12 +83,12 @@ Node ≥22 is required; the project relies on Node 22's native `fetch` and ESM-o
 
 Production runs on a Raspberry Pi 5 (`sula-bassana`) reachable over Tailscale, boat ethernet, boat WiFi, or `https://g5000.sulabassana.net` via Cloudflared.
 
-The autopilot-server is the only deployed artifact — Next.js is mounted into it as a custom server, so `next start` is not used. Deploy is `git pull` + a documented rebuild order (composite project refs matter):
+The g5000 app is the only deployed artifact — Next.js is mounted into it as a custom server, so `next start` is not used. Deploy is `git pull` + a documented rebuild order (composite project refs matter):
 
 ```bash
 git pull
 npx tsc -b packages/core packages/db packages/compute packages/bridge packages/grib
-npm run build --workspace @g5000/autopilot-server
+npm run build --workspace @g5000/app
 npm run build --workspace @g5000/web
 sudo systemctl restart g5000-autopilot
 ```
@@ -110,7 +110,7 @@ All four are designed to coexist — the bridge dedupes by source address + PGN.
 
 ## What's notable
 
-- **One process, many roles** — the autopilot-server is the _only_ runtime artifact in production. Next.js, the N2K bridge, the routing engine, the H-LINK TCP server, and the SQLite store all live in the same Node process. The "custom Next server + `globalThis` singletons" pattern is what keeps this coherent — explicitly defended in `next.config.ts` and `CLAUDE.md`.
+- **One process, many roles** — the g5000 app is the _only_ runtime artifact in production. Next.js, the N2K bridge, the routing engine, the H-LINK TCP server, and the SQLite store all live in the same Node process. The "custom Next server + `globalThis` singletons" pattern is what keeps this coherent — explicitly defended in `next.config.ts` and `CLAUDE.md`.
 - **Replay parity** — any `.jsonl.gz` session file plays back end-to-end through the same compute pipelines and decoders, so bugs reproduce against historical wire-level captures.
 - **Disk-persistent caches** for OSM tiles and GRIB grids under `~/.g5000-router/`, so offshore-without-internet routes still plan against the last-fetched wind field.
 - **Memory and `docs/superpowers/`** capture not just the code but the _reasoning_ — design specs, executable implementation plans, post-mortems of hard-won lessons (e.g., the autopilot's "Performance level" silently swapping algorithms behind the user's dial — a UX anti-pattern to avoid replicating).

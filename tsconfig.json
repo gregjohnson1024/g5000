@@ -8,7 +8,7 @@
     { "path": "./packages/grib" },
     { "path": "./packages/coastline" },
     { "path": "./packages/routing" },
-    { "path": "./apps/autopilot-server" },
+    { "path": "./apps/g5000" },
     { "path": "./apps/router" }
   ]
 }

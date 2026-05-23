@@ -63,8 +63,8 @@ jobs:
           # without reading the "stale-dist gotcha" callout there.
           npx tsc -b packages/core packages/db packages/grib packages/compute packages/bridge packages/routing packages/coastline
 
-      - name: Build autopilot-server
-        working-directory: ${{ env.AUTOPILOT_DIR }}/apps/autopilot-server
+      - name: Build g5000 app
+        working-directory: ${{ env.AUTOPILOT_DIR }}/apps/g5000
         run: npm run build
 
       - name: Build web (next build)

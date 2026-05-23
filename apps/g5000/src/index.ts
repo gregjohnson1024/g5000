@@ -648,7 +648,7 @@ async function main(): Promise<void> {
   // COG concentration ref: initialised to 0 (conservative — OCS predictor
   // will return null until the COG stats window has enough data). Updated at
   // 200 ms from the shared COG stats singleton that startCogStats registers.
-  // Using a lightweight poll here (inside autopilot-server where I/O is
+  // Using a lightweight poll here (inside g5000 app where I/O is
   // allowed) avoids HTTP self-calls and keeps @g5000/compute boundary-clean.
   const cogConcentrationRef: { current: number } = { current: 0 };
   const cogConcentrationPoll = setInterval(() => {

@@ -82,7 +82,7 @@ export class DeviceRegistry {
   async refresh(target?: number): Promise<void> {
     if (!this.txer) {
       throw new Error(
-        'DeviceRegistry.refresh: no txer registered (autopilot-server must call registerTxer at boot)',
+        'DeviceRegistry.refresh: no txer registered (g5000 app must call registerTxer at boot)',
       );
     }
     if (target === undefined) {

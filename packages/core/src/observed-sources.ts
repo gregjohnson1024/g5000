@@ -1,7 +1,7 @@
 /**
- * Shared accessor for the autopilot-server's observed-sources tracker.
+ * Shared accessor for the g5000 app's observed-sources tracker.
  *
- * The tracker itself is owned by `apps/autopilot-server` (it installs a bus
+ * The tracker itself is owned by `apps/g5000` (it installs a bus
  * subscription at boot). We declare the cross-process interface and a
  * `globalThis`-backed singleton here so Next.js API routes living in the web
  * package can resolve the same instance without importing into the server

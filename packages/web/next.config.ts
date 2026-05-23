@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 const config: NextConfig = {
   reactStrictMode: true,
   // @g5000/core and @g5000/db must not be bundled by Next.js. Both host
-  // process-level singletons (shared bus, ConfigStore) that autopilot-server
+  // process-level singletons (shared bus, ConfigStore) that g5000 app
   // sets before Next boots. Bundling them creates a second module instance
   // and the route handler sees a null singleton. @g5000/db also depends on
   // better-sqlite3 (native addon), which cannot be bundled regardless.

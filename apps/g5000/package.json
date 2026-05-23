@@ -1,5 +1,5 @@
 {
-  "name": "@g5000/autopilot-server",
+  "name": "@g5000/app",
   "version": "0.0.0",
   "private": true,
   "type": "module",

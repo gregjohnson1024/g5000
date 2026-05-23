@@ -7,7 +7,7 @@ declare const globalThis: { __g5000_sharedBus__?: Bus };
  *
  * Backed by `globalThis` so the bus survives Next.js + Turbopack's tendency
  * to instantiate a workspace package once per server bundle. Without this,
- * the autopilot-server's bus and the Next.js route handlers' bus would be
+ * the g5000 app's bus and the Next.js route handlers' bus would be
  * two different objects in the same Node process and SSE would never see
  * the bridge's publishes. (Same fix applied to ConfigStore in Plan 3.)
  */

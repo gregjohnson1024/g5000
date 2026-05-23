@@ -2,7 +2,7 @@ import { activeTrack, createTrack, appendPoint, type Track, type TrackPoint } fr
 import { positionStreamUrl } from './g5000-client';
 
 /**
- * Server-side track recorder. Connects to the autopilot-server's
+ * Server-side track recorder. Connects to the g5000 app's
  * `/api/position` SSE feed and appends down-sampled fixes to the currently
  * active track. If there's no active track on startup, one is created.
  *

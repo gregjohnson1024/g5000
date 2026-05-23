@@ -10,7 +10,7 @@ B&G H5000 H-Link output. No extra translation layer required.
 
 ## What works today
 
-The G5000 autopilot-server runs an H-LINK protocol server on
+The G5000 g5000 app runs an H-LINK protocol server on
 configurable port `HLINK_PORT` (default `5050`). The server is a faithful
 implementation of B&G's documented H-Link command set (see
 `docs/superpowers/specs/2026-05-08-h6000-design.md` references to the
@@ -22,7 +22,7 @@ H5000 Operation Manual chapter 11):
 - Reply format: `V<NNN>,<MMM>,<FFF>,<value>*<CS>\r\n`.
 
 Function numbers we currently expose (channel ↔ H5000 function mapping
-lives in `apps/autopilot-server/src/hlink/function-table.ts`):
+lives in `apps/g5000/src/hlink/function-table.ts`):
 
 |  Fn | What it is                           | Internal channel               | Unit out    |
 | --: | ------------------------------------ | ------------------------------ | ----------- |

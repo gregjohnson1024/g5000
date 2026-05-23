@@ -103,7 +103,7 @@ export const alarmsHistory = sqliteTable('alarms_history', {
  * Two `source` values:
  *  - 'manual': crew-typed entry. `text` always populated; nav snapshot
  *    columns optional (client supplies current values).
- *  - 'auto': written by the autopilot-server's hourly auto-logger.
+ *  - 'auto': written by the g5000 app's hourly auto-logger.
  *    `kind='position'` and nav columns populated; `text` is null or
  *    a templated summary.
  *

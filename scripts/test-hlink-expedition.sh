@@ -2,7 +2,7 @@
 # scripts/test-hlink-expedition.sh
 #
 # Emulate an Expedition-shaped H-LINK session against a running G5000
-# autopilot-server, verifying that the read path Expedition uses works
+# g5000 app, verifying that the read path Expedition uses works
 # end-to-end. PASS/FAIL per check; non-zero exit on any FAIL.
 #
 # Usage:
@@ -47,7 +47,7 @@ echo
 
 # Quick reachability probe.
 if ! nc -z -w 2 "$HOST" "$PORT" 2>/dev/null; then
-  fail "Cannot reach $HOST:$PORT — is the autopilot-server running?"
+  fail "Cannot reach $HOST:$PORT — is the g5000 app running?"
   exit 1
 fi
 pass "TCP port $HOST:$PORT is open"

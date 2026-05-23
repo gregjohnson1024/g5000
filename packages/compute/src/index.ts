@@ -13,5 +13,5 @@ export * from './alarms/index.js';
 // re-exported here because race/laylines.js statically imports @g5000/grib
 // (for current-field interpolation), and grib uses node:path. Bundling
 // that chain into client components breaks `next build --webpack`. Server
-// consumers (autopilot-server, /api/race/* routes) import via the subpath.
+// consumers (g5000 app, /api/race/* routes) import via the subpath.
 export * from './sail-crossover/index.js';

@@ -43,7 +43,7 @@ export interface SocketCanDriverOptions {
  * if the module isn't installed, the driver fails to start with a clear
  * message and the bridge boot logs it like an offline NGT-1 / YDWG.
  *
- * On the Pi: `npm install socketcan` inside apps/autopilot-server (or pin
+ * On the Pi: `npm install socketcan` inside apps/g5000 (or pin
  * it via optionalDependencies in package.json). Requires SPI + the
  * mcp2515-can0 dt-overlay loaded, and `ip link set can0 up type can
  * bitrate 250000` already done — see CLAUDE.md "PiCAN-M" section.

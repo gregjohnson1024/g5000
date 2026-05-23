@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 /**
  * GET /api/stats/sog — server-side rolling-window SOG mean.
  *
- * Computed by `startSogStats` in apps/autopilot-server, which subscribes to
+ * Computed by `startSogStats` in apps/g5000, which subscribes to
  * `nav.gps.sog` from the bus and maintains a 15-min ring of samples.
  * Returns the snapshot in m/s — clients convert to knots for display.
  *

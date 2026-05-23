@@ -133,8 +133,8 @@ export default function HelmPage() {
   const positionLat = position ? fmtLat(position.lat) : null;
   const positionLon = position ? fmtLon(position.lon) : null;
 
-  // Rolling-window SOG mean comes from /api/stats/sog. The autopilot-server
-  // owns the buffer (see apps/autopilot-server/src/sog-stats.ts), so it
+  // Rolling-window SOG mean comes from /api/stats/sog. The g5000 app
+  // owns the buffer (see apps/g5000/src/sog-stats.ts), so it
   // survives client navigation — switching tabs doesn't reset the average.
   // Poll every 2 s; the window is whatever the server reports.
   const [avgSog, setAvgSog] = useState<{

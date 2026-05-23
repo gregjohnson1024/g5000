@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 
 /**
  * Hot-toggle the SocketCAN ingest driver without restarting the
- * autopilot-server. The handler:
+ * g5000 app. The handler:
  *   1. Persists `{ enabled, interface }` to ~/.g5000-router/settings.json
  *      so the choice survives the next restart.
  *   2. Adds or removes the SocketCAN driver via the shared DriverHub so
@@ -103,7 +103,7 @@ export async function POST(req: Request): Promise<Response> {
         error: {
           kind: 'unavailable',
           message:
-            'DriverHub not initialised — autopilot-server is starting up or in a test harness',
+            'DriverHub not initialised — g5000 app is starting up or in a test harness',
         },
       },
       { status: 503 },

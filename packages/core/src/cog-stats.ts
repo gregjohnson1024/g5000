@@ -3,7 +3,7 @@
  *
  * Mirrors {@link SogStatsSnapshot} in shape but with circular-mean math —
  * averaging 350° and 10° as direction must produce ~0°, not 180°. The
- * autopilot-server's `startCogStats` buffers raw COG samples (radians)
+ * g5000 app's `startCogStats` buffers raw COG samples (radians)
  * and computes the mean unit vector on snapshot; `avgRad` is the
  * atan2 of that mean.
  */

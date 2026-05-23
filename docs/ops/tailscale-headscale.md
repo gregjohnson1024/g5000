@@ -146,7 +146,7 @@ succeeded, `tailscale status` returned the full RBR tailnet (~120 nodes,
 # From any machine that has joined the headscale tailnet:
 ssh greg@g5000-pi 'uname -a; uptime; tailscale status | head -3'
 
-# HTTP — port-forward the autopilot-server's web UI:
+# HTTP — port-forward the g5000 app's web UI:
 ssh -L 3000:localhost:3000 greg@g5000-pi
 # Then browse http://localhost:3000 locally.
 ```

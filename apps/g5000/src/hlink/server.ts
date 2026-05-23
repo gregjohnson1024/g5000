@@ -28,7 +28,7 @@ export interface HlinkServerOptions {
    * missing or 0/undefined entries mean no damping for that channel.
    *
    * When omitted, no damping is applied — useful for tests and minimal
-   * deployments. The autopilot-server boot wires this to the ConfigStore's
+   * deployments. The g5000 app boot wires this to the ConfigStore's
    * `getDampingConfig()`.
    */
   getDamping?: () => Record<string, number>;

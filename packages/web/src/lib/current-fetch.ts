@@ -42,13 +42,13 @@ interface CacheEntry {
 const G5000_ROOT = process.env.G5000_ROUTER_ROOT ?? join(homedir(), '.g5000-router');
 const CURRENT_CACHE_DIR = join(G5000_ROOT, 'current-cache');
 
-// The dev server runs from apps/autopilot-server (its CWD), the Pi
+// The dev server runs from apps/g5000 (its CWD), the Pi
 // production build runs the same way, but standalone test runs (vitest)
 // may run from the repo root. Walk a small set of candidate paths to
 // find the helper script regardless of CWD.
 const HELPER_SCRIPT = (() => {
   const candidates = [
-    // From apps/autopilot-server (dev + prod runtime CWD)
+    // From apps/g5000 (dev + prod runtime CWD)
     resolve(process.cwd(), '../../packages/web/scripts/fetch-copernicus-currents.py'),
     // From repo root (tests, manual invocation)
     resolve(process.cwd(), 'packages/web/scripts/fetch-copernicus-currents.py'),
@@ -56,7 +56,7 @@ const HELPER_SCRIPT = (() => {
     resolve(process.cwd(), 'scripts/fetch-copernicus-currents.py'),
   ];
   for (const p of candidates) if (existsSync(p)) return p;
-  // Fall back to the apps/autopilot-server-relative path; the actual
+  // Fall back to the apps/g5000-relative path; the actual
   // failure will surface as a clearer error from the spawned process.
   return candidates[0]!;
 })();

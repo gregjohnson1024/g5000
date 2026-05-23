@@ -1,7 +1,7 @@
 /**
  * Shared accessor for the server-side SOG rolling-window statistic.
  *
- * The autopilot-server subscribes to `nav.gps.sog` from the bus, keeps a
+ * The g5000 app subscribes to `nav.gps.sog` from the bus, keeps a
  * rolling buffer of samples for some window (default 15 min), and registers
  * itself via {@link setSharedSogStats}. Route handlers in @g5000/web read
  * the snapshot via {@link getSharedSogStats} so the UI doesn't have to

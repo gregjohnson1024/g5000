@@ -60,7 +60,7 @@ async function readHeaderStartedAt(filePath: string): Promise<string | undefined
     }
   } catch {
     // Tolerate truncated or still-open gzip streams (e.g., the live session
-    // log file held open by an autopilot-server in record mode). Returning
+    // log file held open by an g5000 app in record mode). Returning
     // undefined here lets listSessions still surface the file in the listing
     // with mtime/size only.
     return undefined;

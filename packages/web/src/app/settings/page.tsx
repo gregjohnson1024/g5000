@@ -36,7 +36,7 @@ interface Settings {
   forecastBbox?: Bbox;
   /**
    * Opt-in SocketCAN ingest for the PiCAN-M HAT. Default: disabled (current
-   * fleet uses YDWG/NGT-1). When enabled, the autopilot-server boots an
+   * fleet uses YDWG/NGT-1). When enabled, the g5000 app boots an
    * additional SocketCanDriver alongside YDWG. Takes effect on next service
    * restart — the bridge wires drivers at boot.
    */
