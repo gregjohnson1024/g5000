@@ -125,15 +125,10 @@ export default function RoutesPage() {
       // (with navigation to /chart?plan=<id>) is future work.
       const plan = j.route as Record<string, unknown> | undefined;
       if (plan) {
-        const legs =
-          typeof plan.legs === 'number'
-            ? plan.legs
-            : Array.isArray(plan.isochrones)
-              ? (plan.isochrones as unknown[]).length - 1
-              : '?';
+        const legs = Array.isArray(plan.legs) ? (plan.legs as unknown[]).length : '?';
         const etaTs =
-          typeof plan.eta === 'number'
-            ? new Date(plan.eta * 1000).toUTCString().replace(' GMT', 'Z')
+          typeof plan.end === 'number'
+            ? new Date((plan.end as number) * 1000).toUTCString().replace(' GMT', 'Z')
             : null;
         const etaPart = etaTs ? `, ETA ${etaTs}` : '';
         setPlanMessages((prev) => ({
