@@ -4,6 +4,10 @@ import maplibregl from 'maplibre-gl';
 
 const SOURCE_ID = 'noaa-enc';
 const LAYER_ID = 'noaa-enc-layer';
+/** Standard XYZ floor. NOAA serves tiles from std z=2 (their z=0) upward.
+ * ZoomIndicator imports this to amber-tint when the user is below the
+ * floor with NOAA enabled. */
+export const NOAA_MIN_ZOOM = 2;
 
 /**
  * NOAA NCDS paper-chart raster overlay. Opaque tiles covering the
@@ -44,7 +48,7 @@ export function EncLayer({
             type: 'raster',
             tiles: ['/api/enc-tiles/{z}/{x}/{y}.png'],
             tileSize: 256,
-            minzoom: 2,
+            minzoom: NOAA_MIN_ZOOM,
             maxzoom: 18,
             attribution: 'NOAA / Office of Coast Survey',
           });
@@ -82,4 +86,36 @@ export function EncLayer({
   }, [map, visible]);
 
   return null;
+}
+
+/**
+ * Force MapLibre to drop its in-memory tile cache for the NOAA layer and
+ * re-fetch every visible tile from the disk-cache. Use this after running
+ * the seed script (or after a long offshore pause) to pull newly-cached
+ * tiles into view without panning the chart.
+ *
+ * Calling `setTiles()` with the SAME URL is a no-op in MapLibre — internal
+ * tile keys don't change so the existing cache stays. To force a true
+ * cache bust we append a cache-busting query param that MapLibre treats
+ * as a new URL; the proxy ignores the param and serves from disk, so the
+ * disk cache benefit is preserved.
+ *
+ * Why not poll periodically? `setTiles()` aborts in-flight tile fetches
+ * as a side effect, and at NOAA's 5–25 s timeout that wastes a lot of
+ * work and floods the dev console with AbortError noise. Manual trigger
+ * is the right shape: the user knows when they expect new content.
+ */
+export function refreshEncTiles(map: maplibregl.Map | null): boolean {
+  if (!map) return false;
+  try {
+    const src = map.getSource(SOURCE_ID);
+    if (src && 'setTiles' in src && typeof src.setTiles === 'function') {
+      const buster = Date.now();
+      src.setTiles([`/api/enc-tiles/{z}/{x}/{y}.png?v=${buster}`]);
+      return true;
+    }
+  } catch {
+    /* map torn down mid-call */
+  }
+  return false;
 }

@@ -83,10 +83,10 @@ describe('enc-tiles route', () => {
       makeCtx('15', '9892', '12226'),
     );
     expect(res.status).toBe(200);
-    expect(res.headers.get('x-cache')).toBe('EMPTY-UPSTREAM-5XX');
+    expect(res.headers.get('x-cache')).toBe('UPSTREAM-5XX');
     expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
     const body = new Uint8Array(await res.arrayBuffer());
-    // PNG signature
     expect(Array.from(body.slice(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     await new Promise((r) => setTimeout(r, 50));
     expect(existsSync(join(TMP_ROOT, 'enc-cache', '15', '9892', '12226.png'))).toBe(false);

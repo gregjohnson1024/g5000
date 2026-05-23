@@ -59,6 +59,7 @@ function emptyResponse(): Response {
       'content-type': 'image/png',
       'cache-control': 'public, max-age=2592000',
       'x-cache': 'EMPTY',
+      'access-control-allow-origin': '*',
     },
   });
 }
@@ -74,6 +75,7 @@ async function serveFromDisk(path: string): Promise<Response | null> {
         'content-type': 'image/png',
         'cache-control': 'public, max-age=2592000',
         'x-cache': 'HIT',
+        'access-control-allow-origin': '*',
       },
     });
   } catch {
@@ -92,40 +94,44 @@ async function fetchAndCache(
   const url =
     `https://gis.charttools.noaa.gov/arcgis/rest/services/` +
     `MarineChart_Services/NOAACharts/MapServer/tile/${noaaZ}/${yBase}/${x}`;
+  // NOAA's NCDS tile service is dynamic-render and can be very slow on
+  // cold tiles — keep the timeout generous. On timeout or any network
+  // error, fall back to a transparent tile so MapLibre renders a blank
+  // patch (not a broken-image icon) and retries on the next zoom/pan.
   let r: Response;
   try {
     r = await fetch(url, {
       headers: { 'user-agent': USER_AGENT },
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(25_000),
     });
   } catch {
-    // AbortError on timeout, DNS / connection refused, etc. Serve a
-    // transparent placeholder so MapLibre doesn't keep retrying a
-    // broken tile — the rest of the chart stays usable. Don't cache;
-    // a transient upstream blip shouldn't poison the disk for 30 days.
     return new Response(new Uint8Array(TRANSPARENT_PNG), {
       status: 200,
       headers: {
         'content-type': 'image/png',
-        'cache-control': 'no-store',
-        'x-cache': 'EMPTY-TIMEOUT',
+        'cache-control': 'public, max-age=60',
+        'x-cache': 'TIMEOUT',
+        'access-control-allow-origin': '*',
       },
     });
   }
   if (!r.ok) {
     if (r.status === 404) {
-      return new Response(`upstream tile ${url} → 404`, { status: 404 });
+      return new Response(`upstream tile ${url} → 404`, {
+        status: 404,
+        headers: { 'access-control-allow-origin': '*' },
+      });
     }
-    // NOAA's MapServer occasionally 5xxs under load. Treat the same as a
-    // network timeout: transparent placeholder, no disk write. Avoids the
-    // MapLibre retry storm + console spam, and the rest of the chart stays
-    // usable.
+    // NOAA's MapServer occasionally 5xxs under load. Same pattern as the
+    // timeout branch above: transparent placeholder, no disk write, brief
+    // cache window so MapLibre's `?v=…` retry doesn't immediately re-hit.
     return new Response(new Uint8Array(TRANSPARENT_PNG), {
       status: 200,
       headers: {
         'content-type': 'image/png',
-        'cache-control': 'no-store',
-        'x-cache': 'EMPTY-UPSTREAM-5XX',
+        'cache-control': 'public, max-age=60',
+        'x-cache': 'UPSTREAM-5XX',
+        'access-control-allow-origin': '*',
       },
     });
   }
@@ -144,6 +150,7 @@ async function fetchAndCache(
       'content-type': 'image/png',
       'cache-control': 'public, max-age=2592000',
       'x-cache': 'MISS',
+      'access-control-allow-origin': '*',
     },
   });
 }
@@ -154,7 +161,10 @@ export async function GET(
 ): Promise<Response> {
   const { z, x, y } = await ctx.params;
   if (!/^\d{1,2}$/.test(z) || !/^\d{1,7}$/.test(x) || !/^\d{1,7}(\.png)?$/.test(y)) {
-    return new Response('bad tile coords', { status: 400 });
+    return new Response('bad tile coords', {
+      status: 400,
+      headers: { 'access-control-allow-origin': '*' },
+    });
   }
   const zNum = Number(z);
   if (zNum < MIN_Z || zNum > MAX_Z) {

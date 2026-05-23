@@ -40,7 +40,12 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
             attribution: '© OpenStreetMap contributors',
           },
         },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+        layers: [
+          // Solid black floor: when OSM (and every overlay) is toggled off
+          // the canvas should be true black, not MapLibre's default grey.
+          { id: '__bg-black__', type: 'background', paint: { 'background-color': '#000000' } },
+          { id: 'osm', type: 'raster', source: 'osm' },
+        ],
       },
       center: [center.lon, center.lat],
       zoom,

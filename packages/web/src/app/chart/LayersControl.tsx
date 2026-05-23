@@ -2,8 +2,13 @@
 import { useEffect, useRef, useState } from 'react';
 
 export interface LayersState {
+  /** OSM raster basemap. Defaults true. Off → pure black underneath (handy
+   * for NOAA-only or night use). */
+  osm: boolean;
   enc: boolean;
   buoys: boolean;
+  /** Debug: draw the boundary + z/x/y label of every visible tile. */
+  tileGrid: boolean;
 }
 
 /**
@@ -21,9 +26,13 @@ export interface LayersState {
 export function LayersControl({
   state,
   onToggle,
+  onRefreshNoaa,
 }: {
   state: LayersState;
   onToggle: (key: keyof LayersState) => void;
+  /** Optional handler for the "Refresh NOAA tiles" action — invalidates
+   * MapLibre's in-memory tile cache so newly-seeded disk tiles render. */
+  onRefreshNoaa?: () => void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -71,8 +80,24 @@ export function LayersControl({
           aria-label="Chart layers"
           className="mt-2 w-44 rounded border border-zinc-700 bg-zinc-900/95 text-zinc-100 p-2 shadow-lg"
         >
+          <Row label="OSM base" pressed={state.osm} onClick={() => onToggle('osm')} />
           <Row label="NOAA chart" pressed={state.enc} onClick={() => onToggle('enc')} />
           <Row label="Buoys" pressed={state.buoys} onClick={() => onToggle('buoys')} />
+          <Row
+            label="Tile grid (debug)"
+            pressed={state.tileGrid}
+            onClick={() => onToggle('tileGrid')}
+          />
+          {onRefreshNoaa && state.enc ? (
+            <button
+              type="button"
+              onClick={onRefreshNoaa}
+              className="w-full mt-1 px-2 py-1.5 rounded text-xs text-zinc-300 border border-zinc-700 hover:bg-zinc-800"
+              title="Drop MapLibre's tile cache and re-fetch NOAA tiles from disk"
+            >
+              ↻ Refresh NOAA tiles
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
