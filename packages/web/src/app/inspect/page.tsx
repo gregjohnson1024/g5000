@@ -8,6 +8,29 @@ interface ChannelEntry {
   receivedAtMs: number;
 }
 
+const MS_TO_KN = 1.943844;
+const RAD_TO_DEG = 180 / Math.PI;
+
+/**
+ * Scalar value converted to the units the user reads: speeds (m/s) → knots,
+ * angles (rad) → degrees, angular rates (rad/s) → °/s. Blank for any other
+ * unit or non-scalar sample — the raw Value column already shows those.
+ */
+function formatUserUnits(s: JsonSafeSample): string {
+  if (s.value.kind !== 'scalar') return '';
+  const { value, unit } = s.value;
+  switch (unit) {
+    case 'm/s':
+      return `${(value * MS_TO_KN).toFixed(2)} kn`;
+    case 'rad':
+      return `${(value * RAD_TO_DEG).toFixed(1)}°`;
+    case 'rad/s':
+      return `${(value * RAD_TO_DEG).toFixed(1)}°/s`;
+    default:
+      return '';
+  }
+}
+
 function formatValue(s: JsonSafeSample): string {
   switch (s.value.kind) {
     case 'scalar':
@@ -68,6 +91,7 @@ export default function InspectPage() {
           <tr className="text-left text-slate-400 border-b border-slate-800">
             <th className="py-2 pr-4">Channel</th>
             <th className="py-2 pr-4">Value</th>
+            <th className="py-2 pr-4">User units</th>
             <th className="py-2 pr-4">Source</th>
             <th className="py-2">Age</th>
           </tr>
@@ -77,6 +101,7 @@ export default function InspectPage() {
             <tr key={channel} className="border-b border-slate-900">
               <td className="py-1 pr-4">{channel}</td>
               <td className="py-1 pr-4">{formatValue(entry.sample)}</td>
+              <td className="py-1 pr-4 text-sky-300">{formatUserUnits(entry.sample)}</td>
               <td className="py-1 pr-4 text-slate-500">{entry.sample.source}</td>
               <td className="py-1 text-slate-500">
                 {((Date.now() - entry.receivedAtMs) / 1000).toFixed(1)}s
@@ -85,7 +110,7 @@ export default function InspectPage() {
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-4 text-slate-500">
+              <td colSpan={5} className="py-4 text-slate-500">
                 Waiting for samples…
               </td>
             </tr>
