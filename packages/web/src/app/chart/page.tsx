@@ -90,10 +90,6 @@ function ChartPageInner() {
   useEffect(() => {
     writeTzMode('chart:tz', tz);
   }, [tz]);
-  // Default off — at the user's request. Isochrones add chart clutter and
-  // are mostly useful when actively investigating a planned route's fan-out.
-  const [showIsochrones, setShowIsochrones] = useState(false);
-
   // Layer visibility — persists to localStorage so the choice survives
   // reloads. Hydrated AFTER first render (not via lazy `useState` init)
   // so server and client agree on the initial paint — otherwise the
@@ -217,10 +213,8 @@ function ChartPageInner() {
       if (raw) {
         const j = JSON.parse(raw) as Partial<{
           windHours: number;
-          showIsochrones: boolean;
         }>;
         if (typeof j.windHours === 'number') setWindHours(j.windHours);
-        if (typeof j.showIsochrones === 'boolean') setShowIsochrones(j.showIsochrones);
       }
     } catch {
       /* corrupt blob; ignore */
@@ -230,11 +224,11 @@ function ChartPageInner() {
   useEffect(() => {
     if (!settingsHydrated) return;
     try {
-      localStorage.setItem('chart:settings', JSON.stringify({ windHours, showIsochrones }));
+      localStorage.setItem('chart:settings', JSON.stringify({ windHours }));
     } catch {
       /* quota / private-mode; ignore */
     }
-  }, [settingsHydrated, windHours, showIsochrones]);
+  }, [settingsHydrated, windHours]);
 
   const [waypoints, setWaypoints] = useState<
     Array<{ id: string; name: string; lat: number; lon: number }>
@@ -243,14 +237,14 @@ function ChartPageInner() {
   const [error, setError] = useState<string | undefined>();
 
   // Re-attach the route whenever it changes (planned, restored from
-  // localStorage, isochrone-toggle, or map first comes online). attachRoute
-  // is idempotent — same source/layer id just updates the data — so calling
-  // it on each change is cheap.
+  // localStorage, or map first comes online). attachRoute is idempotent —
+  // same source/layer id just updates the data — so calling it on each
+  // change is cheap. Isochrones are never drawn (the toggle was removed).
   useEffect(() => {
     if (route && mapInstance) {
-      attachRoute(mapInstance, 'route-gfs', route, '#000000', showIsochrones);
+      attachRoute(mapInstance, 'route-gfs', route, '#000000', false);
     }
-  }, [route, mapInstance, showIsochrones]);
+  }, [route, mapInstance]);
 
   // Track the cursor position over the map so the bottom-left readout
   // can show "lat lon, distance + bearing from boat". Cleared on
@@ -727,14 +721,6 @@ function ChartPageInner() {
           {mv.isWindModel && windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
           )}
-          <label className="flex items-center gap-2 text-xs pt-1 border-t border-slate-800 mt-2">
-            <input
-              type="checkbox"
-              checked={showIsochrones}
-              onChange={(e) => setShowIsochrones(e.target.checked)}
-            />
-            <span className="text-slate-300">Show isochrones</span>
-          </label>
         </div>
         {error && <div className="text-rose-400 text-xs">{error}</div>}
       </aside>
