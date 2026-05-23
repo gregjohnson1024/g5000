@@ -9,7 +9,6 @@ import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
 import { WaypointsLayer } from '../../components/WaypointsLayer';
-import { GulfStreamLayer } from '../../components/GulfStreamLayer';
 import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
@@ -462,7 +461,6 @@ function ChartPageInner() {
           }
           hidden={mv.roiHidden}
         />
-        <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
           map={mapInstance}
           marks={waypoints.map((w) => ({
