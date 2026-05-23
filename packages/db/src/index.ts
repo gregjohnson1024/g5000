@@ -6,6 +6,7 @@ export * from './alarms-config.js';
 export * from './alarms-history.js';
 export * from './ship-log.js';
 export * from './race-state.js';
+export type { Waypoint, Route } from './waypoints-routes-types.js';
 
 import { ConfigStore } from './config-store.js';
 
