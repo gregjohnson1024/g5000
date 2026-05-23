@@ -78,38 +78,12 @@ jobs:
         working-directory: ${{ env.AUTOPILOT_DIR }}/packages/web
         run: npm run build
 
-      # --- The next three steps take the service down briefly. They only
-      # do real work on the first deploy after the apps/autopilot-server →
-      # apps/g5000 rename; afterwards they all no-op. Builds above ran while
-      # the old service was still up, so downtime is just stop → start. ---
-
-      - name: Stop service before data migration
-        run: sudo systemctl stop g5000-autopilot
-
-      - name: Migrate data dir from old app path (one-time, idempotent)
-        working-directory: ${{ env.AUTOPILOT_DIR }}
-        run: |
-          # config.db + session logs are CWD-relative (./data). The rename
-          # changed the app's CWD, so the existing config (polars, cals,
-          # alarms, settings, race state) must move with it or the app boots
-          # a fresh empty db. Only moves if old exists and new doesn't, so
-          # it runs exactly once. Service is stopped above → SQLite WAL files
-          # are not held open during the move.
-          if [ -d apps/autopilot-server/data ] && [ ! -d apps/g5000/data ]; then
-            echo "migrating data/ from apps/autopilot-server → apps/g5000"
-            mv apps/autopilot-server/data apps/g5000/data
-            # Clear the now-stale orphan dist/node_modules left behind by the
-            # rename so the old path can't be mistaken for a live checkout.
-            rm -rf apps/autopilot-server
-          else
-            echo "no data migration needed"
-          fi
-
       - name: Sync systemd unit if changed
         working-directory: ${{ env.AUTOPILOT_DIR }}
         run: |
-          # The unit file's WorkingDirectory moved to apps/g5000. Reinstall
-          # when the tracked unit differs from the installed one. The override
+          # Reinstall the unit when the tracked file differs from the
+          # installed one (e.g. WorkingDirectory, WatchdogSec, or env edits),
+          # then daemon-reload so the next restart picks it up. The override
           # drop-in (.../g5000-autopilot.service.d/override.conf, YDWG host)
           # is a separate file and is preserved across this copy.
           if ! cmp -s scripts/g5000-autopilot.service /etc/systemd/system/g5000-autopilot.service; then
@@ -120,8 +94,8 @@ jobs:
             echo "unit file unchanged"
           fi
 
-      - name: Start service
-        run: sudo systemctl start g5000-autopilot
+      - name: Restart service
+        run: sudo systemctl restart g5000-autopilot
 
       - name: Verify service is active
         run: |
