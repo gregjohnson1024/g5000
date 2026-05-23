@@ -15,7 +15,7 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
-import { WindOverlay, type WindGrid, type WindModel } from '../../components/WindOverlay';
+import { WindOverlay, type WindGrid } from '../../components/WindOverlay';
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
@@ -28,6 +28,7 @@ import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { ZoomIndicator } from '../../components/ZoomIndicator';
 import { TileGridOverlay } from '../../components/TileGridOverlay';
 import { LayersControl, type LayersState } from './LayersControl';
+import { modelLayerView, type ChartModel } from './model-layer';
 import { ChartFollowControl } from './ChartFollowControl';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
@@ -60,10 +61,6 @@ function ChartPageInner() {
   const [livePos, setLivePos] = useState<LivePos | null>(null);
   const camera = useChartCamera({ map: mapInstance, livePos });
   const [windHours, setWindHours] = useState(0);
-  const [windModel, setWindModel] = useState<WindModel>('gfs');
-  // Default off — at the user's request. Wind overlay is heavy and most
-  // helm-time looks don't need it; toggle on when checking conditions.
-  const [windOn, setWindOn] = useState(false);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -98,7 +95,53 @@ function ChartPageInner() {
   // Default off — at the user's request. Isochrones add chart clutter and
   // are mostly useful when actively investigating a planned route's fan-out.
   const [showIsochrones, setShowIsochrones] = useState(false);
-  const [displayModel, setDisplayModel] = useState<'GFS' | 'ECMWF' | 'CMEMS'>('GFS');
+
+  // Layer visibility — persists to localStorage so the choice survives
+  // reloads. Hydrated AFTER first render (not via lazy `useState` init)
+  // so server and client agree on the initial paint — otherwise the
+  // popover button text and styling diverge when localStorage has a
+  // prior-session value, tripping React 19 hydration enforcement.
+  const [layers, setLayers] = useState<LayersState>({
+    osm: true,
+    enc: false,
+    buoys: false,
+    tileGrid: false,
+    model: 'none' as ChartModel,
+  });
+  const [layersHydrated, setLayersHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('chart:layers');
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<LayersState>;
+        const validModels: ChartModel[] = ['none', 'gfs', 'ecmwf', 'cmems'];
+        setLayers({
+          osm: parsed.osm ?? true,
+          enc: parsed.enc ?? false,
+          buoys: parsed.buoys ?? false,
+          tileGrid: parsed.tileGrid ?? false,
+          model: validModels.includes(parsed.model as ChartModel)
+            ? (parsed.model as ChartModel)
+            : 'none',
+        });
+      }
+    } catch {
+      /* corrupt JSON / private mode — fall back to defaults */
+    }
+    setLayersHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!layersHydrated) return;
+    try {
+      window.localStorage.setItem('chart:layers', JSON.stringify(layers));
+    } catch {
+      /* private-mode / quota exceeded — ignore */
+    }
+  }, [layers, layersHydrated]);
+
+  // Single source of truth for which overlay(s) are visible, derived from
+  // the mutually-exclusive layers.model choice.
+  const mv = modelLayerView(layers.model);
 
   // Restore the camera (center + zoom + bearing) from the last time the
   // user was on /chart. Synchronous useState initializer so the Map's
@@ -175,18 +218,10 @@ function ChartPageInner() {
       const raw = localStorage.getItem('chart:settings');
       if (raw) {
         const j = JSON.parse(raw) as Partial<{
-          windOn: boolean;
-          windModel: WindModel;
           windHours: number;
-          displayModel: 'GFS' | 'ECMWF' | 'CMEMS';
           showIsochrones: boolean;
         }>;
-        if (typeof j.windOn === 'boolean') setWindOn(j.windOn);
-        if (j.windModel === 'gfs' || j.windModel === 'ecmwf') setWindModel(j.windModel);
         if (typeof j.windHours === 'number') setWindHours(j.windHours);
-        if (j.displayModel === 'GFS' || j.displayModel === 'ECMWF' || j.displayModel === 'CMEMS') {
-          setDisplayModel(j.displayModel);
-        }
         if (typeof j.showIsochrones === 'boolean') setShowIsochrones(j.showIsochrones);
       }
     } catch {
@@ -199,12 +234,12 @@ function ChartPageInner() {
     try {
       localStorage.setItem(
         'chart:settings',
-        JSON.stringify({ windOn, windModel, windHours, displayModel, showIsochrones }),
+        JSON.stringify({ windHours, showIsochrones }),
       );
     } catch {
       /* quota / private-mode; ignore */
     }
-  }, [settingsHydrated, windOn, windModel, windHours, displayModel, showIsochrones]);
+  }, [settingsHydrated, windHours, showIsochrones]);
 
   const [waypoints, setWaypoints] = useState<
     Array<{ id: string; name: string; lat: number; lon: number }>
@@ -247,6 +282,7 @@ function ChartPageInner() {
   //      the /forecast tab is in a different browser/window.
   //   3. background poll every 30 s as a safety net.
   useEffect(() => {
+    if (!mv.isWindModel) return;
     let alive = true;
     const tick = async (): Promise<void> => {
       try {
@@ -293,14 +329,14 @@ function ChartPageInner() {
       bc?.close();
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [layers.model, mv.isWindModel]);
 
   // When the manifest changes or timeline moves, bump refreshKey so the
   // overlay re-reads from the cache.
   useEffect(() => {
     if (livePos === null) return;
     setWindRefreshKey((k) => k + 1);
-  }, [windModel, windHours, livePos?.lat, livePos?.lon, availableHours]);
+  }, [layers.model, windHours, livePos?.lat, livePos?.lon, availableHours]);
 
   // Load saved waypoints once so they're selectable as Start / End.
   useEffect(() => {
@@ -345,44 +381,6 @@ function ChartPageInner() {
       /* quota or disabled — silently drop */
     }
   }, [route, restored]);
-
-  // Layer visibility — persists to localStorage so the choice survives
-  // reloads. Hydrated AFTER first render (not via lazy `useState` init)
-  // so server and client agree on the initial paint — otherwise the
-  // popover button text and styling diverge when localStorage has a
-  // prior-session value, tripping React 19 hydration enforcement.
-  const [layers, setLayers] = useState<LayersState>({
-    osm: true,
-    enc: false,
-    buoys: false,
-    tileGrid: false,
-  });
-  const [layersHydrated, setLayersHydrated] = useState(false);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem('chart:layers');
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<LayersState>;
-        setLayers({
-          osm: parsed.osm ?? true,
-          enc: parsed.enc ?? false,
-          buoys: parsed.buoys ?? false,
-          tileGrid: parsed.tileGrid ?? false,
-        });
-      }
-    } catch {
-      /* corrupt JSON / private mode — fall back to defaults */
-    }
-    setLayersHydrated(true);
-  }, []);
-  useEffect(() => {
-    if (!layersHydrated) return;
-    try {
-      window.localStorage.setItem('chart:layers', JSON.stringify(layers));
-    } catch {
-      /* private-mode / quota exceeded — ignore */
-    }
-  }, [layers, layersHydrated]);
 
   // OSM basemap visibility. The layer is mounted unconditionally inside
   // Map.tsx's initial style; we just flip its `visibility` layout property.
@@ -463,7 +461,7 @@ function ChartPageInner() {
                 }
               : undefined
           }
-          hidden={!windOn}
+          hidden={mv.roiHidden}
         />
         <GulfStreamLayer map={mapInstance} />
         <WaypointsLayer
@@ -478,9 +476,9 @@ function ChartPageInner() {
           map={mapInstance}
           centerLat={livePos?.lat ?? null}
           centerLon={livePos?.lon ?? null}
-          model={windModel}
+          model={mv.windModel ?? 'gfs'}
           hours={windHours}
-          hidden={!windOn || displayModel === 'CMEMS'}
+          hidden={mv.windHidden}
           opacity={0.5}
           showFill={true}
           showBarbs={true}
@@ -498,7 +496,7 @@ function ChartPageInner() {
         />
         <CurrentOverlay
           map={mapInstance}
-          hidden={!windOn || displayModel !== 'CMEMS'}
+          hidden={mv.currentHidden}
           day={0}
           opacity={0.85}
           refreshKey={currentRefreshKey}
@@ -523,6 +521,7 @@ function ChartPageInner() {
         <LayersControl
           state={layers}
           onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+          onSelectModel={(model) => setLayers((prev) => ({ ...prev, model }))}
           onRefreshNoaa={() => refreshEncTiles(mapInstance)}
         />
         <MapLoadingIndicator map={mapInstance} />
@@ -551,46 +550,7 @@ function ChartPageInner() {
         </div>
         <LiveValues p={livePos} />
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400 font-medium">Model display</span>
-            <label className="flex items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                checked={windOn}
-                onChange={(e) => setWindOn(e.target.checked)}
-              />
-              <span className="text-slate-300">visible</span>
-            </label>
-          </div>
-          <div className="flex gap-2 items-center text-xs">
-            <label className="flex items-center gap-1">
-              <span className="text-slate-400">Model</span>
-              <select
-                value={displayModel}
-                onChange={(e) => {
-                  const m = e.target.value as 'GFS' | 'ECMWF' | 'CMEMS';
-                  setDisplayModel(m);
-                  // GFS/ECMWF select wind grids; CMEMS is surface currents
-                  // — keep windModel in sync so the overlay/hours slider
-                  // reads from the right cache.
-                  if (m === 'GFS') setWindModel('gfs');
-                  else if (m === 'ECMWF') setWindModel('ecmwf');
-                  // CMEMS leaves windModel alone — currents overlay is a
-                  // separate render path.
-                }}
-                className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-200"
-              >
-                <option value="GFS">
-                  GFS (wind){availableHours.gfs.length ? '' : ' (no cache)'}
-                </option>
-                <option value="ECMWF">
-                  ECMWF (wind){availableHours.ecmwf.length ? '' : ' (no cache)'}
-                </option>
-                <option value="CMEMS">CMEMS (currents)</option>
-              </select>
-            </label>
-          </div>
-          {displayModel === 'CMEMS' && (
+          {mv.isCurrent && (
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
               <p className="text-slate-400">
                 Surface currents from Copernicus Marine (CMEMS) daily-mean global analysis (1/12°,
@@ -640,16 +600,17 @@ function ChartPageInner() {
               </div>
             </div>
           )}
-          {/* Wind-forecast timeline (run, valid time, hour stepper). Hidden
-              when the user has CMEMS selected — currents are a daily mean
-              and don't have an hour-stepped slider. */}
-          {displayModel !== 'CMEMS' &&
+          {/* Wind-forecast timeline (run, valid time, hour stepper). Only
+              shown when a wind model (GFS/ECMWF) is active — CMEMS is a
+              daily mean without an hour-stepped slider. */}
+          {mv.isWindModel &&
             (() => {
-              const fullList = availableHours[windModel];
+              const fullList = availableHours[mv.windModel ?? 'gfs'];
+              const activeWindModel = mv.windModel ?? 'gfs';
               if (fullList.length === 0) {
                 return (
                   <div className="text-xs text-amber-300">
-                    No {windModel.toUpperCase()} forecast cached. Visit{' '}
+                    No {activeWindModel.toUpperCase()} forecast cached. Visit{' '}
                     <a href="/forecast" className="underline">
                       Forecast
                     </a>
@@ -661,7 +622,7 @@ function ChartPageInner() {
               // Slider always starts at "now" (or the first cached hour
               // that's still useful). Falls back to the full list if we
               // don't yet know the run time.
-              const runAt = latestRunAt[windModel];
+              const runAt = latestRunAt[activeWindModel];
               const nowS = Date.now() / 1000;
               const list = runAt
                 ? fullList.filter((h) => runAt + h * 3600 >= nowS - 1800) // 30 min grace
@@ -669,7 +630,7 @@ function ChartPageInner() {
               if (list.length === 0) {
                 return (
                   <div className="text-xs text-amber-300">
-                    {windModel.toUpperCase()} forecast cache is stale (all valid times in the past).
+                    {activeWindModel.toUpperCase()} forecast cache is stale (all valid times in the past).
                     Refresh on{' '}
                     <a href="/forecast" className="underline">
                       Forecast
@@ -750,7 +711,7 @@ function ChartPageInner() {
                 </div>
               );
             })()}
-          {displayModel !== 'CMEMS' && windGrid && (
+          {mv.isWindModel && windGrid && (
             <div className="text-xs text-slate-400 leading-tight">
               <div>
                 Showing:{' '}
@@ -769,7 +730,7 @@ function ChartPageInner() {
               </div>
             </div>
           )}
-          {displayModel !== 'CMEMS' && windStatus && (
+          {mv.isWindModel && windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
           )}
           <label className="flex items-center gap-2 text-xs pt-1 border-t border-slate-800 mt-2">
