@@ -1,4 +1,5 @@
 import { getWaypoint, updateWaypoint, deleteWaypoint } from '../../../../lib/waypoints';
+import { routesUsingWaypoint } from '../../../../lib/routes';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -37,6 +38,20 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
 
 export async function DELETE(_req: Request, { params }: Ctx): Promise<Response> {
   const { id } = await params;
+  const inUse = await routesUsingWaypoint(id);
+  if (inUse.length > 0) {
+    return Response.json(
+      {
+        ok: false,
+        error: {
+          code: 'waypoint_in_use',
+          message: `Waypoint is used by route(s): ${inUse.map((r) => r.name).join(', ')}`,
+          routes: inUse.map((r) => ({ id: r.id, name: r.name })),
+        },
+      },
+      { status: 409 },
+    );
+  }
   const ok = await deleteWaypoint(id);
   if (!ok) return Response.json({ ok: false, error: { message: 'not found' } }, { status: 404 });
   return Response.json({ ok: true });
