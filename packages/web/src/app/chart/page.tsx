@@ -9,7 +9,7 @@ import { RouteTimeline } from '../../components/RouteTimeline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
-import { WaypointsLayer, type MarkLike } from '../../components/WaypointsLayer';
+import { WaypointsLayer } from '../../components/WaypointsLayer';
 import { GulfStreamLayer } from '../../components/GulfStreamLayer';
 import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
