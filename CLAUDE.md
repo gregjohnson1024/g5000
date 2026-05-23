@@ -26,9 +26,7 @@ npm run bench --workspace @g5000/routing          # routing benchmarks
 
 Node ≥22, ESM-only, strict TypeScript (`noUncheckedIndexedAccess`, composite project refs).
 
-`g5000 app`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under _Deployment_ is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
-
-**Known gotcha:** the top-level `tsconfig.json` still lists `apps/router` in its `references`. That dir was merged into `packages/web` and `tsc -b` reports `TS5083 Cannot read file …/apps/router/tsconfig.json`. Individual workspace builds (`npm run build`, `npm test`) work; only the orchestrated `tsc -b` stops at the missing ref. Remove the ref when convenient.
+The `g5000 app`'s `predev` and `prebuild` scripts run `tsc -b` on `core`, `db`, `compute`, and `bridge` before `tsx watch` / `tsc -b` start, so the composite-ref rebuild order documented under _Deployment_ is enforced automatically in dev — you don't need to remember it locally, only on the Pi.
 
 ### Env-var gates
 
