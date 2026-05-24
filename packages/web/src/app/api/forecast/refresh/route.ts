@@ -10,7 +10,7 @@ import { cache, bboxKey } from '../../wind/route';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-export const maxDuration = 300; // some fetches can take 30 s+
+export const maxDuration = 300; // background job can run 30 s+
 
 interface Body {
   bbox?: Bbox;
@@ -19,17 +19,69 @@ interface Body {
   hours?: number[];
 }
 
+// Concurrency cap. Each fetch can take 5–60 s depending on the model and
+// whether eccodes parsing is involved; fanning all 100+ out at once saturates
+// the autopilot's event loop and accept queue. At 4 the chart stays responsive
+// and a full refresh finishes in ~1–2 min.
+const CONCURRENCY = 4;
+
+// Monotonic job token. Each POST bumps it; workers from a superseded job stop
+// pulling new tasks, so rapid ROI drags don't stack overlapping fetch jobs.
+let generation = 0;
+
+async function runJob(
+  gen: number,
+  bbox: Bbox,
+  models: WindModel[],
+  hours: number[],
+): Promise<void> {
+  const tasks: Array<{ model: WindModel; hour: number }> = [];
+  for (const model of models) {
+    for (const hour of hours) tasks.push({ model, hour });
+  }
+  let nextIdx = 0;
+  let ok = 0;
+  let failed = 0;
+  const worker = async (): Promise<void> => {
+    while (true) {
+      if (gen !== generation) return; // a newer refresh superseded us
+      const idx = nextIdx++;
+      if (idx >= tasks.length) return;
+      const t = tasks[idx]!;
+      try {
+        const grid: WindGrid =
+          t.model === 'ecmwf'
+            ? await fetchWindGridEcmwf(bbox, t.hour)
+            : await fetchWindGrid(bbox, t.hour);
+        cache.set(bboxKey(t.model, bbox, grid.forecastHour), { at: Date.now(), grid });
+        ok++;
+      } catch {
+        failed++;
+      }
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    if (gen === generation) windCache.pruneStale();
+  } catch {
+    /* a detached background job must never throw out */
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[forecast/refresh] gen=${gen} done: ${ok} ok, ${failed} failed of ${tasks.length}`);
+}
+
 /**
  * POST /api/forecast/refresh
  *
- * Fetches the requested (model, forecast hour) combinations for `bbox` and
- * stores them in the shared process cache. The /chart page's wind overlay
- * then reads from this cache via `/api/wind?cached=1`.
+ * Kicks off a background fetch of the requested (model, forecast hour)
+ * combinations for `bbox` and returns 202 immediately. The fetch job runs on
+ * the (long-lived) autopilot's event loop after the response is sent — so a
+ * full 114-combo refresh no longer holds the HTTP connection open for minutes
+ * and trip the cloudflared ~100 s proxy timeout (which returned 502 while the
+ * work actually completed). Clients poll `/api/forecast/manifest` to see grids
+ * land; the /chart wind overlay reads them via `/api/wind?cached=1`.
  *
- * Response: `{ ok, results: [{ model, hour, ok, runAt?, validAt?, error? }] }`.
- * The endpoint never fails wholesale — each combination has its own ok/error
- * so a partial fetch (e.g. GFS up but ECMWF lagged) still surfaces useful
- * grids.
+ * Response: `{ ok: true, started: true, tasks }` (202).
  */
 export async function POST(req: Request): Promise<Response> {
   let body: Body;
@@ -58,66 +110,10 @@ export async function POST(req: Request): Promise<Response> {
     (h) => Number.isFinite(h) && h >= 0 && h <= 240,
   );
 
-  interface Result {
-    model: WindModel;
-    hour: number;
-    ok: boolean;
-    runAt?: number;
-    validAt?: number;
-    points?: number;
-    error?: string;
-  }
-  // Concurrency cap. Each fetch can take 5–60 s depending on the model
-  // and whether eccodes parsing is involved; fanning all 100+ out at once
-  // saturates the autopilot's event loop and accept queue (we saw 500+
-  // backlogged connections on the listen socket during one stall). At
-  // CONCURRENCY=4 the total refresh time stays around 1–2 min and the
-  // chart UI remains responsive throughout. Independent per (model, hour)
-  // so a slow ECMWF fetch doesn't gate a fast GFS one.
-  const CONCURRENCY = 4;
-  type Task = { model: WindModel; hour: number };
-  const tasks: Task[] = [];
-  for (const model of models) {
-    for (const hour of hours) tasks.push({ model, hour });
-  }
-  const results: Result[] = new Array(tasks.length);
-
-  const runOne = async (idx: number, t: Task): Promise<void> => {
-    try {
-      const grid: WindGrid =
-        t.model === 'ecmwf'
-          ? await fetchWindGridEcmwf(bbox, t.hour)
-          : await fetchWindGrid(bbox, t.hour);
-      cache.set(bboxKey(t.model, bbox, grid.forecastHour), { at: Date.now(), grid });
-      results[idx] = {
-        model: t.model,
-        hour: grid.forecastHour,
-        ok: true,
-        runAt: grid.runAt,
-        validAt: grid.validAt,
-        points: grid.lats.length * grid.lons.length,
-      };
-    } catch (e) {
-      const raw = e instanceof Error ? e.message : String(e);
-      const msg = /\b429\b/.test(raw)
-        ? 'ECMWF rate-limited after retries — wait 1 min, fetch fewer hours, or use GFS'
-        : raw;
-      results[idx] = { model: t.model, hour: t.hour, ok: false, error: msg };
-    }
-  };
-
-  let nextIdx = 0;
-  const worker = async (): Promise<void> => {
-    while (true) {
-      const idx = nextIdx++;
-      if (idx >= tasks.length) return;
-      await runOne(idx, tasks[idx]!);
-    }
-  };
-  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-  // Opportunistic cleanup: now that we've added fresh entries, drop any
-  // whose forecast valid-time has passed. Keeps the cache footprint
-  // bounded as the user resizes the ROI over time.
-  const pruned = windCache.pruneStale();
-  return Response.json({ ok: true, results, pruned });
+  const myGen = ++generation;
+  void runJob(myGen, bbox, models, hours);
+  return Response.json(
+    { ok: true, started: true, tasks: models.length * hours.length },
+    { status: 202 },
+  );
 }

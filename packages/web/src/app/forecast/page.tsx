@@ -25,16 +25,6 @@ interface ManifestResponse {
   nowUnix: number;
 }
 
-interface FetchResult {
-  model: WindModel;
-  hour: number;
-  ok: boolean;
-  runAt?: number;
-  validAt?: number;
-  points?: number;
-  error?: string;
-}
-
 // Fixed forecast hours: every 3 h out to 168 h (7 days). Matches the
 // systemd timer's refresh-forecast.sh, so the manual "Refresh now" button
 // fetches the same set as the periodic background refresh.
@@ -69,7 +59,7 @@ function fmtDuration(seconds: number): string {
 export default function ForecastPage() {
   const [manifest, setManifest] = useState<ManifestResponse | null>(null);
   const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState<FetchResult[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const reloadManifest = useCallback(async (): Promise<void> => {
@@ -90,8 +80,8 @@ export default function ForecastPage() {
 
   const runFetch = async (): Promise<void> => {
     setErr(null);
+    setNotice(null);
     setBusy(true);
-    setResults(null);
     try {
       // The ROI is whatever the draggable forecast box on the chart last set
       // (persisted to settings.forecastBbox); this button just triggers an
@@ -103,6 +93,9 @@ export default function ForecastPage() {
         setErr('No forecast ROI set yet — drag the ROI box on the chart first.');
         return;
       }
+      // The refresh runs as a background job server-side (returns 202), so we
+      // don't hold the connection while ~114 grids fetch. The cached-grids
+      // table below fills in as they land; re-poll the manifest a few times.
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,24 +105,22 @@ export default function ForecastPage() {
           hours: FORECAST_HOURS,
         }),
       });
-      const j = (await r.json()) as {
-        ok: boolean;
-        results: FetchResult[];
-        error?: { message: string };
-      };
-      if (!j.ok) {
-        setErr(j.error?.message ?? 'fetch failed');
-      } else {
-        setResults(j.results);
-        // Tell other tabs (e.g. /chart) to re-poll the manifest immediately
-        // so they don't sit on stale "no cache" state for up to 30 s.
-        if (typeof BroadcastChannel !== 'undefined') {
-          const bc = new BroadcastChannel('forecast-cache');
-          bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
-          bc.close();
-        }
+      if (!r.ok) {
+        const j = (await r.json().catch(() => ({}))) as { error?: { message?: string } };
+        setErr(j.error?.message ?? `fetch failed: HTTP ${r.status}`);
+        return;
       }
-      await reloadManifest();
+      setNotice(
+        'Refresh started — caching GFS + ECMWF in the background. The cached-grids table below fills in over the next 1–2 min.',
+      );
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('forecast-cache');
+        bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
+        bc.close();
+      }
+      [10_000, 30_000, 60_000, 120_000].forEach((ms) =>
+        setTimeout(() => void reloadManifest(), ms),
+      );
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -198,41 +189,10 @@ export default function ForecastPage() {
           disabled={busy}
           className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded text-sm font-medium disabled:opacity-50"
         >
-          {busy ? `Fetching 2 models × ${FORECAST_HOURS.length} hours…` : 'Refresh now'}
+          {busy ? 'Starting…' : 'Refresh now'}
         </button>
+        {notice && <p className="text-xs text-emerald-300">{notice}</p>}
       </section>
-
-      {results && (
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold">Last fetch results</h2>
-          <table className="text-sm border-collapse">
-            <thead>
-              <tr className="text-left text-slate-400 border-b border-slate-800">
-                <th className="p-2">Model</th>
-                <th className="p-2">Hour</th>
-                <th className="p-2">Status</th>
-                <th className="p-2">Run</th>
-                <th className="p-2">Valid</th>
-                <th className="p-2">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r, i) => (
-                <tr key={i} className="border-b border-slate-900">
-                  <td className="p-2 font-mono">{r.model.toUpperCase()}</td>
-                  <td className="p-2 font-mono">+{r.hour}h</td>
-                  <td className={`p-2 ${r.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
-                    {r.ok ? 'OK' : (r.error ?? 'failed')}
-                  </td>
-                  <td className="p-2 font-mono">{r.runAt ? fmtUtc(r.runAt) : '—'}</td>
-                  <td className="p-2 font-mono">{r.validAt ? fmtUtc(r.validAt) : '—'}</td>
-                  <td className="p-2 text-slate-400">{r.points ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
 
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Cached grids ({manifest?.entries.length ?? 0})</h2>

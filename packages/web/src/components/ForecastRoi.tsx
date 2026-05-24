@@ -60,7 +60,9 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
   const [statusText, setStatusText] = useState<string | null>(null);
   const markersRef = useRef<Record<Corner, maplibregl.Marker> | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlightRef = useRef<AbortController | null>(null);
+  // Timers that re-broadcast "re-poll the manifest" while a background refresh
+  // fills the cache. Cleared on a new refresh and on unmount.
+  const nudgeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bboxRef = useRef<Bbox | null>(null);
   /** Last bbox that we successfully PUT to /api/settings. Used to short-
    *  circuit a misclick-without-drag dragend that would otherwise trigger
@@ -100,6 +102,17 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
   useEffect(() => {
     bboxRef.current = bbox;
   }, [bbox]);
+
+  // Clear pending debounce + manifest-nudge timers on unmount.
+  useEffect(() => {
+    const nudgeTimers = nudgeTimersRef;
+    const debounce = debounceRef;
+    return () => {
+      if (debounce.current) clearTimeout(debounce.current);
+      for (const id of nudgeTimers.current) clearTimeout(id);
+      nudgeTimers.current = [];
+    };
+  }, []);
 
   // Layer + source lifecycle. Created once when the map is ready; data
   // updated on every bbox change. Torn down on unmount.
@@ -275,15 +288,18 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
   };
 
   const doRefresh = async (next: Bbox): Promise<void> => {
-    // Abort any in-flight refresh — the user's new ROI supersedes it.
-    if (inFlightRef.current) {
-      inFlightRef.current.abort();
-      inFlightRef.current = null;
+    // The server runs the fetch as a background job and returns 202 right away
+    // (older jobs are superseded server-side, so we don't abort here). It keeps
+    // working after the response, so we never hold the connection open long
+    // enough to hit the proxy timeout. Grids land into the cache over the next
+    // 1–2 min; we nudge consumers to re-poll the manifest a few times so the
+    // chart wind overlay and /forecast table pick them up as they arrive.
+    if (nudgeTimersRef.current.length) {
+      for (const id of nudgeTimersRef.current) clearTimeout(id);
+      nudgeTimersRef.current = [];
     }
-    const ctrl = new AbortController();
-    inFlightRef.current = ctrl;
     setStatus('refreshing');
-    setStatusText('refreshing models…');
+    setStatusText('caching models in the background…');
     try {
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
@@ -293,31 +309,30 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
           models: REFRESH_MODELS,
           hours: REFRESH_HOURS,
         }),
-        signal: ctrl.signal,
       });
-      if (ctrl.signal.aborted) return;
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = (await r.json()) as { ok?: boolean; pruned?: number };
-      setStatus('idle');
-      setStatusText(
-        j.pruned && j.pruned > 0
-          ? `models refreshed (pruned ${j.pruned} stale)`
-          : 'models refreshed',
-      );
-      // Tell siblings (forecast page badge, etc.) to re-read the manifest.
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('forecast-cache');
-        bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
-        bc.close();
-      }
-      setTimeout(() => setStatusText(null), 4000);
     } catch (e) {
-      if (ctrl.signal.aborted) return;
       setStatus('error');
       setStatusText(`refresh failed: ${String(e)}`);
-    } finally {
-      if (inFlightRef.current === ctrl) inFlightRef.current = null;
+      return;
     }
+    const nudge = (): void => {
+      if (typeof BroadcastChannel === 'undefined') return;
+      const bc = new BroadcastChannel('forecast-cache');
+      bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
+      bc.close();
+    };
+    // Re-poll at intervals while the background job fills the cache, then clear.
+    [15_000, 45_000, 90_000].forEach((ms) => {
+      nudgeTimersRef.current.push(setTimeout(nudge, ms));
+    });
+    nudgeTimersRef.current.push(
+      setTimeout(() => {
+        setStatus('idle');
+        setStatusText(null);
+      }, 120_000),
+    );
+    setStatusText('caching in background — grids appear as they land');
   };
 
   if (!bbox) return null;
