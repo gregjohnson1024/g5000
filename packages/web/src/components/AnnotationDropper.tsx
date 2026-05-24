@@ -420,7 +420,9 @@ export function AnnotationDropper({
                   <div key={`engine-${side}`} className="space-y-1">
                     <div className="text-[11px] uppercase tracking-wide text-slate-400">
                       {label}
-                      <span className="ml-1 text-slate-300">— {running ? 'running' : 'stopped'}</span>
+                      <span className="ml-1 text-slate-300">
+                        — {running ? 'running' : 'stopped'}
+                      </span>
                     </div>
                     <div className="flex gap-1">
                       <button
