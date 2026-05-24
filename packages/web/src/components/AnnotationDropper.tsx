@@ -378,7 +378,7 @@ export function AnnotationDropper({
                 onClick={() => {
                   if (customLabel.length > 0) void post(customLabel, customKind);
                 }}
-                disabled={submitting || customLabel.length === 0}
+                disabled={disabled || submitting || customLabel.length === 0}
                 className="px-2 py-1 text-xs rounded border bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600 disabled:opacity-40"
               >
                 Add
