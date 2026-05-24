@@ -1,3 +1,4 @@
+import { getSourceModeController } from '@g5000/core';
 import { activeTrack, createTrack, appendPoint, type Track, type TrackPoint } from './tracks';
 import { positionStreamUrl } from './g5000-client';
 
@@ -17,7 +18,7 @@ const MIN_INTERVAL_MS = 5_000; // never append more often than 5 s
 const MIN_DISTANCE_M = 100; // append if moved 100 m since last point
 const MIN_INTERVAL_MS_FORCE = 60_000; // … or if a full minute has passed
 
-interface Recorder {
+export interface Recorder {
   status: 'starting' | 'running' | 'stopped' | 'errored';
   errorMessage?: string;
   activeTrackId: string | null;
@@ -135,8 +136,12 @@ export function ensureRecorder(): Recorder {
   return rec;
 }
 
-async function maybeAppend(rec: Recorder, pt: TrackPoint): Promise<void> {
+export async function maybeAppend(rec: Recorder, pt: TrackPoint): Promise<void> {
   if (!rec.activeTrackId) return;
+  // Only record live fixes. Demo (synthetic Ottawa GPS) and replay (already
+  // recorded) share the nav.gps.position channel, so without this gate a
+  // demo/live toggle stitches Ottawa↔Atlantic points into one track.
+  if (getSourceModeController()?.getStatus().mode !== 'live') return;
   const nowMs = Date.now();
   const elapsedMs = nowMs - rec.lastAppendedAt;
   if (elapsedMs < MIN_INTERVAL_MS) return;
