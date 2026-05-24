@@ -19,6 +19,7 @@ import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer, NOAA_MIN_ZOOM } from '../../components/EncLayer';
+import { SatelliteLayer } from '../../components/SatelliteLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
@@ -99,6 +100,7 @@ function ChartPageInner() {
   const [layers, setLayers] = useState<LayersState>({
     osm: true,
     enc: false,
+    satellite: false,
     buoys: false,
     ais: true,
     aisCog: true,
@@ -114,6 +116,7 @@ function ChartPageInner() {
         setLayers({
           osm: parsed.osm ?? true,
           enc: parsed.enc ?? false,
+          satellite: parsed.satellite ?? false,
           buoys: parsed.buoys ?? false,
           ais: parsed.ais ?? true,
           aisCog: parsed.aisCog ?? true,
@@ -579,6 +582,7 @@ function ChartPageInner() {
         {/* <LaylinesLayer map={mapInstance} />  disabled — not currently useful */}
         <StartLineLayer map={mapInstance} />
         <EncLayer map={mapInstance} visible={layers.enc} />
+        <SatelliteLayer map={mapInstance} visible={layers.satellite} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         {(() => {
           const sel = selectedWaypointId

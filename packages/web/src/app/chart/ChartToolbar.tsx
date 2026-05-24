@@ -5,7 +5,7 @@ import { AnnotationDropper } from '../../components/AnnotationDropper';
 
 export interface ChartToolbarProps {
   layers: LayersState;
-  onToggleLayer: (key: 'osm' | 'enc' | 'buoys' | 'ais' | 'aisCog') => void;
+  onToggleLayer: (key: 'osm' | 'enc' | 'satellite' | 'buoys' | 'ais' | 'aisCog') => void;
   onSelectModel: (model: ChartModel) => void;
   waypointDropActive: boolean;
   onToggleWaypointDrop: () => void;
