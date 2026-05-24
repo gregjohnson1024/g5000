@@ -67,7 +67,6 @@ function ChartPageInner() {
   const [windStatus, setWindStatus] = useState<string | null>(null);
   const [currentRefreshKey, setCurrentRefreshKey] = useState(1);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
-  const [currentFetching, setCurrentFetching] = useState(false);
   const [availableHours, setAvailableHours] = useState<{ gfs: number[]; ecmwf: number[] }>({
     gfs: [],
     ecmwf: [],
@@ -332,6 +331,15 @@ function ChartPageInner() {
     setWindRefreshKey((k) => k + 1);
   }, [layers.model, windHours, livePos?.lat, livePos?.lon, availableHours]);
 
+  // A CMEMS refresh from the /forecast tab broadcasts on 'current-cache';
+  // re-read the cached current grid so an already-open chart picks it up.
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const bc = new BroadcastChannel('current-cache');
+    bc.addEventListener('message', () => setCurrentRefreshKey((k) => k + 1));
+    return () => bc.close();
+  }, []);
+
   // Load saved waypoints once so they're selectable as Start / End.
   useEffect(() => {
     void fetch('/api/waypoints')
@@ -567,7 +575,7 @@ function ChartPageInner() {
           refreshKey={currentRefreshKey}
           onLoaded={({ grid, error }) => {
             if (error === 'not cached') {
-              setCurrentStatus('No CMEMS grid cached. Click Refresh.');
+              setCurrentStatus('No CMEMS grid cached — refresh from the Forecast page.');
             } else if (error) {
               setCurrentStatus(`Error: ${error}`);
             } else if (grid) {
@@ -644,50 +652,10 @@ function ChartPageInner() {
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
               <p className="text-slate-400">
                 Surface currents from Copernicus Marine (CMEMS) daily-mean global analysis (1/12°,
-                surface depth). Colour = speed in knots; arrows = direction.
+                surface depth). Colour = speed in knots; arrows = direction. Refreshed
+                automatically; trigger a manual pull from the Forecast page.
               </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={currentFetching}
-                  onClick={async () => {
-                    setCurrentFetching(true);
-                    setCurrentStatus('Fetching CMEMS…');
-                    try {
-                      // Western North Atlantic — covers Bermuda → New England
-                      // and the full Gulf Stream meander region.
-                      const r = await fetch('/api/current/refresh', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          bbox: { latMin: 20, latMax: 50, lonMin: -82, lonMax: -40 },
-                          days: [0],
-                        }),
-                      });
-                      const j = (await r.json()) as {
-                        ok: boolean;
-                        results?: Array<{ day: number; ok: boolean; error?: string }>;
-                        error?: { message?: string };
-                      };
-                      if (!j.ok || !j.results?.[0]?.ok) {
-                        const err = j.results?.[0]?.error ?? j.error?.message ?? 'fetch failed';
-                        setCurrentStatus(`Refresh failed: ${err}`);
-                      } else {
-                        setCurrentStatus('Refresh OK');
-                        setCurrentRefreshKey((k) => k + 1);
-                      }
-                    } catch (e) {
-                      setCurrentStatus(`Refresh error: ${(e as Error).message}`);
-                    } finally {
-                      setCurrentFetching(false);
-                    }
-                  }}
-                  className="px-2 py-1 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-amber-100 rounded font-medium"
-                >
-                  {currentFetching ? 'Fetching…' : 'Refresh CMEMS'}
-                </button>
-                {currentStatus && <span className="text-slate-400">{currentStatus}</span>}
-              </div>
+              {currentStatus && <p className="text-slate-400">{currentStatus}</p>}
             </div>
           )}
           {/* Wind-forecast timeline (run, valid time, hour stepper). Only

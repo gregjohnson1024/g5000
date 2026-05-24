@@ -30,6 +30,22 @@ interface ManifestResponse {
 // fetches the same set as the periodic background refresh.
 const FORECAST_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
 
+type Bbox = { latMin: number; latMax: number; lonMin: number; lonMax: number };
+
+// Western North Atlantic — the full Gulf Stream meander region. CMEMS always
+// covers at least this so the currents overlay shows the Stream regardless of
+// where the (smaller) wind ROI sits.
+const GULF_STREAM_BBOX: Bbox = { latMin: 20, latMax: 50, lonMin: -82, lonMax: -40 };
+
+function unionBbox(a: Bbox, b: Bbox): Bbox {
+  return {
+    latMin: Math.min(a.latMin, b.latMin),
+    latMax: Math.max(a.latMax, b.latMax),
+    lonMin: Math.min(a.lonMin, b.lonMin),
+    lonMax: Math.max(a.lonMax, b.lonMax),
+  };
+}
+
 function fmtUtc(unix: number): string {
   return new Date(unix * 1000).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 }
@@ -60,6 +76,8 @@ export default function ForecastPage() {
   const [manifest, setManifest] = useState<ManifestResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cmemsBusy, setCmemsBusy] = useState(false);
+  const [cmemsNotice, setCmemsNotice] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const reloadManifest = useCallback(async (): Promise<void> => {
@@ -128,6 +146,48 @@ export default function ForecastPage() {
     }
   };
 
+  const runCmemsFetch = async (): Promise<void> => {
+    setErr(null);
+    setCmemsNotice(null);
+    setCmemsBusy(true);
+    try {
+      // Always cover the Gulf Stream; extend to include the wind ROI so the
+      // currents overlay has data wherever the route box sits (union — one
+      // grid, since the overlay shows a single current grid).
+      const s = await fetch('/api/settings', { cache: 'no-store' });
+      const sj = (await s.json()) as { settings?: { forecastBbox?: Bbox } };
+      const roi = sj.settings?.forecastBbox;
+      const bbox = roi ? unionBbox(GULF_STREAM_BBOX, roi) : GULF_STREAM_BBOX;
+      const r = await fetch('/api/current/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bbox, days: [0] }),
+      });
+      const j = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        results?: Array<{ ok: boolean; error?: string }>;
+        error?: { message?: string };
+      };
+      if (!r.ok || !j.ok || !j.results?.[0]?.ok) {
+        setErr(
+          j.results?.[0]?.error ?? j.error?.message ?? `CMEMS refresh failed: HTTP ${r.status}`,
+        );
+        return;
+      }
+      setCmemsNotice('CMEMS surface currents refreshed.');
+      // Nudge an open /chart to re-read the cached current grid.
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('current-cache');
+        bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
+        bc.close();
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCmemsBusy(false);
+    }
+  };
+
   const now = manifest?.nowUnix ?? Math.floor(Date.now() / 1000);
 
   return (
@@ -192,6 +252,23 @@ export default function ForecastPage() {
           {busy ? 'Starting…' : 'Refresh now'}
         </button>
         {notice && <p className="text-xs text-emerald-300">{notice}</p>}
+      </section>
+
+      <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
+        <h2 className="text-base font-semibold">Surface currents (CMEMS)</h2>
+        <p className="text-xs text-slate-500">
+          Copernicus Marine daily-mean surface currents (1/12°). Covers the Gulf Stream region plus
+          your wind ROI (combined into one box). The Pi refreshes this automatically on the same 3 h
+          timer; this button triggers one out of band.
+        </p>
+        <button
+          onClick={() => void runCmemsFetch()}
+          disabled={cmemsBusy}
+          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded text-sm font-medium disabled:opacity-50"
+        >
+          {cmemsBusy ? 'Fetching CMEMS…' : 'Refresh CMEMS'}
+        </button>
+        {cmemsNotice && <p className="text-xs text-emerald-300">{cmemsNotice}</p>}
       </section>
 
       <section className="space-y-2">

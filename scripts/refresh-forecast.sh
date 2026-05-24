@@ -69,3 +69,29 @@ curl -sS -X POST "${HOST}/api/forecast/refresh" \
   -d "$payload" \
   -m 300
 echo
+
+# --- CMEMS surface currents (today only) ------------------------------------
+# Always cover the Gulf Stream; extend the box to include the wind ROI so the
+# chart's currents overlay has data wherever the route sits (one union box —
+# the overlay shows a single current grid). Secondary to the wind pull, so a
+# failure here must not abort the run.
+GULF_STREAM='{"latMin":20,"latMax":50,"lonMin":-82,"lonMax":-40}'
+current_bbox=$(printf '%s\n%s' "$GULF_STREAM" "$bbox" | python3 -c '
+import json, sys
+lines = [l for l in sys.stdin.read().splitlines() if l.strip()]
+gs, roi = json.loads(lines[0]), json.loads(lines[1])
+print(json.dumps({
+  "latMin": min(gs["latMin"], roi["latMin"]),
+  "latMax": max(gs["latMax"], roi["latMax"]),
+  "lonMin": min(gs["lonMin"], roi["lonMin"]),
+  "lonMax": max(gs["lonMax"], roi["lonMax"]),
+}))
+' 2>/dev/null)
+if [[ -z "${current_bbox}" ]]; then current_bbox="$GULF_STREAM"; fi
+
+echo "[refresh-forecast] POST ${HOST}/api/current/refresh (CMEMS) bbox=$current_bbox"
+curl -sS -X POST "${HOST}/api/current/refresh" \
+  -H 'Content-Type: application/json' \
+  -d "$(printf '{"bbox":%s,"days":[0]}' "$current_bbox")" \
+  -m 300 || true
+echo
