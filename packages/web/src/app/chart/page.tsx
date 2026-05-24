@@ -21,12 +21,12 @@ import { EncLayer, NOAA_MIN_ZOOM, refreshEncTiles } from '../../components/EncLa
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
-import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { ZoomIndicator } from '../../components/ZoomIndicator';
 import { TileGridOverlay } from '../../components/TileGridOverlay';
-import { LayersControl, type LayersState } from './LayersControl';
+import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
+import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
@@ -360,6 +360,8 @@ function ChartPageInner() {
     setRestored(true);
   }, []);
 
+  const [waypointDropActive, setWaypointDropActive] = useState(false);
+
   // Persist the route. Start/end are deliberately omitted — see comment on
   // the restore effect above.
   useEffect(() => {
@@ -506,15 +508,16 @@ function ChartPageInner() {
         <EncLayer map={mapInstance} visible={layers.enc} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         <TileGridOverlay map={mapInstance} visible={layers.tileGrid} />
-        <LayersControl
-          state={layers}
-          onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+        <ChartToolbar
+          layers={layers}
+          onToggleLayer={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
           onSelectModel={(model) => setLayers((prev) => ({ ...prev, model }))}
           onRefreshNoaa={() => refreshEncTiles(mapInstance)}
+          waypointDropActive={waypointDropActive}
+          onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
         />
         <MapLoadingIndicator map={mapInstance} />
         <ZoomIndicator map={mapInstance} noaaFloor={NOAA_MIN_ZOOM} noaaEnabled={layers.enc} />
-        <AnnotationDropper position="top-2 right-28" />
         <ChartFollowControl
           follow={camera.follow}
           orientation={camera.orientation}

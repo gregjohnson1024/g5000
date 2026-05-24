@@ -55,7 +55,7 @@ export function LayersControl({
   const onCount = (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
 
   return (
-    <div ref={wrapRef} className="absolute top-2 right-2 z-10">
+    <div ref={wrapRef} className="relative">
       <button
         type="button"
         aria-haspopup="dialog"
@@ -84,7 +84,7 @@ export function LayersControl({
         <div
           role="dialog"
           aria-label="Chart layers"
-          className="mt-2 w-44 rounded border border-zinc-700 bg-zinc-900/95 text-zinc-100 p-2 shadow-lg"
+          className="absolute right-full mr-2 top-0 w-44 rounded border border-zinc-700 bg-zinc-900/95 text-zinc-100 p-2 shadow-lg"
         >
           <Row label="OSM base" pressed={state.osm} onClick={() => onToggle('osm')} />
           <Row label="NOAA chart" pressed={state.enc} onClick={() => onToggle('enc')} />
