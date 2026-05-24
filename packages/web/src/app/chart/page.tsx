@@ -9,6 +9,7 @@ import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
 import { WaypointsLayer } from '../../components/WaypointsLayer';
+import { WaypointEditPopup } from '../../components/WaypointEditPopup';
 import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
@@ -362,6 +363,7 @@ function ChartPageInner() {
   }, []);
 
   const [waypointDropActive, setWaypointDropActive] = useState(false);
+  const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
 
   // Crosshair cursor while waypoint-drop mode is active.
   useEffect(() => {
@@ -381,6 +383,12 @@ function ChartPageInner() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [waypointDropActive]);
+
+  // Clear any open waypoint-edit popup when entering drop-mode so the two
+  // interaction modes don't overlap.
+  useEffect(() => {
+    if (waypointDropActive) setSelectedWaypointId(null);
   }, [waypointDropActive]);
 
   // Map-click handler for waypoint-drop mode. Auto-names via nextWaypointName,
@@ -511,11 +519,8 @@ function ChartPageInner() {
         />
         <WaypointsLayer
           map={mapInstance}
-          marks={waypoints.map((w) => ({
-            lat: w.lat,
-            lon: w.lon,
-            name: w.name,
-          }))}
+          marks={waypoints.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon, name: w.name }))}
+          onSelectWaypoint={waypointDropActive ? undefined : (id) => setSelectedWaypointId(id)}
         />
         <WindOverlay
           map={mapInstance}
@@ -563,6 +568,30 @@ function ChartPageInner() {
         <EncLayer map={mapInstance} visible={layers.enc} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         <TileGridOverlay map={mapInstance} visible={layers.tileGrid} />
+        {(() => {
+          const sel = selectedWaypointId ? waypoints.find((w) => w.id === selectedWaypointId) : null;
+          if (!sel) return null;
+          return (
+            <WaypointEditPopup
+              map={mapInstance}
+              waypoint={{ id: sel.id, name: sel.name, lat: sel.lat, lon: sel.lon }}
+              onSaved={(updated) => {
+                setWaypoints((prev) =>
+                  prev.map((w) =>
+                    w.id === updated.id
+                      ? { id: updated.id, name: updated.name, lat: updated.lat, lon: updated.lon }
+                      : w,
+                  ),
+                );
+              }}
+              onDeleted={(id) => {
+                setWaypoints((prev) => prev.filter((w) => w.id !== id));
+                setSelectedWaypointId(null);
+              }}
+              onClose={() => setSelectedWaypointId(null)}
+            />
+          );
+        })()}
         <ChartToolbar
           layers={layers}
           onToggleLayer={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}

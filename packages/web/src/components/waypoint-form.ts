@@ -1,4 +1,4 @@
-import { parseLatLon } from '../lib/coords.js';
+import { parseLatLon } from '../lib/coords';
 
 export interface WaypointFormInput {
   name: string;
