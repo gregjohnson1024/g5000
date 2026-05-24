@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 
 export interface MarkLike {
+  /** Waypoint id, when this mark is a saved waypoint (enables selection). */
+  id?: string;
   lat: number;
   lon: number;
   name?: string;
@@ -28,13 +30,25 @@ const RING_LAYER = 'waypoints-ring';
  * Z-order: dots and rings are maplibre layers so they sit above the
  * `__above-wind__` sentinel — i.e. above wind, on top of the chart.
  */
-export function WaypointsLayer({ map, marks }: { map: maplibregl.Map | null; marks: MarkLike[] }) {
+export function WaypointsLayer({
+  map,
+  marks,
+  onSelectWaypoint,
+}: {
+  map: maplibregl.Map | null;
+  marks: MarkLike[];
+  /** Called with the waypoint id when a dot is clicked. Pass undefined to
+   * disable selection (e.g. while waypoint-drop mode is active). */
+  onSelectWaypoint?: (id: string) => void;
+}) {
   // Persistent across re-renders so the marks-change effect can update
   // labels without tearing down the layer.
   const labelMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
   const marksRef = useRef<MarkLike[]>(marks);
   const syncRef = useRef<(() => void) | null>(null);
   marksRef.current = marks;
+  const onSelectRef = useRef<((id: string) => void) | undefined>(onSelectWaypoint);
+  onSelectRef.current = onSelectWaypoint;
 
   // Marks-change effect: just re-run sync via the ref. Does NOT tear down
   // the layer — that only happens on unmount.
@@ -102,7 +116,7 @@ export function WaypointsLayer({ map, marks }: { map: maplibregl.Map | null; mar
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [m.lon, m.lat] },
           properties: {
-            id: `${i}`,
+            id: m.id ?? `${i}`,
             name: m.name ?? null,
             ...(m.badge ? { badge: m.badge } : {}),
           },
@@ -159,7 +173,24 @@ export function WaypointsLayer({ map, marks }: { map: maplibregl.Map | null; mar
     // changing `marks` doesn't tear down the layer; we just re-run sync.
     syncRef.current = sync;
 
+    const onDotClick = (e: maplibregl.MapLayerMouseEvent): void => {
+      const id = e.features?.[0]?.properties?.id;
+      if (typeof id === 'string' && onSelectRef.current) onSelectRef.current(id);
+    };
+    const onEnter = (): void => {
+      if (onSelectRef.current) map.getCanvas().style.cursor = 'pointer';
+    };
+    const onLeave = (): void => {
+      if (onSelectRef.current) map.getCanvas().style.cursor = '';
+    };
+    map.on('click', DOT_LAYER, onDotClick);
+    map.on('mouseenter', DOT_LAYER, onEnter);
+    map.on('mouseleave', DOT_LAYER, onLeave);
+
     return () => {
+      map.off('click', DOT_LAYER, onDotClick);
+      map.off('mouseenter', DOT_LAYER, onEnter);
+      map.off('mouseleave', DOT_LAYER, onLeave);
       syncRef.current = null;
       for (const mk of labelMarkers.values()) {
         try {
