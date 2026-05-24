@@ -6,6 +6,30 @@ import { computeOffscreenAnchor, type OffscreenAnchor } from './offscreen-vessel
 
 const PILL_PAD = 32;
 
+// The chart toolbar (LayersControl + annotation + waypoint icons) sits at
+// top-2 right-2 as a ~44px-wide, ~132px-tall icon rail. Reserve that corner
+// (plus buffer) so the edge pill never lands on top of those buttons.
+const TOOLBAR_RESERVE_W = 56;
+const TOOLBAR_RESERVE_H = 148;
+const PILL_HALF_W = 46;
+const PILL_HALF_H = 16;
+
+/**
+ * Nudge the edge anchor clear of the top-right toolbar when they'd overlap,
+ * keeping the pill on its viewport edge: a top-edge pill slides left of the
+ * rail; a right-edge (or corner) pill slides down below it. The chevron
+ * bearing is untouched so it still points at the boat.
+ */
+function avoidToolbar(a: OffscreenAnchor, width: number, pad: number): OffscreenAnchor {
+  const overlapsToolbar =
+    a.x + PILL_HALF_W > width - TOOLBAR_RESERVE_W && a.y - PILL_HALF_H < TOOLBAR_RESERVE_H;
+  if (!overlapsToolbar) return a;
+  if (a.y <= pad + 0.5) {
+    return { ...a, x: Math.max(pad, width - TOOLBAR_RESERVE_W - PILL_HALF_W) };
+  }
+  return { ...a, y: TOOLBAR_RESERVE_H + PILL_HALF_H };
+}
+
 /**
  * Corner pill that appears when the vessel is OUT of the viewport AND
  * follow mode is OFF. Anchored to the viewport edge closest to the
@@ -40,13 +64,12 @@ export function OffscreenVesselIndicator({
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       const projected = map.project([livePos.lon, livePos.lat]);
-      setAnchor(
-        computeOffscreenAnchor({
-          projected: { x: projected.x, y: projected.y },
-          viewport: { width, height },
-          pad: PILL_PAD,
-        }),
-      );
+      const raw = computeOffscreenAnchor({
+        projected: { x: projected.x, y: projected.y },
+        viewport: { width, height },
+        pad: PILL_PAD,
+      });
+      setAnchor(raw ? avoidToolbar(raw, width, PILL_PAD) : null);
       const center = map.getCenter();
       setDistanceNm(haversineNm(center.lat, center.lng, livePos.lat, livePos.lon));
     };
