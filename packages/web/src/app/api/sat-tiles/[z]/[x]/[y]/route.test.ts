@@ -3,7 +3,10 @@ import { mkdtemp, rm, mkdir, writeFile, stat, utimes } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-let GET: (req: Request, ctx: { params: Promise<{ z: string; x: string; y: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ z: string; x: string; y: string }> },
+) => Promise<Response>;
 let root: string;
 
 function params(z: string, x: string, y: string) {
@@ -54,9 +57,11 @@ describe('sat-tiles proxy', () => {
 
   it('fetches Esri on MISS, passes content-type through, writes disk', async () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(jpeg, { status: 200, headers: { 'content-type': 'image/jpeg' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(jpeg, { status: 200, headers: { 'content-type': 'image/jpeg' } }),
+      );
     const res = await GET(new Request('http://x'), params('10', '3', '4'));
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('MISS');

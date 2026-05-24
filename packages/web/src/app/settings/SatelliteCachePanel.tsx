@@ -76,8 +76,13 @@ export function SatelliteCachePanel(): React.ReactElement {
   );
 
   const overBudget = stats ? stats.totalBytes > stats.capBytes : false;
-  const pct = stats && stats.capBytes > 0 ? Math.min(100, (stats.totalBytes / stats.capBytes) * 100) : 0;
-  const zooms = stats ? Object.keys(stats.byZoom).map(Number).sort((a, b) => a - b) : [];
+  const pct =
+    stats && stats.capBytes > 0 ? Math.min(100, (stats.totalBytes / stats.capBytes) * 100) : 0;
+  const zooms = stats
+    ? Object.keys(stats.byZoom)
+        .map(Number)
+        .sort((a, b) => a - b)
+    : [];
 
   return (
     <section className="rounded border border-zinc-700 bg-zinc-900/50 p-4">

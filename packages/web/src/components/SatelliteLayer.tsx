@@ -13,13 +13,7 @@ const LAYER_ID = 'esri-satellite-layer';
  * IMPORTANT: mount this AFTER <EncLayer> in chart/page.tsx so satellite
  * stacks on top of the NOAA chart but below the vector buoys + annotations.
  */
-export function SatelliteLayer({
-  map,
-  visible,
-}: {
-  map: maplibregl.Map | null;
-  visible: boolean;
-}) {
+export function SatelliteLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
   useEffect(() => {
     if (!map) return;
     // Do NOT gate on map.isStyleLoaded(); the chart page hands us `map` from

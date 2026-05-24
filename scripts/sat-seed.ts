@@ -123,7 +123,11 @@ async function fetchTile(t: Tile): Promise<FetchResult> {
   return 'fetched';
 }
 
-async function runPool<T>(items: T[], workers: number, fn: (item: T) => Promise<void>): Promise<void> {
+async function runPool<T>(
+  items: T[],
+  workers: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
   let i = 0;
   const run = async (): Promise<void> => {
     while (true) {
@@ -165,7 +169,11 @@ async function overBudget(capGb: number): Promise<boolean> {
   return false;
 }
 
-async function seedTiles(label: string, tilesByZoom: Map<number, Tile[]>, capGb: number): Promise<void> {
+async function seedTiles(
+  label: string,
+  tilesByZoom: Map<number, Tile[]>,
+  capGb: number,
+): Promise<void> {
   const concurrency = Number(parseArg('--concurrency') ?? 8);
   for (const z of [...tilesByZoom.keys()].sort((a, b) => a - b)) {
     if (await overBudget(capGb)) return;
@@ -175,7 +183,9 @@ async function seedTiles(label: string, tilesByZoom: Map<number, Tile[]>, capGb:
     await runPool(tiles, concurrency, async (t) => {
       counts[await fetchTile(t)]++;
     });
-    console.log(`[${label}] z=${z} done — cached=${counts.cached} new=${counts.fetched} err=${counts.error}`);
+    console.log(
+      `[${label}] z=${z} done — cached=${counts.cached} new=${counts.fetched} err=${counts.error}`,
+    );
   }
 }
 

@@ -27,7 +27,9 @@ async function report(): Promise<void> {
   const s = await readCacheStats(CACHE_ROOT);
   console.log(`cache: ${CACHE_ROOT}`);
   console.log(`total: ${gb(s.totalBytes)} of ${gb(s.capBytes)} cap · ${s.tileCount} tiles`);
-  for (const z of Object.keys(s.byZoom).map(Number).sort((a, b) => a - b)) {
+  for (const z of Object.keys(s.byZoom)
+    .map(Number)
+    .sort((a, b) => a - b)) {
     console.log(`  z${z}: ${s.byZoom[z]!.tiles} tiles, ${gb(s.byZoom[z]!.bytes)}`);
   }
   if (s.totalBytes > s.capBytes) console.warn('WARNING: over cap — run `prune`.');
@@ -42,7 +44,9 @@ async function prune(): Promise<void> {
   // Default to the 8 GB cap when no flag is given.
   opts.maxBytes = (maxGbRaw !== undefined ? Number(maxGbRaw) : CAP_BYTES / 1024 ** 3) * 1024 ** 3;
   const r = await pruneCache(CACHE_ROOT, opts);
-  console.log(`pruned ${r.removedTiles} tiles, freed ${gb(r.removedBytes)}; now ${gb(r.totalBytesAfter)}`);
+  console.log(
+    `pruned ${r.removedTiles} tiles, freed ${gb(r.removedBytes)}; now ${gb(r.totalBytesAfter)}`,
+  );
 }
 
 async function main(): Promise<void> {
