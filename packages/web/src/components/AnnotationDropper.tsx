@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
 
-function MarkerIcon(): React.ReactElement {
+function FlagIcon(): React.ReactElement {
+  // A flag (mark an event on the track), deliberately distinct from the
+  // map-pin used by the waypoint-drop button directly below it in the rail.
   return (
     <svg
       width="18"
@@ -15,8 +17,8 @@ function MarkerIcon(): React.ReactElement {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" />
-      <circle cx="12" cy="11" r="2" />
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
     </svg>
   );
 }
@@ -153,7 +155,7 @@ export function AnnotationDropper({
     ? 'No active track — wait for GPS'
     : open_
       ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
-      : 'Drop a marker on the active track';
+      : 'Annotate the track';
   const pillClass = open_
     ? 'bg-amber-500/85 text-slate-900 border-amber-600 hover:bg-amber-400'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
@@ -184,8 +186,10 @@ export function AnnotationDropper({
       {!open && variant === 'icon' && (
         <button
           type="button"
-          aria-label={open_ ? `Annotations — open period ${minutesOpen} min` : 'Annotations'}
-          title="Track annotations"
+          aria-label={
+            open_ ? `Annotate the track — open period ${minutesOpen} min` : 'Annotate the track'
+          }
+          title="Annotate the track"
           onClick={() => setOpen(true)}
           disabled={disabled}
           className={
@@ -197,7 +201,7 @@ export function AnnotationDropper({
                 : 'bg-zinc-900/85 text-zinc-100 border-zinc-700 hover:bg-zinc-800')
           }
         >
-          <MarkerIcon />
+          <FlagIcon />
           {open_ ? (
             <span
               aria-hidden
@@ -214,7 +218,7 @@ export function AnnotationDropper({
           }
         >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-100">Drop a marker</span>
+            <span className="text-sm font-semibold text-slate-100">Annotate the track</span>
             <button
               type="button"
               onClick={() => setOpen(false)}
