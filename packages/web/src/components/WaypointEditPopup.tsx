@@ -37,6 +37,10 @@ export function WaypointEditPopup({
     setPositionRaw(fmtLatLonDmm(waypoint.lat, waypoint.lon));
     setNotes(waypoint.notes ?? '');
     setError(null);
+    // Clear the stale projected point so the card doesn't flash at the old
+    // waypoint's screen position for a frame before the projection effect
+    // re-runs for the newly selected waypoint.
+    setPt(null);
   }, [waypoint.id, waypoint.name, waypoint.lat, waypoint.lon, waypoint.notes]);
 
   useEffect(() => {
