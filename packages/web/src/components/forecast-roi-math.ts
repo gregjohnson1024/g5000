@@ -78,6 +78,26 @@ export function polygonFromBbox(b: Bbox): GeoJSON.Feature<GeoJSON.Polygon> {
   };
 }
 
+/**
+ * A LineString along the box's top edge (latMax), from the west corner toward
+ * the east, covering `frac` (0..1) of the width — frac=1 is the full edge,
+ * frac=0 is a zero-length (invisible) line. Used by the refresh progress bar.
+ */
+export function topEdgeLine(b: Bbox, frac = 1): GeoJSON.Feature<GeoJSON.LineString> {
+  const f = Math.max(0, Math.min(1, frac));
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [b.lonMin, b.latMax],
+        [b.lonMin + f * (b.lonMax - b.lonMin), b.latMax],
+      ],
+    },
+  };
+}
+
 /** Sub-arc-second tolerance for "did the user actually drag?" comparison. */
 const BBOX_EPS = 1e-9;
 

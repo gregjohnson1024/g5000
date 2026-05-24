@@ -7,14 +7,20 @@ import {
   cornersFromBbox,
   CORNERS,
   polygonFromBbox,
+  topEdgeLine,
   updateCorner,
   type Bbox,
   type Corner,
 } from './forecast-roi-math';
 
 const SOURCE_ID = 'forecast-roi-source';
-const FILL_LAYER_ID = 'forecast-roi-fill';
 const OUTLINE_LAYER_ID = 'forecast-roi-outline';
+// Refresh progress bar — a strip along the box's top edge: a faint full-width
+// track and a bright fill that grows west→east with fetch completion.
+const PROGRESS_TRACK_SOURCE = 'forecast-roi-progress-track';
+const PROGRESS_FILL_SOURCE = 'forecast-roi-progress-fill';
+const PROGRESS_TRACK_LAYER = 'forecast-roi-progress-track-line';
+const PROGRESS_FILL_LAYER = 'forecast-roi-progress-fill-line';
 
 /** Forecast hours fetched on every refresh. Mirrors /forecast page so a
  *  ROI resize on /chart yields the same depth of forecast as the manual
@@ -58,38 +64,55 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'refreshing' | 'error'>('idle');
   const [statusText, setStatusText] = useState<string | null>(null);
+  // Refresh progress 0..1 while a background fetch runs; null when idle (bar
+  // hidden). Driven by polling GET /api/forecast/refresh.
+  const [progress, setProgress] = useState<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const markersRef = useRef<Record<Corner, maplibregl.Marker> | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Timers that re-broadcast "re-poll the manifest" while a background refresh
-  // fills the cache. Cleared on a new refresh and on unmount.
-  const nudgeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bboxRef = useRef<Bbox | null>(null);
   /** Last bbox that we successfully PUT to /api/settings. Used to short-
    *  circuit a misclick-without-drag dragend that would otherwise trigger
    *  a full model refresh against an unchanged bbox. */
   const lastCommittedRef = useRef<Bbox | null>(null);
+  /** True once we've seeded the bbox (from settings or defaultBbox). The seed
+   *  must happen ONCE — `defaultBbox` is derived from the live GPS fix, so it's
+   *  a new object ~1 Hz; re-running the loader would call setBbox() mid-drag,
+   *  flicker the box back to the persisted value, and clobber bboxRef so the
+   *  drag reverts on release. */
+  const loadedRef = useRef(false);
+  /** True while a corner handle is being dragged — blocks any setBbox() from
+   *  the loader / cross-tab listener so the in-progress drag isn't reset. */
+  const draggingRef = useRef(false);
 
-  // Load initial bbox from /api/settings. If none, optionally seed from
-  // defaultBbox so the user has something to grab. Seeding does NOT
-  // persist — it stays an in-memory placeholder until the user drags.
+  // Load initial bbox from /api/settings. If none, seed from defaultBbox once
+  // it's available. Seeding does NOT persist — it stays an in-memory
+  // placeholder until the user drags. Runs effectively once (guarded by
+  // loadedRef) even though defaultBbox changes on every GPS fix.
   useEffect(() => {
+    if (loadedRef.current) return;
     let cancelled = false;
     void (async () => {
       try {
         const r = await fetch('/api/settings', { cache: 'no-store' });
         const j = (await r.json()) as { settings?: { forecastBbox?: Bbox } };
-        if (cancelled) return;
+        if (cancelled || loadedRef.current) return;
         if (j.settings?.forecastBbox) {
+          loadedRef.current = true;
           setBbox(j.settings.forecastBbox);
           // Server already has this bbox — seed lastCommittedRef so a
           // misclick (dragend with no movement) doesn't fire a refresh
           // against an unchanged bbox.
           lastCommittedRef.current = j.settings.forecastBbox;
         } else if (defaultBbox) {
+          loadedRef.current = true;
           setBbox(defaultBbox);
         }
       } catch {
-        if (!cancelled && defaultBbox) setBbox(defaultBbox);
+        if (!cancelled && !loadedRef.current && defaultBbox) {
+          loadedRef.current = true;
+          setBbox(defaultBbox);
+        }
       }
     })();
     return () => {
@@ -103,52 +126,67 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     bboxRef.current = bbox;
   }, [bbox]);
 
-  // Clear pending debounce + manifest-nudge timers on unmount.
+  // Clear pending debounce + progress poll on unmount.
   useEffect(() => {
-    const nudgeTimers = nudgeTimersRef;
     const debounce = debounceRef;
+    const poll = pollRef;
     return () => {
       if (debounce.current) clearTimeout(debounce.current);
-      for (const id of nudgeTimers.current) clearTimeout(id);
-      nudgeTimers.current = [];
+      if (poll.current) clearInterval(poll.current);
     };
   }, []);
 
-  // Layer + source lifecycle. Created once when the map is ready; data
-  // updated on every bbox change. Torn down on unmount.
+  // Layer + source lifecycle. Created once the map is ready; data updated on
+  // bbox change. Do NOT gate on map.isStyleLoaded() — it can stay false while
+  // sources still load, leaving only the marker handles with no outline (the
+  // "edges sometimes missing" bug). Wrap in try/catch and retry on styledata.
   useEffect(() => {
     if (!map || !bbox) return;
     const setup = (): void => {
-      if (!map.isStyleLoaded()) return;
-      if (!map.getSource(SOURCE_ID)) {
-        map.addSource(SOURCE_ID, {
-          type: 'geojson',
-          data: polygonFromBbox(bbox),
-        });
-      }
-      if (!map.getLayer(FILL_LAYER_ID)) {
-        map.addLayer({
-          id: FILL_LAYER_ID,
-          type: 'fill',
-          source: SOURCE_ID,
-          paint: {
-            'fill-color': '#fbbf24',
-            'fill-opacity': 0.08,
-          },
-        });
-      }
-      if (!map.getLayer(OUTLINE_LAYER_ID)) {
-        map.addLayer({
-          id: OUTLINE_LAYER_ID,
-          type: 'line',
-          source: SOURCE_ID,
-          paint: {
-            'line-color': '#fbbf24',
-            'line-width': 1.5,
-            'line-opacity': 0.7,
-            'line-dasharray': [4, 3],
-          },
-        });
+      try {
+        if (!map.getSource(SOURCE_ID)) {
+          map.addSource(SOURCE_ID, { type: 'geojson', data: polygonFromBbox(bbox) });
+        }
+        if (!map.getSource(PROGRESS_TRACK_SOURCE)) {
+          map.addSource(PROGRESS_TRACK_SOURCE, { type: 'geojson', data: topEdgeLine(bbox, 1) });
+        }
+        if (!map.getSource(PROGRESS_FILL_SOURCE)) {
+          map.addSource(PROGRESS_FILL_SOURCE, { type: 'geojson', data: topEdgeLine(bbox, 0) });
+        }
+        // Outline only — the box is never filled.
+        if (!map.getLayer(OUTLINE_LAYER_ID)) {
+          map.addLayer({
+            id: OUTLINE_LAYER_ID,
+            type: 'line',
+            source: SOURCE_ID,
+            paint: {
+              'line-color': '#fbbf24',
+              'line-width': 1.5,
+              'line-opacity': 0.7,
+              'line-dasharray': [4, 3],
+            },
+          });
+        }
+        if (!map.getLayer(PROGRESS_TRACK_LAYER)) {
+          map.addLayer({
+            id: PROGRESS_TRACK_LAYER,
+            type: 'line',
+            source: PROGRESS_TRACK_SOURCE,
+            layout: { visibility: 'none' },
+            paint: { 'line-color': '#0f172a', 'line-width': 6, 'line-opacity': 0.45 },
+          });
+        }
+        if (!map.getLayer(PROGRESS_FILL_LAYER)) {
+          map.addLayer({
+            id: PROGRESS_FILL_LAYER,
+            type: 'line',
+            source: PROGRESS_FILL_SOURCE,
+            layout: { visibility: 'none' },
+            paint: { 'line-color': '#34d399', 'line-width': 6 },
+          });
+        }
+      } catch {
+        /* style not ready yet — retried on the next styledata */
       }
     };
     setup();
@@ -166,21 +204,41 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     if (src) src.setData(polygonFromBbox(bbox));
   }, [map, bbox]);
 
-  // Visibility control: toggle the layers' visibility based on hidden prop.
+  // Visibility control: outline follows the hidden prop; the progress bar is
+  // shown only while a refresh is running (progress != null) and not hidden.
+  // Also keeps the progress sources' geometry in sync with the bbox + fill
+  // fraction. Re-applied on styledata in case the layers were just (re)created.
   useEffect(() => {
     if (!map) return;
-    const vis = hidden ? 'none' : 'visible';
-    try {
-      if (map.getLayer(FILL_LAYER_ID)) {
-        map.setLayoutProperty(FILL_LAYER_ID, 'visibility', vis);
+    const apply = (): void => {
+      try {
+        if (map.getLayer(OUTLINE_LAYER_ID)) {
+          map.setLayoutProperty(OUTLINE_LAYER_ID, 'visibility', hidden ? 'none' : 'visible');
+        }
+        const showBar = !hidden && progress != null;
+        const barVis = showBar ? 'visible' : 'none';
+        if (map.getLayer(PROGRESS_TRACK_LAYER)) {
+          map.setLayoutProperty(PROGRESS_TRACK_LAYER, 'visibility', barVis);
+        }
+        if (map.getLayer(PROGRESS_FILL_LAYER)) {
+          map.setLayoutProperty(PROGRESS_FILL_LAYER, 'visibility', barVis);
+        }
+        if (bbox) {
+          const track = map.getSource(PROGRESS_TRACK_SOURCE) as
+            | maplibregl.GeoJSONSource
+            | undefined;
+          const fill = map.getSource(PROGRESS_FILL_SOURCE) as maplibregl.GeoJSONSource | undefined;
+          if (track) track.setData(topEdgeLine(bbox, 1));
+          if (fill) fill.setData(topEdgeLine(bbox, progress ?? 0));
+        }
+      } catch {
+        /* map torn down between effects; ignore */
       }
-      if (map.getLayer(OUTLINE_LAYER_ID)) {
-        map.setLayoutProperty(OUTLINE_LAYER_ID, 'visibility', vis);
-      }
-    } catch {
-      /* map torn down between effects; ignore */
-    }
-  }, [map, hidden]);
+    };
+    apply();
+    map.on('styledata', apply);
+    return () => map.off('styledata', apply);
+  }, [map, hidden, progress, bbox]);
 
   // Corner markers. Created/torn-down with the map; their positions are
   // updated imperatively on every render via setLngLat (cheap).
@@ -193,6 +251,9 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       if (c === 'sw' || c === 'ne') el.style.cursor = 'nesw-resize';
       const marker = new maplibregl.Marker({ element: el, draggable: true });
       marker.setLngLat([0, 0]).addTo(map);
+      marker.on('dragstart', () => {
+        draggingRef.current = true;
+      });
       marker.on('drag', () => {
         const lngLat = marker.getLngLat();
         const cur = bboxRef.current;
@@ -209,6 +270,7 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
         positionMarkers(corners, next, c);
       });
       marker.on('dragend', () => {
+        draggingRef.current = false;
         const final = bboxRef.current;
         if (!final) return;
         setBbox(final);
@@ -223,6 +285,12 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       corners[c] = marker;
     }
     markersRef.current = corners;
+    // Position immediately from the current bbox. The [bbox] effect below
+    // handles later changes, but if bbox was already set before these markers
+    // were created (map became ready after the first fix), that effect already
+    // ran and won't re-fire — so without this the handles stay at [0,0]
+    // (off-screen) and only the outline shows.
+    if (bboxRef.current) positionMarkers(corners, bboxRef.current);
     return () => {
       for (const c of CORNERS) corners[c].remove();
       markersRef.current = null;
@@ -242,11 +310,12 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     if (typeof BroadcastChannel === 'undefined') return;
     const bc = new BroadcastChannel('forecast-cache');
     bc.onmessage = () => {
+      if (draggingRef.current) return; // don't reset a box the user is dragging
       void (async () => {
         try {
           const r = await fetch('/api/settings', { cache: 'no-store' });
           const j = (await r.json()) as { settings?: { forecastBbox?: Bbox } };
-          if (j.settings?.forecastBbox) setBbox(j.settings.forecastBbox);
+          if (!draggingRef.current && j.settings?.forecastBbox) setBbox(j.settings.forecastBbox);
         } catch {
           /* transient */
         }
@@ -280,7 +349,6 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
 
   const scheduleRefresh = (next: Bbox): void => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    setStatusText(`refresh in ${(REFRESH_DEBOUNCE_MS / 1000) | 0} s…`);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
       void doRefresh(next);
@@ -288,51 +356,72 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
   };
 
   const doRefresh = async (next: Bbox): Promise<void> => {
-    // The server runs the fetch as a background job and returns 202 right away
-    // (older jobs are superseded server-side, so we don't abort here). It keeps
-    // working after the response, so we never hold the connection open long
-    // enough to hit the proxy timeout. Grids land into the cache over the next
-    // 1–2 min; we nudge consumers to re-poll the manifest a few times so the
-    // chart wind overlay and /forecast table pick them up as they arrive.
-    if (nudgeTimersRef.current.length) {
-      for (const id of nudgeTimersRef.current) clearTimeout(id);
-      nudgeTimersRef.current = [];
+    // The server runs the fetch as a background job and returns 202 with a job
+    // `gen`. We poll GET /api/forecast/refresh to drive the top-edge progress
+    // bar and, on each tick, nudge consumers (wind overlay, /forecast) to
+    // re-read so grids appear as they land. Older jobs are superseded
+    // server-side, so we just re-point the poller at the new gen.
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
     }
     setStatus('refreshing');
-    setStatusText('caching models in the background…');
+    setStatusText(null);
+    setProgress(0);
+    let myGen: number | undefined;
     try {
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          bbox: next,
-          models: REFRESH_MODELS,
-          hours: REFRESH_HOURS,
-        }),
+        body: JSON.stringify({ bbox: next, models: REFRESH_MODELS, hours: REFRESH_HOURS }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      myGen = ((await r.json()) as { gen?: number }).gen;
     } catch (e) {
       setStatus('error');
       setStatusText(`refresh failed: ${String(e)}`);
+      setProgress(null);
       return;
     }
-    const nudge = (): void => {
+    const broadcast = (): void => {
       if (typeof BroadcastChannel === 'undefined') return;
       const bc = new BroadcastChannel('forecast-cache');
       bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
       bc.close();
     };
-    // Re-poll at intervals while the background job fills the cache, then clear.
-    [15_000, 45_000, 90_000].forEach((ms) => {
-      nudgeTimersRef.current.push(setTimeout(nudge, ms));
-    });
-    nudgeTimersRef.current.push(
-      setTimeout(() => {
-        setStatus('idle');
-        setStatusText(null);
-      }, 120_000),
-    );
-    setStatusText('caching in background — grids appear as they land');
+    const stopPoll = (): void => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+    pollRef.current = setInterval(() => {
+      void (async () => {
+        try {
+          const res = await fetch('/api/forecast/refresh', { cache: 'no-store' });
+          const p = (await res.json()) as {
+            gen: number;
+            total: number;
+            done: number;
+            running: boolean;
+          };
+          if (myGen != null && p.gen !== myGen) {
+            stopPoll(); // a newer refresh now owns the bar
+            return;
+          }
+          setProgress(p.total > 0 ? p.done / p.total : 0);
+          broadcast();
+          if (!p.running) {
+            stopPoll();
+            setStatus('idle');
+            setProgress(1);
+            window.setTimeout(() => setProgress(null), 1500);
+          }
+        } catch {
+          /* transient poll failure — keep polling */
+        }
+      })();
+    }, 3000);
   };
 
   if (!bbox) return null;
