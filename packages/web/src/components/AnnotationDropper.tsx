@@ -1,8 +1,9 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
-import { type SailCategory, type SailWardrobe } from '@g5000/db';
+import { type BoatState, type SailCategory, type SailWardrobe } from '@g5000/db';
 import { sailGroups } from './sail-groups';
+import { daggerboardLabel } from './daggerboard-label';
 
 function FlagIcon(): React.ReactElement {
   // A flag (mark an event on the track), deliberately distinct from the
@@ -65,6 +66,7 @@ export function AnnotationDropper({
 }): React.ReactElement {
   const [state, setState] = useState<DropperState>({ trackId: null, annotations: [] });
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
+  const [boatState, setBoatState] = useState<BoatState | null>(null);
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [customLabel, setCustomLabel] = useState('');
@@ -97,6 +99,15 @@ export function AnnotationDropper({
         if (wr.ok && alive) setWardrobe((await wr.json()) as SailWardrobe);
       } catch {
         /* keep last wardrobe */
+      }
+      try {
+        const bs = await fetch('/api/boat-state', { cache: 'no-store' });
+        if (bs.ok && alive) {
+          const j = (await bs.json()) as { ok: boolean; boatState?: BoatState };
+          if (j.boatState) setBoatState(j.boatState);
+        }
+      } catch {
+        /* keep last */
       }
     };
     void tick();
@@ -186,6 +197,35 @@ export function AnnotationDropper({
     [post, state.trackId],
   );
 
+  const postBoatState = useCallback(
+    async (patch: Partial<BoatState>, label: string): Promise<void> => {
+      setOpen(false);
+      try {
+        const res = await fetch('/api/boat-state', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) {
+          setFlash(`✗ ${label} failed`);
+          window.setTimeout(() => setFlash(null), 2500);
+          return;
+        }
+        const j = (await res.json()) as { ok: boolean; boatState?: BoatState };
+        if (j.boatState) setBoatState(j.boatState);
+        if (state.trackId) await post(label, 'event');
+        else {
+          setFlash(`✓ ${label}`);
+          window.setTimeout(() => setFlash(null), 1500);
+        }
+      } catch {
+        setFlash(`✗ ${label} failed`);
+        window.setTimeout(() => setFlash(null), 2500);
+      }
+    },
+    [post, state.trackId],
+  );
+
   const open_ = useMemo(() => openPeriodStart(state.annotations), [state.annotations]);
   const minutesOpen = open_ ? Math.floor((tickMs - open_.tsMs) / 60_000) : 0;
   const disabled = state.trackId === null;
@@ -257,7 +297,7 @@ export function AnnotationDropper({
       {open && (
         <div
           className={
-            'w-[280px] bg-slate-900/95 border border-slate-700 rounded shadow-lg p-3 space-y-3' +
+            'w-[280px] bg-slate-900/95 border border-slate-700 rounded shadow-lg p-3 space-y-3 max-h-[70vh] overflow-y-auto' +
             (variant === 'icon' ? ' absolute right-full mr-2 top-0 z-20' : '')
           }
         >
@@ -340,6 +380,89 @@ export function AnnotationDropper({
                 </div>
               </div>
             ))}
+
+          {boatState && (
+            <>
+              {(['port', 'starboard'] as const).map((side) => (
+                <div key={`dagger-${side}`} className="space-y-1">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    {side === 'port' ? 'Port board' : 'Stbd board'}
+                    <span className="ml-1 text-slate-300">— {boatState.daggerboards[side]}%</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {[0, 25, 50, 75, 100].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() =>
+                          void postBoatState(
+                            { daggerboards: { [side]: pct } } as Partial<BoatState>,
+                            daggerboardLabel(side, pct),
+                          )
+                        }
+                        className={
+                          'px-2 py-1 text-xs rounded border ' +
+                          (boatState.daggerboards[side] === pct
+                            ? 'bg-amber-500 text-slate-900 border-amber-600'
+                            : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                        }
+                      >
+                        {pct === 0 ? 'Up' : pct === 100 ? 'Down' : `${pct}%`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {(['port', 'starboard'] as const).map((side) => {
+                const running = boatState.engines[side].running;
+                const label = side === 'port' ? 'Port engine' : 'Stbd engine';
+                return (
+                  <div key={`engine-${side}`} className="space-y-1">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      {label}
+                      <span className="ml-1 text-slate-300">— {running ? 'running' : 'stopped'}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void postBoatState(
+                            { engines: { [side]: { running: true } } } as Partial<BoatState>,
+                            `${label} on`,
+                          )
+                        }
+                        className={
+                          'px-2 py-1 text-xs rounded border ' +
+                          (running
+                            ? 'bg-emerald-600 text-white border-emerald-700'
+                            : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                        }
+                      >
+                        Run
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void postBoatState(
+                            { engines: { [side]: { running: false } } } as Partial<BoatState>,
+                            `${label} off`,
+                          )
+                        }
+                        className={
+                          'px-2 py-1 text-xs rounded border ' +
+                          (!running
+                            ? 'bg-slate-600 text-white border-slate-500'
+                            : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                        }
+                      >
+                        Stop
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
 
           {!open_ && (
             <button
