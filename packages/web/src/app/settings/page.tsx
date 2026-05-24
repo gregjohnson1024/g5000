@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { SatelliteCachePanel } from './SatelliteCachePanel';
 
 type SourceMode = 'live' | 'demo' | 'replay';
 interface SourceModeStatus {
@@ -417,6 +418,8 @@ export default function SettingsPage() {
         </p>
         {socketCanError && <div className="text-rose-400 text-xs">{socketCanError}</div>}
       </fieldset>
+
+      <SatelliteCachePanel />
 
       <p className="text-xs text-slate-400">
         The fields below are persisted to <code>~/.g5000-router/settings.json</code>. Leave a field
