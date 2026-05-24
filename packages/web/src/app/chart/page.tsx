@@ -18,13 +18,12 @@ import { WindOverlay, type WindGrid } from '../../components/WindOverlay';
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
-import { EncLayer, NOAA_MIN_ZOOM, refreshEncTiles } from '../../components/EncLayer';
+import { EncLayer, NOAA_MIN_ZOOM } from '../../components/EncLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { ZoomIndicator } from '../../components/ZoomIndicator';
-import { TileGridOverlay } from '../../components/TileGridOverlay';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { ChartToolbar } from './ChartToolbar';
@@ -101,7 +100,8 @@ function ChartPageInner() {
     osm: true,
     enc: false,
     buoys: false,
-    tileGrid: false,
+    ais: true,
+    aisCog: true,
     model: 'none' as ChartModel,
   });
   const [layersHydrated, setLayersHydrated] = useState(false);
@@ -115,7 +115,8 @@ function ChartPageInner() {
           osm: parsed.osm ?? true,
           enc: parsed.enc ?? false,
           buoys: parsed.buoys ?? false,
-          tileGrid: parsed.tileGrid ?? false,
+          ais: parsed.ais ?? true,
+          aisCog: parsed.aisCog ?? true,
           model: validModels.includes(parsed.model as ChartModel)
             ? (parsed.model as ChartModel)
             : 'none',
@@ -391,11 +392,10 @@ function ChartPageInner() {
     if (waypointDropActive) setSelectedWaypointId(null);
   }, [waypointDropActive]);
 
-  // Map-click handler for waypoint-drop mode. Auto-names via nextWaypointName,
-  // POSTs to /api/waypoints, adds the pin to state immediately, then exits mode.
-  const handleDropClick = async ({ lat, lon }: { lat: number; lon: number }) => {
+  // Auto-names via nextWaypointName, POSTs to /api/waypoints, and adds the pin
+  // to state immediately. Shared by drop-mode clicks and the long-press gesture.
+  const dropWaypointAt = async ({ lat, lon }: { lat: number; lon: number }) => {
     const name = nextWaypointName(waypoints.map((w) => w.name));
-    setWaypointDropActive(false); // one waypoint per activation
     try {
       const res = await fetch('/api/waypoints', {
         method: 'POST',
@@ -422,6 +422,12 @@ function ChartPageInner() {
     } catch {
       setError('waypoint drop failed');
     }
+  };
+
+  // Map-click handler for waypoint-drop mode: drop, then exit the mode.
+  const handleDropClick = async ({ lat, lon }: { lat: number; lon: number }) => {
+    setWaypointDropActive(false); // one waypoint per activation
+    await dropWaypointAt({ lat, lon });
   };
 
   // Persist the route. Start/end are deliberately omitted — see comment on
@@ -490,6 +496,7 @@ function ChartPageInner() {
             setMapInstance(m);
           }}
           onClick={waypointDropActive ? handleDropClick : undefined}
+          onLongPress={dropWaypointAt}
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension
@@ -502,7 +509,13 @@ function ChartPageInner() {
           totalNm={100}
           hidden={false}
         />
-        <AisTargets map={mapInstance} cogExtensionMinutes={COG_EXTENSION_MINUTES} />
+        {layers.ais && (
+          <AisTargets
+            map={mapInstance}
+            cogExtensionMinutes={COG_EXTENSION_MINUTES}
+            showCogExtensions={layers.aisCog}
+          />
+        )}
         <ForecastRoi
           map={mapInstance}
           defaultBbox={
@@ -567,7 +580,6 @@ function ChartPageInner() {
         <StartLineLayer map={mapInstance} />
         <EncLayer map={mapInstance} visible={layers.enc} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
-        <TileGridOverlay map={mapInstance} visible={layers.tileGrid} />
         {(() => {
           const sel = selectedWaypointId
             ? waypoints.find((w) => w.id === selectedWaypointId)
@@ -598,7 +610,6 @@ function ChartPageInner() {
           layers={layers}
           onToggleLayer={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
           onSelectModel={(model) => setLayers((prev) => ({ ...prev, model }))}
-          onRefreshNoaa={() => refreshEncTiles(mapInstance)}
           waypointDropActive={waypointDropActive}
           onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
         />

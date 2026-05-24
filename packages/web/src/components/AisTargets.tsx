@@ -14,6 +14,9 @@ export interface AisTargetsProps {
    * single time scale governs every vessel on the chart. Default 360 (6 h).
    */
   cogExtensionMinutes?: number;
+  /** Draw the COG-projection extension lines. Default true. When false the
+   * target dots stay but their forward-projection lines are hidden. */
+  showCogExtensions?: boolean;
 }
 
 const M_PER_DEG_LAT = 111_320;
@@ -46,7 +49,28 @@ interface TargetsResponse {
  * dedicated /ais page handles. The chart's purpose is situational
  * awareness only.
  */
-export function AisTargets({ map, pollMs = 2000, cogExtensionMinutes = 360 }: AisTargetsProps) {
+export function AisTargets({
+  map,
+  pollMs = 2000,
+  cogExtensionMinutes = 360,
+  showCogExtensions = true,
+}: AisTargetsProps) {
+  // Toggle the COG-extension line layer without tearing down the polling
+  // effect. Re-applied on styledata in case the layer is (re)created.
+  useEffect(() => {
+    if (!map) return;
+    const apply = (): void => {
+      if (map.getLayer(COG_LAYER_ID)) {
+        map.setLayoutProperty(COG_LAYER_ID, 'visibility', showCogExtensions ? 'visible' : 'none');
+      }
+    };
+    apply();
+    map.on('styledata', apply);
+    return () => {
+      map.off('styledata', apply);
+    };
+  }, [map, showCogExtensions]);
+
   useEffect(() => {
     if (!map) return;
     let cancelled = false;

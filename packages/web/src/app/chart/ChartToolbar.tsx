@@ -5,9 +5,8 @@ import { AnnotationDropper } from '../../components/AnnotationDropper';
 
 export interface ChartToolbarProps {
   layers: LayersState;
-  onToggleLayer: (key: 'osm' | 'enc' | 'buoys' | 'tileGrid') => void;
+  onToggleLayer: (key: 'osm' | 'enc' | 'buoys' | 'ais' | 'aisCog') => void;
   onSelectModel: (model: ChartModel) => void;
-  onRefreshNoaa?: () => void;
   waypointDropActive: boolean;
   onToggleWaypointDrop: () => void;
 }
@@ -16,18 +15,12 @@ export function ChartToolbar({
   layers,
   onToggleLayer,
   onSelectModel,
-  onRefreshNoaa,
   waypointDropActive,
   onToggleWaypointDrop,
 }: ChartToolbarProps): React.ReactElement {
   return (
     <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end">
-      <LayersControl
-        state={layers}
-        onToggle={onToggleLayer}
-        onSelectModel={onSelectModel}
-        onRefreshNoaa={onRefreshNoaa}
-      />
+      <LayersControl state={layers} onToggle={onToggleLayer} onSelectModel={onSelectModel} />
       <AnnotationDropper variant="icon" />
       <button
         type="button"

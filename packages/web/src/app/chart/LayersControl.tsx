@@ -8,22 +8,20 @@ export interface LayersState {
   osm: boolean;
   enc: boolean;
   buoys: boolean;
-  /** Debug: draw the boundary + z/x/y label of every visible tile. */
-  tileGrid: boolean;
+  /** AIS target dots. Defaults true. */
+  ais: boolean;
+  /** COG-projection extension lines on AIS targets. Defaults true. */
+  aisCog: boolean;
   /** Mutually-exclusive forecast/current overlay. 'none' = no model overlay. */
   model: ChartModel;
 }
 
 /**
- * Top-right popover for chart overlays. The button shows "Layers" plus
- * a tally of how many overlays are on; the panel reveals one row per
- * toggle. Two toggles today: NOAA raster chart, and the NOAA vector
- * buoys layer. A mutually-exclusive radio group selects the model
- * overlay (None / GFS / ECMWF / CMEMS).
- *
- * If the panel ever drops back to a single toggle, collapse this back
- * to a single button — same logic that drove the previous single-button
- * shape.
+ * Top-right popover for chart overlays. The button shows a layers icon
+ * plus a badge tallying how many overlays are on; the panel reveals one
+ * toggle per row (OSM base, NOAA chart, Buoys), a mutually-exclusive radio
+ * group for the model overlay (None / GFS / ECMWF / CMEMS), and a Misc
+ * section (AIS targets + their COG extensions).
  *
  * State lives in chart/page.tsx and persists to `chart:layers`.
  */
@@ -31,14 +29,10 @@ export function LayersControl({
   state,
   onToggle,
   onSelectModel,
-  onRefreshNoaa,
 }: {
   state: LayersState;
-  onToggle: (key: 'osm' | 'enc' | 'buoys' | 'tileGrid') => void;
+  onToggle: (key: 'osm' | 'enc' | 'buoys' | 'ais' | 'aisCog') => void;
   onSelectModel: (model: ChartModel) => void;
-  /** Optional handler for the "Refresh NOAA tiles" action — invalidates
-   * MapLibre's in-memory tile cache so newly-seeded disk tiles render. */
-  onRefreshNoaa?: () => void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -89,11 +83,6 @@ export function LayersControl({
           <Row label="OSM base" pressed={state.osm} onClick={() => onToggle('osm')} />
           <Row label="NOAA chart" pressed={state.enc} onClick={() => onToggle('enc')} />
           <Row label="Buoys" pressed={state.buoys} onClick={() => onToggle('buoys')} />
-          <Row
-            label="Tile grid (debug)"
-            pressed={state.tileGrid}
-            onClick={() => onToggle('tileGrid')}
-          />
           <div className="mt-1 pt-1 border-t border-zinc-700">
             <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">
               Model overlay
@@ -119,16 +108,18 @@ export function LayersControl({
               onClick={() => onSelectModel('cmems')}
             />
           </div>
-          {onRefreshNoaa && state.enc ? (
-            <button
-              type="button"
-              onClick={onRefreshNoaa}
-              className="w-full mt-1 px-2 py-1.5 rounded text-xs text-zinc-300 border border-zinc-700 hover:bg-zinc-800"
-              title="Drop MapLibre's tile cache and re-fetch NOAA tiles from disk"
-            >
-              ↻ Refresh NOAA tiles
-            </button>
-          ) : null}
+          <div className="mt-1 pt-1 border-t border-zinc-700">
+            <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">Misc</div>
+            <Row label="AIS targets" pressed={state.ais} onClick={() => onToggle('ais')} />
+            {state.ais ? (
+              <Row
+                label="AIS COG ext"
+                pressed={state.aisCog}
+                indent
+                onClick={() => onToggle('aisCog')}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>
@@ -159,10 +150,13 @@ function Row({
   label,
   pressed,
   onClick,
+  indent = false,
 }: {
   label: string;
   pressed: boolean;
   onClick: () => void;
+  /** Nudge the label right to read as a sub-toggle of the row above. */
+  indent?: boolean;
 }): React.ReactElement {
   return (
     <button
@@ -174,7 +168,7 @@ function Row({
         (pressed ? 'bg-zinc-700 text-zinc-50' : 'text-zinc-200 hover:bg-zinc-800')
       }
     >
-      <span>{label}</span>
+      <span className={indent ? 'pl-3 text-zinc-300' : undefined}>{label}</span>
       <span aria-hidden="true" className={pressed ? 'opacity-100' : 'opacity-30'}>
         ●
       </span>

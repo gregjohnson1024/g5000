@@ -7,10 +7,18 @@ export interface MapProps {
   center: { lat: number; lon: number };
   zoom: number;
   onClick?: (latLon: { lat: number; lon: number }) => void;
+  /** Fired on a press-and-hold (mouse or touch) that stays put for
+   * LONG_PRESS_MS without panning. The trailing click is suppressed. */
+  onLongPress?: (latLon: { lat: number; lon: number }) => void;
   onLoad?: (m: maplibregl.Map) => void;
 }
 
-export function Map({ center, zoom, onClick, onLoad }: MapProps) {
+const LONG_PRESS_MS = 500;
+// Movement (px) that cancels a pending long-press — distinguishes a hold
+// from the start of a pan.
+const LONG_PRESS_MOVE_TOLERANCE = 8;
+
+export function Map({ center, zoom, onClick, onLongPress, onLoad }: MapProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   // Track the latest onClick/onLoad in a ref so the map's listeners (which
@@ -19,8 +27,10 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
   // `start`/`end` props from the parent and never sees state updates —
   // every click would set start, never end.
   const onClickRef = useRef(onClick);
+  const onLongPressRef = useRef(onLongPress);
   const onLoadRef = useRef(onLoad);
   onClickRef.current = onClick;
+  onLongPressRef.current = onLongPress;
   onLoadRef.current = onLoad;
   useEffect(() => {
     if (!ref.current) return;
@@ -60,7 +70,54 @@ export function Map({ center, zoom, onClick, onLoad }: MapProps) {
     });
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'nautical' }), 'bottom-left');
     (window as unknown as { __g5kMap?: maplibregl.Map }).__g5kMap = map;
+    // Press-and-hold → onLongPress. A timer armed on press fires after
+    // LONG_PRESS_MS unless the pointer moves past the tolerance, the press
+    // ends, a pan/zoom starts, or a second finger lands. The trailing click
+    // is swallowed so a hold doesn't also register as a tap.
+    let pressTimer: ReturnType<typeof setTimeout> | null = null;
+    let pressStart: maplibregl.Point | null = null;
+    let firedLongPress = false;
+    const clearPress = (): void => {
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = null;
+      pressStart = null;
+    };
+    const armPress = (e: maplibregl.MapMouseEvent | maplibregl.MapTouchEvent): void => {
+      if (!onLongPressRef.current) return;
+      const oe = e.originalEvent;
+      if (oe instanceof MouseEvent && oe.button !== 0) return; // left button only
+      if (typeof TouchEvent !== 'undefined' && oe instanceof TouchEvent && oe.touches.length > 1)
+        return; // ignore pinch/multitouch
+      clearPress();
+      pressStart = e.point;
+      const { lat, lng } = e.lngLat;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        firedLongPress = true;
+        onLongPressRef.current?.({ lat, lon: lng });
+      }, LONG_PRESS_MS);
+    };
+    const maybeCancelOnMove = (e: maplibregl.MapMouseEvent | maplibregl.MapTouchEvent): void => {
+      if (!pressStart) return;
+      const dx = e.point.x - pressStart.x;
+      const dy = e.point.y - pressStart.y;
+      if (dx * dx + dy * dy > LONG_PRESS_MOVE_TOLERANCE * LONG_PRESS_MOVE_TOLERANCE) clearPress();
+    };
+    map.on('mousedown', armPress);
+    map.on('touchstart', armPress);
+    map.on('mousemove', maybeCancelOnMove);
+    map.on('touchmove', maybeCancelOnMove);
+    map.on('mouseup', clearPress);
+    map.on('touchend', clearPress);
+    map.on('touchcancel', clearPress);
+    map.on('dragstart', clearPress);
+    map.on('zoomstart', clearPress);
+
     map.on('click', (e) => {
+      if (firedLongPress) {
+        firedLongPress = false; // swallow the click that trails a long-press
+        return;
+      }
       onClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
     });
     map.on('load', () => {
