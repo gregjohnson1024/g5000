@@ -2,6 +2,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
 
+function MarkerIcon(): React.ReactElement {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" />
+      <circle cx="12" cy="11" r="2" />
+    </svg>
+  );
+}
+
 const POLL_MS = 5_000;
 
 interface DropperState {
@@ -38,11 +57,17 @@ const QUICK_BUTTONS: Array<{ label: string; row: number }> = [
  */
 export function AnnotationDropper({
   position = 'top-2 right-2',
+  variant = 'pill',
 }: {
   /** Tailwind position classes — caller decides anchor. /chart uses
-   * 'top-2 right-14' to clear the NOAA layers button. */
+   * 'top-2 right-14' to clear the NOAA layers button. Ignored in
+   * 'icon' variant (parent flex-col positions the element). */
   position?: string;
-}) {
+  /** 'pill' (default) = floating pill button, absolutely positioned.
+   * 'icon' = w-9 h-9 icon button; root is relative so a parent
+   * flex-col can position it; expanded panel opens to the left. */
+  variant?: 'pill' | 'icon';
+}): React.ReactElement {
   const [state, setState] = useState<DropperState>({ trackId: null, annotations: [] });
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
@@ -133,14 +158,19 @@ export function AnnotationDropper({
     ? 'bg-amber-500/85 text-slate-900 border-amber-600 hover:bg-amber-400'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
 
+  const rootClass =
+    variant === 'icon'
+      ? 'relative'
+      : `absolute ${position} z-20 flex flex-col items-end gap-2`;
+
   return (
-    <div className={`absolute ${position} z-20 flex flex-col items-end gap-2`}>
-      {flash && (
+    <div className={rootClass}>
+      {flash && variant === 'pill' && (
         <div className="text-xs px-2 py-1 rounded bg-slate-900/90 text-slate-100 border border-slate-700 shadow">
           {flash}
         </div>
       )}
-      {!open && (
+      {!open && variant === 'pill' && (
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -151,8 +181,38 @@ export function AnnotationDropper({
           {pillLabel}
         </button>
       )}
+      {!open && variant === 'icon' && (
+        <button
+          type="button"
+          aria-label={open_ ? `Annotations — open period ${minutesOpen} min` : 'Annotations'}
+          title="Track annotations"
+          onClick={() => setOpen(true)}
+          disabled={disabled}
+          className={
+            'relative w-9 h-9 rounded border flex items-center justify-center ' +
+            (disabled
+              ? 'bg-zinc-900/40 text-zinc-500 border-zinc-800 cursor-not-allowed'
+              : open_
+                ? 'bg-amber-500 text-zinc-900 border-amber-600 hover:bg-amber-400'
+                : 'bg-zinc-900/85 text-zinc-100 border-zinc-700 hover:bg-zinc-800')
+          }
+        >
+          <MarkerIcon />
+          {open_ ? (
+            <span
+              aria-hidden
+              className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-700"
+            />
+          ) : null}
+        </button>
+      )}
       {open && (
-        <div className="w-[280px] bg-slate-900/95 border border-slate-700 rounded shadow-lg p-3 space-y-3">
+        <div
+          className={
+            'w-[280px] bg-slate-900/95 border border-slate-700 rounded shadow-lg p-3 space-y-3' +
+            (variant === 'icon' ? ' absolute right-full mr-2 top-0 z-20' : '')
+          }
+        >
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-100">Drop a marker</span>
             <button
