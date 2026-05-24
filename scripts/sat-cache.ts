@@ -41,8 +41,12 @@ async function prune(): Promise<void> {
   const maxGbRaw = parseArg('--max-gb');
   const opts: { olderThanDays?: number; maxBytes?: number } = {};
   if (olderRaw !== undefined) opts.olderThanDays = Number(olderRaw);
-  // Default to the 8 GB cap when no flag is given.
-  opts.maxBytes = (maxGbRaw !== undefined ? Number(maxGbRaw) : CAP_BYTES / 1024 ** 3) * 1024 ** 3;
+  if (maxGbRaw !== undefined) opts.maxBytes = Number(maxGbRaw) * 1024 ** 3;
+  // With no flag at all, fall back to enforcing the 8 GB cap. `--older-than-days`
+  // alone stays a pure age prune (mirrors the admin UI's "prune unused" button).
+  if (opts.olderThanDays === undefined && opts.maxBytes === undefined) {
+    opts.maxBytes = CAP_BYTES;
+  }
   const r = await pruneCache(CACHE_ROOT, opts);
   console.log(
     `pruned ${r.removedTiles} tiles, freed ${gb(r.removedBytes)}; now ${gb(r.totalBytesAfter)}`,

@@ -130,16 +130,18 @@ export async function pruneCache(root: string, opts: PruneOptions = {}): Promise
   }
 
   let removedBytes = 0;
+  let removedTiles = 0;
   for (const f of toRemove) {
     try {
       await unlink(f.path);
       removedBytes += f.bytes;
+      removedTiles += 1;
     } catch {
-      /* already gone */
+      /* already gone (e.g. concurrent prune) — don't count it */
     }
   }
   return {
-    removedTiles: toRemove.length,
+    removedTiles,
     removedBytes,
     totalBytesAfter: totalBefore - removedBytes,
   };

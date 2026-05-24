@@ -68,6 +68,10 @@ describe('sat-tiles proxy', () => {
     expect(res.headers.get('content-type')).toBe('image/jpeg');
     // ArcGIS row/col order (y before x), no zoom offset.
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('/tile/10/4/3');
+    // The disk write is fire-and-forget; let it settle, then confirm the tile landed.
+    await new Promise((r) => setTimeout(r, 20));
+    const written = await stat(join(root, 'sat-cache', '10', '3', '4.jpg'));
+    expect(written.size).toBe(jpeg.length);
   });
 
   it('falls back to a transparent tile on upstream error', async () => {
