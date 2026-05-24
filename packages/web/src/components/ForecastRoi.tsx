@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import {
   bboxesEqual,
@@ -28,15 +28,26 @@ const PROGRESS_FILL_LAYER = 'forecast-roi-progress-fill-line';
 const REFRESH_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
 const REFRESH_MODELS = ['gfs', 'ecmwf'] as const;
 
-/** Wait this long after the last drag completes before firing the refresh.
- *  Lets the user nudge several corners without firing redundant fetches. */
-const REFRESH_DEBOUNCE_MS = 4000;
-
 function makeHandleEl(): HTMLDivElement {
   const el = document.createElement('div');
   el.style.cssText =
     'width:14px;height:14px;background:#fbbf24;border:2px solid #1e293b;' +
     'border-radius:3px;cursor:nwse-resize;box-shadow:0 0 0 1px rgba(0,0,0,0.4);';
+  return el;
+}
+
+/** The "fetch this region" button anchored at the box's top-left corner.
+ *  Clicking it starts the refresh; dragging the box cancels any in-flight one. */
+function makeFetchButtonEl(): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.title = 'Fetch forecast for this region';
+  el.setAttribute('aria-label', 'Fetch forecast for this region');
+  el.textContent = '↻';
+  el.style.cssText =
+    'width:24px;height:24px;line-height:22px;text-align:center;font-size:15px;' +
+    'background:#fbbf24;color:#1e293b;border:1px solid #b45309;border-radius:4px;' +
+    'cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.4);padding:0;';
   return el;
 }
 
@@ -50,15 +61,16 @@ interface ForecastRoiProps {
 }
 
 /**
- * Always-visible draggable forecast ROI overlay. Renders a transparent
- * amber rectangle on the chart with 4 corner handles. Dragging a handle
- * resizes the bbox live; on dragend the new bbox is persisted to
- * /api/settings and a /api/forecast/refresh kicks off (debounced so a
- * burst of nudges fires one fetch).
+ * Always-visible draggable forecast ROI overlay: an amber outline (no fill)
+ * with 4 corner handles and a ↻ "fetch this region" button at the top-left.
+ * Dragging a handle resizes the box live and persists it to /api/settings on
+ * release; it also cancels any in-flight transfer (DELETE /api/forecast/refresh)
+ * but does NOT auto-fetch — the user starts a transfer with the ↻ button. A
+ * progress strip along the top edge fills west→east as grids land (polled from
+ * GET /api/forecast/refresh).
  *
- * Cross-chart sync: listens on the `forecast-cache` BroadcastChannel so
- * other tabs that complete a refresh tell us to re-read settings. We
- * don't write to that channel ourselves — only refresh handlers do.
+ * Cross-chart sync: listens on the `forecast-cache` BroadcastChannel so other
+ * tabs that complete a refresh tell us to re-read settings.
  */
 export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiProps) {
   const [bbox, setBbox] = useState<Bbox | null>(null);
@@ -67,9 +79,14 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
   // Refresh progress 0..1 while a background fetch runs; null when idle (bar
   // hidden). Driven by polling GET /api/forecast/refresh.
   const [progress, setProgress] = useState<number | null>(null);
+  // The ↻ fetch button shows only when a fetch would get new data: the box was
+  // changed since the last fetch (boxDirty), OR a newer model run is available
+  // than what's cached for this box (newerAvailable, from the manifest).
+  const [boxDirty, setBoxDirty] = useState(false);
+  const [newerAvailable, setNewerAvailable] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const markersRef = useRef<Record<Corner, maplibregl.Marker> | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchBtnRef = useRef<maplibregl.Marker | null>(null);
   const bboxRef = useRef<Bbox | null>(null);
   /** Last bbox that we successfully PUT to /api/settings. Used to short-
    *  circuit a misclick-without-drag dragend that would otherwise trigger
@@ -126,12 +143,55 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     bboxRef.current = bbox;
   }, [bbox]);
 
-  // Clear pending debounce + progress poll on unmount.
+  // Is a newer model run available than what's cached for the current box?
+  // Compares the manifest's latest-available run per model to the newest cached
+  // run for this exact bbox. Drives the ↻ button alongside boxDirty.
+  const checkNewerAvailable = useCallback(async (): Promise<void> => {
+    const b = bboxRef.current;
+    if (!b) return;
+    try {
+      const r = await fetch('/api/forecast/manifest', { cache: 'no-store' });
+      const j = (await r.json()) as {
+        ok?: boolean;
+        entries?: Array<{ model: string; runAt: number; bbox: Bbox }>;
+        availability?: Record<string, { latestRunUnix: number }>;
+      };
+      if (!j.ok) return;
+      const near = (x: number, y: number): boolean => Math.abs(x - y) < 0.01;
+      const matches = (e: { bbox: Bbox }): boolean =>
+        near(e.bbox.latMin, b.latMin) &&
+        near(e.bbox.latMax, b.latMax) &&
+        near(e.bbox.lonMin, b.lonMin) &&
+        near(e.bbox.lonMax, b.lonMax);
+      let newer = false;
+      for (const m of ['gfs', 'ecmwf'] as const) {
+        const avail = j.availability?.[m]?.latestRunUnix ?? 0;
+        const cachedRuns = (j.entries ?? [])
+          .filter((e) => e.model === m && matches(e))
+          .map((e) => e.runAt);
+        const cachedLatest = cachedRuns.length ? Math.max(...cachedRuns) : 0;
+        if (avail > cachedLatest) {
+          newer = true;
+          break;
+        }
+      }
+      setNewerAvailable(newer);
+    } catch {
+      /* transient — leave the last value */
+    }
+  }, []);
+
+  // Re-check on box change + every 60 s (a new run publishes ~every 6 h).
   useEffect(() => {
-    const debounce = debounceRef;
+    void checkNewerAvailable();
+    const id = setInterval(() => void checkNewerAvailable(), 60_000);
+    return () => clearInterval(id);
+  }, [checkNewerAvailable, bbox]);
+
+  // Stop the progress poll on unmount.
+  useEffect(() => {
     const poll = pollRef;
     return () => {
-      if (debounce.current) clearTimeout(debounce.current);
       if (poll.current) clearInterval(poll.current);
     };
   }, []);
@@ -223,6 +283,17 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
         if (map.getLayer(PROGRESS_FILL_LAYER)) {
           map.setLayoutProperty(PROGRESS_FILL_LAYER, 'visibility', barVis);
         }
+        // Corner drag handles follow `hidden` (model 'none'/'cmems' → no ROI).
+        if (markersRef.current) {
+          for (const c of CORNERS)
+            markersRef.current[c].getElement().style.display = hidden ? 'none' : '';
+        }
+        const btnEl = fetchBtnRef.current?.getElement();
+        // Hidden while a fetch runs (progress != null); else shown when the box
+        // changed or a newer run is available.
+        if (btnEl)
+          btnEl.style.display =
+            !hidden && progress == null && (boxDirty || newerAvailable) ? 'inline-block' : 'none';
         if (bbox) {
           const track = map.getSource(PROGRESS_TRACK_SOURCE) as
             | maplibregl.GeoJSONSource
@@ -238,7 +309,7 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     apply();
     map.on('styledata', apply);
     return () => map.off('styledata', apply);
-  }, [map, hidden, progress, bbox]);
+  }, [map, hidden, progress, bbox, boxDirty, newerAvailable]);
 
   // Corner markers. Created/torn-down with the map; their positions are
   // updated imperatively on every render via setLngLat (cheap).
@@ -249,10 +320,21 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       const el = makeHandleEl();
       // Different cursors for diagonal vs anti-diagonal corners.
       if (c === 'sw' || c === 'ne') el.style.cursor = 'nesw-resize';
+      if (hidden) el.style.display = 'none';
       const marker = new maplibregl.Marker({ element: el, draggable: true });
       marker.setLngLat([0, 0]).addTo(map);
       marker.on('dragstart', () => {
         draggingRef.current = true;
+        // The box is changing, so any in-flight transfer is now stale: cancel
+        // it on the server (aborts the downloads) and clear the bar locally.
+        // No auto-refetch — the user re-initiates with the ↻ button.
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        setProgress(null);
+        setBoxDirty(true); // box is changing → offer a fetch again
+        void fetch('/api/forecast/refresh', { method: 'DELETE' }).catch(() => {});
       });
       marker.on('drag', () => {
         const lngLat = marker.getLngLat();
@@ -268,48 +350,73 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
         // one being dragged — maplibre is already updating its position
         // and writing on top would fight the drag handler.
         positionMarkers(corners, next, c);
+        fetchBtnRef.current?.setLngLat([next.lonMin, next.latMax]);
       });
       marker.on('dragend', () => {
         draggingRef.current = false;
         const final = bboxRef.current;
         if (!final) return;
         setBbox(final);
-        // A click without movement still fires dragend with bbox unchanged.
-        // Skip the network calls in that case — otherwise a misclick on a
-        // handle pays for a 2-model × 57-hour refresh.
+        // Persist the new box (no auto-fetch). Skip the PUT on a no-move click.
         if (lastCommittedRef.current && bboxesEqual(lastCommittedRef.current, final)) {
           return;
         }
-        void commitBbox(final);
+        void persistBbox(final);
       });
       corners[c] = marker;
     }
     markersRef.current = corners;
+
+    // "Fetch this region" button, anchored just inside the top-left corner
+    // (offset clears the NW drag handle). Click → start the refresh for the
+    // current box. Not draggable.
+    const btnEl = makeFetchButtonEl();
+    btnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const b = bboxRef.current;
+      if (b) void doRefresh(b);
+    });
+    btnEl.style.display = (boxDirty || newerAvailable) && !hidden ? 'inline-block' : 'none';
+    const fetchBtn = new maplibregl.Marker({
+      element: btnEl,
+      anchor: 'top-left',
+      offset: [12, 12],
+    });
+    fetchBtn.setLngLat([0, 0]).addTo(map);
+    fetchBtnRef.current = fetchBtn;
+
     // Position immediately from the current bbox. The [bbox] effect below
     // handles later changes, but if bbox was already set before these markers
     // were created (map became ready after the first fix), that effect already
     // ran and won't re-fire — so without this the handles stay at [0,0]
     // (off-screen) and only the outline shows.
-    if (bboxRef.current) positionMarkers(corners, bboxRef.current);
+    if (bboxRef.current) {
+      positionMarkers(corners, bboxRef.current);
+      fetchBtn.setLngLat([bboxRef.current.lonMin, bboxRef.current.latMax]);
+    }
     return () => {
       for (const c of CORNERS) corners[c].remove();
+      fetchBtn.remove();
       markersRef.current = null;
+      fetchBtnRef.current = null;
     };
   }, [map]);
 
   // Whenever React's bbox changes (initial load, programmatic update),
-  // realign markers.
+  // realign the corner handles + fetch button.
   useEffect(() => {
-    if (!markersRef.current || !bbox) return;
-    positionMarkers(markersRef.current, bbox);
+    if (!bbox) return;
+    if (markersRef.current) positionMarkers(markersRef.current, bbox);
+    fetchBtnRef.current?.setLngLat([bbox.lonMin, bbox.latMax]);
   }, [bbox]);
 
-  // BroadcastChannel sync — when another tab finishes a refresh, re-read
-  // settings in case the bbox was updated there.
+  // BroadcastChannel sync — when a refresh completes (here or another tab),
+  // re-read settings and re-check whether a newer run is available.
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return;
     const bc = new BroadcastChannel('forecast-cache');
     bc.onmessage = () => {
+      void checkNewerAvailable();
       if (draggingRef.current) return; // don't reset a box the user is dragging
       void (async () => {
         try {
@@ -322,14 +429,14 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       })();
     };
     return () => bc.close();
-  }, []);
+  }, [checkNewerAvailable]);
 
-  const commitBbox = async (next: Bbox): Promise<void> => {
-    setStatus('saving');
-    setStatusText('saving ROI…');
+  // Persist the box to settings (Pi auto-refresh + page reload read it). No
+  // auto-fetch — the user starts a transfer with the ↻ button.
+  const persistBbox = async (next: Bbox): Promise<void> => {
+    lastCommittedRef.current = next;
     try {
-      const r = await fetch('/api/settings');
-      const prev = (await r.json())?.settings ?? {};
+      const prev = (await (await fetch('/api/settings')).json())?.settings ?? {};
       const put = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
@@ -339,20 +446,7 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     } catch (e) {
       setStatus('error');
       setStatusText(`save failed: ${String(e)}`);
-      return;
     }
-    lastCommittedRef.current = next;
-    setStatus('idle');
-    setStatusText(null);
-    scheduleRefresh(next);
-  };
-
-  const scheduleRefresh = (next: Bbox): void => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      debounceRef.current = null;
-      void doRefresh(next);
-    }, REFRESH_DEBOUNCE_MS);
   };
 
   const doRefresh = async (next: Bbox): Promise<void> => {
@@ -368,6 +462,8 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     setStatus('refreshing');
     setStatusText(null);
     setProgress(0);
+    setBoxDirty(false);
+    setNewerAvailable(false); // we're fetching the current run for this box now
     let myGen: number | undefined;
     try {
       const r = await fetch('/api/forecast/refresh', {
@@ -416,12 +512,13 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
             setStatus('idle');
             setProgress(1);
             window.setTimeout(() => setProgress(null), 1500);
+            void checkNewerAvailable(); // cache now current → keep button hidden
           }
         } catch {
           /* transient poll failure — keep polling */
         }
       })();
-    }, 3000);
+    }, 2000);
   };
 
   if (!bbox) return null;
