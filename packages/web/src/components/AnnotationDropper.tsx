@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
 
 function FlagIcon(): React.ReactElement {
@@ -77,6 +77,7 @@ export function AnnotationDropper({
   const [customKind, setCustomKind] = useState<TrackAnnotation['kind']>('event');
   const [submitting, setSubmitting] = useState(false);
   const [tickMs, setTickMs] = useState<number>(() => Date.now());
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // 1 Hz tick so the "open period — N min" pill updates without polling
   // the server. Cheap; only renders when state changes.
@@ -110,6 +111,16 @@ export function AnnotationDropper({
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
+
+  // Close the panel when clicking outside it (matches LayersControl).
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent): void => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
 
   const post = useCallback(
     async (label: string, kind: TrackAnnotation['kind']): Promise<void> => {
@@ -164,7 +175,7 @@ export function AnnotationDropper({
     variant === 'icon' ? 'relative' : `absolute ${position} z-20 flex flex-col items-end gap-2`;
 
   return (
-    <div className={rootClass}>
+    <div ref={wrapRef} className={rootClass}>
       {flash && variant === 'pill' && (
         <div className="text-xs px-2 py-1 rounded bg-slate-900/90 text-slate-100 border border-slate-700 shadow">
           {flash}
@@ -274,7 +285,7 @@ export function AnnotationDropper({
                 onChange={(e) => setCustomLabel(e.target.value)}
                 placeholder="label"
                 disabled={submitting}
-                className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-sm px-2 py-1 rounded disabled:opacity-40"
+                className="flex-1 min-w-0 bg-slate-800 border border-slate-700 text-slate-200 text-sm px-2 py-1 rounded disabled:opacity-40"
               />
               <select
                 value={customKind}
