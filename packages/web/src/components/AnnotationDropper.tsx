@@ -324,7 +324,7 @@ export function AnnotationDropper({
             </button>
           )}
 
-          <div className="flex flex-wrap gap-1">
+          <div className="flex items-center justify-between gap-1">
             {QUICK_BUTTONS.map((b) => (
               <button
                 key={b.label}
@@ -341,13 +341,22 @@ export function AnnotationDropper({
           {wardrobe &&
             sailGroups(wardrobe).map((g) => (
               <div key={g.category} className="space-y-1">
-                <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                  {g.label}
-                  {g.activeId ? (
-                    <span className="ml-1 text-slate-300">
-                      — {g.sails.find((s) => s.id === g.activeId)?.name ?? g.activeId}
-                    </span>
-                  ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-wide text-slate-400">
+                    {g.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void setSail(g.category, null, `${g.label} down`)}
+                    className={
+                      'px-2 py-0.5 text-xs rounded border ' +
+                      (g.activeId
+                        ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        : 'bg-slate-700 text-slate-100 border-slate-600')
+                    }
+                  >
+                    None
+                  </button>
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {g.sails.map((s) => (
@@ -365,104 +374,92 @@ export function AnnotationDropper({
                       {s.name}
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => void setSail(g.category, null, `${g.label} down`)}
-                    className={
-                      'px-2 py-1 text-xs rounded border ' +
-                      (g.activeId
-                        ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                        : 'bg-slate-700 text-slate-100 border-slate-600')
-                    }
-                  >
-                    down
-                  </button>
                 </div>
               </div>
             ))}
 
           {boatState && (
             <>
-              {(['port', 'starboard'] as const).map((side) => (
-                <div key={`dagger-${side}`} className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                    {side === 'port' ? 'Port board' : 'Stbd board'}
-                    <span className="ml-1 text-slate-300">— {boatState.daggerboards[side]}%</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {[0, 25, 50, 75, 100].map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() =>
-                          void postBoatState(
-                            { daggerboards: { [side]: pct } } as Partial<BoatState>,
-                            daggerboardLabel(side, pct),
-                          )
-                        }
-                        className={
-                          'px-2 py-1 text-xs rounded border ' +
-                          (boatState.daggerboards[side] === pct
-                            ? 'bg-amber-500 text-slate-900 border-amber-600'
-                            : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
-                        }
-                      >
-                        {pct === 0 ? 'Up' : pct === 100 ? 'Down' : `${pct}%`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {(['port', 'starboard'] as const).map((side) => {
-                const running = boatState.engines[side].running;
-                const label = side === 'port' ? 'Port engine' : 'Stbd engine';
-                return (
-                  <div key={`engine-${side}`} className="space-y-1">
+              <div className="grid grid-cols-2 gap-2">
+                {(['port', 'starboard'] as const).map((side) => (
+                  <div key={`dagger-${side}`} className="space-y-1">
                     <div className="text-[11px] uppercase tracking-wide text-slate-400">
-                      {label}
-                      <span className="ml-1 text-slate-300">
-                        — {running ? 'running' : 'stopped'}
-                      </span>
+                      {side === 'port' ? 'Port board' : 'Stbd board'}
                     </div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void postBoatState(
-                            { engines: { [side]: { running: true } } } as Partial<BoatState>,
-                            `${label} on`,
-                          )
-                        }
-                        className={
-                          'px-2 py-1 text-xs rounded border ' +
-                          (running
-                            ? 'bg-emerald-600 text-white border-emerald-700'
-                            : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
-                        }
-                      >
-                        Run
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void postBoatState(
-                            { engines: { [side]: { running: false } } } as Partial<BoatState>,
-                            `${label} off`,
-                          )
-                        }
-                        className={
-                          'px-2 py-1 text-xs rounded border ' +
-                          (!running
-                            ? 'bg-slate-600 text-white border-slate-500'
-                            : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
-                        }
-                      >
-                        Stop
-                      </button>
+                    <div className="flex flex-col gap-1">
+                      {[0, 25, 50, 75, 100].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() =>
+                            void postBoatState(
+                              { daggerboards: { [side]: pct } } as Partial<BoatState>,
+                              daggerboardLabel(side, pct),
+                            )
+                          }
+                          className={
+                            'px-2 py-1 text-xs rounded border ' +
+                            (boatState.daggerboards[side] === pct
+                              ? 'bg-amber-500 text-slate-900 border-amber-600'
+                              : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                          }
+                        >
+                          {pct === 0 ? 'Up' : pct === 100 ? 'Down' : `${pct}%`}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(['port', 'starboard'] as const).map((side) => {
+                  const running = boatState.engines[side].running;
+                  const label = side === 'port' ? 'Port engine' : 'Stbd engine';
+                  return (
+                    <div key={`engine-${side}`} className="space-y-1">
+                      <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                        {label}
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void postBoatState(
+                              { engines: { [side]: { running: true } } } as Partial<BoatState>,
+                              `${label} on`,
+                            )
+                          }
+                          className={
+                            'flex-1 px-2 py-1 text-xs rounded border ' +
+                            (running
+                              ? 'bg-emerald-600 text-white border-emerald-700'
+                              : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                          }
+                        >
+                          Run
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void postBoatState(
+                              { engines: { [side]: { running: false } } } as Partial<BoatState>,
+                              `${label} off`,
+                            )
+                          }
+                          className={
+                            'flex-1 px-2 py-1 text-xs rounded border ' +
+                            (!running
+                              ? 'bg-slate-600 text-white border-slate-500'
+                              : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                          }
+                        >
+                          Stop
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
 
