@@ -352,7 +352,7 @@ export function AnnotationDropper({
                       'px-2 py-0.5 text-xs rounded border ' +
                       (g.activeId
                         ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                        : 'bg-slate-700 text-slate-100 border-slate-600')
+                        : 'bg-amber-500 text-slate-900 border-amber-600')
                     }
                   >
                     None
@@ -449,7 +449,7 @@ export function AnnotationDropper({
                           className={
                             'flex-1 px-2 py-1 text-xs rounded border ' +
                             (!running
-                              ? 'bg-slate-600 text-white border-slate-500'
+                              ? 'bg-amber-500 text-slate-900 border-amber-600'
                               : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
                           }
                         >
