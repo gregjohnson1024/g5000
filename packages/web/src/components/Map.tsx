@@ -47,6 +47,11 @@ export function Map({ center, zoom, onClick, onLongPress, onLoad }: MapProps) {
             // never hit the network. Survives autopilot restarts.
             tiles: ['/api/tiles/{z}/{x}/{y}.png'],
             tileSize: 256,
+            // OSM serves tiles only to z19; beyond that the proxy's upstream
+            // fetch 502s. Cap the source so MapLibre overzooms (scales the
+            // z19 tiles) for z20+ harbour-detail views instead of requesting
+            // tiles that don't exist.
+            maxzoom: 19,
             attribution: '© OpenStreetMap contributors',
           },
         },
