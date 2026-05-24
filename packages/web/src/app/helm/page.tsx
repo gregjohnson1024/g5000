@@ -425,7 +425,9 @@ export default function HelmPage() {
       <RaceTiles />
       <MobButton />
       <AudibleAlarm />
-      <AnnotationDropper position="top-2 right-2" />
+      <div className="absolute top-2 right-2 z-20">
+        <AnnotationDropper variant="icon" />
+      </div>
     </main>
   );
 }
