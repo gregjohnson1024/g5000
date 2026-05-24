@@ -32,11 +32,8 @@ function fmtUtc(iso: string): string {
   return iso.slice(0, 16).replace('T', ' ') + 'Z';
 }
 
-function fmtDurationFromIso(start: string, end: string | null): string {
-  const s = Date.parse(start);
-  const e = end ? Date.parse(end) : Date.now();
-  if (!Number.isFinite(s) || !Number.isFinite(e)) return '—';
-  const seconds = Math.max(0, Math.round((e - s) / 1000));
+function fmtDurationMs(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86400) {
@@ -47,6 +44,19 @@ function fmtDurationFromIso(start: string, end: string | null): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   return `${d}d ${h}h`;
+}
+
+function fmtDurationFromIso(start: string, end: string | null): string {
+  const s = Date.parse(start);
+  const e = end ? Date.parse(end) : Date.now();
+  if (!Number.isFinite(s) || !Number.isFinite(e)) return '—';
+  return fmtDurationMs(e - s);
+}
+
+// Full UTC timestamp for an annotation's hover title, e.g. "2026-05-23 14:32Z".
+function fmtUtcMs(ms: number): string {
+  if (!Number.isFinite(ms)) return '—';
+  return new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 }
 
 export default function TracksPage() {
@@ -346,7 +356,7 @@ export default function TracksPage() {
                           {expanded[t.id] ? '▼' : '▶'} Annotations
                         </button>
                         {expanded[t.id] && (
-                          <div className="mt-2 pl-3 border-l border-slate-800 space-y-1">
+                          <div className="mt-2 pl-3 border-l border-slate-800 space-y-0.5">
                             {(loadedAnnotations[t.id] ?? []).length === 0 ? (
                               <div className="text-xs text-slate-500">No annotations.</div>
                             ) : (
@@ -357,9 +367,13 @@ export default function TracksPage() {
                                     : ann.kind === 'periodStart'
                                       ? '▶'
                                       : '■';
-                                const relMin = Math.round(
-                                  (ann.tsMs - new Date(t.startedAt).getTime()) / 60_000,
-                                );
+                                const iconColor =
+                                  ann.kind === 'event'
+                                    ? 'text-slate-400'
+                                    : ann.kind === 'periodStart'
+                                      ? 'text-emerald-400'
+                                      : 'text-amber-400';
+                                const relMs = ann.tsMs - new Date(t.startedAt).getTime();
                                 const matchingEnd =
                                   ann.kind === 'periodStart'
                                     ? arr.slice(idx + 1).find((a) => a.kind === 'periodEnd')
@@ -367,13 +381,16 @@ export default function TracksPage() {
                                 return (
                                   <div
                                     key={`${ann.tsMs}-${ann.label}`}
-                                    className="text-xs text-slate-300"
+                                    title={fmtUtcMs(ann.tsMs)}
+                                    className="flex items-baseline gap-2 text-xs py-0.5"
                                   >
-                                    <span className="font-mono text-slate-500 w-12 inline-block">
-                                      +{relMin}m
+                                    <span className="font-mono text-slate-500 shrink-0 w-16 text-right tabular-nums">
+                                      +{fmtDurationMs(relMs)}
                                     </span>
-                                    <span className="mr-2">{icon}</span>
-                                    <span>{ann.label}</span>
+                                    <span className={`shrink-0 ${iconColor}`}>{icon}</span>
+                                    <span className="text-slate-200 flex-1 min-w-0 truncate">
+                                      {ann.label}
+                                    </span>
                                     {matchingEnd && (
                                       <button
                                         type="button"
@@ -386,15 +403,17 @@ export default function TracksPage() {
                                             matchingEnd.label,
                                           )
                                         }
-                                        className="ml-2 text-slate-400 hover:text-slate-200 underline"
+                                        className="shrink-0 text-slate-400 hover:text-slate-200 underline"
                                       >
-                                        View slice (
-                                        {Math.round((matchingEnd.tsMs - ann.tsMs) / 60_000)} min)
+                                        slice · {fmtDurationMs(matchingEnd.tsMs - ann.tsMs)}
                                       </button>
                                     )}
                                     {ann.kind === 'periodStart' && !matchingEnd && (
-                                      <span className="ml-2 text-amber-400">
-                                        open — drop an End period to close
+                                      <span
+                                        className="shrink-0 text-amber-400"
+                                        title="Drop an End period to close this"
+                                      >
+                                        open
                                       </span>
                                     )}
                                   </div>
