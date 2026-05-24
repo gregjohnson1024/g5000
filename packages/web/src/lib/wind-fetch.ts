@@ -3,6 +3,7 @@ import { mkdtemp, writeFile, rm, readdir, readFile, mkdir } from 'node:fs/promis
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { pickEcmwfRun } from '@g5000/grib';
+import { cropFromGlobalCache, writeGlobalGrid } from './ecmwf-global-cache';
 
 // ECMWF Open Data IFS is mirrored on AWS S3 (public bucket, no auth, no rate
 // limit). Prefer it over data.ecmwf.int which 429s aggressively after a
@@ -49,18 +50,25 @@ async function fetchEcmwfMessagesS3(opts: {
     .filter(Boolean)
     .map((l) => JSON.parse(l) as EcmwfIndexLine);
   const wanted = lines.filter((l) => opts.variables.includes(l.param as '10u' | '10v' | 'msl'));
-  const buffers: Buffer[] = [];
-  for (const w of wanted) {
-    const res = await fetch(gribUrl, {
-      headers: { Range: `bytes=${w._offset}-${w._offset + w._length - 1}` },
-      signal: fetchSignal(30_000, opts.signal),
-    });
-    if (!(res.status === 200 || res.status === 206)) {
-      throw new Error(`ECMWF S3 range fetch failed: ${res.status} for param=${w.param}`);
-    }
-    buffers.push(Buffer.from(await res.arrayBuffer()));
-  }
-  return buffers;
+  // Fetch the per-variable byte ranges concurrently. The S3 bucket is in
+  // eu-central-1, so from the western Atlantic each request pays a fat
+  // round-trip; running them back-to-back made the download dominate the
+  // whole ECMWF fetch (~7 s of a ~9 s total). They're independent reads of
+  // the same object, decodeUVGrib pairs messages by shortName not order, so
+  // overlapping the round-trips is safe and collapses download wall-time to
+  // roughly the slowest single range.
+  return Promise.all(
+    wanted.map(async (w) => {
+      const res = await fetch(gribUrl, {
+        headers: { Range: `bytes=${w._offset}-${w._offset + w._length - 1}` },
+        signal: fetchSignal(30_000, opts.signal),
+      });
+      if (!(res.status === 200 || res.status === 206)) {
+        throw new Error(`ECMWF S3 range fetch failed: ${res.status} for param=${w.param}`);
+      }
+      return Buffer.from(await res.arrayBuffer());
+    }),
+  );
 }
 
 export type WindModel = 'gfs' | 'ecmwf';
@@ -670,6 +678,11 @@ export async function fetchWindGridEcmwf(
     ) / 1000;
   const fh = Math.max(0, Math.round(forecastHour / 3) * 3);
 
+  // The global field for this (run, fh) is identical regardless of bbox, so a
+  // box change just re-crops the cached globe instead of re-downloading it.
+  const hit = await cropFromGlobalCache(runUnix, fh, bbox);
+  if (hit) return hit;
+
   const messages = await fetchEcmwfMessagesS3({
     runDateUtc: run.runDateUtc,
     runHourUtc: run.runHourUtc,
@@ -682,5 +695,12 @@ export async function fetchWindGridEcmwf(
   }
   const combined = Buffer.concat(messages);
   const globalGrid = await decodeUVGrib(combined, 'ecmwf', runUnix, fh);
+  // Persist the global grid for future bbox changes. Fire-and-forget: a failed
+  // write just means the next box re-downloads, and we don't want to add the
+  // serialise cost to first-fill latency. Stale runs are pruned once per
+  // refresh job (see route.ts), not here.
+  void writeGlobalGrid(globalGrid).catch(() => {
+    /* disk full / perm denied — in-memory crop below still serves this request */
+  });
   return cropGrid(globalGrid, bbox);
 }

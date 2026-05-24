@@ -8,6 +8,7 @@ import {
   type WindModel,
 } from '../../../../lib/wind-fetch';
 import { cache, bboxKey } from '../../wind/route';
+import { pruneGlobalCache } from '../../../../lib/ecmwf-global-cache';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -99,6 +100,8 @@ async function runJob(
     progress.done = settled;
     progress.running = false;
     windCache.pruneStale();
+    // Also drop superseded ECMWF runs, not just past-valid hours.
+    void pruneGlobalCache(Date.now(), undefined, expectedRun.ecmwf);
   }
   // eslint-disable-next-line no-console
   console.log(`[forecast/refresh] gen=${gen} done: ${settled} of ${models.length * hours.length}`);
