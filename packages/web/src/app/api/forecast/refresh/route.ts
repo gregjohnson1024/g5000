@@ -2,6 +2,7 @@ import {
   fetchWindGrid,
   fetchWindGridEcmwf,
   windCache,
+  expectedRunUnix,
   type Bbox,
   type WindGrid,
   type WindModel,
@@ -29,6 +30,10 @@ const POOL_CONCURRENCY: Record<WindModel, number> = { gfs: 4, ecmwf: 3 };
 // Monotonic job token. Each POST bumps it; workers from a superseded job stop
 // pulling new tasks, so rapid ROI drags don't stack overlapping fetch jobs.
 let generation = 0;
+// Aborts the in-flight downloads of the current job. A new POST or a DELETE
+// aborts it so a superseded/cancelled refresh stops its network work in ms,
+// not after its ~7 in-flight fetches time out.
+let activeAbort: AbortController | null = null;
 
 // Latest job's progress, polled by the chart's ROI progress bar via GET.
 // `done` counts settled tasks (ok + failed) so it still reaches `total` even
@@ -45,15 +50,30 @@ async function runJob(
   bbox: Bbox,
   models: WindModel[],
   hours: number[],
+  signal: AbortSignal,
 ): Promise<void> {
-  let settled = 0; // ok + failed, across both pools
+  // The run a fetch would target right now, per model. An hour already cached
+  // at this run is current — skip it (incremental refresh) so the 3 h timer
+  // only downloads genuinely new data instead of all 114 grids every time.
+  const expectedRun: Record<WindModel, number> = {
+    gfs: expectedRunUnix('gfs'),
+    ecmwf: expectedRunUnix('ecmwf'),
+  };
+  let settled = 0; // ok + failed + skipped, across both pools
   const fetchOne = async (model: WindModel, hour: number): Promise<void> => {
+    const cached = cache.get(bboxKey(model, bbox, hour));
+    if (cached && cached.grid.runAt === expectedRun[model]) {
+      if (gen === generation) progress.done = ++settled; // already current — skip
+      return;
+    }
     try {
       const grid: WindGrid =
-        model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, hour) : await fetchWindGrid(bbox, hour);
+        model === 'ecmwf'
+          ? await fetchWindGridEcmwf(bbox, hour, undefined, signal)
+          : await fetchWindGrid(bbox, hour, undefined, signal);
       cache.set(bboxKey(model, bbox, grid.forecastHour), { at: Date.now(), grid });
     } catch {
-      /* a failed hour (e.g. ECMWF run not published yet) still counts settled */
+      /* failed (ECMWF run unpublished) or aborted (superseded) — counts settled */
     }
     if (gen === generation) progress.done = ++settled;
   };
@@ -87,6 +107,19 @@ async function runJob(
 /** GET /api/forecast/refresh — progress of the latest background refresh. */
 export function GET(): Response {
   return Response.json({ ok: true, ...progress });
+}
+
+/**
+ * DELETE /api/forecast/refresh — cancel the running refresh. Aborts in-flight
+ * downloads and bumps the generation so workers stop pulling new tasks. Used by
+ * the chart when the ROI changes, so a stale fetch doesn't keep downloading.
+ */
+export function DELETE(): Response {
+  generation += 1;
+  activeAbort?.abort();
+  activeAbort = null;
+  progress = { ...progress, running: false };
+  return Response.json({ ok: true, cancelled: true });
 }
 
 /**
@@ -132,6 +165,10 @@ export async function POST(req: Request): Promise<Response> {
   const myGen = ++generation;
   const total = models.length * hours.length;
   progress = { gen: myGen, total, done: 0, running: true };
-  void runJob(myGen, bbox, models, hours);
+  // Abort any prior job's in-flight downloads, then arm a fresh controller.
+  activeAbort?.abort();
+  const ac = new AbortController();
+  activeAbort = ac;
+  void runJob(myGen, bbox, models, hours, ac.signal);
   return Response.json({ ok: true, started: true, gen: myGen, tasks: total }, { status: 202 });
 }

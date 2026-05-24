@@ -15,11 +15,19 @@ interface EcmwfIndexLine {
   _length: number;
 }
 
+/** Combine the per-fetch hard timeout with an optional external cancel signal,
+ *  so a superseded refresh aborts its in-flight downloads immediately. */
+function fetchSignal(timeoutMs: number, cancel?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return cancel ? AbortSignal.any([timeout, cancel]) : timeout;
+}
+
 async function fetchEcmwfMessagesS3(opts: {
   runDateUtc: string;
   runHourUtc: 0 | 6 | 12 | 18;
   forecastHour: number;
   variables: Array<'10u' | '10v' | 'msl'>;
+  signal?: AbortSignal;
 }): Promise<Buffer[]> {
   const date = opts.runDateUtc.replace(/-/g, '');
   const hh = String(opts.runHourUtc).padStart(2, '0');
@@ -31,7 +39,7 @@ async function fetchEcmwfMessagesS3(opts: {
   // without this will hang the autopilot's event loop indefinitely (the
   // refresh endpoint loops 50+ times per model, so one hung fetch stalls
   // every subsequent request).
-  const idxRes = await fetch(idxUrl, { signal: AbortSignal.timeout(30_000) });
+  const idxRes = await fetch(idxUrl, { signal: fetchSignal(30_000, opts.signal) });
   if (!idxRes.ok) {
     throw new Error(`ECMWF S3 index ${idxUrl} → ${idxRes.status}`);
   }
@@ -45,7 +53,7 @@ async function fetchEcmwfMessagesS3(opts: {
   for (const w of wanted) {
     const res = await fetch(gribUrl, {
       headers: { Range: `bytes=${w._offset}-${w._offset + w._length - 1}` },
-      signal: AbortSignal.timeout(30_000),
+      signal: fetchSignal(30_000, opts.signal),
     });
     if (!(res.status === 200 || res.status === 206)) {
       throw new Error(`ECMWF S3 range fetch failed: ${res.status} for param=${w.param}`);
@@ -196,6 +204,27 @@ void (async () => {
 
 export function bboxKey(model: WindModel, b: Bbox, fh: number): string {
   return `${model}|${fh}|${b.latMin.toFixed(2)}|${b.latMax.toFixed(2)}|${b.lonMin.toFixed(2)}|${b.lonMax.toFixed(2)}`;
+}
+
+/**
+ * The run (unix seconds) a fetch *now* would target for `model` — deterministic
+ * from the clock + each model's publication lag. Lets the refresh skip an hour
+ * whose cached grid already has this run (incremental refresh), and lets the
+ * UI tell whether a newer run than cached is available.
+ */
+export function expectedRunUnix(model: WindModel, now: Date = new Date()): number {
+  if (model === 'ecmwf') {
+    const run = pickEcmwfRun(now.getTime() / 1000);
+    return (
+      Date.UTC(
+        Number(run.runDateUtc.slice(0, 4)),
+        Number(run.runDateUtc.slice(5, 7)) - 1,
+        Number(run.runDateUtc.slice(8, 10)),
+        run.runHourUtc,
+      ) / 1000
+    );
+  }
+  return pickRun(now).runUnix;
 }
 
 /**
@@ -429,6 +458,7 @@ export async function fetchWindGrid(
   bbox: Bbox,
   forecastHour: number,
   now: Date = new Date(),
+  signal?: AbortSignal,
 ): Promise<WindGrid> {
   const run = pickRun(now);
   const url = buildGfsUrl({
@@ -439,7 +469,7 @@ export async function fetchWindGrid(
   });
   // 60-s timeout for GFS NOMADS — it does its own server-side bbox subsetting
   // so the response can take a beat to assemble for larger ROIs.
-  const resp = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+  const resp = await fetch(url, { signal: fetchSignal(60_000, signal) });
   if (!resp.ok) {
     throw new Error(`NOMADS GFS fetch failed: HTTP ${resp.status} ${resp.statusText}`);
   }
@@ -628,6 +658,7 @@ export async function fetchWindGridEcmwf(
   bbox: Bbox,
   forecastHour: number,
   now: Date = new Date(),
+  signal?: AbortSignal,
 ): Promise<WindGrid> {
   const run = pickEcmwfRun(now.getTime() / 1000);
   const runUnix =
@@ -644,6 +675,7 @@ export async function fetchWindGridEcmwf(
     runHourUtc: run.runHourUtc,
     forecastHour: fh,
     variables: ['10u', '10v', 'msl'],
+    signal,
   });
   if (messages.length === 0) {
     throw new Error('ECMWF: no GRIB messages returned (run may not be posted yet)');
