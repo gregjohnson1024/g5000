@@ -396,7 +396,14 @@ function ChartPageInner() {
       });
       const j = (await res.json()) as {
         ok: boolean;
-        waypoint?: { id: string; name: string; lat: number; lon: number; notes?: string; createdAt?: string };
+        waypoint?: {
+          id: string;
+          name: string;
+          lat: number;
+          lon: number;
+          notes?: string;
+          createdAt?: string;
+        };
       };
       if (res.ok && j.ok && j.waypoint) {
         const wp = j.waypoint;

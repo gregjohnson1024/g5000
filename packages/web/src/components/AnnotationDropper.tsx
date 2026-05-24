@@ -161,9 +161,7 @@ export function AnnotationDropper({
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
 
   const rootClass =
-    variant === 'icon'
-      ? 'relative'
-      : `absolute ${position} z-20 flex flex-col items-end gap-2`;
+    variant === 'icon' ? 'relative' : `absolute ${position} z-20 flex flex-col items-end gap-2`;
 
   return (
     <div className={rootClass}>
