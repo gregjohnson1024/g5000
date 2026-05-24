@@ -149,3 +149,8 @@ export const routes = sqliteTable('routes', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded Route[]
 });
+
+export const boatState = sqliteTable('boat_state', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded BoatState
+});

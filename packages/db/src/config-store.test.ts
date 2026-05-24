@@ -20,6 +20,7 @@ import {
   type SourcePriorityConfig,
 } from './defaults.js';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
+import type { BoatState } from './boat-state.js';
 
 describe('ConfigStore', () => {
   let dir: string;
@@ -383,6 +384,33 @@ describe('ConfigStore', () => {
       await store.close();
       store = await ConfigStore.open(dbPath);
       expect(store.getWaypoints().map((w) => w.id)).toEqual(['x']);
+    });
+  });
+
+  describe('ConfigStore boat_state', () => {
+    it('defaults to boards up + engines stopped', () => {
+      expect(store.getBoatState()).toEqual({
+        daggerboards: { port: 0, starboard: 0 },
+        engines: { port: { running: false }, starboard: { running: false } },
+      });
+    });
+    it('round-trips a boat state', async () => {
+      const s: BoatState = {
+        daggerboards: { port: 75, starboard: 50 },
+        engines: { port: { running: true }, starboard: { running: false } },
+      };
+      await store.setBoatState(s);
+      expect(store.getBoatState()).toEqual(s);
+      expect(await firstValueFrom(store.boatState$)).toEqual(s);
+    });
+    it('persists across reopen', async () => {
+      await store.setBoatState({
+        daggerboards: { port: 25, starboard: 100 },
+        engines: { port: { running: false }, starboard: { running: true } },
+      });
+      await store.close();
+      store = await ConfigStore.open(dbPath);
+      expect(store.getBoatState().daggerboards.starboard).toBe(100);
     });
   });
 });

@@ -42,8 +42,10 @@ import {
   sourcePriorityConfig as sourcePriorityConfigTable,
   waypoints as waypointsTable,
   routes as routesTable,
+  boatState as boatStateTable,
 } from './schema.js';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
+import { type BoatState, DEFAULT_BOAT_STATE } from './boat-state.js';
 import {
   insertRevision,
   listRevisions as listRevisionsRepo,
@@ -75,6 +77,7 @@ export class ConfigStore {
     crossoverSettings: BehaviorSubject<CrossoverSettings>;
     waypoints: BehaviorSubject<Waypoint[]>;
     routes: BehaviorSubject<Route[]>;
+    boatState: BehaviorSubject<BoatState>;
   };
 
   private readonly __activeBoatId: BoatId;
@@ -101,6 +104,7 @@ export class ConfigStore {
       crossoverSettings: CrossoverSettings;
       waypoints: Waypoint[];
       routes: Route[];
+      boatState: BoatState;
     },
     activeBoatId: BoatId,
   ) {
@@ -119,6 +123,7 @@ export class ConfigStore {
       crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
       waypoints: new BehaviorSubject(initial.waypoints),
       routes: new BehaviorSubject(initial.routes),
+      boatState: new BehaviorSubject(initial.boatState),
     };
   }
 
@@ -200,6 +205,7 @@ export class ConfigStore {
       );
       CREATE TABLE IF NOT EXISTS waypoints (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS routes (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS boat_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -358,6 +364,7 @@ export class ConfigStore {
       crossoverSettings: crossoverSettingsValue,
       waypoints: loadOrInsert<Waypoint[]>(waypointsTable, []),
       routes: loadOrInsert<Route[]>(routesTable, []),
+      boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -492,6 +499,17 @@ export class ConfigStore {
   async setRoutes(value: Route[]): Promise<void> {
     this.upsert(routesTable, value);
     this.subjects.routes.next(value);
+  }
+
+  get boatState$(): Observable<BoatState> {
+    return this.subjects.boatState.asObservable();
+  }
+  getBoatState(): BoatState {
+    return this.subjects.boatState.value;
+  }
+  async setBoatState(value: BoatState): Promise<void> {
+    this.upsert(boatStateTable, value);
+    this.subjects.boatState.next(value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
@@ -670,6 +688,7 @@ export class ConfigStore {
     this.subjects.crossoverSettings.complete();
     this.subjects.waypoints.complete();
     this.subjects.routes.complete();
+    this.subjects.boatState.complete();
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

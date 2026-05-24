@@ -7,6 +7,8 @@ export * from './alarms-history.js';
 export * from './ship-log.js';
 export * from './race-state.js';
 export type { Waypoint, Route } from './waypoints-routes-types.js';
+export type { BoatState } from './boat-state.js';
+export { DEFAULT_BOAT_STATE } from './boat-state.js';
 
 import { ConfigStore } from './config-store.js';
 
