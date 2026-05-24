@@ -30,6 +30,7 @@ import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
+import { nextWaypointName } from './waypoint-name';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import type { Route } from '@g5000/routing';
@@ -362,6 +363,52 @@ function ChartPageInner() {
 
   const [waypointDropActive, setWaypointDropActive] = useState(false);
 
+  // Crosshair cursor while waypoint-drop mode is active.
+  useEffect(() => {
+    if (!mapInstance) return;
+    const canvas = mapInstance.getCanvas();
+    canvas.style.cursor = waypointDropActive ? 'crosshair' : '';
+    return () => {
+      canvas.style.cursor = '';
+    };
+  }, [mapInstance, waypointDropActive]);
+
+  // Esc cancels waypoint-drop mode.
+  useEffect(() => {
+    if (!waypointDropActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setWaypointDropActive(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [waypointDropActive]);
+
+  // Map-click handler for waypoint-drop mode. Auto-names via nextWaypointName,
+  // POSTs to /api/waypoints, adds the pin to state immediately, then exits mode.
+  const handleDropClick = async ({ lat, lon }: { lat: number; lon: number }) => {
+    const name = nextWaypointName(waypoints.map((w) => w.name));
+    setWaypointDropActive(false); // one waypoint per activation
+    try {
+      const res = await fetch('/api/waypoints', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, lat, lon }),
+      });
+      const j = (await res.json()) as {
+        ok: boolean;
+        waypoint?: { id: string; name: string; lat: number; lon: number; notes?: string; createdAt?: string };
+      };
+      if (res.ok && j.ok && j.waypoint) {
+        const wp = j.waypoint;
+        setWaypoints((prev) => [...prev, { id: wp.id, name: wp.name, lat: wp.lat, lon: wp.lon }]);
+      } else {
+        setError('waypoint drop failed');
+      }
+    } catch {
+      setError('waypoint drop failed');
+    }
+  };
+
   // Persist the route. Start/end are deliberately omitted — see comment on
   // the restore effect above.
   useEffect(() => {
@@ -427,6 +474,7 @@ function ChartPageInner() {
             mapRef.current = m;
             setMapInstance(m);
           }}
+          onClick={waypointDropActive ? handleDropClick : undefined}
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension
