@@ -1,4 +1,7 @@
-import { SAIL_CATEGORIES, type SailCategory, type SailWardrobe } from '@g5000/db';
+import { type SailCategory, type SailWardrobe } from '@g5000/db';
+
+// Inline constant avoids pulling @g5000/db (better-sqlite3) into the client bundle.
+const SAIL_CATEGORIES: readonly SailCategory[] = ['headsail', 'main', 'downwind'] as const;
 
 export interface SailGroup {
   category: SailCategory;

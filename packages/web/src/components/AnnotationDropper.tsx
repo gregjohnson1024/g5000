@@ -1,6 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
+import { type SailCategory, type SailWardrobe } from '@g5000/db';
+import { sailGroups } from './sail-groups';
 
 function FlagIcon(): React.ReactElement {
   // A flag (mark an event on the track), deliberately distinct from the
@@ -33,15 +35,6 @@ interface DropperState {
 const QUICK_BUTTONS: Array<{ label: string; row: number }> = [
   { label: 'Tack', row: 0 },
   { label: 'Gybe', row: 0 },
-  { label: 'Reef in', row: 0 },
-  { label: 'Reef out', row: 0 },
-  { label: 'Main up', row: 1 },
-  { label: 'Main down', row: 1 },
-  { label: 'J1', row: 1 },
-  { label: 'J2', row: 1 },
-  { label: 'J3', row: 1 },
-  { label: 'Spinnaker up', row: 2 },
-  { label: 'Spinnaker down', row: 2 },
 ];
 
 /**
@@ -71,6 +64,7 @@ export function AnnotationDropper({
   variant?: 'pill' | 'icon';
 }): React.ReactElement {
   const [state, setState] = useState<DropperState>({ trackId: null, annotations: [] });
+  const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [customLabel, setCustomLabel] = useState('');
@@ -97,6 +91,12 @@ export function AnnotationDropper({
         if (alive) setState(body);
       } catch {
         /* offline — keep last good state */
+      }
+      try {
+        const wr = await fetch('/api/sails', { cache: 'no-store' });
+        if (wr.ok && alive) setWardrobe((await wr.json()) as SailWardrobe);
+      } catch {
+        /* keep last wardrobe */
       }
     };
     void tick();
@@ -157,16 +157,51 @@ export function AnnotationDropper({
     [state.trackId, submitting],
   );
 
+  const setSail = useCallback(
+    async (category: SailCategory, sailId: string | null, label: string): Promise<void> => {
+      setOpen(false);
+      try {
+        const res = await fetch('/api/sails/active', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ category, sailId }),
+        });
+        if (!res.ok) {
+          setFlash(`✗ ${label} failed`);
+          window.setTimeout(() => setFlash(null), 2500);
+          return;
+        }
+        const wr = await fetch('/api/sails', { cache: 'no-store' });
+        if (wr.ok) setWardrobe((await wr.json()) as SailWardrobe);
+        if (state.trackId) await post(label, 'event');
+        else {
+          setFlash(`✓ ${label}`);
+          window.setTimeout(() => setFlash(null), 1500);
+        }
+      } catch {
+        setFlash(`✗ ${label} failed`);
+        window.setTimeout(() => setFlash(null), 2500);
+      }
+    },
+    [post, state.trackId],
+  );
+
   const open_ = useMemo(() => openPeriodStart(state.annotations), [state.annotations]);
   const minutesOpen = open_ ? Math.floor((tickMs - open_.tsMs) / 60_000) : 0;
   const disabled = state.trackId === null;
 
+  // Panel is accessible when either a track is active (annotations) or wardrobe
+  // is loaded (sail groups work without a track). Both paths need the panel open.
+  const triggerDisabled = disabled && !wardrobe;
+
   const pillLabel = open_ ? `⏺ open period — ${minutesOpen} min` : '+ marker';
-  const pillTitle = disabled
+  const pillTitle = triggerDisabled
     ? 'No active track — wait for GPS'
-    : open_
-      ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
-      : 'Annotate the track';
+    : disabled
+      ? 'Set sails (no active track)'
+      : open_
+        ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
+        : 'Annotate the track';
   const pillClass = open_
     ? 'bg-amber-500/85 text-slate-900 border-amber-600 hover:bg-amber-400'
     : 'bg-slate-900/85 text-slate-200 border-slate-700 hover:bg-slate-800';
@@ -185,9 +220,9 @@ export function AnnotationDropper({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          disabled={disabled}
+          disabled={triggerDisabled}
           title={pillTitle}
-          className={`px-3 py-1.5 text-sm rounded border shadow ${disabled ? 'bg-slate-900/40 text-slate-500 border-slate-800 cursor-not-allowed' : pillClass}`}
+          className={`px-3 py-1.5 text-sm rounded border shadow ${triggerDisabled ? 'bg-slate-900/40 text-slate-500 border-slate-800 cursor-not-allowed' : pillClass}`}
         >
           {pillLabel}
         </button>
@@ -198,12 +233,12 @@ export function AnnotationDropper({
           aria-label={
             open_ ? `Annotate the track — open period ${minutesOpen} min` : 'Annotate the track'
           }
-          title="Annotate the track"
+          title={pillTitle}
           onClick={() => setOpen(true)}
-          disabled={disabled}
+          disabled={triggerDisabled}
           className={
             'relative w-9 h-9 rounded border flex items-center justify-center ' +
-            (disabled
+            (triggerDisabled
               ? 'bg-zinc-900/40 text-zinc-500 border-zinc-800 cursor-not-allowed'
               : open_
                 ? 'bg-amber-500 text-zinc-900 border-amber-600 hover:bg-amber-400'
@@ -249,27 +284,68 @@ export function AnnotationDropper({
             </button>
           )}
 
-          {[0, 1, 2].map((rowIdx) => (
-            <div key={rowIdx} className="flex flex-wrap gap-1">
-              {QUICK_BUTTONS.filter((b) => b.row === rowIdx).map((b) => (
-                <button
-                  key={b.label}
-                  type="button"
-                  onClick={() => void post(b.label, 'event')}
-                  disabled={submitting}
-                  className="px-2 py-1 text-xs rounded border bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 disabled:opacity-40"
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
-          ))}
+          <div className="flex flex-wrap gap-1">
+            {QUICK_BUTTONS.map((b) => (
+              <button
+                key={b.label}
+                type="button"
+                onClick={() => void post(b.label, 'event')}
+                disabled={disabled || submitting}
+                className="px-2 py-1 text-xs rounded border bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 disabled:opacity-40"
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+
+          {wardrobe &&
+            sailGroups(wardrobe).map((g) => (
+              <div key={g.category} className="space-y-1">
+                <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  {g.label}
+                  {g.activeId ? (
+                    <span className="ml-1 text-slate-300">
+                      — {g.sails.find((s) => s.id === g.activeId)?.name ?? g.activeId}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {g.sails.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => void setSail(g.category, s.id, s.name)}
+                      className={
+                        'px-2 py-1 text-xs rounded border ' +
+                        (g.activeId === s.id
+                          ? 'bg-amber-500 text-slate-900 border-amber-600'
+                          : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                      }
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => void setSail(g.category, null, `${g.label} down`)}
+                    className={
+                      'px-2 py-1 text-xs rounded border ' +
+                      (g.activeId
+                        ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        : 'bg-slate-700 text-slate-100 border-slate-600')
+                    }
+                  >
+                    down
+                  </button>
+                </div>
+              </div>
+            ))}
 
           {!open_ && (
             <button
               type="button"
               onClick={() => void post('Start period', 'periodStart')}
-              disabled={submitting}
+              disabled={disabled || submitting}
               className="w-full px-3 py-1.5 text-xs rounded border bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 disabled:opacity-40"
             >
               Start period
