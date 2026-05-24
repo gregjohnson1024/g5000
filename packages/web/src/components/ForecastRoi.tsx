@@ -308,7 +308,9 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     };
     apply();
     map.on('styledata', apply);
-    return () => map.off('styledata', apply);
+    return () => {
+      map.off('styledata', apply);
+    };
   }, [map, hidden, progress, bbox, boxDirty, newerAvailable]);
 
   // Corner markers. Created/torn-down with the map; their positions are
