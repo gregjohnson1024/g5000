@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { fmtLatLonDmm } from '../lib/format-coords';
 import { parseWaypointForm } from './waypoint-form';
@@ -31,6 +31,7 @@ export function WaypointEditPopup({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pt, setPt] = useState<{ x: number; y: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setName(waypoint.name);
@@ -64,6 +65,17 @@ export function WaypointEditPopup({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Click anywhere outside the card (including the map canvas) dismisses it.
+  // Clicking another waypoint dot still switches: this mousedown closes the
+  // current card, then the dot's click fires and selects the new one.
+  useEffect(() => {
+    const onDocDown = (e: MouseEvent): void => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', onDocDown);
+    return () => document.removeEventListener('mousedown', onDocDown);
   }, [onClose]);
 
   if (!pt) return null;
@@ -125,6 +137,7 @@ export function WaypointEditPopup({
 
   return (
     <div
+      ref={wrapRef}
       className="absolute z-30 w-64 -translate-x-1/2 -translate-y-full -mt-3 bg-slate-900/95 border border-slate-700 rounded shadow-lg p-3 space-y-2"
       style={{ left: pt.x, top: pt.y }}
     >
