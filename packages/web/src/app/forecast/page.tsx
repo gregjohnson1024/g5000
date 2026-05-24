@@ -68,38 +68,9 @@ function fmtDuration(seconds: number): string {
 
 export default function ForecastPage() {
   const [manifest, setManifest] = useState<ManifestResponse | null>(null);
-  const [boatLat, setBoatLat] = useState<number | null>(null);
-  const [boatLon, setBoatLon] = useState<number | null>(null);
-
-  // ROI state — defaults to a box around the boat once we have a fix.
-  const [roi, setRoi] = useState<{
-    latMin: number;
-    latMax: number;
-    lonMin: number;
-    lonMax: number;
-  }>({ latMin: 30, latMax: 40, lonMin: -75, lonMax: -65 });
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<FetchResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-
-  // Poll the live position once on mount so we can auto-fill an ROI centred
-  // on the boat the first time the user lands here.
-  useEffect(() => {
-    const es = new EventSource('/api/position');
-    es.onmessage = (e) => {
-      try {
-        const p = JSON.parse(e.data) as { lat?: number; lon?: number };
-        if (typeof p.lat === 'number' && typeof p.lon === 'number') {
-          setBoatLat(p.lat);
-          setBoatLon(p.lon);
-          es.close();
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    return () => es.close();
-  }, []);
 
   const reloadManifest = useCallback(async (): Promise<void> => {
     try {
@@ -117,27 +88,26 @@ export default function ForecastPage() {
     return () => clearInterval(id);
   }, [reloadManifest]);
 
-  const centerOnBoat = (): void => {
-    if (boatLat === null || boatLon === null) return;
-    const radius = 6;
-    setRoi({
-      latMin: boatLat - radius,
-      latMax: boatLat + radius,
-      lonMin: boatLon - radius,
-      lonMax: boatLon + radius,
-    });
-  };
-
   const runFetch = async (): Promise<void> => {
     setErr(null);
     setBusy(true);
     setResults(null);
     try {
+      // The ROI is whatever the draggable forecast box on the chart last set
+      // (persisted to settings.forecastBbox); this button just triggers an
+      // out-of-band pull of that same region.
+      const s = await fetch('/api/settings', { cache: 'no-store' });
+      const sj = (await s.json()) as { settings?: { forecastBbox?: ManifestEntry['bbox'] } };
+      const bbox = sj.settings?.forecastBbox;
+      if (!bbox) {
+        setErr('No forecast ROI set yet — drag the ROI box on the chart first.');
+        return;
+      }
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bbox: roi,
+          bbox,
           models: ['gfs', 'ecmwf'] as WindModel[],
           hours: FORECAST_HOURS,
         }),
@@ -216,50 +186,12 @@ export default function ForecastPage() {
       </section>
 
       <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Region of interest</h2>
-          <button
-            onClick={centerOnBoat}
-            disabled={boatLat === null}
-            className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50"
-          >
-            Centre on boat (±6°)
-          </button>
-        </div>
-        <div className="grid grid-cols-4 gap-2 text-sm">
-          {(
-            [
-              ['latMin', 'Lat min'],
-              ['latMax', 'Lat max'],
-              ['lonMin', 'Lon min'],
-              ['lonMax', 'Lon max'],
-            ] as Array<[keyof typeof roi, string]>
-          ).map(([k, label]) => (
-            <label key={k} className="block">
-              <span className="text-xs text-slate-400">{label}</span>
-              <input
-                type="number"
-                step={0.25}
-                value={roi[k]}
-                onChange={(e) => setRoi((prev) => ({ ...prev, [k]: Number(e.target.value) }))}
-                className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
-              />
-            </label>
-          ))}
-        </div>
-        <p className="text-xs text-slate-500">
-          ECMWF Open Data is global per request; the response is cropped to this box client-side
-          after decode. GFS is fetched as a NOMADS subset (native bbox support, smaller transfer).
-        </p>
-      </section>
-
-      <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
         <h2 className="text-base font-semibold">Refresh forecast cache</h2>
         <p className="text-xs text-slate-500">
-          Fetches GFS + ECMWF for the ROI above, every 3 h out to +168 h (57 snapshots/model). The
-          Pi runs the same refresh on a 3 h timer in the background; this button just lets you
-          trigger one out of band. Partial 404s (ECMWF when its run hasn&apos;t published yet) are
-          normal.
+          Fetches GFS + ECMWF for the forecast ROI (the draggable box on the chart), every 3 h out
+          to +168 h (57 snapshots/model). The Pi runs the same refresh on a 3 h timer in the
+          background; this button just lets you trigger one out of band. Partial 404s (ECMWF when
+          its run hasn&apos;t published yet) are normal.
         </p>
         <button
           onClick={() => void runFetch()}
@@ -306,7 +238,7 @@ export default function ForecastPage() {
         <h2 className="text-base font-semibold">Cached grids ({manifest?.entries.length ?? 0})</h2>
         {(!manifest || manifest.entries.length === 0) && (
           <p className="text-sm text-slate-500">
-            Nothing cached yet. Pick an ROI and click Fetch all.
+            Nothing cached yet. Drag the forecast ROI box on the chart, or click Refresh now.
           </p>
         )}
         {manifest && manifest.entries.length > 0 && (
