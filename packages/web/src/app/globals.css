@@ -16,3 +16,41 @@ body {
     -apple-system,
     sans-serif;
 }
+
+/* Forecast timeline slider: a transparent native track so the two-band track
+   rendered behind it (darker = available, lighter = still fetching) shows
+   through, plus a small custom thumb. */
+.fc-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 16px;
+  cursor: pointer;
+}
+.fc-slider::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 16px;
+}
+.fc-slider::-moz-range-track {
+  background: transparent;
+  height: 16px;
+}
+.fc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1px solid #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.fc-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1px solid #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}

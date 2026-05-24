@@ -485,6 +485,7 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
       bc.close();
     };
+    broadcast(); // nudge consumers now so the timeline band re-reads the new box immediately
     const stopPoll = (): void => {
       if (pollRef.current) {
         clearInterval(pollRef.current);

@@ -23,19 +23,33 @@ interface ManifestEntry {
  */
 export async function GET(): Promise<Response> {
   const entries: ManifestEntry[] = [];
-  for (const [, value] of cache) {
+  for (const [key, value] of cache) {
     const g = value.grid;
+    // Report the REQUESTED bbox (encoded in the cache key by bboxKey:
+    // `model|fh|latMin|latMax|lonMin|lonMax`), not the grid's snapped extent —
+    // so consumers can match an entry to the exact ROI that fetched it. Falls
+    // back to the grid extent if the key is somehow malformed.
+    const p = key.split('|');
+    const bbox =
+      p.length >= 6
+        ? {
+            latMin: Number(p[2]),
+            latMax: Number(p[3]),
+            lonMin: Number(p[4]),
+            lonMax: Number(p[5]),
+          }
+        : {
+            latMin: g.lats[0] ?? 0,
+            latMax: g.lats[g.lats.length - 1] ?? 0,
+            lonMin: g.lons[0] ?? 0,
+            lonMax: g.lons[g.lons.length - 1] ?? 0,
+          };
     entries.push({
       model: g.model,
       forecastHour: g.forecastHour,
       runAt: g.runAt,
       validAt: g.validAt,
-      bbox: {
-        latMin: g.lats[0] ?? 0,
-        latMax: g.lats[g.lats.length - 1] ?? 0,
-        lonMin: g.lons[0] ?? 0,
-        lonMax: g.lons[g.lons.length - 1] ?? 0,
-      },
+      bbox,
       fetchedAt: value.at,
       points: g.lats.length * g.lons.length,
     });

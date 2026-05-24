@@ -43,6 +43,10 @@ import type { Route } from '@g5000/routing';
  */
 const COG_EXTENSION_MINUTES = 360;
 
+// Full intended forecast set: every 3 h to +168 h. Matches the refresh job, so
+// the timeline can show how far the cache has filled (available vs in-progress).
+const WIND_FORECAST_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
+
 export default function ChartPage() {
   // Next.js requires useSearchParams() to be wrapped in a Suspense boundary
   // because the search params can suspend during static prerender. This
@@ -279,9 +283,27 @@ function ChartPageInner() {
     let alive = true;
     const tick = async (): Promise<void> => {
       try {
-        const r = await fetch('/api/forecast/manifest', { cache: 'no-store' });
-        const j = await r.json();
+        const [mr, sr] = await Promise.all([
+          fetch('/api/forecast/manifest', { cache: 'no-store' }),
+          fetch('/api/settings', { cache: 'no-store' }),
+        ]);
+        const j = await mr.json();
+        const sj = await sr.json();
         if (!alive || !j.ok) return;
+        // Only count grids cached for the CURRENT ROI box, so moving the box
+        // empties the timeline band and a fetch fills it. (Grids for the old
+        // box stay cached, so an unfiltered count would always read full.)
+        const roi = sj?.settings?.forecastBbox as
+          | { latMin: number; latMax: number; lonMin: number; lonMax: number }
+          | undefined;
+        const near = (x: number, y: number): boolean => Math.abs(x - y) < 0.01;
+        const matches = (b: typeof roi): boolean =>
+          !roi ||
+          (!!b &&
+            near(b.latMin, roi.latMin) &&
+            near(b.latMax, roi.latMax) &&
+            near(b.lonMin, roi.lonMin) &&
+            near(b.lonMax, roi.lonMax));
         const gfs = new Set<number>();
         const ecmwf = new Set<number>();
         let gfsRun: number | null = null;
@@ -290,7 +312,9 @@ function ChartPageInner() {
           model: 'gfs' | 'ecmwf';
           forecastHour: number;
           runAt: number;
+          bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number };
         }>) {
+          if (!matches(e.bbox)) continue;
           (e.model === 'gfs' ? gfs : ecmwf).add(e.forecastHour);
           if (e.model === 'gfs') gfsRun = Math.max(gfsRun ?? 0, e.runAt);
           else ecmwfRun = Math.max(ecmwfRun ?? 0, e.runAt);
@@ -750,22 +774,51 @@ function ChartPageInner() {
                       →
                     </button>
                   </div>
-                  <input
-                    type="range"
-                    min={list[0]}
-                    max={list[list.length - 1]}
-                    step={1}
-                    value={effectiveHours}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      const nearest = list.reduce(
-                        (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
-                        list[0]!,
-                      );
-                      setWindHours(nearest);
-                    }}
-                    className="block w-full"
-                  />
+                  {(() => {
+                    // Slider spans the full intended range (to +168 h, past
+                    // hours dropped) so a two-band track can show how far the
+                    // cache has filled: darker = available (cached), lighter =
+                    // still in progress. The thumb still snaps to cached hours.
+                    const minH = list[0]!;
+                    const availMaxH = list[list.length - 1]!;
+                    const expectedMaxH = Math.max(
+                      availMaxH,
+                      ...WIND_FORECAST_HOURS.filter(
+                        (h) => !runAt || runAt + h * 3600 >= nowS - 1800,
+                      ),
+                    );
+                    const span = expectedMaxH - minH;
+                    const availPct = span > 0 ? ((availMaxH - minH) / span) * 100 : 100;
+                    return (
+                      <div className="relative w-full">
+                        {/* Two-band track behind the slider: lighter = still
+                            in progress, darker = available (cached). */}
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full overflow-hidden bg-sky-300/40">
+                          <div
+                            className="absolute inset-y-0 left-0 bg-sky-600"
+                            style={{ width: `${availPct}%` }}
+                            title="Available (cached); the lighter band is still being fetched"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          min={minH}
+                          max={expectedMaxH}
+                          step={1}
+                          value={effectiveHours}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            const nearest = list.reduce(
+                              (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
+                              list[0]!,
+                            );
+                            setWindHours(nearest);
+                          }}
+                          className="fc-slider relative block w-full"
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
