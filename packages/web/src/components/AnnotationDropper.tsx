@@ -68,6 +68,8 @@ export function AnnotationDropper({
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
   const [boatState, setBoatState] = useState<BoatState | null>(null);
   const [open, setOpen] = useState(false);
+  const [justSelected, setJustSelected] = useState<string | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [customLabel, setCustomLabel] = useState('');
   const [customKind, setCustomKind] = useState<TrackAnnotation['kind']>('event');
@@ -133,13 +135,35 @@ export function AnnotationDropper({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
+  // Flash the just-clicked pill amber and keep the panel visible briefly so
+  // the selection registers visually, then auto-close. Selection actions
+  // (sails / daggerboards / engines) use this instead of closing instantly.
+  const markSelectedAndClose = useCallback((key: string): void => {
+    setJustSelected(key);
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      setOpen(false);
+      setJustSelected(null);
+      closeTimerRef.current = null;
+    }, 300);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    },
+    [],
+  );
+
   const post = useCallback(
-    async (label: string, kind: TrackAnnotation['kind']): Promise<void> => {
+    async (label: string, kind: TrackAnnotation['kind'], closePanel = true): Promise<void> => {
       if (!state.trackId || submitting) return;
       setSubmitting(true);
-      // Always close the panel on any click outcome — success, error, or
-      // network failure. The flash message tells the user which happened.
-      setOpen(false);
+      // The custom "Add" button closes the panel immediately; flash actions
+      // (sails, daggerboards, engines, tack/gybe, period start/end) pass
+      // closePanel=false and let the 300ms amber-flash timer close it. The
+      // flash message reports the outcome either way.
+      if (closePanel) setOpen(false);
       setCustomLabel('');
       try {
         const res = await fetch('/api/tracks/active/annotation', {
@@ -170,7 +194,7 @@ export function AnnotationDropper({
 
   const setSail = useCallback(
     async (category: SailCategory, sailId: string | null, label: string): Promise<void> => {
-      setOpen(false);
+      markSelectedAndClose(`sail:${category}:${sailId ?? 'none'}`);
       try {
         const res = await fetch('/api/sails/active', {
           method: 'POST',
@@ -184,7 +208,7 @@ export function AnnotationDropper({
         }
         const wr = await fetch('/api/sails', { cache: 'no-store' });
         if (wr.ok) setWardrobe((await wr.json()) as SailWardrobe);
-        if (state.trackId) await post(label, 'event');
+        if (state.trackId) await post(label, 'event', false);
         else {
           setFlash(`✓ ${label}`);
           window.setTimeout(() => setFlash(null), 1500);
@@ -194,12 +218,12 @@ export function AnnotationDropper({
         window.setTimeout(() => setFlash(null), 2500);
       }
     },
-    [post, state.trackId],
+    [post, state.trackId, markSelectedAndClose],
   );
 
   const postBoatState = useCallback(
-    async (patch: Partial<BoatState>, label: string): Promise<void> => {
-      setOpen(false);
+    async (patch: Partial<BoatState>, label: string, selectionKey: string): Promise<void> => {
+      markSelectedAndClose(selectionKey);
       try {
         const res = await fetch('/api/boat-state', {
           method: 'POST',
@@ -213,7 +237,7 @@ export function AnnotationDropper({
         }
         const j = (await res.json()) as { ok: boolean; boatState?: BoatState };
         if (j.boatState) setBoatState(j.boatState);
-        if (state.trackId) await post(label, 'event');
+        if (state.trackId) await post(label, 'event', false);
         else {
           setFlash(`✓ ${label}`);
           window.setTimeout(() => setFlash(null), 1500);
@@ -223,7 +247,7 @@ export function AnnotationDropper({
         window.setTimeout(() => setFlash(null), 2500);
       }
     },
-    [post, state.trackId],
+    [post, state.trackId, markSelectedAndClose],
   );
 
   const open_ = useMemo(() => openPeriodStart(state.annotations), [state.annotations]);
@@ -259,7 +283,10 @@ export function AnnotationDropper({
       {!open && variant === 'pill' && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setJustSelected(null);
+            setOpen(true);
+          }}
           disabled={triggerDisabled}
           title={pillTitle}
           className={`px-3 py-1.5 text-sm rounded border shadow ${triggerDisabled ? 'bg-slate-900/40 text-slate-500 border-slate-800 cursor-not-allowed' : pillClass}`}
@@ -274,7 +301,10 @@ export function AnnotationDropper({
             open_ ? `Annotate the track — open period ${minutesOpen} min` : 'Annotate the track'
           }
           title={pillTitle}
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setJustSelected(null);
+            setOpen(true);
+          }}
           disabled={triggerDisabled}
           className={
             'relative w-9 h-9 rounded border flex items-center justify-center ' +
@@ -316,9 +346,17 @@ export function AnnotationDropper({
           {open_ && (
             <button
               type="button"
-              onClick={() => void post('End period', 'periodEnd')}
+              onClick={() => {
+                markSelectedAndClose('period:end');
+                void post('End period', 'periodEnd', false);
+              }}
               disabled={submitting}
-              className="w-full px-3 py-2 text-sm font-semibold rounded border bg-amber-500/90 text-slate-900 border-amber-600 hover:bg-amber-400 disabled:opacity-50"
+              className={
+                'w-full px-3 py-2 text-sm font-semibold rounded border text-slate-900 border-amber-600 disabled:opacity-50 ' +
+                (justSelected === 'period:end'
+                  ? 'bg-amber-400'
+                  : 'bg-amber-500/90 hover:bg-amber-400')
+              }
             >
               End period ({minutesOpen} min)
             </button>
@@ -329,9 +367,17 @@ export function AnnotationDropper({
               <button
                 key={b.label}
                 type="button"
-                onClick={() => void post(b.label, 'event')}
+                onClick={() => {
+                  markSelectedAndClose(`quick:${b.label}`);
+                  void post(b.label, 'event', false);
+                }}
                 disabled={disabled || submitting}
-                className="px-2 py-1 text-xs rounded border bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 disabled:opacity-40"
+                className={
+                  'px-2 py-1 text-xs rounded border disabled:opacity-40 ' +
+                  (justSelected === `quick:${b.label}`
+                    ? 'bg-amber-500 text-slate-900 border-amber-600'
+                    : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                }
               >
                 {b.label}
               </button>
@@ -350,9 +396,9 @@ export function AnnotationDropper({
                     onClick={() => void setSail(g.category, null, `${g.label} down`)}
                     className={
                       'px-2 py-0.5 text-xs rounded border ' +
-                      (g.activeId
-                        ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                        : 'bg-amber-500 text-slate-900 border-amber-600')
+                      (justSelected === `sail:${g.category}:none` || !g.activeId
+                        ? 'bg-amber-500 text-slate-900 border-amber-600'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700')
                     }
                   >
                     None
@@ -366,7 +412,7 @@ export function AnnotationDropper({
                       onClick={() => void setSail(g.category, s.id, s.name)}
                       className={
                         'px-2 py-1 text-xs rounded border ' +
-                        (g.activeId === s.id
+                        (justSelected === `sail:${g.category}:${s.id}` || g.activeId === s.id
                           ? 'bg-amber-500 text-slate-900 border-amber-600'
                           : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
                       }
@@ -395,11 +441,13 @@ export function AnnotationDropper({
                             void postBoatState(
                               { daggerboards: { [side]: pct } } as Partial<BoatState>,
                               daggerboardLabel(side, pct),
+                              `dagger:${side}:${pct}`,
                             )
                           }
                           className={
                             'px-2 py-1 text-xs rounded border ' +
-                            (boatState.daggerboards[side] === pct
+                            (justSelected === `dagger:${side}:${pct}` ||
+                            boatState.daggerboards[side] === pct
                               ? 'bg-amber-500 text-slate-900 border-amber-600'
                               : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
                           }
@@ -427,12 +475,13 @@ export function AnnotationDropper({
                             void postBoatState(
                               { engines: { [side]: { running: true } } } as Partial<BoatState>,
                               `${label} on`,
+                              `engine:${side}:run`,
                             )
                           }
                           className={
                             'flex-1 px-2 py-1 text-xs rounded border ' +
-                            (running
-                              ? 'bg-emerald-600 text-white border-emerald-700'
+                            (justSelected === `engine:${side}:run` || running
+                              ? 'bg-amber-500 text-slate-900 border-amber-600'
                               : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
                           }
                         >
@@ -444,11 +493,12 @@ export function AnnotationDropper({
                             void postBoatState(
                               { engines: { [side]: { running: false } } } as Partial<BoatState>,
                               `${label} off`,
+                              `engine:${side}:stop`,
                             )
                           }
                           className={
                             'flex-1 px-2 py-1 text-xs rounded border ' +
-                            (!running
+                            (justSelected === `engine:${side}:stop` || !running
                               ? 'bg-amber-500 text-slate-900 border-amber-600'
                               : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
                           }
@@ -466,9 +516,17 @@ export function AnnotationDropper({
           {!open_ && (
             <button
               type="button"
-              onClick={() => void post('Start period', 'periodStart')}
+              onClick={() => {
+                markSelectedAndClose('period:start');
+                void post('Start period', 'periodStart', false);
+              }}
               disabled={disabled || submitting}
-              className="w-full px-3 py-1.5 text-xs rounded border bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 disabled:opacity-40"
+              className={
+                'w-full px-3 py-1.5 text-xs rounded border disabled:opacity-40 ' +
+                (justSelected === 'period:start'
+                  ? 'bg-amber-500 text-slate-900 border-amber-600'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+              }
             >
               Start period
             </button>
