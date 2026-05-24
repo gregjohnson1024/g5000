@@ -19,15 +19,26 @@ interface Body {
   hours?: number[];
 }
 
-// Concurrency cap. Each fetch can take 5–60 s depending on the model and
-// whether eccodes parsing is involved; fanning all 100+ out at once saturates
-// the autopilot's event loop and accept queue. At 4 the chart stays responsive
-// and a full refresh finishes in ~1–2 min.
-const CONCURRENCY = 4;
+// GFS (NOAA NOMADS) and ECMWF (ECMWF Open Data) are different servers, so each
+// model gets its own worker pool and the two pools run concurrently — total
+// wall-clock is bounded by the slower model, not the sum. Per-model caps keep
+// the autopilot's event loop from saturating (peak ~7 concurrent fetches);
+// ECMWF's is smaller because it rate-limits (429s) under load.
+const POOL_CONCURRENCY: Record<WindModel, number> = { gfs: 4, ecmwf: 3 };
 
 // Monotonic job token. Each POST bumps it; workers from a superseded job stop
 // pulling new tasks, so rapid ROI drags don't stack overlapping fetch jobs.
 let generation = 0;
+
+// Latest job's progress, polled by the chart's ROI progress bar via GET.
+// `done` counts settled tasks (ok + failed) so it still reaches `total` even
+// when ECMWF 404s for an unpublished run.
+let progress: { gen: number; total: number; done: number; running: boolean } = {
+  gen: 0,
+  total: 0,
+  done: 0,
+  running: false,
+};
 
 async function runJob(
   gen: number,
@@ -35,39 +46,47 @@ async function runJob(
   models: WindModel[],
   hours: number[],
 ): Promise<void> {
-  const tasks: Array<{ model: WindModel; hour: number }> = [];
-  for (const model of models) {
-    for (const hour of hours) tasks.push({ model, hour });
-  }
-  let nextIdx = 0;
-  let ok = 0;
-  let failed = 0;
-  const worker = async (): Promise<void> => {
-    while (true) {
-      if (gen !== generation) return; // a newer refresh superseded us
-      const idx = nextIdx++;
-      if (idx >= tasks.length) return;
-      const t = tasks[idx]!;
-      try {
-        const grid: WindGrid =
-          t.model === 'ecmwf'
-            ? await fetchWindGridEcmwf(bbox, t.hour)
-            : await fetchWindGrid(bbox, t.hour);
-        cache.set(bboxKey(t.model, bbox, grid.forecastHour), { at: Date.now(), grid });
-        ok++;
-      } catch {
-        failed++;
-      }
+  let settled = 0; // ok + failed, across both pools
+  const fetchOne = async (model: WindModel, hour: number): Promise<void> => {
+    try {
+      const grid: WindGrid =
+        model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, hour) : await fetchWindGrid(bbox, hour);
+      cache.set(bboxKey(model, bbox, grid.forecastHour), { at: Date.now(), grid });
+    } catch {
+      /* a failed hour (e.g. ECMWF run not published yet) still counts settled */
     }
+    if (gen === generation) progress.done = ++settled;
+  };
+  // One pool per model, hitting its own server; pools run concurrently.
+  const runPool = async (model: WindModel): Promise<void> => {
+    let nextIdx = 0;
+    const worker = async (): Promise<void> => {
+      while (true) {
+        if (gen !== generation) return; // superseded by a newer refresh
+        const idx = nextIdx++;
+        if (idx >= hours.length) return;
+        await fetchOne(model, hours[idx]!);
+      }
+    };
+    await Promise.all(Array.from({ length: POOL_CONCURRENCY[model] }, () => worker()));
   };
   try {
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-    if (gen === generation) windCache.pruneStale();
+    await Promise.all(models.map((m) => runPool(m)));
   } catch {
     /* a detached background job must never throw out */
   }
+  if (gen === generation) {
+    progress.done = settled;
+    progress.running = false;
+    windCache.pruneStale();
+  }
   // eslint-disable-next-line no-console
-  console.log(`[forecast/refresh] gen=${gen} done: ${ok} ok, ${failed} failed of ${tasks.length}`);
+  console.log(`[forecast/refresh] gen=${gen} done: ${settled} of ${models.length * hours.length}`);
+}
+
+/** GET /api/forecast/refresh — progress of the latest background refresh. */
+export function GET(): Response {
+  return Response.json({ ok: true, ...progress });
 }
 
 /**
@@ -111,9 +130,8 @@ export async function POST(req: Request): Promise<Response> {
   );
 
   const myGen = ++generation;
+  const total = models.length * hours.length;
+  progress = { gen: myGen, total, done: 0, running: true };
   void runJob(myGen, bbox, models, hours);
-  return Response.json(
-    { ok: true, started: true, tasks: models.length * hours.length },
-    { status: 202 },
-  );
+  return Response.json({ ok: true, started: true, gen: myGen, tasks: total }, { status: 202 });
 }
