@@ -39,7 +39,7 @@ export function TileLoadingIndicator({
 
   return (
     <div
-      className="absolute bottom-2 left-2 z-10 pointer-events-none"
+      className="absolute bottom-8 left-2 z-10 pointer-events-none"
       title={loading ? 'Loading tiles…' : 'Tiles loaded'}
     >
       <div

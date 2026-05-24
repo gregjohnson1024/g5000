@@ -6,28 +6,56 @@ import { computeOffscreenAnchor, type OffscreenAnchor } from './offscreen-vessel
 
 const PILL_PAD = 32;
 
-// The chart toolbar (LayersControl + annotation + waypoint icons) sits at
-// top-2 right-2 as a ~44px-wide, ~132px-tall icon rail. Reserve that corner
-// (plus buffer) so the edge pill never lands on top of those buttons.
-const TOOLBAR_RESERVE_W = 56;
-const TOOLBAR_RESERVE_H = 148;
-const PILL_HALF_W = 46;
+const PILL_HALF_W = 50;
 const PILL_HALF_H = 16;
 
+// Persistent corner controls the edge pill must not cover, as generous
+// footprints (px, including the corner inset) measured from each corner:
+//   tl = ChartFollowControl (follow + orientation stack)
+//   tr = ChartToolbar icon rail (Layers / Annotate / Waypoint)
+//   bl = MapLibre scale bar + tile-loading chip
+//   br = ZoomIndicator
+const CORNERS = {
+  tl: { w: 52, h: 96 },
+  tr: { w: 56, h: 148 },
+  bl: { w: 132, h: 44 },
+  br: { w: 80, h: 40 },
+};
+
+function clampRange(v: number, lo: number, hi: number): number {
+  if (lo >= hi) return (lo + hi) / 2; // edge too short to fit both controls
+  return Math.min(Math.max(v, lo), hi);
+}
+
 /**
- * Nudge the edge anchor clear of the top-right toolbar when they'd overlap,
- * keeping the pill on its viewport edge: a top-edge pill slides left of the
- * rail; a right-edge (or corner) pill slides down below it. The chevron
- * bearing is untouched so it still points at the boat.
+ * Keep the edge pill clear of the corner controls for every boat bearing.
+ * The pill rides the viewport perimeter, so this slides it ALONG its current
+ * edge, away from whichever corner control it would cover — it never leaves
+ * the perimeter and its chevron keeps pointing at the boat. Corners are
+ * resolved by sliding along the horizontal (top/bottom) edge.
  */
-function avoidToolbar(a: OffscreenAnchor, width: number, pad: number): OffscreenAnchor {
-  const overlapsToolbar =
-    a.x + PILL_HALF_W > width - TOOLBAR_RESERVE_W && a.y - PILL_HALF_H < TOOLBAR_RESERVE_H;
-  if (!overlapsToolbar) return a;
-  if (a.y <= pad + 0.5) {
-    return { ...a, x: Math.max(pad, width - TOOLBAR_RESERVE_W - PILL_HALF_W) };
+function avoidCornerControls(
+  a: OffscreenAnchor,
+  width: number,
+  height: number,
+  pad: number,
+): OffscreenAnchor {
+  const onTop = a.y <= pad + 0.5;
+  const onBottom = a.y >= height - pad - 0.5;
+  const onLeft = a.x <= pad + 0.5;
+  const onRight = a.x >= width - pad - 0.5;
+  let { x, y } = a;
+  if (onTop) {
+    x = clampRange(x, CORNERS.tl.w + PILL_HALF_W, width - CORNERS.tr.w - PILL_HALF_W);
+  } else if (onBottom) {
+    x = clampRange(x, CORNERS.bl.w + PILL_HALF_W, width - CORNERS.br.w - PILL_HALF_W);
   }
-  return { ...a, y: TOOLBAR_RESERVE_H + PILL_HALF_H };
+  if (onLeft && !onTop && !onBottom) {
+    y = clampRange(y, CORNERS.tl.h + PILL_HALF_H, height - CORNERS.bl.h - PILL_HALF_H);
+  } else if (onRight && !onTop && !onBottom) {
+    y = clampRange(y, CORNERS.tr.h + PILL_HALF_H, height - CORNERS.br.h - PILL_HALF_H);
+  }
+  return { ...a, x, y };
 }
 
 /**
@@ -69,7 +97,7 @@ export function OffscreenVesselIndicator({
         viewport: { width, height },
         pad: PILL_PAD,
       });
-      setAnchor(raw ? avoidToolbar(raw, width, PILL_PAD) : null);
+      setAnchor(raw ? avoidCornerControls(raw, width, height, PILL_PAD) : null);
       const center = map.getCenter();
       setDistanceNm(haversineNm(center.lat, center.lng, livePos.lat, livePos.lon));
     };
