@@ -1,5 +1,5 @@
 import { cache } from '../../wind/route';
-import { runAvailability, type WindModel } from '../../../../lib/wind-fetch';
+import { runAvailability, expectedRunUnix, type WindModel } from '../../../../lib/wind-fetch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -64,5 +64,20 @@ export async function GET(): Promise<Response> {
     gfs: runAvailability('gfs'),
     ecmwf: runAvailability('ecmwf'),
   };
-  return Response.json({ ok: true, entries, availability, nowUnix: Math.floor(now / 1000) });
+  // The run a fetch *right now* would actually target, per model. Use this —
+  // not `availability.latestRunUnix` — to decide whether a newer run is
+  // fetchable: `runAvailability` assumes a fixed publication lag that for ECMWF
+  // is more optimistic than the conservative `pickEcmwfRun` the fetcher uses,
+  // so the two disagree by a run cycle and the box looks perpetually stale.
+  const expectedRun: Record<WindModel, number> = {
+    gfs: expectedRunUnix('gfs'),
+    ecmwf: expectedRunUnix('ecmwf'),
+  };
+  return Response.json({
+    ok: true,
+    entries,
+    availability,
+    expectedRun,
+    nowUnix: Math.floor(now / 1000),
+  });
 }

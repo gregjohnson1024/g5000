@@ -154,7 +154,7 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       const j = (await r.json()) as {
         ok?: boolean;
         entries?: Array<{ model: string; runAt: number; bbox: Bbox }>;
-        availability?: Record<string, { latestRunUnix: number }>;
+        expectedRun?: Record<string, number>;
       };
       if (!j.ok) return;
       const near = (x: number, y: number): boolean => Math.abs(x - y) < 0.01;
@@ -165,12 +165,15 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
         near(e.bbox.lonMax, b.lonMax);
       let newer = false;
       for (const m of ['gfs', 'ecmwf'] as const) {
-        const avail = j.availability?.[m]?.latestRunUnix ?? 0;
+        // Compare against the run the fetcher would actually pull (expectedRun),
+        // not the optimistic publication-lag estimate — otherwise ECMWF's box
+        // always reads "newer available" and the ↻ button never hides.
+        const target = j.expectedRun?.[m] ?? 0;
         const cachedRuns = (j.entries ?? [])
           .filter((e) => e.model === m && matches(e))
           .map((e) => e.runAt);
         const cachedLatest = cachedRuns.length ? Math.max(...cachedRuns) : 0;
-        if (avail > cachedLatest) {
+        if (target > cachedLatest) {
           newer = true;
           break;
         }

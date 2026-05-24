@@ -348,12 +348,15 @@ function ChartPageInner() {
     };
   }, [layers.model, mv.isWindModel]);
 
-  // When the manifest changes or timeline moves, bump refreshKey so the
-  // overlay re-reads from the cache.
+  // When the model, selected hour, or available cache changes, bump refreshKey
+  // so the overlay re-reads its grid. NOT gated on a live fix and NOT keyed on
+  // position: the overlay looks grids up by (model, hour) regardless of boat
+  // location, so it must refresh even before/without a GPS fix (e.g. on the
+  // Mac, or in port) — otherwise it stays stuck on its stale mount-time fetch
+  // while the cache fills behind it.
   useEffect(() => {
-    if (livePos === null) return;
     setWindRefreshKey((k) => k + 1);
-  }, [layers.model, windHours, livePos?.lat, livePos?.lon, availableHours]);
+  }, [layers.model, windHours, availableHours]);
 
   // A CMEMS refresh from the /forecast tab broadcasts on 'current-cache';
   // re-read the cached current grid so an already-open chart picks it up.

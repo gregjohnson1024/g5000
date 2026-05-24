@@ -340,7 +340,10 @@ export interface Bbox {
 /** Hours of publication lag after a model's nominal run start. */
 export const PUBLICATION_LAG_HOURS: Record<WindModel, number> = {
   gfs: 4,
-  ecmwf: 6,
+  // ECMWF's 0.25° open data lands ~7–9 h after run start; keep this in step
+  // with pickEcmwfRun's lag in @g5000/grib so `runAvailability` doesn't claim a
+  // run is available before the fetcher will actually pull it.
+  ecmwf: 9,
 };
 
 /**

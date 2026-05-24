@@ -24,22 +24,24 @@ describe('buildEcmwfUrls', () => {
 });
 
 describe('pickEcmwfRun', () => {
-  it('uses 6-hourly runs with ~6h lag', () => {
+  it('uses 6-hourly runs with ~9h lag', () => {
+    // 2026-05-12 12:00Z → minus 9h = 03:00Z → run hour = floor(3/6)*6 = 0.
     const at = Date.UTC(2026, 4, 12, 12, 0, 0) / 1000;
     const r = pickEcmwfRun(at);
     expect(r.runDateUtc).toBe('2026-05-12');
-    expect([0, 6, 12, 18]).toContain(r.runHourUtc);
+    expect(r.runHourUtc).toBe(0);
   });
 
-  it('picks the 06z run at 13:00Z (06z is 7h old, 12z is 1h old → too new)', () => {
+  it('picks the 00z run at 13:00Z (06z is only 7h old → not yet disseminated)', () => {
+    // 2026-05-12 13:00Z → minus 9h = 04:00Z → run hour = floor(4/6)*6 = 0.
     const at = Date.UTC(2026, 4, 12, 13, 0, 0) / 1000;
     const r = pickEcmwfRun(at);
     expect(r.runDateUtc).toBe('2026-05-12');
-    expect(r.runHourUtc).toBe(6);
+    expect(r.runHourUtc).toBe(0);
   });
 
   it('rolls back across midnight UTC', () => {
-    // 2026-05-12 03:00Z → minus 6h = 2026-05-11 21:00Z → run hour = floor(21/6)*6 = 18.
+    // 2026-05-12 03:00Z → minus 9h = 2026-05-11 18:00Z → run hour = floor(18/6)*6 = 18.
     const at = Date.UTC(2026, 4, 12, 3, 0, 0) / 1000;
     const r = pickEcmwfRun(at);
     expect(r.runDateUtc).toBe('2026-05-11');
