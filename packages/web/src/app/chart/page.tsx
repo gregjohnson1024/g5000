@@ -16,7 +16,8 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 // pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid } from '../../components/WindOverlay';
 import { WindLegend } from '../../components/WindLegend';
-import { CurrentOverlay } from '../../components/CurrentOverlay';
+import { CurrentOverlay, type CurrentGrid } from '../../components/CurrentOverlay';
+import { sampleUV, type UvGrid } from '../../lib/grid-sample';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer } from '../../components/EncLayer';
@@ -73,6 +74,18 @@ function ChartPageInner() {
   const [windRefreshKey, setWindRefreshKey] = useState(1);
   const [windGrid, setWindGrid] = useState<WindGrid | null>(null);
   const [windStatus, setWindStatus] = useState<string | null>(null);
+  // The CMEMS current grid currently displayed, lifted so the cursor readout
+  // can sample it (same role as windGrid for the wind overlay).
+  const [currentGrid, setCurrentGrid] = useState<CurrentGrid | null>(null);
+  // The active forecast ROI box (from /api/settings). Passed to WindOverlay so
+  // it only shows grids fetched for this box — keeping it in step with the
+  // slider/banner, which key on the same box.
+  const [forecastBbox, setForecastBbox] = useState<{
+    latMin: number;
+    latMax: number;
+    lonMin: number;
+    lonMax: number;
+  } | null>(null);
   const [currentRefreshKey, setCurrentRefreshKey] = useState(1);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const [availableHours, setAvailableHours] = useState<{ gfs: number[]; ecmwf: number[] }>({
@@ -303,6 +316,24 @@ function ChartPageInner() {
           | { latMin: number; latMax: number; lonMin: number; lonMax: number }
           | undefined;
         const near = (x: number, y: number): boolean => Math.abs(x - y) < 0.01;
+        // Lift the ROI box for WindOverlay. Only replace the object when a
+        // value actually changed, so its identity stays stable (avoids a
+        // refresh-key bump — and overlay re-fetch — on every 30 s poll).
+        setForecastBbox((prev) => {
+          const next = roi ?? null;
+          if (prev === next) return prev;
+          if (
+            prev &&
+            next &&
+            near(prev.latMin, next.latMin) &&
+            near(prev.latMax, next.latMax) &&
+            near(prev.lonMin, next.lonMin) &&
+            near(prev.lonMax, next.lonMax)
+          ) {
+            return prev;
+          }
+          return next;
+        });
         const matches = (b: typeof roi): boolean =>
           !roi ||
           (!!b &&
@@ -362,7 +393,7 @@ function ChartPageInner() {
   // while the cache fills behind it.
   useEffect(() => {
     setWindRefreshKey((k) => k + 1);
-  }, [layers.model, windHours, availableHours]);
+  }, [layers.model, windHours, availableHours, forecastBbox]);
 
   // A CMEMS refresh from the /forecast tab broadcasts on 'current-cache';
   // re-read the cached current grid so an already-open chart picks it up.
@@ -590,6 +621,7 @@ function ChartPageInner() {
           showBarbs={true}
           showIsobars={true}
           refreshKey={windRefreshKey}
+          bbox={forecastBbox}
           onLoaded={({ grid, identical, error }) => {
             if (error) {
               setWindStatus(`Not cached: ${error}`);
@@ -608,11 +640,13 @@ function ChartPageInner() {
           refreshKey={currentRefreshKey}
           onLoaded={({ grid, error }) => {
             if (error === 'not cached') {
+              setCurrentGrid(null);
               setCurrentStatus('No CMEMS grid cached — refresh from the Forecast page.');
             } else if (error) {
+              setCurrentGrid(null);
               setCurrentStatus(`Error: ${error}`);
             } else if (grid) {
-              const ageH = Math.round((Date.now() / 1000 - grid.validAt) / 3600);
+              setCurrentGrid(grid);
               setCurrentStatus(
                 `CMEMS daily mean for ${new Date(grid.validAt * 1000).toISOString().slice(0, 10)}`,
               );
@@ -671,7 +705,17 @@ function ChartPageInner() {
           visible={!camera.follow}
           onTap={camera.enterFollow}
         />
-        <CursorReadout cursor={cursorLatLon} boat={livePos} />
+        <CursorReadout
+          cursor={cursorLatLon}
+          boat={livePos}
+          variable={
+            mv.isWindModel && windGrid
+              ? { kind: 'wind', grid: windGrid }
+              : mv.isCurrent && currentGrid
+                ? { kind: 'current', grid: currentGrid }
+                : null
+          }
+        />
         <TileLoadingIndicator map={mapInstance} />
       </div>
       <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
@@ -956,18 +1000,40 @@ function LiveValues({ p }: { p: LivePos | null }) {
 function CursorReadout({
   cursor,
   boat,
+  variable,
 }: {
   cursor: { lat: number; lon: number } | null;
   boat: LivePos | null;
+  variable: { kind: 'wind' | 'current'; grid: UvGrid } | null;
 }) {
   if (!cursor) return null;
   const hasBoat = !!boat && Number.isFinite(boat.lat) && Number.isFinite(boat.lon);
   const rangeBearing = hasBoat
     ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
     : null;
+  // The displayed model variable (wind / current) interpolated at the cursor.
+  // Absolute compass direction from the grid's u/v — nothing to do with the boat.
+  const varLine = ((): string | null => {
+    if (!variable) return null;
+    const uv = sampleUV(variable.grid, cursor.lat, cursor.lon);
+    if (!uv) return null; // cursor outside the grid's coverage
+    const MS_TO_KN = 1 / 0.514444;
+    const speedKn = Math.hypot(uv.u, uv.v) * MS_TO_KN;
+    if (variable.kind === 'wind') {
+      // Wind FROM: the direction it blows out of (atan2 of the reversed vector).
+      const fromDeg = (Math.atan2(-uv.u, -uv.v) * 180) / Math.PI;
+      const d = ((fromDeg % 360) + 360) % 360;
+      return `Wind ${speedKn.toFixed(1)} kn · ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
+    }
+    // Current SET: the direction it flows toward.
+    const setDeg = (Math.atan2(uv.u, uv.v) * 180) / Math.PI;
+    const d = ((setDeg % 360) + 360) % 360;
+    return `Current ${speedKn.toFixed(1)} kn · set ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
+  })();
   return (
     <div className="fixed bottom-3 right-3 z-30 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
       <div>{fmtLatLonDmm(cursor.lat, cursor.lon)}</div>
+      {varLine && <div className="text-sky-200 mt-1">{varLine}</div>}
       <div className="text-slate-300 mt-1">
         {rangeBearing
           ? `${rangeBearing.distNm.toFixed(1)} NM · ${rangeBearing.bearingDeg
@@ -977,6 +1043,29 @@ function CursorReadout({
       </div>
     </div>
   );
+}
+
+/** 16-point compass abbreviation for a true bearing in degrees. */
+function cardinal16(deg: number): string {
+  const pts = [
+    'N',
+    'NNE',
+    'NE',
+    'ENE',
+    'E',
+    'ESE',
+    'SE',
+    'SSE',
+    'S',
+    'SSW',
+    'SW',
+    'WSW',
+    'W',
+    'WNW',
+    'NW',
+    'NNW',
+  ];
+  return pts[Math.round(deg / 22.5) % 16]!;
 }
 
 /** Great-circle distance (NM) and initial bearing (deg, 0-360, true). */

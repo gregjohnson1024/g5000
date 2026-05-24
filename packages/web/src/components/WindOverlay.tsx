@@ -283,6 +283,9 @@ export interface WindOverlayProps {
   showIsobars?: boolean;
   /** Bumping this triggers a fetch from cache. */
   refreshKey: number;
+  /** When set, only a grid cached for this exact ROI box is shown (keeps the
+   *  overlay in step with the slider/banner, which key on the same box). */
+  bbox?: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null;
   onLoaded?: (info: { grid: WindGrid | null; identical: boolean; error: string | null }) => void;
 }
 
@@ -300,6 +303,7 @@ export function WindOverlay({
   showBarbs = true,
   showIsobars = false,
   refreshKey,
+  bbox = null,
   onLoaded,
 }: WindOverlayProps) {
   const [grid, setGrid] = useState<WindGrid | null>(null);
@@ -309,14 +313,16 @@ export function WindOverlay({
   useEffect(() => {
     if (refreshKey === 0) return;
     let cancelled = false;
-    // Look up the cached grid by (model, hour). /forecast fetches with a
-    // specific bbox; this endpoint returns whatever's cached for that
-    // (model, hour) regardless of bbox, so /chart doesn't have to mirror
-    // /forecast's ROI.
+    // Look up the cached grid by (model, hour) and — when given — the ROI bbox,
+    // so the overlay only shows data fetched for the box the slider/banner
+    // describe (no more "overlay draws an unrelated region's grid" mismatch).
     void centerLat;
     void centerLon;
     void radius;
-    const url = `/api/forecast/grid?model=${model}&hour=${hours}`;
+    const bboxQ = bbox
+      ? `&latMin=${bbox.latMin}&latMax=${bbox.latMax}&lonMin=${bbox.lonMin}&lonMax=${bbox.lonMax}`
+      : '';
+    const url = `/api/forecast/grid?model=${model}&hour=${hours}${bboxQ}`;
     fetch(url)
       .then((r) => r.json())
       .then((j) => {

@@ -23,12 +23,43 @@ export async function GET(req: Request): Promise<Response> {
   if (!Number.isFinite(hour) || hour < 0) {
     return Response.json({ ok: false, error: { message: 'hour required' } }, { status: 400 });
   }
-  // Find latest cache entry matching model + hour. Cache keys begin with
-  // `<model>|<hour>|...` so a simple scan works.
+  // Optional bbox filter. When present, only a grid fetched for *that* ROI box
+  // qualifies — so /chart's overlay and its slider/banner agree (both keyed on
+  // the same box). Matched against the cache KEY bbox (model|fh|latMin|latMax|
+  // lonMin|lonMax), within 0.01° to match the slider's availableHours tolerance.
+  const num = (k: string): number | null => {
+    const s = url.searchParams.get(k);
+    if (s === null) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
+  const bb = {
+    latMin: num('latMin'),
+    latMax: num('latMax'),
+    lonMin: num('lonMin'),
+    lonMax: num('lonMax'),
+  };
+  const hasBbox =
+    bb.latMin !== null && bb.latMax !== null && bb.lonMin !== null && bb.lonMax !== null;
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.01;
+
+  // Find latest cache entry matching model + hour (+ bbox, when requested).
   let best: { at: number; grid: import('../../../../lib/wind-fetch').WindGrid } | undefined;
-  for (const [, v] of cache) {
+  for (const [key, v] of cache) {
     if (v.grid.model !== model) continue;
     if (v.grid.forecastHour !== hour) continue;
+    if (hasBbox) {
+      const p = key.split('|'); // model|fh|latMin|latMax|lonMin|lonMax
+      if (p.length < 6) continue;
+      if (
+        !near(Number(p[2]), bb.latMin!) ||
+        !near(Number(p[3]), bb.latMax!) ||
+        !near(Number(p[4]), bb.lonMin!) ||
+        !near(Number(p[5]), bb.lonMax!)
+      ) {
+        continue;
+      }
+    }
     if (!best || v.at > best.at) best = v;
   }
   if (!best) {
