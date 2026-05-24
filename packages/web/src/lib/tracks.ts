@@ -87,13 +87,19 @@ function summarise(t: Track): TrackMeta {
   };
 }
 
+// Only files named exactly `track-NNN.json` are tracks. This deliberately
+// excludes backups (`track-001.pre-merge.bak.json`) and temp files
+// (`track-001.json.tmp`), which otherwise get listed as phantom tracks
+// sharing the canonical track's id — causing duplicate React keys on /tracks.
+const CANONICAL_TRACK_FILE = /^track-\d+\.json$/;
+
 /** List metadata for every track on disk, sorted by track number ascending. */
 export async function listTracks(): Promise<TrackMeta[]> {
   await ensureDir();
   const files = await fs.readdir(TRACKS_DIR);
   const out: TrackMeta[] = [];
   for (const f of files) {
-    if (!f.endsWith('.json')) continue;
+    if (!CANONICAL_TRACK_FILE.test(f)) continue;
     try {
       const raw = await fs.readFile(join(TRACKS_DIR, f), 'utf8');
       const t = JSON.parse(raw) as Track;
