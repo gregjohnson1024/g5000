@@ -14,12 +14,12 @@ const PILL_HALF_H = 16;
 //   tl = ChartFollowControl (follow + orientation stack)
 //   tr = ChartToolbar icon rail (Layers / Annotate / Waypoint)
 //   bl = MapLibre scale bar + tile-loading chip
-//   br = ZoomIndicator
+//   br = cursor lat/lon + range/bearing readout
 const CORNERS = {
   tl: { w: 52, h: 96 },
   tr: { w: 56, h: 148 },
   bl: { w: 132, h: 44 },
-  br: { w: 80, h: 40 },
+  br: { w: 200, h: 56 },
 };
 
 function clampRange(v: number, lo: number, hi: number): number {

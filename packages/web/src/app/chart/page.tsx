@@ -18,13 +18,12 @@ import { WindOverlay, type WindGrid } from '../../components/WindOverlay';
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
-import { EncLayer, NOAA_MIN_ZOOM } from '../../components/EncLayer';
+import { EncLayer } from '../../components/EncLayer';
 import { SatelliteLayer } from '../../components/SatelliteLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
-import { ZoomIndicator } from '../../components/ZoomIndicator';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { ChartToolbar } from './ChartToolbar';
@@ -618,7 +617,6 @@ function ChartPageInner() {
           onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
         />
         <MapLoadingIndicator map={mapInstance} />
-        <ZoomIndicator map={mapInstance} noaaFloor={NOAA_MIN_ZOOM} noaaEnabled={layers.enc} />
         <ChartFollowControl
           follow={camera.follow}
           orientation={camera.orientation}
@@ -895,7 +893,7 @@ function CursorReadout({
     ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
     : null;
   return (
-    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
+    <div className="fixed bottom-3 right-3 z-30 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
       <div>{fmtLatLonDmm(cursor.lat, cursor.lon)}</div>
       <div className="text-slate-300 mt-1">
         {rangeBearing
