@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { contours } from 'd3-contour';
+import { FILL_STOPS } from '../lib/wind-scale';
 
 export type WindModel = 'gfs' | 'ecmwf';
 
@@ -29,19 +30,7 @@ const LAYER_ISOBAR_LINE = 'wind-isobar-line';
 const M_PER_DEG_LAT = 111_320;
 const MS_TO_KN = 1 / 0.514444;
 
-// Speed bin → fill color. Steps match common nautical-wind palettes.
-const FILL_STOPS: Array<[number, string]> = [
-  [0, '#1e3a8a'], // navy
-  [5, '#3b82f6'], // blue-500
-  [10, '#22d3ee'], // cyan-400
-  [15, '#10b981'], // emerald-500
-  [20, '#a3e635'], // lime-400
-  [25, '#facc15'], // yellow-400
-  [30, '#fb923c'], // orange-400
-  [35, '#f87171'], // red-400
-  [45, '#c084fc'], // purple-400
-  [60, '#fb7185'], // rose-400
-];
+// Speed bin → fill colour lives in lib/wind-scale so the legend reuses it.
 
 function project(
   fromLat: number,

@@ -15,6 +15,7 @@ import { fmtLatLonDmm } from '../../lib/format-coords';
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid } from '../../components/WindOverlay';
+import { WindLegend } from '../../components/WindLegend';
 import { CurrentOverlay } from '../../components/CurrentOverlay';
 import { StartLineLayer } from '../../components/StartLineLayer';
 import { LaylinesLayer } from '../../components/LaylinesLayer';
@@ -64,6 +65,9 @@ function ChartPageInner() {
   const [livePos, setLivePos] = useState<LivePos | null>(null);
   const camera = useChartCamera({ map: mapInstance, livePos });
   const [windHours, setWindHours] = useState(0);
+  // When true, the slider stays pinned to the forecast hour nearest now and
+  // advances with the clock; dragging the slider / using ←→ turns it off.
+  const [windLockNow, setWindLockNow] = useState(true);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -221,8 +225,10 @@ function ChartPageInner() {
       if (raw) {
         const j = JSON.parse(raw) as Partial<{
           windHours: number;
+          windLockNow: boolean;
         }>;
         if (typeof j.windHours === 'number') setWindHours(j.windHours);
+        if (typeof j.windLockNow === 'boolean') setWindLockNow(j.windLockNow);
       }
     } catch {
       /* corrupt blob; ignore */
@@ -232,11 +238,11 @@ function ChartPageInner() {
   useEffect(() => {
     if (!settingsHydrated) return;
     try {
-      localStorage.setItem('chart:settings', JSON.stringify({ windHours }));
+      localStorage.setItem('chart:settings', JSON.stringify({ windHours, windLockNow }));
     } catch {
       /* quota / private-mode; ignore */
     }
-  }, [settingsHydrated, windHours]);
+  }, [settingsHydrated, windHours, windLockNow]);
 
   const [waypoints, setWaypoints] = useState<
     Array<{ id: string; name: string; lat: number; lon: number }>
@@ -724,17 +730,41 @@ function ChartPageInner() {
                   </div>
                 );
               }
+              // The hour whose valid time is closest to now (used when locked).
+              // With runAt unknown, list[0] is the earliest still-valid hour.
+              const nearestNowIdx = (): number => {
+                if (!runAt) return 0;
+                let best = 0;
+                let bestDiff = Infinity;
+                for (let i = 0; i < list.length; i++) {
+                  const d = Math.abs(runAt + list[i]! * 3600 - nowS);
+                  if (d < bestDiff) {
+                    bestDiff = d;
+                    best = i;
+                  }
+                }
+                return best;
+              };
               const idx = list.indexOf(windHours);
-              const effectiveIdx = idx >= 0 ? idx : 0;
+              // Locked → track the nearest-now hour (advances as the clock moves
+              // and fresh hours land); unlocked → keep the user's chosen hour.
+              const effectiveIdx = windLockNow ? nearestNowIdx() : idx >= 0 ? idx : 0;
               const effectiveHours = list[effectiveIdx]!;
               if (effectiveHours !== windHours) {
                 setTimeout(() => setWindHours(effectiveHours), 0);
               }
+              // ←/→ are explicit hour navigation, so they exit lock mode.
               const goPrev = (): void => {
-                if (effectiveIdx > 0) setWindHours(list[effectiveIdx - 1]!);
+                if (effectiveIdx > 0) {
+                  setWindLockNow(false);
+                  setWindHours(list[effectiveIdx - 1]!);
+                }
               };
               const goNext = (): void => {
-                if (effectiveIdx < list.length - 1) setWindHours(list[effectiveIdx + 1]!);
+                if (effectiveIdx < list.length - 1) {
+                  setWindLockNow(false);
+                  setWindHours(list[effectiveIdx + 1]!);
+                }
               };
               // Label: "HH:MM[Z] DD MMM (in N h)" — absolute time in the
               // page's current Local/UTC mode, plus a relative offset so
@@ -755,6 +785,23 @@ function ChartPageInner() {
               return (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWindLockNow((v) => !v)}
+                      aria-pressed={windLockNow}
+                      className={`px-2 py-0.5 text-xs rounded ${
+                        windLockNow
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title={
+                        windLockNow
+                          ? 'Locked to current time — click to unlock and scrub'
+                          : 'Lock the slider to current time'
+                      }
+                    >
+                      now
+                    </button>
                     <button
                       type="button"
                       onClick={goPrev}
@@ -815,6 +862,7 @@ function ChartPageInner() {
                               (best, h) => (Math.abs(h - v) < Math.abs(best - v) ? h : best),
                               list[0]!,
                             );
+                            setWindLockNow(false); // scrubbing exits lock mode
                             setWindHours(nearest);
                           }}
                           className="fc-slider relative block w-full"
@@ -847,6 +895,7 @@ function ChartPageInner() {
           {mv.isWindModel && windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
           )}
+          {mv.isWindModel && <WindLegend />}
         </div>
         {error && <div className="text-rose-400 text-xs">{error}</div>}
       </aside>
