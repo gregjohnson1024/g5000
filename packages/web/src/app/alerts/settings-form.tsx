@@ -131,8 +131,8 @@ function NumberField({
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 py-1">
-      <span className="w-48">{label}</span>
+    <label className="flex items-center justify-between gap-2 py-1">
+      <span>{label}</span>
       <input
         type="number"
         step="0.1"

@@ -14,7 +14,7 @@ async function AlertsPageInner({
   const { tab = 'active' } = await searchParamsPromise;
 
   return (
-    <main className="p-4 max-w-4xl mx-auto">
+    <main className="p-4 max-w-2xl mx-auto">
       <h1 className="text-2xl font-semibold mb-4">Alerts</h1>
       <nav className="flex gap-4 mb-6 border-b">
         <TabLink href="?tab=active" label="Active" active={tab === 'active'} />
