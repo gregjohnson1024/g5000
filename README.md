@@ -7,7 +7,7 @@ Built for one boat, by one person. Not a product. Source is public so the patter
 ## What it does
 
 - **Helm** — live wind, speed, heading, course display from the boat's N2K backbone.
-- **Chart** — MapLibre-rendered chart with the live boat position, projected COG, AIS targets, waypoints, range rings, and overlays for GFS / ECMWF wind and Copernicus Marine currents.
+- **Chart** — MapLibre-rendered chart with the live boat position, projected COG, AIS targets, waypoints, range rings, toggleable NOAA raster charts and Esri satellite imagery, and overlays for GFS / ECMWF wind and Copernicus Marine currents.
 - **Passage** — distance / log / ETA tiles, cumulative-mileage sparkline, fuel-stop diversion math (Block Island vs Newport vs Nantucket geometry), and an embedded PredictWind tracker.
 - **Forecast** — fetched on the Pi every 3 h on a configurable bbox; lives on disk so it survives offshore-internet outages.
 - **Router** — isochronic-fan routing with land-avoidance against an OSM coastline index, fed by the live wind cache and (optionally) Copernicus currents. Property-tested with fast-check.
@@ -112,7 +112,7 @@ All four are designed to coexist — the bridge dedupes by source address + PGN.
 
 - **One process, many roles** — the g5000 app is the _only_ runtime artifact in production. Next.js, the N2K bridge, the routing engine, the H-LINK TCP server, and the SQLite store all live in the same Node process. The "custom Next server + `globalThis` singletons" pattern is what keeps this coherent — explicitly defended in `next.config.ts` and `CLAUDE.md`.
 - **Replay parity** — any `.jsonl.gz` session file plays back end-to-end through the same compute pipelines and decoders, so bugs reproduce against historical wire-level captures.
-- **Disk-persistent caches** for OSM tiles and GRIB grids under `~/.g5000-router/`, so offshore-without-internet routes still plan against the last-fetched wind field.
+- **Disk-persistent caches** for OSM / NOAA chart / Esri satellite tiles and GRIB grids under `~/.g5000-router/`, so offshore-without-internet routes still plan against the last-fetched wind field (pre-warm satellite coverage on shore wifi with `scripts/sat-seed.ts`).
 - **Memory and `docs/superpowers/`** capture not just the code but the _reasoning_ — design specs, executable implementation plans, post-mortems of hard-won lessons (e.g., the autopilot's "Performance level" silently swapping algorithms behind the user's dial — a UX anti-pattern to avoid replicating).
 
 ## License

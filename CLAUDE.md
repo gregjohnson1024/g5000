@@ -131,6 +131,7 @@ Currently mounted, top of OSM basemap upwards:
 
 - **OSM basemap** (raster), served via the same-origin proxy at `/api/tiles/[z]/[x]/[y]` which caches PNGs under `~/.g5000-router/tile-cache/`.
 - **`<EncLayer/>`** — NOAA NCDS paper-chart raster, served via `/api/enc-tiles/[z]/[x]/[y]` with disk cache under `~/.g5000-router/enc-cache/`. Off by default; toggle via the top-right `NOAA` button. Translates standard XYZ → NOAA grid: `noaa_z = std_z - 2` and ArcGIS row/col order `/tile/{z}/{y}/{x}`. Outside z=2..18 (NOAA's coverage), the proxy serves a transparent 1×1 PNG with `x-cache: EMPTY` to keep MapLibre quiet. US waters only.
+- **`<SatelliteLayer/>`** — Esri World Imagery satellite raster, served via `/api/sat-tiles/[z]/[x]/[y]` with disk cache under `~/.g5000-router/sat-cache/`. Off by default; `Satellite` toggle in the layers popover. Global, JPEG, standard XYZ zoom (NO `-2` offset, unlike NOAA) but ArcGIS row/col order `/tile/{z}/{y}/{x}`. **Mounted immediately after `<EncLayer/>`** so it stacks above NOAA but below annotations — do not reorder. Esri, not Google: Google's tiles can't be legally proxied/cached offline; the proxy is source-agnostic (one-line URL swap to Sentinel-2/EOX, which IS open-licensed). 365-day TTL (imagery is static); bumps tile mtime on disk HIT so "unused" = least-recently-viewed for the prune guard. Pre-warm with `scripts/sat-seed.ts` (`regions` from `~/.g5000-router/sat-seed-regions.json` + `global` z0–7 base); inspect/prune via `scripts/sat-cache.ts` or the **Satellite tile cache** panel on `/settings` (backed by `/api/sat-cache` + `lib/sat-cache.ts`). 8 GB cap, never auto-deletes; tiles at z≤8 are protected from pruning.
 - **`__above-wind__` sentinel** (invisible, always present).
 - **`<WindOverlay/>`** / **`<CurrentOverlay/>`** (mutually exclusive via the model toggle), **`<GulfStreamLayer/>`**.
 - **`<AisTargets/>`**, **`<RoutePolyline/>`**, **`<CogExtension/>`**, **`<WaypointsLayer/>`**, **`<StartLineLayer/>`**, **`<LiveBoatMarker/>`**, **`<ForecastRoi/>`**.
@@ -143,17 +144,17 @@ Disabled / preserved-but-unmounted (one-line revert):
 **Chart UI controls and localStorage keys:**
 
 - **Top-left:** `<ChartFollowControl/>` — two-button stack from `useChartCamera` hook. Follow toggle (sticky state, NOT a one-shot recenter) and Orientation cycle (`N` → `↑COG` → `↑HDG`). Course/heading orientations also push a 30% top padding so the boat sits at lower-third → implicit lookahead.
-- **Top-right:** `<LayersControl/>` — single `NOAA` toggle button. If this ever grows to 2+ overlays again, revert to a popover layout.
+- **Top-right:** `<ChartToolbar/>` wraps `<LayersControl/>` — a layers popover with OSM / NOAA / **Satellite** / Buoys toggles, a mutually-exclusive Model-overlay radio (None / GFS / ECMWF / CMEMS), and a Misc section (AIS targets + COG extensions). `onToggle` takes a key union — add new toggle keys there and to `LayersState`.
 - **Bottom corners on demand:** `<OffscreenVesselIndicator/>` — amber pill anchored to the viewport edge closest to the (off-screen) boat. Tap = re-enter follow mode. Renders only when `follow=false` AND `livePos` is outside the viewport bounds.
 
-| localStorage key    | Shape                              | Default          | Owner            |
-| ------------------- | ---------------------------------- | ---------------- | ---------------- |
-| `chart:camera`      | `{ lat, lon, zoom }`               | first-fix-driven | page.tsx         |
-| `chart:settings`    | UI prefs                           | UI prefs         | page.tsx         |
-| `chart:planState`   | in-progress route                  | empty            | page.tsx         |
-| `chart:layers`      | `{ enc: boolean }`                 | `{ enc: false }` | page.tsx         |
-| `chart:follow`      | `boolean`                          | `true`           | `useChartCamera` |
-| `chart:orientation` | `'north' \| 'course' \| 'heading'` | `'north'`        | `useChartCamera` |
+| localStorage key    | Shape                                                | Default                | Owner            |
+| ------------------- | ---------------------------------------------------- | ---------------------- | ---------------- |
+| `chart:camera`      | `{ lat, lon, zoom }`                                 | first-fix-driven       | page.tsx         |
+| `chart:settings`    | UI prefs                                             | UI prefs               | page.tsx         |
+| `chart:planState`   | in-progress route                                    | empty                  | page.tsx         |
+| `chart:layers`      | `{ osm, enc, satellite, buoys, ais, aisCog, model }` | osm on; model `'none'` | page.tsx         |
+| `chart:follow`      | `boolean`                                            | `true`                 | `useChartCamera` |
+| `chart:orientation` | `'north' \| 'course' \| 'heading'`                   | `'north'`              | `useChartCamera` |
 
 ### MapLibre traps (read before adding a layer)
 
@@ -161,7 +162,8 @@ Disabled / preserved-but-unmounted (one-line revert):
 - **Distinguishing user pans from programmatic moves:** MapLibre's `dragend`, `movestart`, etc. fire for BOTH user gestures and our own `easeTo`/`flyTo` calls. The discriminator is `e.originalEvent` — `undefined` means programmatic, a real `MouseEvent` / `TouchEvent` means user gesture. The follow-mode exit handler in `useChartCamera` uses this to avoid exiting follow on its own recenters.
 - **Bearing changes need a dead-band.** COG and HDG arrive at ~1 Hz with sensor noise. Re-easing the bearing on every tiny wiggle looks bad. `useChartCamera` uses a 3° dead-band via `wrapBearingDelta` (which correctly handles the 0/360 seam).
 - **`LivePos` carries radians for `cog` and `hdg`.** MapLibre's `setBearing` and `easeTo({ bearing })` take degrees. Convert before applying.
-- **Same-origin tile proxies are the pattern.** All three tile types (`/api/tiles`, `/api/seamark-tiles`, `/api/enc-tiles`) follow the same shape: regex-validate `z`/`x`/`y`, serve from disk if fresh, otherwise fetch upstream, write to disk best-effort, stream the response. 30-day max-age, `x-cache: HIT | MISS | EMPTY`, transparent 1×1 PNG for off-coverage zooms. If you add another raster overlay, copy one of these as a starting point.
+- **Same-origin tile proxies are the pattern.** All four tile types (`/api/tiles`, `/api/seamark-tiles`, `/api/enc-tiles`, `/api/sat-tiles`) follow the same shape: regex-validate `z`/`x`/`y`, serve from disk if fresh, otherwise fetch upstream, write to disk best-effort, stream the response. `x-cache: HIT | MISS | EMPTY`, transparent 1×1 PNG for off-coverage zooms. If you add another raster overlay, copy one of these as a starting point (`/api/sat-tiles` is the most recent and passes the upstream content-type through for JPEG).
+- **Cap each raster source's `maxzoom` at its upstream's ceiling so MapLibre overzooms.** OSM and Esri publish to z19, NOAA to z18. Without `maxzoom` on the source, MapLibre requests tiles past coverage and the proxy returns 404/502 on the upstream miss (this bit the OSM basemap at z20). With it set, MapLibre scales the deepest available tiles for closer harbour-detail views.
 
 ## Branching model
 
