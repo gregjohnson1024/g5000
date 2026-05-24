@@ -130,7 +130,12 @@ export function WaypointEditPopup({
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-100">Edit waypoint</span>
-        <button type="button" onClick={onClose} aria-label="close" className="text-xs text-slate-400 hover:text-slate-200">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="close"
+          className="text-xs text-slate-400 hover:text-slate-200"
+        >
           ✕
         </button>
       </div>
@@ -160,10 +165,20 @@ export function WaypointEditPopup({
       />
       {error && <div className="text-xs text-rose-400">{error}</div>}
       <div className="flex gap-2">
-        <button type="button" onClick={() => void save()} disabled={busy} className="flex-1 px-2 py-1 text-xs rounded border bg-sky-600 text-white border-sky-700 hover:bg-sky-500 disabled:opacity-40">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy}
+          className="flex-1 px-2 py-1 text-xs rounded border bg-sky-600 text-white border-sky-700 hover:bg-sky-500 disabled:opacity-40"
+        >
           Save
         </button>
-        <button type="button" onClick={() => void del()} disabled={busy} className="px-2 py-1 text-xs rounded border bg-slate-800 text-rose-300 border-rose-800 hover:bg-rose-950 disabled:opacity-40">
+        <button
+          type="button"
+          onClick={() => void del()}
+          disabled={busy}
+          className="px-2 py-1 text-xs rounded border bg-slate-800 text-rose-300 border-rose-800 hover:bg-rose-950 disabled:opacity-40"
+        >
           Delete
         </button>
       </div>

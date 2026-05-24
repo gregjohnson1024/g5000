@@ -569,7 +569,9 @@ function ChartPageInner() {
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         <TileGridOverlay map={mapInstance} visible={layers.tileGrid} />
         {(() => {
-          const sel = selectedWaypointId ? waypoints.find((w) => w.id === selectedWaypointId) : null;
+          const sel = selectedWaypointId
+            ? waypoints.find((w) => w.id === selectedWaypointId)
+            : null;
           if (!sel) return null;
           return (
             <WaypointEditPopup
