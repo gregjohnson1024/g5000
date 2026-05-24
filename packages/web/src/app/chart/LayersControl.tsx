@@ -7,6 +7,8 @@ export interface LayersState {
    * for NOAA-only or night use). */
   osm: boolean;
   enc: boolean;
+  /** Esri World Imagery. Opaque; stacks on top of NOAA when both on. */
+  satellite: boolean;
   buoys: boolean;
   /** AIS target dots. Defaults true. */
   ais: boolean;
@@ -31,7 +33,7 @@ export function LayersControl({
   onSelectModel,
 }: {
   state: LayersState;
-  onToggle: (key: 'osm' | 'enc' | 'buoys' | 'ais' | 'aisCog') => void;
+  onToggle: (key: 'osm' | 'enc' | 'satellite' | 'buoys' | 'ais' | 'aisCog') => void;
   onSelectModel: (model: ChartModel) => void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
@@ -46,7 +48,11 @@ export function LayersControl({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [open]);
 
-  const onCount = (state.enc ? 1 : 0) + (state.buoys ? 1 : 0) + (state.model !== 'none' ? 1 : 0);
+  const onCount =
+    (state.enc ? 1 : 0) +
+    (state.satellite ? 1 : 0) +
+    (state.buoys ? 1 : 0) +
+    (state.model !== 'none' ? 1 : 0);
 
   return (
     <div ref={wrapRef} className="relative">
@@ -82,6 +88,7 @@ export function LayersControl({
         >
           <Row label="OSM base" pressed={state.osm} onClick={() => onToggle('osm')} />
           <Row label="NOAA chart" pressed={state.enc} onClick={() => onToggle('enc')} />
+          <Row label="Satellite" pressed={state.satellite} onClick={() => onToggle('satellite')} />
           <Row label="Buoys" pressed={state.buoys} onClick={() => onToggle('buoys')} />
           <div className="mt-1 pt-1 border-t border-zinc-700">
             <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">
