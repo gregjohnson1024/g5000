@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir, rm, stat, utimes } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Bbox, WindGrid } from './wind-fetch';
@@ -131,6 +131,11 @@ export async function cropFromGlobalCache(
   }
   if (latIdx.length === 0 || lonIdx.length === 0) return null;
 
+  // Touch the file's mtime on a hit so the LRU cap treats "recently viewed" as
+  // recently used (same trick as the satellite tile cache). Best-effort.
+  const now = new Date();
+  void utimes(fileFor(runAt, fh), now, now).catch(() => {});
+
   const valuesCount = nLats * nLons;
   const uOff = HEADER_BYTES + (nLats + nLons) * 8;
   const vOff = uOff + valuesCount * 4;
@@ -191,4 +196,49 @@ export async function pruneGlobalCache(
     }
   }
   return pruned;
+}
+
+/** Default LRU cap for the global cache — a backstop beyond the time-based prune. */
+export const GLOBAL_CACHE_CAP_BYTES = 1024 ** 3; // 1 GiB
+
+/**
+ * Enforce a hard size cap on the global cache by evicting least-recently-used
+ * grids (oldest mtime first; reads bump mtime) until the total is under
+ * `maxBytes`. A backstop for the time-based prune — e.g. when many distinct
+ * ROI boxes are fetched within one run so nothing is yet stale. Returns the
+ * number of files evicted.
+ */
+export async function capGlobalCache(maxBytes: number = GLOBAL_CACHE_CAP_BYTES): Promise<number> {
+  let files: string[];
+  try {
+    files = await readdir(DIR);
+  } catch {
+    return 0;
+  }
+  const entries: Array<{ path: string; size: number; mtime: number }> = [];
+  let total = 0;
+  for (const f of files) {
+    if (!f.endsWith('.bin')) continue;
+    try {
+      const s = await stat(join(DIR, f));
+      entries.push({ path: join(DIR, f), size: s.size, mtime: s.mtimeMs });
+      total += s.size;
+    } catch {
+      /* vanished mid-scan — ignore */
+    }
+  }
+  if (total <= maxBytes) return 0;
+  entries.sort((a, b) => a.mtime - b.mtime); // least-recently-used first
+  let evicted = 0;
+  for (const e of entries) {
+    if (total <= maxBytes) break;
+    try {
+      await rm(e.path, { force: true });
+      total -= e.size;
+      evicted += 1;
+    } catch {
+      /* best-effort */
+    }
+  }
+  return evicted;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, stat, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { WindGrid } from './wind-fetch.js';
@@ -115,6 +115,29 @@ describe('ecmwf-global-cache', () => {
         lonMax: -67,
       }),
     ).toBeNull();
+  });
+
+  it('evicts least-recently-used files to honour the size cap', async () => {
+    const dir = join(root, 'ecmwf-global-cache');
+    await rm(dir, { recursive: true, force: true }); // isolate from other tests
+    const now = Math.floor(Date.now() / 1000);
+    await mod.writeGlobalGrid(makeGlobalGrid(now, 3));
+    await mod.writeGlobalGrid(makeGlobalGrid(now, 6));
+    await mod.writeGlobalGrid(makeGlobalGrid(now, 9));
+    // fh3 oldest → fh9 newest (the LRU "recently used" end).
+    await utimes(join(dir, `ecmwf_${now}_3.bin`), new Date(1000), new Date(1000));
+    await utimes(join(dir, `ecmwf_${now}_6.bin`), new Date(2000), new Date(2000));
+    await utimes(join(dir, `ecmwf_${now}_9.bin`), new Date(3000), new Date(3000));
+    const sizeOne = (await stat(join(dir, `ecmwf_${now}_9.bin`))).size;
+
+    // Cap to hold ~1.5 files → keep the newest, evict the two oldest.
+    const evicted = await mod.capGlobalCache(Math.floor(sizeOne * 1.5));
+    expect(evicted).toBe(2);
+
+    const bbox = { latMin: 11, latMax: 13, lonMin: -69, lonMax: -67 };
+    expect(await mod.cropFromGlobalCache(now, 9, bbox)).not.toBeNull(); // newest kept
+    expect(await mod.cropFromGlobalCache(now, 3, bbox)).toBeNull(); // oldest evicted
+    expect(await mod.cropFromGlobalCache(now, 6, bbox)).toBeNull();
   });
 
   it('prunes superseded runs even when their valid time is still in the future', async () => {
