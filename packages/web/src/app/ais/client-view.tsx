@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { computeCpa, type CpaResult } from '@g5000/compute';
 import type { AisTarget, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
+import { aisDetailRows, fmtTcpa } from '../../lib/ais-detail';
 
 const NM = 1852;
 const MS_TO_KN = 1 / 0.514444;
@@ -71,17 +72,6 @@ function geoValue(s: JsonSafeSample | undefined): { lat: number; lon: number } |
 function scalarValue(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
   return s.value.value;
-}
-
-function fmtTcpa(seconds: number): string {
-  // Negative TCPA = closest approach already happened (boats are diverging).
-  // Surface that case explicitly rather than collapsing it to "—" which is
-  // indistinguishable from "no data".
-  if (!Number.isFinite(seconds)) return '—';
-  if (seconds < 0) return 'past';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
 /**
@@ -844,34 +834,12 @@ export function AisClientView() {
             <div className="mb-3 bg-slate-900 border border-slate-800 rounded p-3 text-xs font-mono">
               <div className="text-slate-400 mb-1 text-[10px] uppercase">Selected</div>
               <div className="grid grid-cols-2 gap-y-1">
-                <div className="text-slate-400">MMSI</div>
-                <div>{selectedRow.target.mmsi}</div>
-                <div className="text-slate-400">Name</div>
-                <div>{selectedRow.target.name ?? '—'}</div>
-                <div className="text-slate-400">Class</div>
-                <div>{selectedRow.target.vesselClass}</div>
-                <div className="text-slate-400">COG</div>
-                <div>
-                  {selectedRow.target.cog !== undefined
-                    ? `${((selectedRow.target.cog * RAD_TO_DEG + 360) % 360).toFixed(0)}°`
-                    : '—'}
-                </div>
-                <div className="text-slate-400">SOG</div>
-                <div>
-                  {selectedRow.target.sog !== undefined
-                    ? `${(selectedRow.target.sog * MS_TO_KN).toFixed(1)} kn`
-                    : '—'}
-                </div>
-                <div className="text-slate-400">Range</div>
-                <div>
-                  {selectedRow.cpa ? `${(selectedRow.cpa.rangeMeters / NM).toFixed(2)} NM` : '—'}
-                </div>
-                <div className="text-slate-400">CPA</div>
-                <div>
-                  {selectedRow.cpa ? `${(selectedRow.cpa.cpaMeters / NM).toFixed(2)} NM` : '—'}
-                </div>
-                <div className="text-slate-400">TCPA</div>
-                <div>{selectedRow.cpa ? fmtTcpa(selectedRow.cpa.tcpaSeconds) : '—'}</div>
+                {aisDetailRows(selectedRow.target, selectedRow.cpa).map(([label, value]) => (
+                  <Fragment key={label}>
+                    <div className="text-slate-400">{label}</div>
+                    <div>{value}</div>
+                  </Fragment>
+                ))}
               </div>
             </div>
           )}

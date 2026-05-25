@@ -1,7 +1,9 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { AisTarget } from '@g5000/core';
+import { computeCpa, type CpaResult } from '@g5000/compute';
+import { aisDetailRows } from '../lib/ais-detail';
 
 export interface AisTargetsProps {
   /** Map instance from `onLoad`. Pass `null` until the map is ready. */
@@ -17,6 +19,9 @@ export interface AisTargetsProps {
   /** Draw the COG-projection extension lines. Default true. When false the
    * target dots stay but their forward-projection lines are hidden. */
   showCogExtensions?: boolean;
+  /** Own-boat fix, used to compute Range/CPA/TCPA in the click popup. Null
+   *  before the first fix — the popup then shows "—" for those rows. */
+  own?: { lat: number; lon: number; cog: number | null; sog: number | null } | null;
 }
 
 const M_PER_DEG_LAT = 111_320;
@@ -54,7 +59,15 @@ export function AisTargets({
   pollMs = 2000,
   cogExtensionMinutes = 360,
   showCogExtensions = true,
+  own = null,
 }: AisTargetsProps) {
+  // Latest own-boat fix + targets, read by the click handler (registered once)
+  // without re-subscribing on every ~1 Hz fix / 2 s poll. A single popup is
+  // reused across clicks.
+  const ownRef = useRef(own);
+  ownRef.current = own;
+  const targetsRef = useRef<AisTarget[]>([]);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
   // Toggle the COG-extension line layer without tearing down the polling
   // effect. Re-applied on styledata in case the layer is (re)created.
   useEffect(() => {
@@ -164,6 +177,7 @@ export function AisTargets({
     // exist; first poll creates them, subsequent polls just update data.
     const writeSources = (targets: AisTarget[]): void => {
       if (!map.isStyleLoaded()) return;
+      targetsRef.current = targets; // latest, for the click handler
       setupLayers();
       const tgtSrc = map.getSource(TARGET_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
       const cogSrc = map.getSource(COG_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
@@ -243,9 +257,62 @@ export function AisTargets({
     void poll();
     pollTimer = setInterval(poll, pollMs);
 
+    // Click a target dot → popup with the same details as the /ais Selected
+    // panel (shared aisDetailRows). Built with textContent, not innerHTML, so
+    // an external vessel name can't inject markup.
+    const onTargetClick = (e: maplibregl.MapLayerMouseEvent): void => {
+      const mmsi = e.features?.[0]?.properties?.mmsi;
+      if (typeof mmsi !== 'number') return;
+      const target = targetsRef.current.find((t) => t.mmsi === mmsi);
+      if (!target || target.lat == null || target.lon == null) return;
+      const o = ownRef.current;
+      const cpa: CpaResult | null =
+        o && Number.isFinite(o.lat) && Number.isFinite(o.lon)
+          ? computeCpa(
+              { lat: o.lat, lon: o.lon, cog: o.cog ?? 0, sog: o.sog ?? 0 },
+              { lat: target.lat, lon: target.lon, cog: target.cog ?? 0, sog: target.sog ?? 0 },
+            )
+          : null;
+      const root = document.createElement('div');
+      root.className = 'text-xs font-mono';
+      const grid = document.createElement('div');
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'auto auto';
+      grid.style.columnGap = '10px';
+      grid.style.rowGap = '2px';
+      for (const [label, value] of aisDetailRows(target, cpa)) {
+        const l = document.createElement('div');
+        l.textContent = label;
+        l.style.color = '#94a3b8';
+        const v = document.createElement('div');
+        v.textContent = value;
+        grid.append(l, v);
+      }
+      root.append(grid);
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({ closeButton: true, closeOnClick: true, offset: 8 })
+        .setLngLat([target.lon, target.lat])
+        .setDOMContent(root)
+        .addTo(map);
+    };
+    const onEnter = (): void => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+    const onLeave = (): void => {
+      map.getCanvas().style.cursor = '';
+    };
+    map.on('click', TARGET_CIRCLE_ID, onTargetClick);
+    map.on('mouseenter', TARGET_CIRCLE_ID, onEnter);
+    map.on('mouseleave', TARGET_CIRCLE_ID, onLeave);
+
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
+      map.off('click', TARGET_CIRCLE_ID, onTargetClick);
+      map.off('mouseenter', TARGET_CIRCLE_ID, onEnter);
+      map.off('mouseleave', TARGET_CIRCLE_ID, onLeave);
+      popupRef.current?.remove();
+      popupRef.current = null;
       for (const m of nameMarkers.values()) {
         try {
           m.remove();

@@ -588,6 +588,7 @@ function ChartPageInner() {
             map={mapInstance}
             cogExtensionMinutes={COG_EXTENSION_MINUTES}
             showCogExtensions={layers.aisCog}
+            own={livePos}
           />
         )}
         <ForecastRoi
