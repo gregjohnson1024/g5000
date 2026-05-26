@@ -36,3 +36,13 @@ it('converts auto-motor knots to m/s and only when enabled', () => {
   );
   expect(off.autoMotor).toBeUndefined();
 });
+
+it('a present request with no autoMotor turns it off even if settings enable it', () => {
+  // Chart user unchecks Auto-motor → sends options without autoMotor. The
+  // settings default must NOT reinstate it.
+  const o = resolvePlanOptions(
+    { autoMotor: { enabled: true, minSailKt: 3, motorKt: 5 } },
+    { avoidLand: false },
+  );
+  expect(o.autoMotor).toBeUndefined();
+});

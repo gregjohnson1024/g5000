@@ -52,6 +52,12 @@ export function resolvePlanOptions(
       ? { minSail: am.minSailKt * KN_TO_MS, motor: am.motorKt * KN_TO_MS }
       : undefined;
 
+  // When a request is present (the chart always sends one, seeded from these
+  // settings), its autoMotor is authoritative — `undefined` means the user
+  // explicitly turned auto-motor OFF, so it must NOT fall back to the settings
+  // default. Only a bare call (no request at all) uses the settings default.
+  const autoMotor = request === undefined ? settingsAutoMotor : r.autoMotor;
+
   return {
     stepMinutes: pick('stepMinutes', r.stepMinutes) as number,
     pruneBucketDeg: pick('pruneBucketDeg', r.pruneBucketDeg) as number,
@@ -60,6 +66,6 @@ export function resolvePlanOptions(
     maxHours: pick('maxHours', r.maxHours) as number,
     avoidLand: pick('avoidLand', r.avoidLand) as boolean,
     captureIsochrones: false,
-    autoMotor: r.autoMotor ?? settingsAutoMotor,
+    autoMotor,
   };
 }

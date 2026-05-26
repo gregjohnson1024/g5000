@@ -266,17 +266,24 @@ export function selectConsistentGrids(grids: WindGrid[]): WindGrid[] {
   if (grids.length === 0) return [];
   const groups = new Map<string, WindGrid[]>();
   for (const g of grids) {
-    const key = `${g.lats[0]},${g.lats[g.lats.length - 1]},${g.lons[0]},${g.lons[g.lons.length - 1]},${g.runAt}`;
+    // Key on actual extent + resolution + run, so we never stack grids of a
+    // different region OR a different grid resolution (the dimensions guard
+    // the old code enforced as a separate mismatch check).
+    const key = `${g.lats[0]},${g.lats[g.lats.length - 1]},${g.lons[0]},${g.lons[g.lons.length - 1]},${g.lats.length}x${g.lons.length},${g.runAt}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(g);
     else groups.set(key, [g]);
   }
-  let best: WindGrid[] = [];
-  for (const set of groups.values()) {
-    const run = set[0]!.runAt;
-    const bestRun = best.length ? best[0]!.runAt : -Infinity;
-    if (run > bestRun || (run === bestRun && set.length > best.length)) best = set;
-  }
+  // Rank groups newest-run-first, then most hours. Prefer the newest run that
+  // has ≥ 2 forecast hours: the forecast refresh writes a run's hours
+  // progressively, so a run mid-publish can have only 1 cached hour while the
+  // prior complete run (same ROI) is still present — picking the 1-hour run
+  // would strand the planner on `no_wind`. Fall back to the newest group if
+  // none yet has 2 (windFieldFromCache then surfaces the proper shortage).
+  const ranked = [...groups.values()].sort(
+    (a, b) => b[0]!.runAt - a[0]!.runAt || b.length - a.length,
+  );
+  const best = ranked.find((g) => g.length >= 2) ?? ranked[0] ?? [];
   const sorted = [...best].sort((a, b) => a.validAt - b.validAt);
   const seen = new Set<number>();
   const out: WindGrid[] = [];

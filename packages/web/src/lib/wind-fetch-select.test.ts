@@ -43,6 +43,15 @@ describe('selectConsistentGrids', () => {
     expect(out.every((g) => g.runAt === 20000)).toBe(true);
   });
 
+  it('falls back to the prior complete run when the newest run has only 1 hour', () => {
+    // Mid-refresh: new run has published only f000 so far; prior run is complete.
+    const newRunPartial = [mk(20000, 0, A)]; // 1 hour, newest
+    const oldRunComplete = [mk(1000, 0, A), mk(1000, 3, A), mk(1000, 6, A)]; // 3 hours
+    const out = selectConsistentGrids([...newRunPartial, ...oldRunComplete]);
+    expect(out.length).toBe(3);
+    expect(out.every((g) => g.runAt === 1000)).toBe(true);
+  });
+
   it('never mixes two extents of the same dimensions (same run)', () => {
     const extentA = [mk(1000, 0, A), mk(1000, 3, A), mk(1000, 6, A)]; // 3 hours
     const extentB = [mk(1000, 0, B), mk(1000, 3, B)]; // 2 hours

@@ -76,6 +76,14 @@ export function PlaybackScrubber(props: {
         mk.setLngLat([s.lon, s.lat]).addTo(map);
       }
     }
+    // Remove ghosts for models no longer in the route set (e.g. re-planned
+    // with fewer models) so a dropped model's dot doesn't linger.
+    for (const m of MODELS) {
+      if (!props.routes[m]) {
+        markers.current[m]?.remove();
+        markers.current[m] = undefined;
+      }
+    }
     props.onStates(states);
     props.onWindHour(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
