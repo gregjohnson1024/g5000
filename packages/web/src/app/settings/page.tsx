@@ -54,8 +54,10 @@ const DEFAULTS = {
   cacheRoot: '~/.g5000-router/grib-cache',
 };
 
-function PlanningSection() {
-  const [p, setP] = useState<Required<PlanningSettings>>({
+// A fresh, mutable copy of the engine defaults. Used both for initial state and
+// the Reset button so the two never drift apart.
+function freshDefaults(): Required<PlanningSettings> {
+  return {
     stepMinutes: PLANNING_DEFAULTS.stepMinutes,
     pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg,
     headingFanDeg: PLANNING_DEFAULTS.headingFanDeg,
@@ -63,7 +65,11 @@ function PlanningSection() {
     maxHours: PLANNING_DEFAULTS.maxHours,
     avoidLand: PLANNING_DEFAULTS.avoidLand,
     autoMotor: { ...PLANNING_DEFAULTS.autoMotor },
-  });
+  };
+}
+
+function PlanningSection() {
+  const [p, setP] = useState<Required<PlanningSettings>>(freshDefaults);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -194,17 +200,7 @@ function PlanningSection() {
           Save planning
         </button>
         <button
-          onClick={() =>
-            setP({
-              stepMinutes: PLANNING_DEFAULTS.stepMinutes,
-              pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg,
-              headingFanDeg: PLANNING_DEFAULTS.headingFanDeg,
-              headingResolutionDeg: PLANNING_DEFAULTS.headingResolutionDeg,
-              maxHours: PLANNING_DEFAULTS.maxHours,
-              avoidLand: PLANNING_DEFAULTS.avoidLand,
-              autoMotor: { ...PLANNING_DEFAULTS.autoMotor },
-            })
-          }
+          onClick={() => setP(freshDefaults())}
           className="bg-slate-700 px-3 py-1 rounded text-sm"
         >
           Reset to defaults

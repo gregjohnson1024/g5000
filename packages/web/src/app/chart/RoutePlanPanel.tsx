@@ -13,6 +13,34 @@ interface Wp {
 
 const selectClass = 'bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full mt-0.5 text-sm';
 
+/** Start/End waypoint picker. `disabledId` greys out the waypoint already
+ *  chosen for the other endpoint so the same one can't be both. */
+function WaypointSelect(props: {
+  label: string;
+  value: string;
+  waypoints: Wp[];
+  disabledId: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <label className="block text-sm">
+      {props.label}
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="">— select waypoint —</option>
+        {props.waypoints.map((w) => (
+          <option key={w.id} value={w.id} disabled={w.id === props.disabledId}>
+            {w.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /**
  * Chart-side route planner. Pick a Start and End waypoint, then PlanControls
  * (departure / wind model / currents / motor) POSTs to /api/route/plan. The
@@ -95,36 +123,20 @@ export function RoutePlanPanel(props: {
         </p>
       ) : (
         <>
-          <label className="block text-sm">
-            Start
-            <select
-              value={startId}
-              onChange={(e) => setStartId(e.target.value)}
-              className={selectClass}
-            >
-              <option value="">— select waypoint —</option>
-              {waypoints.map((w) => (
-                <option key={w.id} value={w.id} disabled={w.id === endId}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            End
-            <select
-              value={endId}
-              onChange={(e) => setEndId(e.target.value)}
-              className={selectClass}
-            >
-              <option value="">— select waypoint —</option>
-              {waypoints.map((w) => (
-                <option key={w.id} value={w.id} disabled={w.id === startId}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <WaypointSelect
+            label="Start"
+            value={startId}
+            waypoints={waypoints}
+            disabledId={endId}
+            onChange={setStartId}
+          />
+          <WaypointSelect
+            label="End"
+            value={endId}
+            waypoints={waypoints}
+            disabledId={startId}
+            onChange={setEndId}
+          />
           <PlanControls
             start={start ? { lat: start.lat, lon: start.lon } : undefined}
             end={end ? { lat: end.lat, lon: end.lon } : undefined}

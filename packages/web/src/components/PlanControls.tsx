@@ -24,6 +24,30 @@ export interface PlanParams {
 
 const KN = 0.514444;
 
+const inputClass = 'bg-slate-900 border border-slate-700 rounded px-2 py-1';
+const checkboxClass = 'bg-slate-900 border border-slate-700 rounded';
+
+/** Number input that coerces blanks/NaN to 0, matching the planner's tolerance
+ *  for empty fields. `width` picks the inline (kn boxes) vs full-width variant. */
+function NumberInput(props: {
+  value: number;
+  min: number;
+  step: number;
+  onChange: (value: number) => void;
+  width: 'inline' | 'full';
+}) {
+  return (
+    <input
+      type="number"
+      min={props.min}
+      step={props.step}
+      value={props.value}
+      onChange={(e) => props.onChange(Number(e.target.value) || 0)}
+      className={`${inputClass} ${props.width === 'inline' ? 'w-16' : 'w-full'}`}
+    />
+  );
+}
+
 export function PlanControls(props: {
   start?: { lat: number; lon: number };
   end?: { lat: number; lon: number };
@@ -109,7 +133,7 @@ export function PlanControls(props: {
           type="datetime-local"
           value={departureInput}
           onChange={(e) => setDepartureAnchor(parseDatetimeLocalInput(e.target.value, tz))}
-          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
+          className={`${inputClass} w-full`}
         />
         <span className="text-[10px] text-slate-500 font-mono">
           ≡ {fmtTimestamp(departureAnchor, tz === 'utc' ? 'local' : 'utc')}
@@ -118,24 +142,17 @@ export function PlanControls(props: {
       <fieldset className="block text-sm">
         <legend>Wind models</legend>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={models.gfs}
-              onChange={(e) => setModels((m) => ({ ...m, gfs: e.target.checked }))}
-              className="bg-slate-900 border border-slate-700 rounded"
-            />
-            GFS
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={models.ecmwf}
-              onChange={(e) => setModels((m) => ({ ...m, ecmwf: e.target.checked }))}
-              className="bg-slate-900 border border-slate-700 rounded"
-            />
-            ECMWF
-          </label>
+          {(['gfs', 'ecmwf'] as const).map((key) => (
+            <label key={key} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={models[key]}
+                onChange={(e) => setModels((m) => ({ ...m, [key]: e.target.checked }))}
+                className={checkboxClass}
+              />
+              {key === 'gfs' ? 'GFS' : 'ECMWF'}
+            </label>
+          ))}
         </div>
       </fieldset>
       <label className="flex items-center gap-2 text-sm">
@@ -143,7 +160,7 @@ export function PlanControls(props: {
           type="checkbox"
           checked={useCurrents}
           onChange={(e) => setUseCurrents(e.target.checked)}
-          className="bg-slate-900 border border-slate-700 rounded"
+          className={checkboxClass}
         />
         Use surface currents (RTOFS)
       </label>
@@ -153,29 +170,27 @@ export function PlanControls(props: {
             type="checkbox"
             checked={auto.enabled}
             onChange={(e) => setAuto((a) => ({ ...a, enabled: e.target.checked }))}
-            className="bg-slate-900 border border-slate-700 rounded"
+            className={checkboxClass}
           />
           Auto-motor
         </label>
         {auto.enabled && (
           <div className="flex flex-wrap items-center gap-1 pl-6 text-xs text-slate-400">
             motor when slower than
-            <input
-              type="number"
+            <NumberInput
               min={0}
               step={0.5}
               value={auto.minSailKt}
-              onChange={(e) => setAuto((a) => ({ ...a, minSailKt: Number(e.target.value) || 0 }))}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16"
+              onChange={(minSailKt) => setAuto((a) => ({ ...a, minSailKt }))}
+              width="inline"
             />
             kn, at
-            <input
-              type="number"
+            <NumberInput
               min={0}
               step={0.5}
               value={auto.motorKt}
-              onChange={(e) => setAuto((a) => ({ ...a, motorKt: Number(e.target.value) || 0 }))}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16"
+              onChange={(motorKt) => setAuto((a) => ({ ...a, motorKt }))}
+              width="inline"
             />
             kn
           </div>
@@ -189,43 +204,38 @@ export function PlanControls(props: {
               type="checkbox"
               checked={adv.avoidLand}
               onChange={(e) => setAdv((a) => ({ ...a, avoidLand: e.target.checked }))}
-              className="bg-slate-900 border border-slate-700 rounded"
+              className={checkboxClass}
             />
             Avoid land
           </label>
           <label className="block">
             Frontier size (°)
-            <input
-              type="number"
+            <NumberInput
               min={0.5}
               step={0.5}
               value={adv.pruneBucketDeg}
-              onChange={(e) =>
-                setAdv((a) => ({ ...a, pruneBucketDeg: Number(e.target.value) || 0 }))
-              }
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
+              onChange={(pruneBucketDeg) => setAdv((a) => ({ ...a, pruneBucketDeg }))}
+              width="full"
             />
           </label>
           <label className="block">
             Isochrone length (min)
-            <input
-              type="number"
+            <NumberInput
               min={5}
               step={5}
               value={adv.stepMinutes}
-              onChange={(e) => setAdv((a) => ({ ...a, stepMinutes: Number(e.target.value) || 0 }))}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
+              onChange={(stepMinutes) => setAdv((a) => ({ ...a, stepMinutes }))}
+              width="full"
             />
           </label>
           <label className="block">
             Max hours
-            <input
-              type="number"
+            <NumberInput
               min={12}
               step={12}
               value={adv.maxHours}
-              onChange={(e) => setAdv((a) => ({ ...a, maxHours: Number(e.target.value) || 0 }))}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
+              onChange={(maxHours) => setAdv((a) => ({ ...a, maxHours }))}
+              width="full"
             />
           </label>
         </div>

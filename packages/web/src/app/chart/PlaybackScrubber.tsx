@@ -32,6 +32,13 @@ export function PlaybackScrubber(props: {
   const raf = useRef<number | null>(null);
   const last = useRef<number>(0);
 
+  // Detach a model's map marker and drop the ref. Idempotent — safe to call
+  // for a model that has no marker.
+  const removeMarker = (m: Model): void => {
+    markers.current[m]?.remove();
+    markers.current[m] = undefined;
+  };
+
   useEffect(() => {
     setT(tMin);
     setPlaying(false);
@@ -79,10 +86,7 @@ export function PlaybackScrubber(props: {
     // Remove ghosts for models no longer in the route set (e.g. re-planned
     // with fewer models) so a dropped model's dot doesn't linger.
     for (const m of MODELS) {
-      if (!props.routes[m]) {
-        markers.current[m]?.remove();
-        markers.current[m] = undefined;
-      }
+      if (!props.routes[m]) removeMarker(m);
     }
     props.onStates(states);
     props.onWindHour(t);
@@ -91,11 +95,9 @@ export function PlaybackScrubber(props: {
 
   useEffect(() => {
     return () => {
-      for (const m of MODELS) {
-        markers.current[m]?.remove();
-        markers.current[m] = undefined;
-      }
+      for (const m of MODELS) removeMarker(m);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (entries.length === 0) return null;
