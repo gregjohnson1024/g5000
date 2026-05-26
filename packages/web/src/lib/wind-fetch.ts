@@ -263,8 +263,20 @@ export function windFieldFromCache(
     const lats = v.grid.lats;
     const lons = v.grid.lons;
     if (lats.length === 0 || lons.length === 0) continue;
-    if (lats[0]! > requireBbox.latMin || lats[lats.length - 1]! < requireBbox.latMax) continue;
-    if (lons[0]! > requireBbox.lonMin || lons[lons.length - 1]! < requireBbox.lonMax) continue;
+    // NOMADS snaps a requested bbox INWARD to the model's native grid (0.25°
+    // for GFS), so a grid fetched for exactly this ROI ends up a fraction of a
+    // cell smaller on every edge. A strict `lats[0] <= latMin` test then
+    // rejects the planner's own auto-fetched grid — it can never satisfy its
+    // own request for an arbitrary (non-grid-aligned) bbox. Allow up to one
+    // grid spacing of shortfall. Safe because the planner pads the route by 2°
+    // before requesting wind, so the sub-cell gap at the bbox edge is never
+    // actually sampled (and propagate() drops any out-of-grid leg anyway).
+    const dlat = lats.length > 1 ? Math.abs(lats[1]! - lats[0]!) : 0;
+    const dlon = lons.length > 1 ? Math.abs(lons[1]! - lons[0]!) : 0;
+    if (lats[0]! > requireBbox.latMin + dlat || lats[lats.length - 1]! < requireBbox.latMax - dlat)
+      continue;
+    if (lons[0]! > requireBbox.lonMin + dlon || lons[lons.length - 1]! < requireBbox.lonMax - dlon)
+      continue;
     grids.push(v.grid);
   }
   if (grids.length < 2) {
@@ -274,29 +286,45 @@ export function windFieldFromCache(
         `have ${grids.length}. Fetch more on the /forecast tab.`,
     );
   }
-  // All grids must share the same lats/lons. With our eccodes pipeline this
-  // is true when they came from the same bbox fetch — but if a previous
-  // refresh used a different ROI we'd see size drift. Reject mismatches up
-  // front rather than silently producing a bad field.
-  grids.sort((a, b) => a.validAt - b.validAt);
-  const ref = grids[0]!;
-  for (let i = 1; i < grids.length; i++) {
-    const g = grids[i]!;
-    if (g.lats.length !== ref.lats.length || g.lons.length !== ref.lons.length) {
-      throw new Error(
-        `windFieldFromCache: grid size mismatch between forecast hours ` +
-          `(t=${ref.forecastHour}h: ${ref.lats.length}×${ref.lons.length}, ` +
-          `t=${g.forecastHour}h: ${g.lats.length}×${g.lons.length}). ` +
-          `Re-fetch ${model.toUpperCase()} for a single ROI on /forecast.`,
-      );
-    }
+  // Several ROIs (and even a global grid) can all contain the requested bbox
+  // at DIFFERENT resolutions; stacking mixed dimensions along the time axis is
+  // invalid. Group the candidates by grid shape and keep the largest single
+  // consistent set — the ROI the user actually fetched will dominate by
+  // forecast-hour count. Then dedupe by valid time (two ROIs of equal shape
+  // can both supply the same hour) so the time axis is strictly increasing.
+  const byShape = new Map<string, WindGrid[]>();
+  for (const g of grids) {
+    const key = `${g.lats.length}x${g.lons.length}`;
+    const bucket = byShape.get(key);
+    if (bucket) bucket.push(g);
+    else byShape.set(key, [g]);
   }
+  let chosen: WindGrid[] = [];
+  for (const set of byShape.values()) {
+    if (set.length > chosen.length) chosen = set;
+  }
+  chosen.sort((a, b) => a.validAt - b.validAt);
+  const seen = new Set<number>();
+  const series: WindGrid[] = [];
+  for (const g of chosen) {
+    if (seen.has(g.validAt)) continue;
+    seen.add(g.validAt);
+    series.push(g);
+  }
+  if (series.length < 2) {
+    throw new Error(
+      `windFieldFromCache: need ≥ 2 cached ${model.toUpperCase()} forecast hours covering bbox ` +
+        `[${requireBbox.latMin.toFixed(1)}..${requireBbox.latMax.toFixed(1)}, ${requireBbox.lonMin.toFixed(1)}..${requireBbox.lonMax.toFixed(1)}], ` +
+        `have ${series.length}. Fetch more on the /forecast tab.`,
+    );
+  }
+  const ref = series[0]!;
   return {
     lats: ref.lats,
     lons: ref.lons,
-    times: grids.map((g) => g.validAt),
-    u: grids.map((g) => g.u),
-    v: grids.map((g) => g.v),
+    times: series.map((g) => g.validAt),
+    u: series.map((g) => g.u),
+    v: series.map((g) => g.v),
     source: model === 'gfs' ? 'GFS' : 'ECMWF',
     runTime: ref.runAt,
   };
