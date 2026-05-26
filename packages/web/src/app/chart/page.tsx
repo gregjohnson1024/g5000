@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
-import { attachRoute } from '../../components/RoutePolyline';
+import { attachRoute, attachIsochronesUpTo, detachRoute } from '../../components/RoutePolyline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
@@ -30,6 +30,7 @@ import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
+import { RoutePlanPanel } from './RoutePlanPanel';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
 import { nextWaypointName } from './waypoint-name';
@@ -263,14 +264,43 @@ function ChartPageInner() {
   const [route, setRoute] = useState<Route | undefined>();
   const [error, setError] = useState<string | undefined>();
 
-  // Re-attach the route whenever it changes (planned, restored from
-  // localStorage, or map first comes online). attachRoute is idempotent —
-  // same source/layer id just updates the data — so calling it on each
-  // change is cheap. Isochrones are never drawn (the toggle was removed).
+  // Set true by the planner panel right before setRoute() so the draw effect
+  // knows this route is freshly planned (→ animate the isochrone fan) versus
+  // restored from localStorage / a ?plan= link (→ draw statically).
+  const animateNextRef = useRef(false);
+
+  // Draw the route whenever it changes. For a freshly-planned route with
+  // isochrones, reveal the frontier step by step ("see the planning as it
+  // happens"), then lay the route line on top. Otherwise draw statically.
   useEffect(() => {
-    if (route && mapInstance) {
-      attachRoute(mapInstance, 'route-gfs', route, '#000000', false);
+    const map = mapInstance;
+    if (!route || !map) return;
+    const isos = route.isochrones ?? [];
+    if (animateNextRef.current && isos.length > 1) {
+      animateNextRef.current = false;
+      detachRoute(map, 'route-gfs'); // clear any prior route + fan
+      let cancelled = false;
+      let timer: ReturnType<typeof setTimeout>;
+      let k = 1;
+      const stepMs = Math.max(16, Math.min(60, 2500 / isos.length));
+      const tick = (): void => {
+        if (cancelled) return;
+        attachIsochronesUpTo(map, route, k);
+        k += 1;
+        if (k <= isos.length) {
+          timer = setTimeout(tick, stepMs);
+        } else {
+          // Frontier fully drawn — lay the route line over the fan.
+          attachRoute(map, 'route-gfs', route, '#000000', true);
+        }
+      };
+      timer = setTimeout(tick, stepMs);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
     }
+    attachRoute(map, 'route-gfs', route, '#000000', true);
   }, [route, mapInstance]);
 
   // Track the cursor position over the map so the bottom-left readout
@@ -509,11 +539,56 @@ function ChartPageInner() {
   useEffect(() => {
     if (!restored) return;
     try {
-      localStorage.setItem('chart:planState', JSON.stringify({ route }));
+      // Drop isochrones before persisting — the captured frontier fan can be
+      // hundreds of polylines (megabytes) and is only needed for the live
+      // planning animation, not for restoring the route line on revisit.
+      const slim = route ? { ...route, isochrones: undefined } : undefined;
+      localStorage.setItem('chart:planState', JSON.stringify({ route: slim }));
     } catch {
       /* quota or disabled — silently drop */
     }
   }, [route, restored]);
+
+  // Fresh plan from the panel: flag for the animation, draw it, and frame the
+  // route (exiting follow first so it doesn't immediately recenter on the boat).
+  const handleRouted = (r: Route): void => {
+    animateNextRef.current = true;
+    setRoute(r);
+    const map = mapInstance;
+    if (!map) return;
+    if (camera.follow) camera.toggleFollow();
+    const pts = r.isochrones?.length
+      ? r.isochrones.flatMap((i) => i.points)
+      : r.legs.map((l) => ({ lat: l.lat, lon: l.lon }));
+    if (pts.length >= 2) {
+      let latMin = Infinity,
+        latMax = -Infinity,
+        lonMin = Infinity,
+        lonMax = -Infinity;
+      for (const p of pts) {
+        latMin = Math.min(latMin, p.lat);
+        latMax = Math.max(latMax, p.lat);
+        lonMin = Math.min(lonMin, p.lon);
+        lonMax = Math.max(lonMax, p.lon);
+      }
+      try {
+        map.fitBounds(
+          [
+            [lonMin, latMin],
+            [lonMax, latMax],
+          ],
+          { padding: 60, duration: 800 },
+        );
+      } catch {
+        /* style not ready */
+      }
+    }
+  };
+
+  const handleClearRoute = (): void => {
+    setRoute(undefined);
+    if (mapInstance) detachRoute(mapInstance, 'route-gfs');
+  };
 
   // OSM basemap visibility. The layer is mounted unconditionally inside
   // Map.tsx's initial style; we just flip its `visibility` layout property.
@@ -725,6 +800,13 @@ function ChartPageInner() {
           <TzToggle tz={tz} setTz={setTz} />
         </div>
         <LiveValues p={livePos} />
+        <RoutePlanPanel
+          waypoints={waypoints}
+          tz={tz}
+          hasRoute={!!route}
+          onRouted={handleRouted}
+          onClear={handleClearRoute}
+        />
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
           {mv.isCurrent && (
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">

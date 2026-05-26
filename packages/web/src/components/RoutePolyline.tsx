@@ -56,8 +56,20 @@ export function attachRoute(
   }
 }
 
-function attachIsochrones(map: maplibregl.Map, route: Route): void {
-  if (!route.isochrones || route.isochrones.length === 0) {
+/**
+ * Draw only the first `count` isochrones of a route. Used to animate the
+ * planner's frontier expanding step by step ("see the planning as it
+ * happens"); call repeatedly with an increasing count. Creates the source/
+ * layer on first call and updates its data thereafter.
+ */
+export function attachIsochronesUpTo(map: maplibregl.Map, route: Route, count: number): void {
+  attachIsochrones(map, route, count);
+}
+
+function attachIsochrones(map: maplibregl.Map, route: Route, count?: number): void {
+  const all = route.isochrones ?? [];
+  const isos = count == null ? all : all.slice(0, Math.max(0, count));
+  if (isos.length === 0) {
     // Clear any previous isochrones from an earlier plan.
     if (map.getSource(ISOCHRONE_SRC)) {
       (map.getSource(ISOCHRONE_SRC) as maplibregl.GeoJSONSource).setData({
@@ -67,7 +79,7 @@ function attachIsochrones(map: maplibregl.Map, route: Route): void {
     }
     return;
   }
-  const features: GeoJSON.Feature[] = route.isochrones.map((iso) => {
+  const features: GeoJSON.Feature[] = isos.map((iso) => {
     const hoursFromStart = (iso.t - route.start) / 3600;
     return {
       type: 'Feature',
