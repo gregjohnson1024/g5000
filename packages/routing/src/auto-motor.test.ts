@@ -31,8 +31,13 @@ const END: LatLon = { lat: 40, lon: -62 };
 
 it('auto-motor floors boat speed when polar speed is below the threshold', () => {
   const r = plan({
-    start: START, end: END, departure: DEP, wind: uniformWind(),
-    polar: SLOW_POLAR, polarId: 'slow', coastline: NO_COAST,
+    start: START,
+    end: END,
+    departure: DEP,
+    wind: uniformWind(),
+    polar: SLOW_POLAR,
+    polarId: 'slow',
+    coastline: NO_COAST,
     options: { avoidLand: false, autoMotor: { minSail: 1.5432, motor: 2.572 } },
   });
   const sailLegs = r.legs.filter((l) => l.bsp > 0 && Math.abs(l.bsp - 1.5) < 0.01);
@@ -42,8 +47,13 @@ it('auto-motor floors boat speed when polar speed is below the threshold', () =>
 
 it('without autoMotor the polar speed is used unchanged', () => {
   const r = plan({
-    start: START, end: END, departure: DEP, wind: uniformWind(),
-    polar: SLOW_POLAR, polarId: 'slow', coastline: NO_COAST,
+    start: START,
+    end: END,
+    departure: DEP,
+    wind: uniformWind(),
+    polar: SLOW_POLAR,
+    polarId: 'slow',
+    coastline: NO_COAST,
     options: { avoidLand: false },
   });
   expect(r.legs.some((l) => Math.abs(l.bsp - 1.5) < 0.01)).toBe(true);
@@ -51,8 +61,13 @@ it('without autoMotor the polar speed is used unchanged', () => {
 
 it('cog is populated and equals heading when currents are off', () => {
   const r = plan({
-    start: START, end: END, departure: DEP, wind: uniformWind(),
-    polar: SLOW_POLAR, polarId: 'slow', coastline: NO_COAST,
+    start: START,
+    end: END,
+    departure: DEP,
+    wind: uniformWind(),
+    polar: SLOW_POLAR,
+    polarId: 'slow',
+    coastline: NO_COAST,
     options: { avoidLand: false, autoMotor: { minSail: 1.5432, motor: 2.572 } },
   });
   const moving = r.legs.filter((l) => l.bsp > 0).slice(1);
