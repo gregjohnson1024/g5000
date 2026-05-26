@@ -4,8 +4,8 @@ import type { Route } from '@g5000/routing';
 
 const r: Route = {
   legs: [
-    { t: 0, lat: 30, lon: -75, heading: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 },
-    { t: 3600, lat: 30, lon: -74, heading: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 },
+    { t: 0, lat: 30, lon: -75, heading: 0, cog: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 },
+    { t: 3600, lat: 30, lon: -74, heading: 0, cog: 0, twa: 0, tws: 8, bsp: 5, sogGround: 5 },
   ],
   start: 0,
   end: 3600,

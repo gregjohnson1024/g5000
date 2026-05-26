@@ -243,6 +243,51 @@ export function expectedRunUnix(model: WindModel, now: Date = new Date()): numbe
  * time axis. Throws if fewer than 2 forecast hours are cached — the
  * planner needs at least a start + step interpolation.
  */
+/**
+ * From a set of candidate grids (already filtered to those covering the
+ * requested bbox), pick one CONSISTENT time series to stack along the time
+ * axis. Grids are grouped by exact extent + model run; we then choose the
+ * group from the MOST RECENT run (tie-broken by most forecast hours).
+ *
+ * Two failure modes this prevents:
+ *  - Mixing different actual extents that happen to share dimensions (same
+ *    `lats.length × lons.length` but a different region) — stacking those
+ *    produces a spatially incoherent field.
+ *  - Preferring an OLDER run just because it has more cached hours. An old
+ *    run's forecast window can end before the (near-future) departure time,
+ *    so `interpolateWind` throws "out of range" at the start and the planner
+ *    reports `no_wind`. The newest run's window always covers "now".
+ *
+ * Returns the chosen grids sorted by valid time and deduped (two fetches of
+ * the same run+extent can supply the same hour), so the time axis is strictly
+ * increasing.
+ */
+export function selectConsistentGrids(grids: WindGrid[]): WindGrid[] {
+  if (grids.length === 0) return [];
+  const groups = new Map<string, WindGrid[]>();
+  for (const g of grids) {
+    const key = `${g.lats[0]},${g.lats[g.lats.length - 1]},${g.lons[0]},${g.lons[g.lons.length - 1]},${g.runAt}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(g);
+    else groups.set(key, [g]);
+  }
+  let best: WindGrid[] = [];
+  for (const set of groups.values()) {
+    const run = set[0]!.runAt;
+    const bestRun = best.length ? best[0]!.runAt : -Infinity;
+    if (run > bestRun || (run === bestRun && set.length > best.length)) best = set;
+  }
+  const sorted = [...best].sort((a, b) => a.validAt - b.validAt);
+  const seen = new Set<number>();
+  const out: WindGrid[] = [];
+  for (const g of sorted) {
+    if (seen.has(g.validAt)) continue;
+    seen.add(g.validAt);
+    out.push(g);
+  }
+  return out;
+}
+
 export function windFieldFromCache(
   model: WindModel,
   requireBbox: Bbox,
@@ -286,31 +331,7 @@ export function windFieldFromCache(
         `have ${grids.length}. Fetch more on the /forecast tab.`,
     );
   }
-  // Several ROIs (and even a global grid) can all contain the requested bbox
-  // at DIFFERENT resolutions; stacking mixed dimensions along the time axis is
-  // invalid. Group the candidates by grid shape and keep the largest single
-  // consistent set — the ROI the user actually fetched will dominate by
-  // forecast-hour count. Then dedupe by valid time (two ROIs of equal shape
-  // can both supply the same hour) so the time axis is strictly increasing.
-  const byShape = new Map<string, WindGrid[]>();
-  for (const g of grids) {
-    const key = `${g.lats.length}x${g.lons.length}`;
-    const bucket = byShape.get(key);
-    if (bucket) bucket.push(g);
-    else byShape.set(key, [g]);
-  }
-  let chosen: WindGrid[] = [];
-  for (const set of byShape.values()) {
-    if (set.length > chosen.length) chosen = set;
-  }
-  chosen.sort((a, b) => a.validAt - b.validAt);
-  const seen = new Set<number>();
-  const series: WindGrid[] = [];
-  for (const g of chosen) {
-    if (seen.has(g.validAt)) continue;
-    seen.add(g.validAt);
-    series.push(g);
-  }
+  const series = selectConsistentGrids(grids);
   if (series.length < 2) {
     throw new Error(
       `windFieldFromCache: need ≥ 2 cached ${model.toUpperCase()} forecast hours covering bbox ` +
