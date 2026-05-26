@@ -7,88 +7,100 @@ import {
   type TzMode,
 } from '../lib/tz';
 
-export interface PlanRequest {
+export interface PlanParams {
   start: { lat: number; lon: number };
   end: { lat: number; lon: number };
   departure: number;
-  model: 'GFS' | 'ECMWF';
-  polarId: string;
-  polar: unknown;
-  useCurrents?: boolean;
-  options?: Record<string, unknown>;
+  models: Array<'GFS' | 'ECMWF'>;
+  useCurrents: boolean;
+  options: {
+    avoidLand?: boolean;
+    pruneBucketDeg?: number;
+    stepMinutes?: number;
+    maxHours?: number;
+    autoMotor?: { minSail: number; motor: number };
+  };
 }
 
-const MOTOR_KEY = 'chart:motorMode';
-const KNOTS_TO_MS = 0.514444;
+const KN = 0.514444;
 
 export function PlanControls(props: {
   start?: { lat: number; lon: number };
   end?: { lat: number; lon: number };
-  onPlan: (req: PlanRequest) => void;
+  onPlan: (params: PlanParams) => void;
   loading: boolean;
   /** Page-level timezone display preference. Controls how the Departure
    *  picker labels itself and how its input string is interpreted. */
   tz: TzMode;
 }) {
   const tz = props.tz;
-  const [model, setModel] = useState<'GFS' | 'ECMWF'>('GFS');
   // Departure is stored as an absolute UNIX-seconds anchor; the displayed
   // string is derived from anchor + tz, so flipping the toggle preserves
   // the moment in time rather than the wallclock typed.
   const [departureAnchor, setDepartureAnchor] = useState<number>(() => Date.now() / 1000 + 3600);
   const departureInput = toDatetimeLocalInput(departureAnchor, tz);
   const [useCurrents, setUseCurrents] = useState<boolean>(false);
-  // Motor mode + cruise speed (knots). Persisted to localStorage so the
-  // user's mode choice survives page reloads. Defaults to motor=true at
-  // 5 kn — Sula is on a motor-only passage. Sailors will uncheck.
-  const [motor, setMotor] = useState<boolean>(true);
-  const [motorKt, setMotorKt] = useState<number>(5);
-  const [motorRestored, setMotorRestored] = useState<boolean>(false);
+  // Wind models to plan against — both on by default so a single Plan press
+  // fans out a GFS and an ECMWF route for side-by-side comparison.
+  const [models, setModels] = useState({ gfs: true, ecmwf: true });
+  // Auto-motor: motor when the polar speed drops below minSail, capping the
+  // engine contribution at motorKt. Seeded from saved Settings/Planning prefs.
+  const [auto, setAuto] = useState({ enabled: false, minSailKt: 3, motorKt: 5 });
+  // Advanced isochrone-router knobs, also seeded from settings.
+  const [adv, setAdv] = useState({
+    avoidLand: true,
+    pruneBucketDeg: 2,
+    stepMinutes: 30,
+    maxHours: 168,
+  });
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(MOTOR_KEY);
-      if (raw) {
-        const j = JSON.parse(raw) as { motor?: boolean; motorKt?: number };
-        if (typeof j.motor === 'boolean') setMotor(j.motor);
-        if (typeof j.motorKt === 'number' && j.motorKt > 0) setMotorKt(j.motorKt);
-      }
-    } catch {
-      /* corrupt — keep defaults */
-    }
-    setMotorRestored(true);
+    void fetch('/api/settings')
+      .then((r) => r.json())
+      .then((j) => {
+        const pl = j?.settings?.planning;
+        if (pl) {
+          if (pl.autoMotor)
+            setAuto({
+              enabled: !!pl.autoMotor.enabled,
+              minSailKt: pl.autoMotor.minSailKt ?? 3,
+              motorKt: pl.autoMotor.motorKt ?? 5,
+            });
+          setAdv((a) => ({
+            ...a,
+            avoidLand: pl.avoidLand ?? a.avoidLand,
+            pruneBucketDeg: pl.pruneBucketDeg ?? a.pruneBucketDeg,
+            stepMinutes: pl.stepMinutes ?? a.stepMinutes,
+            maxHours: pl.maxHours ?? a.maxHours,
+          }));
+        }
+      })
+      .catch(() => {});
   }, []);
-  useEffect(() => {
-    if (!motorRestored) return;
-    try {
-      localStorage.setItem(MOTOR_KEY, JSON.stringify({ motor, motorKt }));
-    } catch {
-      /* quota or disabled */
-    }
-  }, [motor, motorKt, motorRestored]);
-  const onSubmit = async () => {
-    const polarRes = await fetch('/api/wardrobe/active');
-    if (!polarRes.ok) return alert('No polar available (live or cached).');
-    const { polar } = await polarRes.json();
-    const t = Math.floor(departureAnchor);
-    if (!props.start || !props.end) return alert('Click start and end on the map first.');
+
+  const onSubmit = () => {
+    const selected = [models.gfs && 'GFS', models.ecmwf && 'ECMWF'].filter(Boolean) as Array<
+      'GFS' | 'ECMWF'
+    >;
+    if (!props.start || !props.end || selected.length === 0) return;
     props.onPlan({
       start: props.start,
       end: props.end,
-      departure: t,
-      model,
-      polarId: polar.id ?? 'default',
-      polar: polar.polar ?? polar,
+      departure: Math.floor(departureAnchor),
+      models: selected,
       useCurrents,
-      // Always capture isochrones — the chart draws them as a fan-out
-      // visualisation behind the route polyline so the user can see the
-      // exploration depth at each step.
       options: {
-        captureIsochrones: true,
-        motor,
-        motorSpeed: motorKt * KNOTS_TO_MS,
+        avoidLand: adv.avoidLand,
+        pruneBucketDeg: adv.pruneBucketDeg,
+        stepMinutes: adv.stepMinutes,
+        maxHours: adv.maxHours,
+        autoMotor: auto.enabled
+          ? { minSail: auto.minSailKt * KN, motor: auto.motorKt * KN }
+          : undefined,
       },
     });
   };
+
   return (
     <div className="space-y-2">
       <label className="block text-sm">
@@ -103,17 +115,29 @@ export function PlanControls(props: {
           ≡ {fmtTimestamp(departureAnchor, tz === 'utc' ? 'local' : 'utc')}
         </span>
       </label>
-      <label className="block text-sm">
-        Wind model
-        <select
-          value={model}
-          onChange={(e) => setModel(e.target.value as 'GFS' | 'ECMWF')}
-          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
-        >
-          <option value="GFS">GFS (NOAA)</option>
-          <option value="ECMWF">ECMWF</option>
-        </select>
-      </label>
+      <fieldset className="block text-sm">
+        <legend>Wind models</legend>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={models.gfs}
+              onChange={(e) => setModels((m) => ({ ...m, gfs: e.target.checked }))}
+              className="bg-slate-900 border border-slate-700 rounded"
+            />
+            GFS
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={models.ecmwf}
+              onChange={(e) => setModels((m) => ({ ...m, ecmwf: e.target.checked }))}
+              className="bg-slate-900 border border-slate-700 rounded"
+            />
+            ECMWF
+          </label>
+        </div>
+      </fieldset>
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -123,34 +147,91 @@ export function PlanControls(props: {
         />
         Use surface currents (RTOFS)
       </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={motor}
-          onChange={(e) => setMotor(e.target.checked)}
-          className="bg-slate-900 border border-slate-700 rounded"
-        />
-        Motor (ignore polar, use fixed speed)
-      </label>
-      {motor && (
-        <label className="block text-sm pl-6">
-          Motor speed
-          <div className="flex items-center gap-1">
+      <div className="space-y-1 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={auto.enabled}
+            onChange={(e) => setAuto((a) => ({ ...a, enabled: e.target.checked }))}
+            className="bg-slate-900 border border-slate-700 rounded"
+          />
+          Auto-motor
+        </label>
+        {auto.enabled && (
+          <div className="flex flex-wrap items-center gap-1 pl-6 text-xs text-slate-400">
+            motor when slower than
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={auto.minSailKt}
+              onChange={(e) => setAuto((a) => ({ ...a, minSailKt: Number(e.target.value) || 0 }))}
+              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16"
+            />
+            kn, at
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={auto.motorKt}
+              onChange={(e) => setAuto((a) => ({ ...a, motorKt: Number(e.target.value) || 0 }))}
+              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16"
+            />
+            kn
+          </div>
+        )}
+      </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-slate-300">Advanced</summary>
+        <div className="space-y-2 pt-2">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={adv.avoidLand}
+              onChange={(e) => setAdv((a) => ({ ...a, avoidLand: e.target.checked }))}
+              className="bg-slate-900 border border-slate-700 rounded"
+            />
+            Avoid land
+          </label>
+          <label className="block">
+            Frontier size (°)
             <input
               type="number"
               min={0.5}
-              max={30}
-              step={0.1}
-              value={motorKt}
-              onChange={(e) => setMotorKt(Number(e.target.value) || 0)}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-20"
+              step={0.5}
+              value={adv.pruneBucketDeg}
+              onChange={(e) =>
+                setAdv((a) => ({ ...a, pruneBucketDeg: Number(e.target.value) || 0 }))
+              }
+              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
             />
-            <span className="text-slate-400">kn</span>
-          </div>
-        </label>
-      )}
+          </label>
+          <label className="block">
+            Isochrone length (min)
+            <input
+              type="number"
+              min={5}
+              step={5}
+              value={adv.stepMinutes}
+              onChange={(e) => setAdv((a) => ({ ...a, stepMinutes: Number(e.target.value) || 0 }))}
+              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
+            />
+          </label>
+          <label className="block">
+            Max hours
+            <input
+              type="number"
+              min={12}
+              step={12}
+              value={adv.maxHours}
+              onChange={(e) => setAdv((a) => ({ ...a, maxHours: Number(e.target.value) || 0 }))}
+              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full"
+            />
+          </label>
+        </div>
+      </details>
       <button
-        disabled={props.loading || !props.start || !props.end}
+        disabled={props.loading || !props.start || !props.end || (!models.gfs && !models.ecmwf)}
         onClick={onSubmit}
         className="bg-emerald-700 disabled:bg-slate-700 px-3 py-2 rounded w-full text-sm"
       >

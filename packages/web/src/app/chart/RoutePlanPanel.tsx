@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { Route } from '@g5000/routing';
-import { PlanControls, type PlanRequest } from '../../components/PlanControls';
+import { PlanControls, type PlanParams } from '../../components/PlanControls';
 import type { TzMode } from '../../lib/tz';
 
 interface Wp {
@@ -24,7 +24,7 @@ export function RoutePlanPanel(props: {
   waypoints: Wp[];
   tz: TzMode;
   hasRoute: boolean;
-  onRouted: (route: Route) => void;
+  onRouted: (routes: Partial<Record<'GFS' | 'ECMWF', Route>>) => void;
   onClear: () => void;
 }) {
   const { waypoints } = props;
@@ -37,44 +37,51 @@ export function RoutePlanPanel(props: {
   const start = waypoints.find((w) => w.id === startId);
   const end = waypoints.find((w) => w.id === endId);
 
-  const onPlan = async (req: PlanRequest): Promise<void> => {
+  const onPlan = async (params: PlanParams): Promise<void> => {
     setLoading(true);
     setError(null);
     setSummary(null);
-    try {
-      const res = await fetch('/api/route/plan', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          start: req.start,
-          end: req.end,
-          departure: req.departure,
-          model: req.model,
-          useCurrents: req.useCurrents,
-          options: req.options,
-        }),
-      });
-      const j = (await res.json()) as {
-        ok: boolean;
-        route?: Route;
-        error?: { message?: string };
-      };
-      if (!j.ok || !j.route) {
-        setError(j.error?.message ?? 'plan failed');
-        return;
-      }
-      const r = j.route;
-      const hrs = (r.end - r.start) / 3600;
-      const nm = r.distance / 1852;
-      setSummary(
-        `${r.incomplete ? 'Incomplete' : 'Reached'} — ${r.legs.length} legs, ${nm.toFixed(0)} NM, ${hrs.toFixed(1)} h` +
-          (r.incomplete && r.reason ? ` (${r.reason})` : ''),
+    // Drop the previous route the moment planning starts — otherwise a stale
+    // line lingers on the chart for the seconds the plan takes to compute.
+    props.onClear();
+    const results: Partial<Record<'GFS' | 'ECMWF', Route>> = {};
+    const errs: string[] = [];
+    await Promise.all(
+      params.models.map(async (model) => {
+        try {
+          const res = await fetch('/api/route/plan', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              start: params.start,
+              end: params.end,
+              departure: params.departure,
+              model,
+              useCurrents: params.useCurrents,
+              options: params.options,
+            }),
+          });
+          const j = (await res.json()) as {
+            ok: boolean;
+            route?: Route;
+            error?: { message?: string };
+          };
+          if (!j.ok || !j.route) errs.push(`${model}: ${j.error?.message ?? 'plan failed'}`);
+          else results[model] = j.route;
+        } catch (e) {
+          errs.push(`${model}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }),
+    );
+    setLoading(false);
+    if (errs.length) setError(errs.join(' · '));
+    if (Object.keys(results).length) {
+      const parts = (Object.entries(results) as Array<['GFS' | 'ECMWF', Route]>).map(
+        ([m, r]) =>
+          `${m}: ${(r.distance / 1852).toFixed(0)} NM / ${((r.end - r.start) / 3600).toFixed(1)} h${r.incomplete ? ' (incomplete)' : ''}`,
       );
-      props.onRouted(r);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
+      setSummary(parts.join(' · '));
+      props.onRouted(results);
     }
   };
 
