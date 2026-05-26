@@ -450,6 +450,10 @@ function ChartPageInner() {
 
   const [waypointDropActive, setWaypointDropActive] = useState(false);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
+  // Route Start/End waypoint ids (owned here so the marks can be badged
+  // green/red on the chart).
+  const [routeStartId, setRouteStartId] = useState('');
+  const [routeEndId, setRouteEndId] = useState('');
 
   // Crosshair cursor while waypoint-drop mode is active.
   useEffect(() => {
@@ -691,7 +695,18 @@ function ChartPageInner() {
         />
         <WaypointsLayer
           map={mapInstance}
-          marks={waypoints.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon, name: w.name }))}
+          marks={waypoints.map((w) => ({
+            id: w.id,
+            lat: w.lat,
+            lon: w.lon,
+            name: w.name,
+            badge:
+              w.id === routeStartId
+                ? ('S' as const)
+                : w.id === routeEndId
+                  ? ('E' as const)
+                  : undefined,
+          }))}
           onSelectWaypoint={waypointDropActive ? undefined : (id) => setSelectedWaypointId(id)}
           onMoveWaypoint={waypointDropActive ? undefined : handleMoveWaypoint}
         />
@@ -815,6 +830,10 @@ function ChartPageInner() {
           waypoints={waypoints}
           tz={tz}
           hasRoute={Object.keys(routes).length > 0}
+          startId={routeStartId}
+          endId={routeEndId}
+          onStartId={setRouteStartId}
+          onEndId={setRouteEndId}
           onRouted={handleRouted}
           onClear={handleClearRoute}
         />

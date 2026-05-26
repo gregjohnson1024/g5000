@@ -112,7 +112,8 @@ export function WaypointsLayer({
           source: SOURCE_ID,
           paint: {
             'circle-radius': 5,
-            'circle-color': '#fbbf24',
+            // Start = green, End = red (route endpoints), else default amber.
+            'circle-color': ['match', ['get', 'badge'], 'S', '#22c55e', 'E', '#ef4444', '#fbbf24'],
             'circle-stroke-color': '#0f172a',
             'circle-stroke-width': 1.2,
           },

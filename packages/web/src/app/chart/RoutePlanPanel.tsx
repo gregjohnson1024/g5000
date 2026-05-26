@@ -52,12 +52,16 @@ export function RoutePlanPanel(props: {
   waypoints: Wp[];
   tz: TzMode;
   hasRoute: boolean;
+  /** Selected Start/End waypoint ids, lifted to the parent so it can badge
+   *  the start (green) and end (red) marks on the chart. */
+  startId: string;
+  endId: string;
+  onStartId: (id: string) => void;
+  onEndId: (id: string) => void;
   onRouted: (routes: Partial<Record<'GFS' | 'ECMWF', Route>>) => void;
   onClear: () => void;
 }) {
-  const { waypoints } = props;
-  const [startId, setStartId] = useState('');
-  const [endId, setEndId] = useState('');
+  const { waypoints, startId, endId } = props;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -128,14 +132,14 @@ export function RoutePlanPanel(props: {
             value={startId}
             waypoints={waypoints}
             disabledId={endId}
-            onChange={setStartId}
+            onChange={props.onStartId}
           />
           <WaypointSelect
             label="End"
             value={endId}
             waypoints={waypoints}
             disabledId={startId}
-            onChange={setEndId}
+            onChange={props.onEndId}
           />
           <PlanControls
             start={start ? { lat: start.lat, lon: start.lon } : undefined}
