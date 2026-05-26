@@ -34,6 +34,7 @@ export function WaypointsLayer({
   map,
   marks,
   onSelectWaypoint,
+  onMoveWaypoint,
 }: {
   map: maplibregl.Map | null;
   marks: MarkLike[];
