@@ -1,0 +1,65 @@
+const KN_TO_MS = 0.514444;
+
+export interface PlanningSettings {
+  stepMinutes?: number;
+  pruneBucketDeg?: number;
+  headingFanDeg?: number;
+  headingResolutionDeg?: number;
+  maxHours?: number;
+  avoidLand?: boolean;
+  autoMotor?: { enabled: boolean; minSailKt: number; motorKt: number };
+}
+
+export const PLANNING_DEFAULTS = {
+  stepMinutes: 30,
+  pruneBucketDeg: 2,
+  headingFanDeg: 90,
+  headingResolutionDeg: 5,
+  maxHours: 168,
+  avoidLand: true,
+  autoMotor: { enabled: false, minSailKt: 3, motorKt: 5 },
+} as const;
+
+/** Plain numeric/boolean PlanOptions plus the m/s autoMotor the engine wants. */
+export interface ResolvedPlanOptions {
+  stepMinutes: number;
+  pruneBucketDeg: number;
+  headingFanDeg: number;
+  headingResolutionDeg: number;
+  maxHours: number;
+  avoidLand: boolean;
+  captureIsochrones: false;
+  autoMotor?: { minSail: number; motor: number };
+}
+
+/** Merge engine defaults < settings.planning < per-request overrides. */
+export function resolvePlanOptions(
+  settings: PlanningSettings | undefined,
+  request:
+    | (Partial<Omit<ResolvedPlanOptions, 'autoMotor' | 'captureIsochrones'>> & {
+        autoMotor?: { minSail: number; motor: number };
+      })
+    | undefined,
+): ResolvedPlanOptions {
+  const s = settings ?? {};
+  const r = request ?? {};
+  const pick = <K extends keyof typeof PLANNING_DEFAULTS>(k: K, rv: unknown): number | boolean =>
+    (rv ?? s[k as keyof PlanningSettings] ?? PLANNING_DEFAULTS[k]) as number | boolean;
+
+  const am = s.autoMotor;
+  const settingsAutoMotor =
+    am && am.enabled
+      ? { minSail: am.minSailKt * KN_TO_MS, motor: am.motorKt * KN_TO_MS }
+      : undefined;
+
+  return {
+    stepMinutes: pick('stepMinutes', r.stepMinutes) as number,
+    pruneBucketDeg: pick('pruneBucketDeg', r.pruneBucketDeg) as number,
+    headingFanDeg: pick('headingFanDeg', r.headingFanDeg) as number,
+    headingResolutionDeg: pick('headingResolutionDeg', r.headingResolutionDeg) as number,
+    maxHours: pick('maxHours', r.maxHours) as number,
+    avoidLand: pick('avoidLand', r.avoidLand) as boolean,
+    captureIsochrones: false,
+    autoMotor: r.autoMotor ?? settingsAutoMotor,
+  };
+}
