@@ -31,11 +31,14 @@ import { modelLayerView, type ChartModel } from './model-layer';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { RoutePlanPanel } from './RoutePlanPanel';
+import { PlaybackScrubber } from './PlaybackScrubber';
+import { RouteDetailsBox } from './RouteDetailsBox';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
 import { nextWaypointName } from './waypoint-name';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
+import { nearestForecastHour, type PlaybackState } from '../../lib/route-playback';
 import type { Route } from '@g5000/routing';
 
 /**
@@ -262,6 +265,9 @@ function ChartPageInner() {
     Array<{ id: string; name: string; lat: number; lon: number }>
   >([]);
   const [routes, setRoutes] = useState<Partial<Record<'GFS' | 'ECMWF', Route>>>({});
+  const [playbackStates, setPlaybackStates] = useState<
+    Partial<Record<'GFS' | 'ECMWF', PlaybackState>>
+  >({});
   const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
   const ROUTE_LAYER: Record<'GFS' | 'ECMWF', string> = { GFS: 'route-gfs', ECMWF: 'route-ecmwf' };
   const [error, setError] = useState<string | undefined>();
@@ -561,6 +567,21 @@ function ChartPageInner() {
       (['GFS', 'ECMWF'] as const).forEach((m) => detachRoute(mapInstance, ROUTE_LAYER[m]));
   };
 
+  // Drive the wind overlay's selected forecast hour from the playback clock.
+  // The scrubber reports a wall-clock time `t`; map it to the nearest cached
+  // forecast hour for the active wind model and unlock the slider so the
+  // overlay tracks the ghost boats as they advance.
+  const onWindHour = (t: number): void => {
+    const model: 'gfs' | 'ecmwf' = mv.windModel ?? 'gfs';
+    const run = latestRunAt[model];
+    if (run == null) return;
+    const h = nearestForecastHour(run, t, availableHours[model]);
+    if (h != null) {
+      setWindLockNow(false);
+      setWindHours(h);
+    }
+  };
+
   // OSM basemap visibility. The layer is mounted unconditionally inside
   // Map.tsx's initial style; we just flip its `visibility` layout property.
   // When OSM is hidden the `__bg-black__` background layer underneath shows
@@ -778,6 +799,26 @@ function ChartPageInner() {
           onRouted={handleRouted}
           onClear={handleClearRoute}
         />
+        {Object.keys(routes).length > 0 && (
+          <>
+            <PlaybackScrubber
+              map={mapInstance}
+              routes={routes}
+              onStates={setPlaybackStates}
+              onWindHour={onWindHour}
+            />
+            {(['GFS', 'ECMWF'] as const)
+              .filter((m) => routes[m])
+              .map((m) => (
+                <RouteDetailsBox
+                  key={m}
+                  model={m}
+                  color={ROUTE_COLOR[m]}
+                  state={playbackStates[m] ?? null}
+                />
+              ))}
+          </>
+        )}
         <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
           {mv.isCurrent && (
             <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
