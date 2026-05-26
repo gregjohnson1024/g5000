@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
-import { attachRoute, attachIsochronesUpTo, detachRoute } from '../../components/RoutePolyline';
+import { attachRoute, detachRoute } from '../../components/RoutePolyline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
@@ -261,47 +261,22 @@ function ChartPageInner() {
   const [waypoints, setWaypoints] = useState<
     Array<{ id: string; name: string; lat: number; lon: number }>
   >([]);
-  const [route, setRoute] = useState<Route | undefined>();
+  const [routes, setRoutes] = useState<Partial<Record<'GFS' | 'ECMWF', Route>>>({});
+  const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
+  const ROUTE_LAYER: Record<'GFS' | 'ECMWF', string> = { GFS: 'route-gfs', ECMWF: 'route-ecmwf' };
   const [error, setError] = useState<string | undefined>();
 
-  // Set true by the planner panel right before setRoute() so the draw effect
-  // knows this route is freshly planned (→ animate the isochrone fan) versus
-  // restored from localStorage / a ?plan= link (→ draw statically).
-  const animateNextRef = useRef(false);
-
-  // Draw the route whenever it changes. For a freshly-planned route with
-  // isochrones, reveal the frontier step by step ("see the planning as it
-  // happens"), then lay the route line on top. Otherwise draw statically.
+  // Draw the colour-coded route line for each model that has a route, and
+  // remove the layer for any model that doesn't. GFS = amber, ECMWF = cyan.
   useEffect(() => {
     const map = mapInstance;
-    if (!route || !map) return;
-    const isos = route.isochrones ?? [];
-    if (animateNextRef.current && isos.length > 1) {
-      animateNextRef.current = false;
-      detachRoute(map, 'route-gfs'); // clear any prior route + fan
-      let cancelled = false;
-      let timer: ReturnType<typeof setTimeout>;
-      let k = 1;
-      const stepMs = Math.max(16, Math.min(60, 2500 / isos.length));
-      const tick = (): void => {
-        if (cancelled) return;
-        attachIsochronesUpTo(map, route, k);
-        k += 1;
-        if (k <= isos.length) {
-          timer = setTimeout(tick, stepMs);
-        } else {
-          // Frontier fully drawn — lay the route line over the fan.
-          attachRoute(map, 'route-gfs', route, '#000000', true);
-        }
-      };
-      timer = setTimeout(tick, stepMs);
-      return () => {
-        cancelled = true;
-        clearTimeout(timer);
-      };
-    }
-    attachRoute(map, 'route-gfs', route, '#000000', true);
-  }, [route, mapInstance]);
+    if (!map) return;
+    (['GFS', 'ECMWF'] as const).forEach((m) => {
+      const r = routes[m];
+      if (r) attachRoute(map, ROUTE_LAYER[m], r, ROUTE_COLOR[m]);
+      else detachRoute(map, ROUTE_LAYER[m]);
+    });
+  }, [routes, mapInstance]);
 
   // Track the cursor position over the map so the bottom-left readout
   // can show "lat lon, distance + bearing from boat". Cleared on
@@ -458,8 +433,8 @@ function ChartPageInner() {
     try {
       const raw = localStorage.getItem('chart:planState');
       if (raw) {
-        const saved = JSON.parse(raw) as { route?: Route };
-        if (saved.route) setRoute(saved.route);
+        const saved = JSON.parse(raw) as { routes?: Partial<Record<'GFS' | 'ECMWF', Route>> };
+        setRoutes(saved.routes ?? {});
       }
     } catch {
       /* corrupt or quota — drop it on the floor */
@@ -534,32 +509,27 @@ function ChartPageInner() {
     await dropWaypointAt({ lat, lon });
   };
 
-  // Persist the route. Start/end are deliberately omitted — see comment on
+  // Persist the routes. Start/end are deliberately omitted — see comment on
   // the restore effect above.
   useEffect(() => {
     if (!restored) return;
     try {
-      // Drop isochrones before persisting — the captured frontier fan can be
-      // hundreds of polylines (megabytes) and is only needed for the live
-      // planning animation, not for restoring the route line on revisit.
-      const slim = route ? { ...route, isochrones: undefined } : undefined;
-      localStorage.setItem('chart:planState', JSON.stringify({ route: slim }));
+      localStorage.setItem('chart:planState', JSON.stringify({ routes }));
     } catch {
       /* quota or disabled — silently drop */
     }
-  }, [route, restored]);
+  }, [routes, restored]);
 
-  // Fresh plan from the panel: flag for the animation, draw it, and frame the
-  // route (exiting follow first so it doesn't immediately recenter on the boat).
-  const handleRouted = (r: Route): void => {
-    animateNextRef.current = true;
-    setRoute(r);
+  // Fresh plan from the panel: store the routes-by-model, draw them, and frame
+  // them (exiting follow first so it doesn't immediately recenter on the boat).
+  const handleRouted = (next: Partial<Record<'GFS' | 'ECMWF', Route>>): void => {
+    setRoutes(next);
     const map = mapInstance;
     if (!map) return;
     if (camera.follow) camera.toggleFollow();
-    const pts = r.isochrones?.length
-      ? r.isochrones.flatMap((i) => i.points)
-      : r.legs.map((l) => ({ lat: l.lat, lon: l.lon }));
+    const pts: Array<{ lat: number; lon: number }> = [];
+    for (const r of Object.values(next))
+      if (r) for (const l of r.legs) pts.push({ lat: l.lat, lon: l.lon });
     if (pts.length >= 2) {
       let latMin = Infinity,
         latMax = -Infinity,
@@ -586,8 +556,9 @@ function ChartPageInner() {
   };
 
   const handleClearRoute = (): void => {
-    setRoute(undefined);
-    if (mapInstance) detachRoute(mapInstance, 'route-gfs');
+    setRoutes({});
+    if (mapInstance)
+      (['GFS', 'ECMWF'] as const).forEach((m) => detachRoute(mapInstance, ROUTE_LAYER[m]));
   };
 
   // OSM basemap visibility. The layer is mounted unconditionally inside
@@ -627,7 +598,7 @@ function ChartPageInner() {
           setError(j.error?.message ?? 'plan not found');
           return;
         }
-        setRoute(j.plan.route);
+        setRoutes({ GFS: j.plan.route });
       } catch (e) {
         setError(String(e));
       }
@@ -803,7 +774,7 @@ function ChartPageInner() {
         <RoutePlanPanel
           waypoints={waypoints}
           tz={tz}
-          hasRoute={!!route}
+          hasRoute={Object.keys(routes).length > 0}
           onRouted={handleRouted}
           onClear={handleClearRoute}
         />
