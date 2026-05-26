@@ -515,6 +515,22 @@ function ChartPageInner() {
     await dropWaypointAt({ lat, lon });
   };
 
+  // Drag-to-move: optimistically update the mark, then persist the new
+  // position. On failure, surface an error (the in-flight mark already moved
+  // locally; a reload reflects the server's value).
+  const handleMoveWaypoint = (id: string, lat: number, lon: number): void => {
+    setWaypoints((prev) => prev.map((w) => (w.id === id ? { ...w, lat, lon } : w)));
+    void fetch(`/api/waypoints/${id}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lat, lon }),
+    })
+      .then((r) => {
+        if (!r.ok) setError('waypoint move failed');
+      })
+      .catch(() => setError('waypoint move failed'));
+  };
+
   // Persist the routes. Start/end are deliberately omitted — see comment on
   // the restore effect above.
   useEffect(() => {
@@ -676,6 +692,7 @@ function ChartPageInner() {
           map={mapInstance}
           marks={waypoints.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon, name: w.name }))}
           onSelectWaypoint={waypointDropActive ? undefined : (id) => setSelectedWaypointId(id)}
+          onMoveWaypoint={waypointDropActive ? undefined : handleMoveWaypoint}
         />
         <WindOverlay
           map={mapInstance}
