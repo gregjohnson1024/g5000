@@ -654,6 +654,7 @@ function ChartPageInner() {
           }}
           onClick={waypointDropActive ? handleDropClick : undefined}
           onLongPress={dropWaypointAt}
+          suppressLongPressLayers={['waypoints-dot']}
         />
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension
@@ -760,6 +761,7 @@ function ChartPageInner() {
                       : w,
                   ),
                 );
+                setSelectedWaypointId(null); // dismiss the popup after a save
               }}
               onDeleted={(id) => {
                 setWaypoints((prev) => prev.filter((w) => w.id !== id));

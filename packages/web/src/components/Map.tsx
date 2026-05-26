@@ -10,6 +10,9 @@ export interface MapProps {
   /** Fired on a press-and-hold (mouse or touch) that stays put for
    * LONG_PRESS_MS without panning. The trailing click is suppressed. */
   onLongPress?: (latLon: { lat: number; lon: number }) => void;
+  /** Layer ids that suppress the long-press when the press lands on one of
+   * their features (e.g. the waypoint dots, which own a drag gesture). */
+  suppressLongPressLayers?: string[];
   onLoad?: (m: maplibregl.Map) => void;
 }
 
@@ -18,7 +21,14 @@ const LONG_PRESS_MS = 500;
 // from the start of a pan.
 const LONG_PRESS_MOVE_TOLERANCE = 8;
 
-export function Map({ center, zoom, onClick, onLongPress, onLoad }: MapProps) {
+export function Map({
+  center,
+  zoom,
+  onClick,
+  onLongPress,
+  suppressLongPressLayers,
+  onLoad,
+}: MapProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   // Track the latest onClick/onLoad in a ref so the map's listeners (which
@@ -28,9 +38,11 @@ export function Map({ center, zoom, onClick, onLongPress, onLoad }: MapProps) {
   // every click would set start, never end.
   const onClickRef = useRef(onClick);
   const onLongPressRef = useRef(onLongPress);
+  const suppressLayersRef = useRef(suppressLongPressLayers);
   const onLoadRef = useRef(onLoad);
   onClickRef.current = onClick;
   onLongPressRef.current = onLongPress;
+  suppressLayersRef.current = suppressLongPressLayers;
   onLoadRef.current = onLoad;
   useEffect(() => {
     if (!ref.current) return;
@@ -93,6 +105,13 @@ export function Map({ center, zoom, onClick, onLongPress, onLoad }: MapProps) {
       if (oe instanceof MouseEvent && oe.button !== 0) return; // left button only
       if (typeof TouchEvent !== 'undefined' && oe instanceof TouchEvent && oe.touches.length > 1)
         return; // ignore pinch/multitouch
+      // Don't arm a long-press when the press lands on a layer that owns its
+      // own press gesture (e.g. a waypoint dot being dragged) — otherwise the
+      // drag also drops a new waypoint at the start point.
+      const suppress = (suppressLayersRef.current ?? []).filter((l) => map.getLayer(l));
+      if (suppress.length && map.queryRenderedFeatures(e.point, { layers: suppress }).length > 0) {
+        return;
+      }
       clearPress();
       pressStart = e.point;
       const { lat, lng } = e.lngLat;
