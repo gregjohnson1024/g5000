@@ -216,7 +216,8 @@ export function WaypointsLayer({
       if (!onMoveRef.current) return;
       const f = e.features?.[0];
       const id = f?.properties?.id;
-      if (typeof id !== 'string' || f?.properties?.badge) return; // saved waypoints only
+      // Drag any saved waypoint, including the badged route start/end ones.
+      if (typeof id !== 'string') return;
       e.preventDefault(); // stop the map from starting a pan
       map.dragPan.disable();
       dragRef.current = { id, moved: false, startX: e.point.x, startY: e.point.y };
