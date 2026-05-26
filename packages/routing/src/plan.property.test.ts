@@ -89,12 +89,9 @@ describe('property: determinism', () => {
 });
 
 describe('property: uniform wind => direction roughly toward destination', () => {
-  it('mean leg bearing within 45 deg of great-circle bearing for broad-reach conditions', () => {
+  it('mean leg bearing within 10 deg of great-circle bearing for broad-reach conditions', () => {
     const start = { lat: 30, lon: -75 };
     const end = { lat: 30, lon: -65 }; // due east, wind from west (u=8)
-    // maxHours=96 matches plan.test.ts — with this polar, bearing-bucket prune
-    // prefers a 30°/150° zigzag (~16 km/h east) over the optimal 60°/120°
-    // zigzag, so 960 km needs ~80h, not 48h.
     const r = plan({
       start,
       end,
@@ -114,11 +111,13 @@ describe('property: uniform wind => direction roughly toward destination', () =>
     for (const l of r.legs) mean += l.heading;
     mean /= r.legs.length;
     const delta = Math.abs(((mean - gcb + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
-    // Wider tolerance (45° instead of 30°) because the test polar has a steep
-    // TWA gradient at TWA=120° causing the prune bucket to prefer a wider-angle
-    // zigzag than the optimal beam-reach pair. Real polars are smoother and
-    // the optimal route is tighter.
-    expect(delta).toBeLessThan(45 * DEG);
+    // The progress-based prune (closest-to-destination per bearing bucket)
+    // sails an almost-straight broad reach here (mean heading ≈ 1.5° off the
+    // great-circle bearing). The old furthest-from-start prune preferred a
+    // wide 30°/150° zigzag that needed ~80h for the 960 km crossing; the fix
+    // takes the direct reach in ~50h. Tolerance tightened 45° → 10° to lock
+    // that in.
+    expect(delta).toBeLessThan(10 * DEG);
   });
 });
 
@@ -154,23 +153,24 @@ function syntheticIsland(): Coastline {
   return { level: 'l', polygons: [polygon], index };
 }
 
-// TODO (v2): The bearing-bucket prune in plan() — combined with this test
-// polar's steep TWA gradient — causes the algorithm to reject candidate
-// frontier nodes that wander far enough from bearing-to-destination to
-// detour around a real obstacle. Concretely: a tall vertical wall at
-// lon -70 to -69 blocks the natural east-bound path, but the algorithm
-// can't find a detour route within 14 days because nodes that head far
-// enough north/south to clear the wall get pruned by the bucket-from-
-// start key in favor of nodes that stay closer to the bearing line (which
-// then collide with the wall and get rejected by avoidLand).
+// STILL SKIPPED after the progress-based prune fix. The progress prune
+// (prune.ts: closest-to-destination per bearing-from-start bucket) fixed the
+// convergence failures — upwind beating, deep running, and adverse-current
+// routing all complete now. But obstacle rounding is the OPPOSITE problem and
+// the progress prune does not solve it: to clear a tall vertical wall the boat
+// must sail AWAY from the destination (far enough north/south to get past the
+// wall's end), and a progress-greedy prune discards exactly those away-from-
+// goal nodes within each bearing sector — mirror image of how the old
+// furthest-from-start prune discarded the converging nodes. No single scalar
+// prune key captures both "expand outward past the goal to round an obstacle"
+// and "converge on the goal"; real isochrone routers use separate machinery
+// (visibility graph / A* for land, sweep-detection for termination). That is
+// research, not a prune tweak, so this stays skipped.
 //
 // Land avoidance IS exercised at lower layers: @g5000/coastline's
-// intersectsLand unit tests (Task 13) verify the geometry, and the
-// Bermuda → Newport integration test (Task 41) will verify routing-
-// against-real-coastline end-to-end. A property-level land-avoidance
-// test at the routing core would require either a smoother polar or
-// a richer prune key (e.g., bucket by (bearing-from-start, progress)
-// rather than bearing alone). Both are v2 refinements.
+// intersectsLand unit tests verify the geometry, and the Bermuda → Newport
+// integration test verifies routing against real coastline end-to-end (real
+// coastlines are gentle enough that the progress prune routes around them).
 describe.skip('property: coastline forces detour', () => {
   it('route with avoidLand=true is longer and does not cross the island', () => {
     const start = { lat: 30, lon: -75 };
@@ -245,7 +245,7 @@ function uniformCurrent(uVal: number, vVal: number): CurrentField {
 // A property-level symmetry test at the routing core requires either a
 // smoother polar or a richer prune key (bucket by (bearing, progress)).
 // Both are v2 refinements.
-describe.skip('property: currents reverse → ETA asymmetry', () => {
+describe('property: currents reverse → ETA asymmetry', () => {
   it('current pushing toward destination yields earlier ETA than current pushing away', () => {
     const start = { lat: 30, lon: -75 };
     const end = { lat: 30, lon: -65 };

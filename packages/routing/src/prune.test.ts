@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { pruneByBearingBucket, type FrontierNode } from './prune.js';
 
 const START = { lat: 30, lon: -75 };
+const END = { lat: 38, lon: -75 }; // due north of start
 
 function mk(lat: number, lon: number, distFromStart: number): FrontierNode {
   return {
@@ -18,35 +19,34 @@ function mk(lat: number, lon: number, distFromStart: number): FrontierNode {
 }
 
 describe('pruneByBearingBucket', () => {
-  it('keeps only the furthest node per bearing bucket', () => {
-    // Three nodes in roughly the same bearing-from-start; only the farthest stays.
-    const a = mk(31, -75, 100_000); // due north of start
-    const b = mk(32, -75, 200_000); // also due north, further
-    const c = mk(30, -74, 80_000); // due east — different bucket
-    const out = pruneByBearingBucket([a, b, c], START, 2);
+  it('keeps the node closest to the destination in each bearing bucket', () => {
+    // a and b are both due north of start → same bearing bucket. a is still
+    // approaching the destination (lat 35, 3° short); b has OVERSHOT it
+    // (lat 42, 4° past) and is therefore further from BOTH start and end.
+    // The old "furthest from start" prune kept b; the progress prune keeps a.
+    const a = mk(35, -75, 1_000_000); // approaching — closer to END
+    const b = mk(42, -75, 100_000); // overshot — further from END (and start)
+    const c = mk(32, -74, 50_000); // NE of start — different bucket
+    const out = pruneByBearingBucket([a, b, c], START, END, 2);
     expect(out.length).toBe(2);
-    expect(out).toContain(b);
+    expect(out).toContain(a);
     expect(out).toContain(c);
-    expect(out).not.toContain(a);
+    expect(out).not.toContain(b);
   });
 
   it('handles empty input', () => {
-    expect(pruneByBearingBucket([], START, 2)).toEqual([]);
+    expect(pruneByBearingBucket([], START, END, 2)).toEqual([]);
   });
 
-  it('does not let A→B→A oscillation inflate the prune metric', () => {
-    // Regression: prune used to bucket-by-bearing and keep the highest
-    // FrontierNode.distFromStart, which is accumulated path length. A node
-    // that bounced A→B→A→B has the same final position as one that took a
-    // single step to A, but a much higher distFromStart — the old prune
-    // wrongly preferred it, producing visible zigzag in real routes.
-    //
-    // Real progress: one step due north to lat 31. distFromStart ≈ 111 km.
-    const realProgress = mk(31, -75, 111_000);
-    // Oscillation: bounced around but ended up at almost the same place
-    // (slightly south, same lon). Accumulated path length is much larger.
-    const oscillation = mk(30.9, -75, 600_000);
-    const kept = pruneByBearingBucket([realProgress, oscillation], START, 2);
+  it('ranks by remaining distance to destination, not accumulated path length', () => {
+    // Regression: the prune must not be fooled by FrontierNode.distFromStart
+    // (accumulated water distance). An oscillating node racks up a huge
+    // distFromStart but ends up further from the destination than a node that
+    // made genuine progress; remaining-distance-to-end correctly prefers the
+    // latter regardless of path length.
+    const realProgress = mk(35, -75, 120_000); // closer to END, short path
+    const oscillation = mk(33, -75, 900_000); // further from END, long path
+    const kept = pruneByBearingBucket([realProgress, oscillation], START, END, 2);
     expect(kept).toEqual([realProgress]);
   });
 });

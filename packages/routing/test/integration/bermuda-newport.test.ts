@@ -77,28 +77,18 @@ describeOrSkip('Bermuda → Newport regression', () => {
     });
 
     const hrs = (r.end - r.start) / 3600;
+    console.log(
+      `[bermuda-newport] incomplete=${r.incomplete ?? false} reason=${r.reason ?? 'reached'} legs=${r.legs.length} hrs=${hrs.toFixed(1)} dist=${(r.distance / 1852).toFixed(0)}nm`,
+    );
 
-    // Current observed behaviour against real GFS + i-level coastline +
-    // DEFAULT_POLARS: the algorithm makes substantial progress (~240 legs,
-    // ~120 hours) but does not reach Newport within the GRIB time horizon,
-    // landing at `incomplete=true, reason='no_wind'`.
-    //
-    // Root cause is the same bearing-bucket prune characteristic
-    // documented in plan.property.test.ts (Tasks 21-23): the prune kills
-    // off candidates that wander far enough from bearing-to-destination
-    // to find a productive route. The v2 fix is a richer prune key
-    // (bearing × progress) or per-step adaptive prune width.
-    //
-    // For this test we assert the CURRENT state: the engine runs end-to-
-    // end against real data, produces a large route, terminates cleanly.
-    // This is still a useful regression guard — if the route count drops
-    // sharply or the engine throws, the integration is broken. When the
-    // prune is fixed in v2, flip these assertions to require r.incomplete
-    // falsy and hrs in [80, 120].
+    // With the progress-based prune (prune.ts keeps the node closest to the
+    // destination per bearing-from-start bucket), the route now COMPLETES
+    // against real GFS + i-level coastline + DEFAULT_POLARS, where the old
+    // furthest-from-start prune stalled at incomplete/no_wind. ETA lands in
+    // the historical baseline envelope.
     expect(r.legs.length).toBeGreaterThan(100);
-    expect(hrs).toBeGreaterThan(60);
-    if (r.incomplete) {
-      expect(['no_wind', 'exceeded_max_hours']).toContain(r.reason);
-    }
-  }, 60_000);
+    expect(r.incomplete).toBeFalsy();
+    expect(hrs).toBeGreaterThan(80);
+    expect(hrs).toBeLessThan(140);
+  }, 120_000);
 });

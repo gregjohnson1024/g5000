@@ -75,7 +75,7 @@ export function plan(input: PlanInput): Route {
     if (next.length === 0) {
       return assembleRoute(bestForReason, input, isochrones, true, 'no_wind');
     }
-    frontier = pruneByBearingBucket(next, input.start, o.pruneBucketDeg);
+    frontier = pruneByBearingBucket(next, input.start, input.end, o.pruneBucketDeg);
 
     if (o.captureIsochrones && frontier.length > 0) {
       // Sort by bearing from start so the resulting polyline traces the
