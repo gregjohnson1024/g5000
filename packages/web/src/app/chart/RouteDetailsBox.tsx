@@ -5,6 +5,8 @@ const MS_TO_KN = 1.94384;
 const RAD_TO_DEG = 180 / Math.PI;
 const deg = (rad: number): string => `${Math.round((((rad * RAD_TO_DEG) % 360) + 360) % 360)}° T`;
 const kn = (ms: number): string => `${(ms * MS_TO_KN).toFixed(1)} kn`;
+// TWA is a relative angle |TWA| in [0, 180], not a compass bearing.
+const twaDeg = (rad: number): string => `${Math.round(rad * RAD_TO_DEG)}°`;
 
 export function RouteDetailsBox(props: {
   model: string;
@@ -23,6 +25,8 @@ export function RouteDetailsBox(props: {
         <span>BSP {s ? kn(s.bsp) : '—'}</span>
         <span>COG {s ? deg(s.cog) : '—'}</span>
         <span>HDG {s ? deg(s.hdg) : '—'}</span>
+        <span>TWS {s ? kn(s.tws) : '—'}</span>
+        <span>TWA {s ? twaDeg(s.twa) : '—'}</span>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ export interface PlaybackLeg {
   lon: number;
   heading: number; // rad
   cog: number; // rad
+  twa: number; // rad, |TWA|
   tws: number; // m/s
   bsp: number; // m/s
   sogGround: number; // m/s
@@ -22,6 +23,8 @@ export interface PlaybackState {
   cog: number;
   sog: number;
   bsp: number;
+  twa: number; // rad, |TWA|
+  tws: number; // m/s
   beforeStart: boolean;
   atEnd: boolean;
 }
@@ -41,6 +44,8 @@ export function stateAtTime(route: PlaybackRoute, t: number): PlaybackState {
       cog: first.cog,
       sog: first.sogGround,
       bsp: first.bsp,
+      twa: first.twa,
+      tws: first.tws,
       beforeStart: true,
       atEnd: false,
     };
@@ -53,6 +58,8 @@ export function stateAtTime(route: PlaybackRoute, t: number): PlaybackState {
       cog: last.cog,
       sog: last.sogGround,
       bsp: last.bsp,
+      twa: last.twa,
+      tws: last.tws,
       beforeStart: false,
       atEnd: true,
     };
@@ -69,6 +76,8 @@ export function stateAtTime(route: PlaybackRoute, t: number): PlaybackState {
     cog: a.cog,
     sog: a.sogGround,
     bsp: a.bsp,
+    twa: a.twa,
+    tws: a.tws,
     beforeStart: false,
     atEnd: false,
   };

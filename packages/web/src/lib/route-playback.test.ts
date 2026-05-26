@@ -5,9 +5,9 @@ const route: PlaybackRoute = {
   start: 1000,
   end: 1000 + 3600,
   legs: [
-    { t: 1000, lat: 40, lon: -60, heading: 0, cog: 0, tws: 5, bsp: 2, sogGround: 2 },
-    { t: 2800, lat: 41, lon: -60, heading: 0, cog: 0.1, tws: 6, bsp: 3, sogGround: 3 },
-    { t: 4600, lat: 42, lon: -60, heading: 0, cog: 0.2, tws: 7, bsp: 4, sogGround: 4 },
+    { t: 1000, lat: 40, lon: -60, heading: 0, cog: 0, twa: 0.7, tws: 5, bsp: 2, sogGround: 2 },
+    { t: 2800, lat: 41, lon: -60, heading: 0, cog: 0.1, twa: 0.8, tws: 6, bsp: 3, sogGround: 3 },
+    { t: 4600, lat: 42, lon: -60, heading: 0, cog: 0.2, twa: 0.9, tws: 7, bsp: 4, sogGround: 4 },
   ],
 };
 
@@ -36,4 +36,6 @@ it('reports the active leg state (sog/cog/hdg/bsp)', () => {
   expect(s.bsp).toBe(2);
   expect(s.hdg).toBe(0);
   expect(s.cog).toBe(0); // active leg is leg index 0
+  expect(s.tws).toBe(5);
+  expect(s.twa).toBe(0.7);
 });
