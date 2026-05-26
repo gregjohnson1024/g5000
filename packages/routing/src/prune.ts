@@ -12,6 +12,8 @@ export interface FrontierNode {
   heading: number;
   cog: number;
   twa: number;
+  tack?: 'port' | 'starboard';
+  motoring?: boolean;
   tws: number;
   bsp: number;
   sogGround: number;

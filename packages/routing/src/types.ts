@@ -16,6 +16,12 @@ export interface RouteLeg {
   cog: number;
   /** |TWA| in radians, [0, π]. */
   twa: number;
+  /** Tack the leg is sailed on, from the signed TWA (wind on starboard vs
+   *  port). Absent on the synthetic start/finish legs. */
+  tack?: 'port' | 'starboard';
+  /** True when this leg ran under engine — full motor mode, or auto-motor
+   *  flooring the polar speed. Drawn as a dashed segment. */
+  motoring?: boolean;
   /** TWS in m/s. */
   tws: number;
   /** Through-water boat speed (m/s). */

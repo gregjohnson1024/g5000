@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Route } from '@g5000/routing';
 import { PlanControls, type PlanParams } from '../../components/PlanControls';
+import type { RouteColorMode } from '../../components/RoutePolyline';
 import type { TzMode } from '../../lib/tz';
 
 interface Wp {
@@ -58,6 +59,9 @@ export function RoutePlanPanel(props: {
   endId: string;
   onStartId: (id: string) => void;
   onEndId: (id: string) => void;
+  colorMode: RouteColorMode;
+  onColorMode: (m: RouteColorMode) => void;
+  colorTwaDisabled?: boolean;
   onRouted: (routes: Partial<Record<'GFS' | 'ECMWF', Route>>) => void;
   onClear: () => void;
 }) {
@@ -147,12 +151,19 @@ export function RoutePlanPanel(props: {
             onPlan={onPlan}
             loading={loading}
             tz={props.tz}
+            colorMode={props.colorMode}
+            onColorMode={props.onColorMode}
+            colorTwaDisabled={props.colorTwaDisabled}
           />
           {summary && <p className="text-xs text-emerald-400">{summary}</p>}
           {error && <p className="text-xs text-rose-400">Error: {error}</p>}
           {props.hasRoute && (
             <button
-              onClick={props.onClear}
+              onClick={() => {
+                setError(null);
+                setSummary(null);
+                props.onClear();
+              }}
               className="w-full px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 rounded"
             >
               Clear route

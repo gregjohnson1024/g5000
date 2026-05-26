@@ -116,6 +116,8 @@ export function plan(input: PlanInput): Route {
           heading: finalHeading,
           cog: finalHeading,
           twa: n.twa,
+          tack: n.tack,
+          motoring: n.motoring,
           tws: n.tws,
           bsp: n.bsp,
           sogGround: n.sogGround,
@@ -148,7 +150,9 @@ function propagate(
   // data is still read above so legs carry tws/twa for display and the
   // wind-field bbox still gates the planner's reach.
   const bspRaw = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
-  const bsp = o.autoMotor && bspRaw < o.autoMotor.minSail ? o.autoMotor.motor : bspRaw;
+  const autoMotored = !!o.autoMotor && bspRaw < o.autoMotor.minSail;
+  const bsp = autoMotored ? o.autoMotor!.motor : bspRaw;
+  const motoring = o.motor || autoMotored;
   if (bsp < 0.1) return null; // in-irons / no progress
 
   let vGroundX = Math.sin(heading) * bsp;
@@ -174,6 +178,8 @@ function propagate(
     heading,
     cog: groundBearing,
     twa: Math.abs(twa),
+    tack: twa >= 0 ? 'starboard' : 'port',
+    motoring,
     tws,
     bsp,
     sogGround,
@@ -223,6 +229,8 @@ function assembleRoute(
       heading: cur.heading,
       cog: cur.cog,
       twa: cur.twa,
+      tack: cur.tack,
+      motoring: cur.motoring,
       tws: cur.tws,
       bsp: cur.bsp,
       sogGround: cur.sogGround,

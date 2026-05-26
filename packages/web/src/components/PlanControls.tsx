@@ -6,6 +6,7 @@ import {
   toDatetimeLocalInput,
   type TzMode,
 } from '../lib/tz';
+import type { RouteColorMode } from './RoutePolyline';
 
 export interface PlanParams {
   start: { lat: number; lon: number };
@@ -56,6 +57,11 @@ export function PlanControls(props: {
   /** Page-level timezone display preference. Controls how the Departure
    *  picker labels itself and how its input string is interpreted. */
   tz: TzMode;
+  /** Route line-colour mode (display only — recolours live, does not re-plan). */
+  colorMode: RouteColorMode;
+  onColorMode: (m: RouteColorMode) => void;
+  /** Grey out the "by TWA" option (e.g. the drawn route is motoring). */
+  colorTwaDisabled?: boolean;
 }) {
   const tz = props.tz;
   // Departure is stored as an absolute UNIX-seconds anchor; the displayed
@@ -229,14 +235,29 @@ export function PlanControls(props: {
             />
           </label>
           <label className="block">
-            Max hours
+            Max days
             <NumberInput
-              min={12}
-              step={12}
-              value={adv.maxHours}
-              onChange={(maxHours) => setAdv((a) => ({ ...a, maxHours }))}
+              min={1}
+              step={1}
+              value={Math.round(adv.maxHours / 24)}
+              onChange={(days) => setAdv((a) => ({ ...a, maxHours: Math.max(1, days) * 24 }))}
               width="full"
             />
+          </label>
+          <label className="block">
+            Colour route by
+            <select
+              value={props.colorMode}
+              onChange={(e) => props.onColorMode(e.target.value as RouteColorMode)}
+              className={`${inputClass} w-full mt-0.5`}
+            >
+              <option value="none">None</option>
+              <option value="tack">Tack (port/starboard)</option>
+              <option value="sog">Speed over ground</option>
+              <option value="twa" disabled={props.colorTwaDisabled}>
+                TWA{props.colorTwaDisabled ? ' (n/a — motoring)' : ''}
+              </option>
+            </select>
           </label>
         </div>
       </details>

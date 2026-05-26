@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
-import { attachRoute, detachRoute } from '../../components/RoutePolyline';
+import { attachRoute, detachRoute, type RouteColorMode } from '../../components/RoutePolyline';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
@@ -270,6 +270,19 @@ function ChartPageInner() {
   >({});
   const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
   const ROUTE_LAYER: Record<'GFS' | 'ECMWF', string> = { GFS: 'route-gfs', ECMWF: 'route-ecmwf' };
+  // Route line-colour mode (display only). Persisted; hydrated after mount.
+  const [routeColorMode, setRouteColorMode] = useState<RouteColorMode>('none');
+  useEffect(() => {
+    const raw = window.localStorage.getItem('chart:routeColorMode');
+    if (raw === 'none' || raw === 'tack' || raw === 'sog' || raw === 'twa') setRouteColorMode(raw);
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('chart:routeColorMode', routeColorMode);
+    } catch {
+      /* quota / private mode */
+    }
+  }, [routeColorMode]);
   const [error, setError] = useState<string | undefined>();
 
   // Draw the colour-coded route line for each model that has a route, and
@@ -279,10 +292,19 @@ function ChartPageInner() {
     if (!map) return;
     (['GFS', 'ECMWF'] as const).forEach((m) => {
       const r = routes[m];
-      if (r) attachRoute(map, ROUTE_LAYER[m], r, ROUTE_COLOR[m]);
+      if (r) attachRoute(map, ROUTE_LAYER[m], r, ROUTE_COLOR[m], routeColorMode);
       else detachRoute(map, ROUTE_LAYER[m]);
     });
-  }, [routes, mapInstance]);
+  }, [routes, mapInstance, routeColorMode]);
+
+  // Any leg motoring? Disables TWA colouring (meaningless under engine) and
+  // is what makes those segments draw dashed.
+  const hasMotoring = (['GFS', 'ECMWF'] as const).some((m) =>
+    routes[m]?.legs.some((l) => l.motoring),
+  );
+  useEffect(() => {
+    if (routeColorMode === 'twa' && hasMotoring) setRouteColorMode('none');
+  }, [routeColorMode, hasMotoring]);
 
   // Track the cursor position over the map so the bottom-left readout
   // can show "lat lon, distance + bearing from boat". Cleared on
@@ -834,6 +856,9 @@ function ChartPageInner() {
           endId={routeEndId}
           onStartId={setRouteStartId}
           onEndId={setRouteEndId}
+          colorMode={routeColorMode}
+          onColorMode={setRouteColorMode}
+          colorTwaDisabled={hasMotoring}
           onRouted={handleRouted}
           onClear={handleClearRoute}
         />
