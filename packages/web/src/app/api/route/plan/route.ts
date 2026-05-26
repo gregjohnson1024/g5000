@@ -4,6 +4,9 @@ import { getSharedConfigStore } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { loadWindFor, loadCurrentFor } from '../../../../lib/grib-context';
 import { loadDefaultCoastline } from '../../../../lib/coastline';
+import { readJson } from '../../../../lib/persistence';
+import { SETTINGS } from '../../../../lib/paths';
+import { resolvePlanOptions, type PlanningSettings } from '../../../../lib/planning-settings';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,7 +17,7 @@ interface Body {
   departure: number;
   model: 'GFS' | 'ECMWF';
   useCurrents?: boolean;
-  options?: Record<string, unknown>;
+  options?: Record<string, unknown> & { autoMotor?: { minSail: number; motor: number } };
 }
 
 function bboxAround(a: Body['start'], b: Body['end']) {
@@ -65,6 +68,8 @@ export async function POST(req: Request): Promise<Response> {
     // human-readable tag; identity tracking happens via revision rows.
     const store = getSharedConfigStore();
     const polar = await firstValueFrom(store.activePolar$);
+    const settings = ((await readJson(SETTINGS)) ?? {}) as { planning?: PlanningSettings };
+    const resolved = resolvePlanOptions(settings.planning, b.options as never);
     const route = plan({
       start: b.start,
       end: b.end,
@@ -74,7 +79,7 @@ export async function POST(req: Request): Promise<Response> {
       polarId: 'active',
       coastline,
       currents,
-      options: { ...(b.options ?? {}), useCurrents: !!b.useCurrents, captureIsochrones: true },
+      options: { ...resolved, useCurrents: !!b.useCurrents },
     });
     return Response.json({ ok: true, route });
   } catch (err) {
