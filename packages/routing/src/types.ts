@@ -11,6 +11,9 @@ export interface RouteLeg {
   lon: number;
   /** Boat's heading (water frame), radians true. */
   heading: number;
+  /** Course over ground (water+current), radians true. Equals heading with
+   *  currents off. */
+  cog: number;
   /** |TWA| in radians, [0, π]. */
   twa: number;
   /** TWS in m/s. */
@@ -65,6 +68,11 @@ export interface PlanOptions {
   /** Through-water boat speed in m/s when `motor` is true. Ignored
    *  otherwise. */
   motorSpeed?: number; // default 2.572 (5 kn)
+  /** Auto-motor: when the polar through-water speed falls below `minSail`
+   *  (m/s), substitute `motor` (m/s) for that leg. Evaluated per step because
+   *  wind varies along the route. Independent of `motor` (which ignores the
+   *  polar entirely). */
+  autoMotor?: { minSail: number; motor: number };
 }
 
 export interface PlanInput {

@@ -26,6 +26,7 @@ const DEFAULTS: Required<PlanOptions> = {
   captureIsochrones: false,
   motor: false,
   motorSpeed: 2.572, // 5 kn in m/s
+  autoMotor: undefined as unknown as { minSail: number; motor: number },
 };
 
 export function plan(input: PlanInput): Route {
@@ -40,6 +41,7 @@ export function plan(input: PlanInput): Route {
     t: input.departure,
     parent: null,
     heading: 0,
+    cog: 0,
     twa: 0,
     tws: 0,
     bsp: 0,
@@ -112,6 +114,7 @@ export function plan(input: PlanInput): Route {
           t: finalTime,
           parent: n,
           heading: finalHeading,
+          cog: finalHeading,
           twa: n.twa,
           tws: n.tws,
           bsp: n.bsp,
@@ -144,7 +147,8 @@ function propagate(
   // Motor mode bypasses the polar — engine doesn't care about TWA. Wind
   // data is still read above so legs carry tws/twa for display and the
   // wind-field bbox still gates the planner's reach.
-  const bsp = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+  const bspRaw = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+  const bsp = o.autoMotor && bspRaw < o.autoMotor.minSail ? o.autoMotor.motor : bspRaw;
   if (bsp < 0.1) return null; // in-irons / no progress
 
   let vGroundX = Math.sin(heading) * bsp;
@@ -168,6 +172,7 @@ function propagate(
     t: n.t + stepSec,
     parent: n,
     heading,
+    cog: groundBearing,
     twa: Math.abs(twa),
     tws,
     bsp,
@@ -216,6 +221,7 @@ function assembleRoute(
       lat: cur.pos.lat,
       lon: cur.pos.lon,
       heading: cur.heading,
+      cog: cur.cog,
       twa: cur.twa,
       tws: cur.tws,
       bsp: cur.bsp,

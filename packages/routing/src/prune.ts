@@ -10,6 +10,7 @@ export interface FrontierNode {
   t: number;
   parent: FrontierNode | null;
   heading: number;
+  cog: number;
   twa: number;
   tws: number;
   bsp: number;
