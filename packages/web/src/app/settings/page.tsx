@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { SatelliteCachePanel } from './SatelliteCachePanel';
+import { PLANNING_DEFAULTS, type PlanningSettings } from '../../lib/planning-settings.js';
 
 type SourceMode = 'live' | 'demo' | 'replay';
 interface SourceModeStatus {
@@ -52,6 +53,167 @@ const DEFAULTS = {
   wgrib2Path: 'wgrib2',
   cacheRoot: '~/.g5000-router/grib-cache',
 };
+
+function PlanningSection() {
+  const [p, setP] = useState<Required<PlanningSettings>>({
+    stepMinutes: PLANNING_DEFAULTS.stepMinutes,
+    pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg,
+    headingFanDeg: PLANNING_DEFAULTS.headingFanDeg,
+    headingResolutionDeg: PLANNING_DEFAULTS.headingResolutionDeg,
+    maxHours: PLANNING_DEFAULTS.maxHours,
+    avoidLand: PLANNING_DEFAULTS.avoidLand,
+    autoMotor: { ...PLANNING_DEFAULTS.autoMotor },
+  });
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetch('/api/settings')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok && j.settings?.planning) {
+          setP((prev) => ({
+            ...prev,
+            ...j.settings.planning,
+            autoMotor: { ...prev.autoMotor, ...(j.settings.planning.autoMotor ?? {}) },
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setStatus('Saving…');
+    const cur = await fetch('/api/settings')
+      .then((r) => r.json())
+      .catch(() => ({ settings: {} }));
+    const merged = { ...(cur.settings ?? {}), planning: p };
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    setStatus(res.ok ? 'Saved' : 'Save failed');
+    setTimeout(() => setStatus(null), 2500);
+  };
+
+  const num = (label: string, hint: string, key: keyof PlanningSettings, step = 1, min = 0) => (
+    <label className="block text-sm">
+      {label}
+      <input
+        type="number"
+        min={min}
+        step={step}
+        value={p[key] as number}
+        onChange={(e) => setP((s) => ({ ...s, [key]: Number(e.target.value) }))}
+        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-28 ml-2"
+      />
+      <span className="block text-[11px] text-slate-500">{hint}</span>
+    </label>
+  );
+
+  return (
+    <section className="space-y-3 border border-slate-800 rounded p-3">
+      <h2 className="text-lg font-semibold">Planning</h2>
+      {num(
+        'Frontier size (°)',
+        'Smaller = denser frontier, slower but finer.',
+        'pruneBucketDeg',
+        0.5,
+        0.5,
+      )}
+      {num(
+        'Isochrone length (min)',
+        'Time between isochrones / planner step.',
+        'stepMinutes',
+        5,
+        5,
+      )}
+      {num(
+        'Heading fan (±°)',
+        'Search width around bearing-to-destination.',
+        'headingFanDeg',
+        5,
+        5,
+      )}
+      {num('Heading resolution (°)', 'Headings tried per fan.', 'headingResolutionDeg', 1, 1)}
+      {num('Max hours', 'Planning horizon cap.', 'maxHours', 12, 12)}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={p.avoidLand}
+          onChange={(e) => setP((s) => ({ ...s, avoidLand: e.target.checked }))}
+        />
+        Avoid land (uncheck to skip the land check on open-ocean routes — faster)
+      </label>
+      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={p.autoMotor.enabled}
+            onChange={(e) =>
+              setP((s) => ({ ...s, autoMotor: { ...s.autoMotor, enabled: e.target.checked } }))
+            }
+          />
+          Auto-motor
+        </label>
+        <div className="text-sm pl-6">
+          motor when slower than
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={p.autoMotor.minSailKt}
+            onChange={(e) =>
+              setP((s) => ({
+                ...s,
+                autoMotor: { ...s.autoMotor, minSailKt: Number(e.target.value) },
+              }))
+            }
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1"
+          />{' '}
+          kn, at
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={p.autoMotor.motorKt}
+            onChange={(e) =>
+              setP((s) => ({
+                ...s,
+                autoMotor: { ...s.autoMotor, motorKt: Number(e.target.value) },
+              }))
+            }
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1"
+          />{' '}
+          kn
+        </div>
+        <p className="text-[11px] text-slate-500 pl-6">Set the threshold high to always motor.</p>
+      </fieldset>
+      <div className="flex items-center gap-3">
+        <button onClick={save} className="bg-emerald-700 px-3 py-1 rounded text-sm">
+          Save planning
+        </button>
+        <button
+          onClick={() =>
+            setP({
+              stepMinutes: PLANNING_DEFAULTS.stepMinutes,
+              pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg,
+              headingFanDeg: PLANNING_DEFAULTS.headingFanDeg,
+              headingResolutionDeg: PLANNING_DEFAULTS.headingResolutionDeg,
+              maxHours: PLANNING_DEFAULTS.maxHours,
+              avoidLand: PLANNING_DEFAULTS.avoidLand,
+              autoMotor: { ...PLANNING_DEFAULTS.autoMotor },
+            })
+          }
+          className="bg-slate-700 px-3 py-1 rounded text-sm"
+        >
+          Reset to defaults
+        </button>
+        {status && <span className="text-sm text-slate-400">{status}</span>}
+      </div>
+    </section>
+  );
+}
 
 export default function SettingsPage() {
   const [g5000Host, setG5000Host] = useState<string>('');
@@ -395,6 +557,8 @@ export default function SettingsPage() {
       </fieldset>
 
       <SatelliteCachePanel />
+
+      <PlanningSection />
 
       <p className="text-xs text-slate-400">
         The fields below are persisted to <code>~/.g5000-router/settings.json</code>. Leave a field
