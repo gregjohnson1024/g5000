@@ -171,6 +171,9 @@ export interface CurrentOverlayProps {
   showArrows?: boolean;
   /** Bumping this triggers a re-fetch. */
   refreshKey?: number;
+  /** When set, only a grid cached for this ROI box is shown — keeps the current
+   *  overlay in step with the ROI (no more "shows the previous region's data"). */
+  bbox?: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null;
   onLoaded?: (info: { grid: CurrentGrid | null; identical: boolean; error: string | null }) => void;
 }
 
@@ -183,6 +186,7 @@ export function CurrentOverlay({
   showFill = true,
   showArrows = true,
   refreshKey = 0,
+  bbox = null,
   onLoaded,
 }: CurrentOverlayProps) {
   const [grid, setGrid] = useState<CurrentGrid | null>(null);
@@ -193,15 +197,22 @@ export function CurrentOverlay({
   const gridRef = useRef<CurrentGrid | null>(null);
   gridRef.current = grid;
 
-  // Fetch on mount + whenever refreshKey changes.
+  // Fetch on mount + whenever refreshKey or the ROI bbox changes.
   useEffect(() => {
     let cancelled = false;
-    const url = `/api/current/grid?day=${day}`;
+    const bboxQ = bbox
+      ? `&latMin=${bbox.latMin}&latMax=${bbox.latMax}&lonMin=${bbox.lonMin}&lonMax=${bbox.lonMax}`
+      : '';
+    const url = `/api/current/grid?day=${day}${bboxQ}`;
     fetch(url)
       .then(async (r) => {
         if (r.status === 404) {
-          if (!cancelled)
+          if (!cancelled) {
+            // Clear so a ROI with no cached current grid doesn't keep showing
+            // the previous region's data.
+            setGrid(null);
             onLoadedRef.current?.({ grid: null, identical: false, error: 'not cached' });
+          }
           return;
         }
         const j = (await r.json()) as
@@ -209,6 +220,7 @@ export function CurrentOverlay({
           | { ok: false; error?: { message?: string } };
         if (cancelled) return;
         if (!j.ok) {
+          setGrid(null);
           onLoadedRef.current?.({
             grid: null,
             identical: false,
@@ -225,6 +237,7 @@ export function CurrentOverlay({
       })
       .catch((e) => {
         if (cancelled) return;
+        setGrid(null);
         onLoadedRef.current?.({
           grid: null,
           identical: false,
@@ -234,7 +247,7 @@ export function CurrentOverlay({
     return () => {
       cancelled = true;
     };
-  }, [day, refreshKey]);
+  }, [day, refreshKey, bbox]);
 
   // Render layers + push grid data.
   useEffect(() => {

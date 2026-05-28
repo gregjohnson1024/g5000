@@ -516,6 +516,50 @@ function ChartPageInner() {
     return () => bc.close();
   }, []);
 
+  // Keep the ROI box in sync from /api/settings regardless of the active model.
+  // The wind manifest sync below also sets forecastBbox, but only for wind
+  // models — without this, the CMEMS overlay would have a null/stale ROI (and
+  // show the previous region) whenever no wind model had been selected. Reads on
+  // mount and whenever a refresh broadcasts on 'forecast-cache'. The stabilizer
+  // dedupes against the manifest sync so there's no churn.
+  useEffect(() => {
+    let alive = true;
+    const near = (x: number, y: number): boolean => Math.abs(x - y) < 0.01;
+    const read = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/settings', { cache: 'no-store' });
+        const j = await r.json();
+        const roi = j?.settings?.forecastBbox as typeof forecastBbox;
+        if (!alive) return;
+        setForecastBbox((prev) => {
+          const next = roi ?? null;
+          if (prev === next) return prev;
+          if (
+            prev &&
+            next &&
+            near(prev.latMin, next.latMin) &&
+            near(prev.latMax, next.latMax) &&
+            near(prev.lonMin, next.lonMin) &&
+            near(prev.lonMax, next.lonMax)
+          ) {
+            return prev;
+          }
+          return next;
+        });
+      } catch {
+        /* ignore */
+      }
+    };
+    void read();
+    const bc =
+      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('forecast-cache') : null;
+    bc?.addEventListener('message', () => void read());
+    return () => {
+      alive = false;
+      bc?.close();
+    };
+  }, []);
+
   // Load saved waypoints once so they're selectable as Start / End.
   useEffect(() => {
     void fetch('/api/waypoints')
@@ -794,7 +838,7 @@ function ChartPageInner() {
                 }
               : undefined
           }
-          activeWindModel={mv.windModel}
+          activeModel={layers.model}
         />
         <WaypointsLayer
           map={mapInstance}
@@ -857,6 +901,7 @@ function ChartPageInner() {
           day={0}
           opacity={0.85}
           refreshKey={currentRefreshKey}
+          bbox={forecastBbox}
           onLoaded={({ grid, error }) => {
             if (error === 'not cached') {
               setCurrentGrid(null);
