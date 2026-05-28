@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import type maplibregl from 'maplibre-gl';
+import type { ExpressionSpecification } from 'maplibre-gl';
 
 const SOURCE_ID = 'bathy-contours';
 const LINE_LAYER_ID = 'bathy-contour-line';
@@ -9,7 +10,7 @@ const SOURCE_LAYER = 'depth_contours';
 
 // Depth-based opacity expression used when the layer is "on". Major isobaths
 // (>=200 m) are more solid than the shallow set so they read at a glance.
-const VISIBLE_OPACITY = ['case', ['>=', ['get', 'depth'], 200], 0.9, 0.6] as const;
+const VISIBLE_OPACITY: ExpressionSpecification = ['case', ['>=', ['get', 'depth'], 200], 0.9, 0.6];
 
 /**
  * Depth-contour overlay backed by a precomputed global PMTiles archive

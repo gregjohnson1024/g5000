@@ -191,7 +191,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ ok: false, error: { message: 'bbox is degenerate' } }, { status: 422 });
   }
   const models: WindModel[] = (body.models?.length ? body.models : ['gfs']).filter(
-    (m) =>
+    (m): m is WindModel =>
       m === 'gfs' ||
       m === 'ecmwf' ||
       // HRRR is CONUS-only; drop it for a mid-ocean box so the job doesn't queue
