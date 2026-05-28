@@ -172,6 +172,8 @@ Two long-lived branches:
 - **`develop`** — active work lands here. All new commits go on `develop` first. This is the default working branch on the Mac and what feature work is committed against.
 - **`main`** — production. Tracks **what is running on the Pi**. Only updated via a "promote" step (fast-forward merge of `develop`) when work is ready to deploy.
 
+**Commit autonomy:** Claude may commit completed, verified work to `develop` without asking first — no need to pause for permission once typecheck/tests/lint are green and the change is coherent. Promoting `develop` → `main` and deploying to the Pi remain explicit, on-request steps (they ship to a live boat).
+
 Pi's `~/autopilot` is pinned to `main`. The Pi never sees `develop`. To deploy, promote `develop` → `main` on the Mac, then run the Pi rebuild (see _Deployment_ below).
 
 Promote workflow (Mac):
