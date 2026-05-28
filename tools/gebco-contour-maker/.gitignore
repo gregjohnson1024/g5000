@@ -1,0 +1,6 @@
+# Source grids and build artifacts are large and reproducible — never commit.
+data/
+
+# Python bytecode caches.
+__pycache__/
+*.pyc

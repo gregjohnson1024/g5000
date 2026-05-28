@@ -1,0 +1,44 @@
+{
+  "grid": {
+    "url": "https://www.bodc.ac.uk/data/open_download/gebco/gebco_2024/zip/",
+    "downloadNote": "GEBCO 2024 global grid, 15 arc-second, ~7.5 GB NetCDF. Free, no login. The BODC 'open_download' endpoint returns a zip containing GEBCO_2024.nc. See README for the GeoTIFF alternative and the bbox-subset tile interface used for smoke tests.",
+    "path": "data/GEBCO_2024.nc",
+    "ncVariable": "elevation",
+    "ncVariableNote": "NetCDF variable holding the elevation band. GEBCO 2024 names it 'elevation'. The build reads NETCDF:<path>:<ncVariable>. Ignored when the grid is a GeoTIFF (single band read directly).",
+    "sha256": "",
+    "variant": "ice surface",
+    "variantNote": "GEBCO ships an 'ice surface' grid and a 'sub-ice' (bed) grid. Either is fine for bathymetry; both agree everywhere outside the Antarctic/Greenland ice sheets. We use 'ice surface' — record whichever you actually downloaded here.",
+    "attribution": "GEBCO 2024 Grid"
+  },
+
+  "levels": [
+    { "fromM": 0, "toM": 1000, "stepM": 20 },
+    { "fromM": 1000, "toM": 11000, "stepM": 200 }
+  ],
+  "levelsNote": "Depth intervals in POSITIVE metres. Each rule generates levels fromM (exclusive of 0) up to and including toM, every stepM. The build expands these to the union of all rules, then negates them (GEBCO stores elevation; seabed is negative) for gdal_contour. Edit this list and re-run `make` to change the whole contour set.",
+
+  "ranks": [
+    { "name": "basin", "minzoom": 0, "match": { "multipleOf": 1000 } },
+    { "name": "major", "minzoom": 3, "match": { "anyOf": [100, 200] } },
+    { "name": "deep", "minzoom": 5, "match": { "multipleOf": 200 } },
+    { "name": "shelf", "minzoom": 6, "match": { "multipleOf": 100 } },
+    { "name": "fine", "minzoom": 8, "match": "default" }
+  ],
+  "ranksNote": "Ordered importance ladder applied to each expanded depth (positive m). FIRST matching rule wins, so put the most important (lowest minzoom) tiers first. `minzoom` becomes the per-feature minimum zoom tippecanoe honours, so coarse isobaths show when zoomed out and the dense 20 m set only appears when zoomed in. The `basin` tier (every 1000 m) is minzoom 0 so the major ocean-basin isobaths stay visible even at a whole-world view; the 100/200 m shelf lines and finer sets are gated higher to keep low zooms legible. The trailing `default` rule must stay last and catch everything else (the full 20 m set).",
+
+  "build": {
+    "fullArcsec": 15,
+    "coarseArcsec": 60,
+    "coarseForMinzoomLE": 6,
+    "maxzoom": 11,
+    "simplification": 4,
+    "buildNote": "Levels whose rank minzoom is <= coarseForMinzoomLE are contoured on a grid downsampled to coarseArcsec (cheap, no visible loss for wide-spaced isobaths). The remaining fine levels are contoured on the full fullArcsec grid. This bounds runtime without chunking the world — multi-resolution, not tiling, so there are no chunk-edge seam artifacts. tippecanoe tiles to `maxzoom`; contours overzoom cleanly beyond that."
+  },
+
+  "tippecanoe": {
+    "layer": "depth_contours",
+    "name": "GEBCO 2024 depth contours",
+    "description": "Depth contour lines derived from the GEBCO 2024 Grid (BODC). NOT FOR NAVIGATION — interpolated ~450 m grid that smooths out shoals, wrecks and isolated dangers; situational awareness only.",
+    "attribution": "GEBCO 2024 Grid"
+  }
+}
