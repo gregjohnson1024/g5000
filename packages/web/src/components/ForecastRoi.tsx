@@ -79,6 +79,9 @@ interface ForecastRoiProps {
   defaultBbox?: Bbox;
   /** Hide the overlay when true; show when false. Defaults to false. */
   hidden?: boolean;
+  /** The currently-selected wind model (or null for none/CMEMS). Switching to a
+   *  wind model tops up its grids for the current box — see the effect below. */
+  activeWindModel?: 'gfs' | 'ecmwf' | 'hrrr' | null;
 }
 
 /**
@@ -93,7 +96,12 @@ interface ForecastRoiProps {
  * Cross-chart sync: listens on the `forecast-cache` BroadcastChannel so other
  * tabs that complete a refresh tell us to re-read settings.
  */
-export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiProps) {
+export function ForecastRoi({
+  map,
+  defaultBbox,
+  hidden = false,
+  activeWindModel = null,
+}: ForecastRoiProps) {
   const [bbox, setBbox] = useState<Bbox | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'refreshing' | 'error'>('idle');
   const [statusText, setStatusText] = useState<string | null>(null);
@@ -567,6 +575,25 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       })();
     }, 2000);
   };
+
+  // Switching to a wind model tops up its grids for the current box. doRefresh
+  // skips hours already cached at the current run, so this is a cheap no-op for
+  // an already-loaded model (e.g. GFS) and only does real work for a freshly-
+  // selected one — notably HRRR, which isn't in the default refresh set, so
+  // without this it would never render until a manual ↻ fetch. This fires on an
+  // explicit model change only, NOT on box drag (the deliberate no-auto-fetch-
+  // on-drag behavior is preserved — the first render is skipped).
+  const modelInitRef = useRef(true);
+  useEffect(() => {
+    if (modelInitRef.current) {
+      modelInitRef.current = false;
+      return;
+    }
+    if (!activeWindModel || hidden) return;
+    const b = bboxRef.current;
+    if (b) void doRefresh(b);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWindModel]);
 
   if (!bbox) return null;
   return (

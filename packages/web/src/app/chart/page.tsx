@@ -794,6 +794,7 @@ function ChartPageInner() {
                 }
               : undefined
           }
+          activeWindModel={mv.windModel}
         />
         <WaypointsLayer
           map={mapInstance}
