@@ -41,10 +41,27 @@ export function hrrrHorizonHours(runHourUtc: number): number {
   return runHourUtc % 6 === 0 ? 48 : 18;
 }
 
-/** Rough CONUS+coastal envelope. Outside this, HRRR has no data. The eastern
- *  edge is clamped to -66° (the coast of Maine) rather than -60°: HRRR's CONUS
- *  grid stops well west of Bermuda (~-64.7°), so a -60° bound would wrongly
- *  admit mid-Atlantic boxes that the model never covers. */
+/** Rough CONUS+coastal envelope HRRR actually covers. The eastern edge is
+ *  -66° (coast of Maine), not -60°: HRRR's CONUS grid stops well west of
+ *  Bermuda (~-64.7°), so a -60° bound would wrongly admit mid-Atlantic boxes
+ *  the model never covers. */
+export const HRRR_DOMAIN: Bbox = { latMin: 21, latMax: 53, lonMin: -135, lonMax: -66 };
+
+/** Intersect a requested bbox with the HRRR domain. Returns the clipped box, or
+ *  null if the request is entirely outside coverage. Lets a ROI that straddles
+ *  the coast (e.g. a passage box reaching into the Atlantic) still fetch HRRR
+ *  for the covered coastal strip instead of being rejected whole. */
+export function clipToHrrrDomain(b: Bbox): Bbox | null {
+  const latMin = Math.max(b.latMin, HRRR_DOMAIN.latMin);
+  const latMax = Math.min(b.latMax, HRRR_DOMAIN.latMax);
+  const lonMin = Math.max(b.lonMin, HRRR_DOMAIN.lonMin);
+  const lonMax = Math.min(b.lonMax, HRRR_DOMAIN.lonMax);
+  if (latMin >= latMax || lonMin >= lonMax) return null;
+  return { latMin, latMax, lonMin, lonMax };
+}
+
+/** True when the bbox intersects the HRRR domain at all (gates the model
+ *  selector / refresh / "no data" notice). */
 export function inHrrrDomain(b: Bbox): boolean {
-  return b.latMin >= 21 && b.latMax <= 53 && b.lonMin >= -135 && b.lonMax <= -66;
+  return clipToHrrrDomain(b) !== null;
 }

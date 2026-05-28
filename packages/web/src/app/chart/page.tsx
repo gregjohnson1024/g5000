@@ -841,6 +841,7 @@ function ChartPageInner() {
           bbox={forecastBbox}
           onLoaded={({ grid, identical, error }) => {
             if (error) {
+              setWindGrid(null); // clear the "Showing: <model>" line + cursor readout
               setWindStatus(`Not cached: ${error}`);
             } else if (grid) {
               setWindGrid(grid);

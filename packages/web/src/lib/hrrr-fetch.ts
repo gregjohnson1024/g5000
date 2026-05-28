@@ -2,13 +2,19 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnText, parseGridData, type Bbox, type WindGrid } from './wind-fetch';
-import { buildHrrrUrl, pickHrrrRun, hrrrHorizonHours, inHrrrDomain } from './hrrr-helpers';
+import {
+  buildHrrrUrl,
+  pickHrrrRun,
+  hrrrHorizonHours,
+  inHrrrDomain,
+  clipToHrrrDomain,
+} from './hrrr-helpers';
 
 // Re-export the pure helpers so existing consumers (and the unit test) can keep
 // importing them from './hrrr-fetch'. The pure helpers live in './hrrr-helpers'
 // (no node imports) so client components like ForecastRoi can import
 // `inHrrrDomain` without dragging node:fs into the browser bundle.
-export { buildHrrrUrl, pickHrrrRun, hrrrHorizonHours, inHrrrDomain };
+export { buildHrrrUrl, pickHrrrRun, hrrrHorizonHours, inHrrrDomain, clipToHrrrDomain };
 export type { BuildHrrrUrlOpts } from './hrrr-helpers';
 
 /** Target lat/lon resolution of the regridded HRRR field, in degrees. ~3 km
@@ -35,7 +41,10 @@ export async function fetchHrrrGrid(
   now: Date = new Date(),
   signal?: AbortSignal,
 ): Promise<WindGrid> {
-  if (!inHrrrDomain(bbox)) {
+  // Clip the request to the part of the ROI HRRR actually covers. A straddling
+  // ROI fetches only the covered coastal strip; a fully-outside ROI throws.
+  const fetchBbox = clipToHrrrDomain(bbox);
+  if (!fetchBbox) {
     throw new Error(
       `HRRR covers US waters only; bbox ` +
         `[${bbox.latMin.toFixed(1)}..${bbox.latMax.toFixed(1)}, ` +
@@ -63,7 +72,7 @@ export async function fetchHrrrGrid(
     runDateUtc: run.runDateUtc,
     runHourUtc: run.runHourUtc,
     forecastHour,
-    bbox,
+    bbox: fetchBbox,
   });
   // 60-s timeout — NOMADS does its own server-side bbox subsetting, so the
   // response can take a beat to assemble. Combine with any external cancel
@@ -87,10 +96,10 @@ export async function fetchHrrrGrid(
     // Lambert Conformal → regular lat/lon. `-new_grid_winds earth` makes U/V
     // earth-relative (HRRR stores them grid-relative). nx/ny from the bbox span
     // at ~3 km (REGRID_DEG). lon0/lat0 are the SW corner.
-    const lon0 = bbox.lonMin;
-    const lat0 = bbox.latMin;
-    const nx = Math.max(2, Math.ceil((bbox.lonMax - bbox.lonMin) / REGRID_DEG));
-    const ny = Math.max(2, Math.ceil((bbox.latMax - bbox.latMin) / REGRID_DEG));
+    const lon0 = fetchBbox.lonMin;
+    const lat0 = fetchBbox.latMin;
+    const nx = Math.max(2, Math.ceil((fetchBbox.lonMax - fetchBbox.lonMin) / REGRID_DEG));
+    const ny = Math.max(2, Math.ceil((fetchBbox.latMax - fetchBbox.latMin) / REGRID_DEG));
     await spawnText('wgrib2', [
       inPath,
       '-new_grid_winds',

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildHrrrUrl, pickHrrrRun, hrrrHorizonHours, inHrrrDomain } from './hrrr-fetch.js';
+import {
+  buildHrrrUrl,
+  pickHrrrRun,
+  hrrrHorizonHours,
+  inHrrrDomain,
+  clipToHrrrDomain,
+} from './hrrr-fetch.js';
 
 describe('hrrr helpers', () => {
   it('buildHrrrUrl targets filter_hrrr_2d with conus dir, 10 m wind, bbox subregion', () => {
@@ -34,8 +40,29 @@ describe('hrrr helpers', () => {
     expect(hrrrHorizonHours(0)).toBe(48);
   });
 
-  it('inHrrrDomain rejects mid-ocean / non-US', () => {
+  it('inHrrrDomain: covered, fully-outside, and straddling', () => {
     expect(inHrrrDomain({ latMin: 40, latMax: 42, lonMin: -72, lonMax: -70 })).toBe(true); // RI
     expect(inHrrrDomain({ latMin: 30, latMax: 34, lonMin: -64, lonMax: -60 })).toBe(false); // Bermuda
+    // Passage box straddling the coast (reaches into the Atlantic) still counts.
+    expect(inHrrrDomain({ latMin: 32, latMax: 42, lonMin: -72, lonMax: -56 })).toBe(true);
+  });
+
+  it('clipToHrrrDomain clips a straddling box and rejects a fully-outside one', () => {
+    // Fully inside → unchanged.
+    expect(clipToHrrrDomain({ latMin: 40, latMax: 42, lonMin: -72, lonMax: -70 })).toEqual({
+      latMin: 40,
+      latMax: 42,
+      lonMin: -72,
+      lonMax: -70,
+    });
+    // Straddling the coast → clipped to the covered strip (eastern edge -66).
+    expect(clipToHrrrDomain({ latMin: 32, latMax: 42, lonMin: -72, lonMax: -56 })).toEqual({
+      latMin: 32,
+      latMax: 42,
+      lonMin: -72,
+      lonMax: -66,
+    });
+    // Entirely east of coverage → null.
+    expect(clipToHrrrDomain({ latMin: 30, latMax: 34, lonMin: -64, lonMax: -60 })).toBeNull();
   });
 });

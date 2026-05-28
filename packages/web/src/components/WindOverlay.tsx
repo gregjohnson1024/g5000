@@ -223,6 +223,10 @@ export function WindOverlay({
       .then((j) => {
         if (cancelled) return;
         if (!j.ok) {
+          // Clear the overlay — otherwise switching to a model with no cached
+          // grid for this ROI (e.g. HRRR over an Atlantic-reaching box) leaves
+          // the previous model's field on screen, so they look "identical".
+          setGrid(null);
           onLoadedRef.current?.({
             grid: null,
             identical: false,

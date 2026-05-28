@@ -491,17 +491,25 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     setBoxDirty(false);
     setNewerAvailable(false); // we're fetching the current run for this box now
     // Warm the CMEMS ocean-current cache for the same ROI, in parallel with the
-    // wind fetch. Fire-and-forget: the current route is synchronous (no progress
-    // endpoint) and each day's S3 subset is slow, so we do NOT await it or couple
-    // the wind progress bar to it. The chart's <CurrentOverlay> picks up the
-    // warmed grids from /api/current/grid once they land in cache. Unlike wind,
-    // we don't DELETE this on a box drag — there's no abort path for the Python
-    // helper, so we just let any in-flight current fetch finish writing to cache.
+    // wind fetch. Not awaited / not coupled to the wind progress bar (the current
+    // route is synchronous and each day's S3 subset is slow). The route responds
+    // once grids are cached, so on success we broadcast 'current-cache' — the
+    // same signal the /forecast page sends — to nudge the chart's CurrentOverlay
+    // to re-read. Without this the overlay stays stale until a tab switch/remount.
+    // We don't DELETE on a box drag — there's no abort path for the Python helper.
     void fetch('/api/current/refresh', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ bbox: next, days: REFRESH_CURRENT_DAYS }),
-    }).catch(() => {});
+    })
+      .then((r) => {
+        if (r.ok && typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('current-cache');
+          bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
+          bc.close();
+        }
+      })
+      .catch(() => {});
     let myGen: number | undefined;
     try {
       const r = await fetch('/api/forecast/refresh', {
