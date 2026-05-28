@@ -25,7 +25,12 @@ const PROGRESS_FILL_LAYER = 'forecast-roi-progress-fill-line';
 /** Forecast hours fetched on every refresh. Mirrors /forecast page so a
  *  ROI resize on /chart yields the same depth of forecast as the manual
  *  refresh from /forecast. */
-const REFRESH_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
+// GFS 0.25° is published hourly to f120, then 3-hourly to f168. (ECMWF only
+// has the 3-hourly subset of these — the refresh route filters per model.)
+const REFRESH_HOURS: number[] = [
+  ...Array.from({ length: 121 }, (_, i) => i),
+  ...Array.from({ length: 16 }, (_, i) => 123 + i * 3),
+];
 const REFRESH_MODELS = ['gfs', 'ecmwf'] as const;
 
 /** CMEMS ocean-current forecast days warmed alongside wind on each refresh.

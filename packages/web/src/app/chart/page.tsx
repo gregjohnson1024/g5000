@@ -61,9 +61,13 @@ const TRACK_LAYERS_KEY = 'chart:trackLayers';
  */
 const COG_EXTENSION_MINUTES = 360;
 
-// Full intended forecast set: every 3 h to +168 h. Matches the refresh job, so
-// the timeline can show how far the cache has filled (available vs in-progress).
-const WIND_FORECAST_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
+// Full intended forecast set: GFS is hourly to +120 h then 3-hourly to +168 h.
+// Matches the refresh job, so the timeline can show how far the cache has
+// filled (available vs in-progress).
+const WIND_FORECAST_HOURS: number[] = [
+  ...Array.from({ length: 121 }, (_, i) => i),
+  ...Array.from({ length: 16 }, (_, i) => 123 + i * 3),
+];
 
 export default function ChartPage() {
   // Next.js requires useSearchParams() to be wrapped in a Suspense boundary

@@ -46,6 +46,16 @@ let progress: { gen: number; total: number; done: number; running: boolean } = {
   running: false,
 };
 
+/**
+ * Valid forecast hours for a model, given the requested set. GFS 0.25° is
+ * published hourly to f120 (then 3-hourly), so it takes every requested hour.
+ * ECMWF open data is only published every 3 h, so drop non-multiples — without
+ * this, an hourly request set hammers ECMWF with guaranteed-404 hours.
+ */
+function hoursForModel(model: WindModel, hours: number[]): number[] {
+  return model === 'ecmwf' ? hours.filter((h) => h % 3 === 0) : hours;
+}
+
 async function runJob(
   gen: number,
   bbox: Bbox,
@@ -80,13 +90,14 @@ async function runJob(
   };
   // One pool per model, hitting its own server; pools run concurrently.
   const runPool = async (model: WindModel): Promise<void> => {
+    const mHours = hoursForModel(model, hours);
     let nextIdx = 0;
     const worker = async (): Promise<void> => {
       while (true) {
         if (gen !== generation) return; // superseded by a newer refresh
         const idx = nextIdx++;
-        if (idx >= hours.length) return;
-        await fetchOne(model, hours[idx]!);
+        if (idx >= mHours.length) return;
+        await fetchOne(model, mHours[idx]!);
       }
     };
     await Promise.all(Array.from({ length: POOL_CONCURRENCY[model] }, () => worker()));
@@ -168,7 +179,7 @@ export async function POST(req: Request): Promise<Response> {
   );
 
   const myGen = ++generation;
-  const total = models.length * hours.length;
+  const total = models.reduce((n, m) => n + hoursForModel(m, hours).length, 0);
   progress = { gen: myGen, total, done: 0, running: true };
   // Abort any prior job's in-flight downloads, then arm a fresh controller.
   activeAbort?.abort();
