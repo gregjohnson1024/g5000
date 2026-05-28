@@ -974,13 +974,9 @@ function ChartPageInner() {
         <CursorReadout
           cursor={cursorLatLon}
           boat={livePos}
-          variable={
-            mv.isWindModel && windGrid
-              ? { kind: 'wind', grid: windGrid }
-              : mv.isCurrent && currentGrid
-                ? { kind: 'current', grid: currentGrid }
-                : null
-          }
+          map={mapInstance}
+          wind={windGrid}
+          current={currentGrid}
         />
         <TileLoadingIndicator map={mapInstance} />
       </div>
@@ -1340,40 +1336,42 @@ function LiveValues({ p }: { p: LivePos | null }) {
 function CursorReadout({
   cursor,
   boat,
-  variable,
+  map,
+  wind,
+  current,
 }: {
   cursor: { lat: number; lon: number } | null;
   boat: LivePos | null;
-  variable: { kind: 'wind' | 'current'; grid: UvGrid } | null;
+  map: maplibregl.Map | null;
+  /** Wind grid sampled when present, independent of which overlay is selected. */
+  wind: UvGrid | null;
+  /** Current grid sampled when present, independent of which overlay is selected. */
+  current: UvGrid | null;
 }) {
   if (!cursor) return null;
   const hasBoat = !!boat && Number.isFinite(boat.lat) && Number.isFinite(boat.lon);
   const rangeBearing = hasBoat
     ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
     : null;
-  // The displayed model variable (wind / current) interpolated at the cursor.
-  // Absolute compass direction from the grid's u/v — nothing to do with the boat.
-  const varLine = ((): string | null => {
-    if (!variable) return null;
-    const uv = sampleUV(variable.grid, cursor.lat, cursor.lon);
-    if (!uv) return null; // cursor outside the grid's coverage
-    const MS_TO_KN = 1 / 0.514444;
-    const speedKn = Math.hypot(uv.u, uv.v) * MS_TO_KN;
-    if (variable.kind === 'wind') {
-      // Wind FROM: the direction it blows out of (atan2 of the reversed vector).
-      const fromDeg = (Math.atan2(-uv.u, -uv.v) * 180) / Math.PI;
-      const d = ((fromDeg % 360) + 360) % 360;
-      return `Wind ${speedKn.toFixed(1)} kn · ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
-    }
-    // Current SET: the direction it flows toward.
-    const setDeg = (Math.atan2(uv.u, uv.v) * 180) / Math.PI;
-    const d = ((setDeg % 360) + 360) % 360;
-    return `Current ${speedKn.toFixed(1)} kn · set ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
-  })();
+  // Nearest isobath depth from the GEBCO contour layer. Works even when the
+  // visible layer is toggled off because BathyLayer keeps it mounted with
+  // line-opacity 0 (so queryRenderedFeatures still returns features). Contours
+  // are LINES not a field, so we report the nearest line's depth, not an
+  // interpolated point depth (which would need the 7 GB grid online).
+  const depthM = map ? nearestContourDepth(map, cursor) : null;
+  // Wind/current at the cursor, sampled from whichever grids happen to be
+  // loaded — independent of which overlay (if any) is currently being painted
+  // on the chart, so the readout doesn't disappear when the overlay is hidden.
+  const windLine = formatCursorUv(wind, cursor, 'wind');
+  const currentLine = formatCursorUv(current, cursor, 'current');
   return (
     <div className="fixed bottom-3 right-3 z-30 px-3 py-2 bg-slate-900/85 border border-slate-700 text-slate-200 text-xs font-mono rounded shadow pointer-events-none leading-tight">
       <div>{fmtLatLonDmm(cursor.lat, cursor.lon)}</div>
-      {varLine && <div className="text-sky-200 mt-1">{varLine}</div>}
+      {windLine && <div className="text-sky-200 mt-1">{windLine}</div>}
+      {currentLine && <div className="text-teal-200 mt-1">{currentLine}</div>}
+      {depthM != null && (
+        <div className="text-cyan-200 mt-1">Depth ≈ {depthM} m (nearest isobath)</div>
+      )}
       <div className="text-slate-300 mt-1">
         {rangeBearing
           ? `${rangeBearing.distNm.toFixed(1)} NM · ${rangeBearing.bearingDeg
@@ -1383,6 +1381,32 @@ function CursorReadout({
       </div>
     </div>
   );
+}
+
+/**
+ * Format a u/v grid sample at the cursor as a single readable line. Wind uses
+ * the meteorological convention "FROM" (the direction it blows out of);
+ * current uses "SET" (the direction it flows toward). Returns null if the grid
+ * is missing or the cursor is outside the grid's coverage.
+ */
+function formatCursorUv(
+  grid: UvGrid | null,
+  cursor: { lat: number; lon: number },
+  kind: 'wind' | 'current',
+): string | null {
+  if (!grid) return null;
+  const uv = sampleUV(grid, cursor.lat, cursor.lon);
+  if (!uv) return null;
+  const MS_TO_KN = 1 / 0.514444;
+  const speedKn = Math.hypot(uv.u, uv.v) * MS_TO_KN;
+  if (kind === 'wind') {
+    const fromDeg = (Math.atan2(-uv.u, -uv.v) * 180) / Math.PI;
+    const d = ((fromDeg % 360) + 360) % 360;
+    return `Wind ${speedKn.toFixed(1)} kn · ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
+  }
+  const setDeg = (Math.atan2(uv.u, uv.v) * 180) / Math.PI;
+  const d = ((setDeg % 360) + 360) % 360;
+  return `Current ${speedKn.toFixed(1)} kn · set ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
 }
 
 /** 16-point compass abbreviation for a true bearing in degrees. */
@@ -1426,4 +1450,52 @@ function haversineAndBearing(
   let bearingDeg = (Math.atan2(y, x) * 180) / Math.PI;
   if (bearingDeg < 0) bearingDeg += 360;
   return { distNm, bearingDeg };
+}
+
+/**
+ * Depth of the bathy contour line nearest the cursor in pixel space across the
+ * whole viewport, or null if no contour features are rendered (e.g. the source
+ * hasn't loaded a tile yet, or we're over an area with no bathy at this zoom).
+ * Works regardless of whether the user has toggled Depth (GEBCO) visible —
+ * BathyLayer keeps the layer mounted with line-opacity 0 when "off" so
+ * queryRenderedFeatures still returns features.
+ *
+ * Per-mousemove cost is O(total vertices in viewport) project() calls. At z6
+ * over Bermuda that's ~50–100k vertices and a few ms; if a future zoom level
+ * shows lag, switch to a two-stage filter (feature centroid → top-N → all
+ * vertices).
+ */
+function nearestContourDepth(
+  map: maplibregl.Map,
+  cursor: { lat: number; lon: number },
+): number | null {
+  if (!map.getLayer('bathy-contour-line')) return null;
+  let feats: maplibregl.MapGeoJSONFeature[] = [];
+  try {
+    feats = map.queryRenderedFeatures(undefined, { layers: ['bathy-contour-line'] });
+  } catch {
+    return null; // style not ready
+  }
+  if (!feats.length) return null;
+  const p = map.project([cursor.lon, cursor.lat]);
+  let bestSq = Infinity;
+  let bestDepth: number | null = null;
+  for (const f of feats) {
+    const g = f.geometry as GeoJSON.LineString | GeoJSON.MultiLineString;
+    const lines: GeoJSON.Position[][] =
+      g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+    for (const line of lines) {
+      for (const c of line) {
+        const q = map.project([c[0]!, c[1]!]);
+        const dx = q.x - p.x;
+        const dy = q.y - p.y;
+        const sq = dx * dx + dy * dy;
+        if (sq < bestSq) {
+          bestSq = sq;
+          bestDepth = (f.properties as { depth?: number } | null)?.depth ?? null;
+        }
+      }
+    }
+  }
+  return bestDepth;
 }

@@ -1,7 +1,15 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+// Register the pmtiles:// protocol once so any source can read a local
+// PMTiles archive over HTTP range requests (used by the GEBCO depth layer).
+// Module scope = runs once per page load; re-running under HMR just re-adds
+// the same handler, which is harmless.
+const pmtilesProtocol = new Protocol();
+maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 
 export interface MapProps {
   center: { lat: number; lon: number };
