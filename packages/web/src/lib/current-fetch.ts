@@ -145,15 +145,88 @@ class PersistentCurrentCache {
 export const currentCache = new PersistentCurrentCache();
 void currentCache.hydrate();
 
-function cacheKey(b: Bbox, dateUtc: string): string {
+/**
+ * Tolerance (degrees) for treating a cached grid's extent as "the same region"
+ * as a requested bbox. CMEMS snaps requests to its 1/12° (~0.083°) grid and its
+ * boundary rule can drop the edge cell, so the returned extent can sit up to ~1
+ * cell inside the request. 0.25° (3 cells) absorbs that without over-matching a
+ * genuinely different ROI. The read route and the pre-fetch dedup share this so
+ * write-identity and read-identity agree.
+ */
+export const CMEMS_BBOX_TOL = 0.25;
+
+/** Actual geographic extent of a grid, from its (ascending) lat/lon arrays. */
+function gridExtent(g: { lats: number[]; lons: number[] }): {
+  latMin: number;
+  latMax: number;
+  lonMin: number;
+  lonMax: number;
+} {
+  return {
+    latMin: g.lats[0] ?? NaN,
+    latMax: g.lats[g.lats.length - 1] ?? NaN,
+    lonMin: g.lons[0] ?? NaN,
+    lonMax: g.lons[g.lons.length - 1] ?? NaN,
+  };
+}
+
+/**
+ * True when a grid's actual extent matches the requested bbox within `tol`.
+ * This is the single definition of "this grid covers that ROI" — shared by the
+ * read route (so the overlay stays in step with the ROI) and the pre-fetch
+ * dedup (so a jittered ROI reuses an existing grid instead of re-fetching).
+ */
+export function gridMatchesBbox(
+  g: { lats: number[]; lons: number[] },
+  b: Bbox,
+  tol: number = CMEMS_BBOX_TOL,
+): boolean {
+  const e = gridExtent(g);
+  return (
+    Math.abs(e.latMin - b.latMin) <= tol &&
+    Math.abs(e.latMax - b.latMax) <= tol &&
+    Math.abs(e.lonMin - b.lonMin) <= tol &&
+    Math.abs(e.lonMax - b.lonMax) <= tol
+  );
+}
+
+/**
+ * Persistent-cache key for a grid, derived from the grid's ACTUAL extent (not
+ * the requested bbox). CMEMS decides the returned extent, so keying on it makes
+ * the storage key equal the identity the read route matches on — and collapses
+ * near-duplicate requests (sub-cell ROI drags) that return the same grid onto a
+ * single entry instead of one slow re-fetch per jitter.
+ */
+export function gridExtentKey(g: { lats: number[]; lons: number[] }, dateUtc: string): string {
+  const e = gridExtent(g);
   return [
     'cmems',
     dateUtc,
-    b.latMin.toFixed(2),
-    b.latMax.toFixed(2),
-    b.lonMin.toFixed(2),
-    b.lonMax.toFixed(2),
+    e.latMin.toFixed(2),
+    e.latMax.toFixed(2),
+    e.lonMin.toFixed(2),
+    e.lonMax.toFixed(2),
   ].join('|');
+}
+
+/**
+ * Find a cached grid that already satisfies a request: same forecast day, same
+ * represented day (validAt — guards against serving an earlier day's grid), and
+ * an extent within `tol` of the requested bbox. Returns null when none qualify.
+ */
+export function findReusableGrid(
+  grids: Iterable<CurrentGrid>,
+  bbox: Bbox,
+  forecastDay: number,
+  validAt: number,
+  tol: number = CMEMS_BBOX_TOL,
+): CurrentGrid | null {
+  for (const g of grids) {
+    if (g.forecastDay !== forecastDay) continue;
+    if (g.validAt !== validAt) continue;
+    if (gridMatchesBbox(g, bbox, tol)) return g;
+  }
+  return null;
 }
 
 function todayUtcDate(): string {
@@ -229,10 +302,18 @@ export async function fetchCurrentGrid(bbox: Bbox, forecastDay = 0): Promise<Cur
   const m = String(base.getUTCMonth() + 1).padStart(2, '0');
   const d = String(base.getUTCDate()).padStart(2, '0');
   const dateUtc = `${y}-${m}-${d}`;
+  // CMEMS daily-mean validAt is midnight UTC of the represented day — the same
+  // stamp the Python helper writes, so equality below is exact.
+  const targetValidAt = Math.floor(Date.UTC(y, base.getUTCMonth(), base.getUTCDate()) / 1000);
 
-  const key = cacheKey(bbox, dateUtc);
-  const cached = currentCache.get(key);
-  if (cached) return cached.grid;
+  // Reuse an existing grid that already covers this ROI (within tolerance) for
+  // the same day. A sub-cell ROI nudge would otherwise mint a fresh request and
+  // pay another 10-30 s CMEMS S3 subset for a byte-identical grid.
+  const cachedGrids = (function* () {
+    for (const e of currentCache.values()) yield e.grid;
+  })();
+  const reusable = findReusableGrid(cachedGrids, bbox, forecastDay, targetValidAt);
+  if (reusable) return reusable;
 
   const parsed = await spawnFetcher(bbox, dateUtc);
   const grid: CurrentGrid = {
@@ -245,7 +326,9 @@ export async function fetchCurrentGrid(bbox: Bbox, forecastDay = 0): Promise<Cur
     forecastDay,
     source: 'CMEMS',
   };
-  await currentCache.set(key, { at: Date.now(), grid });
+  // Key on the RETURNED extent, not the request — so the storage key equals the
+  // identity the read route matches on (bbox ≡ cache key).
+  await currentCache.set(gridExtentKey(grid, dateUtc), { at: Date.now(), grid });
   return grid;
 }
 

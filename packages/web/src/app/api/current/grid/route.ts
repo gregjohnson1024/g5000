@@ -1,4 +1,4 @@
-import { currentCache } from '../../../../lib/current-fetch';
+import { currentCache, gridMatchesBbox } from '../../../../lib/current-fetch';
 import type { CurrentGrid } from '../../../../lib/current-fetch';
 
 export const dynamic = 'force-dynamic';
@@ -37,20 +37,11 @@ export async function GET(req: Request): Promise<Response> {
   const lonMin = n('lonMin');
   const lonMax = n('lonMax');
   const wantBbox = latMin != null && latMax != null && lonMin != null && lonMax != null;
-  const TOL = 0.25;
-  const matchesBbox = (g: CurrentGrid): boolean => {
-    if (!wantBbox) return true;
-    const gLatMin = g.lats[0] ?? NaN;
-    const gLatMax = g.lats[g.lats.length - 1] ?? NaN;
-    const gLonMin = g.lons[0] ?? NaN;
-    const gLonMax = g.lons[g.lons.length - 1] ?? NaN;
-    return (
-      Math.abs(gLatMin - latMin!) <= TOL &&
-      Math.abs(gLatMax - latMax!) <= TOL &&
-      Math.abs(gLonMin - lonMin!) <= TOL &&
-      Math.abs(gLonMax - lonMax!) <= TOL
-    );
-  };
+  // Same extent-within-tolerance definition the cache writer uses for dedup, so
+  // a freshly-stored grid is always found by a read for the box it was fetched for.
+  const matchesBbox = (g: CurrentGrid): boolean =>
+    !wantBbox ||
+    gridMatchesBbox(g, { latMin: latMin!, latMax: latMax!, lonMin: lonMin!, lonMax: lonMax! });
   let best: { at: number; grid: CurrentGrid } | undefined;
   for (const [, v] of currentCache.entries()) {
     if (v.grid.forecastDay !== day) continue;

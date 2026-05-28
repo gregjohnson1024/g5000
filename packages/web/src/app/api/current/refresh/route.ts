@@ -1,4 +1,4 @@
-import { fetchCurrentGrid } from '../../../../lib/current-fetch';
+import { currentCache, fetchCurrentGrid } from '../../../../lib/current-fetch';
 import type { Bbox } from '@g5000/grib';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +42,11 @@ export async function POST(req: Request): Promise<Response> {
   const days = (body.days?.length ? body.days : [0]).filter(
     (d) => Number.isInteger(d) && d >= 0 && d <= 9,
   );
+
+  // Drop grids whose represented day has aged out before we add today's. Without
+  // this the current cache grows unbounded — unlike the wind cache, nothing else
+  // ever calls pruneStale(). Fire-and-forget; a slow prune mustn't delay the fetch.
+  void currentCache.pruneStale();
 
   interface R {
     day: number;
