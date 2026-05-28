@@ -9,7 +9,14 @@ export const runtime = 'nodejs';
 // Precomputed global GEBCO depth-contour archive, produced by
 // tools/gebco-contour-maker and pre-warmed into the router cache. Served
 // same-origin so MapLibre's pmtiles:// protocol can read it with HTTP range
-// requests. Bathymetry is static, so the file never changes underneath us.
+// requests.
+//
+// The archive IS rebuilt occasionally (re-running the pipeline drops a new file
+// at the same path), so it must NOT be served `immutable`: a stale immutable
+// cache mixes old and new byte ranges and corrupts pmtiles' offset math
+// ("Failed to Decode Data"). We emit an ETag from size+mtime and let the
+// browser revalidate on reload — still cached within max-age for offline use,
+// but a reload after a rebuild refetches the changed bytes.
 const FILE = join(ROOT, 'bathy-pmtiles', 'world.pmtiles');
 
 function webStream(start: number, end: number): ReadableStream<Uint8Array> {
@@ -18,20 +25,35 @@ function webStream(start: number, end: number): ReadableStream<Uint8Array> {
 
 export function GET(req: Request): Response {
   let size: number;
+  let mtimeMs: number;
   try {
-    size = statSync(FILE).size;
+    const st = statSync(FILE);
+    size = st.size;
+    mtimeMs = st.mtimeMs;
   } catch {
     return new Response('bathy pmtiles not found', { status: 404 });
   }
 
+  const etag = `"${size.toString(16)}-${Math.round(mtimeMs).toString(16)}"`;
   const base = {
     'content-type': 'application/octet-stream',
     'accept-ranges': 'bytes',
-    'cache-control': 'public, max-age=31536000, immutable',
+    // Cacheable for offline use, but revalidate on reload (NOT immutable) so a
+    // rebuilt archive is picked up instead of a stale partial.
+    'cache-control': 'public, max-age=31536000',
+    etag,
   };
 
+  // Cheap revalidation: client's cached copy is still current.
+  if (req.headers.get('if-none-match') === etag) {
+    return new Response(null, { status: 304, headers: base });
+  }
+
   const range = req.headers.get('range');
-  if (!range) {
+  // If the client's partial cache (If-Range) predates the current file, ignore
+  // the range and return the whole new entity so it discards stale partials.
+  const ifRange = req.headers.get('if-range');
+  if (!range || (ifRange && ifRange !== etag)) {
     return new Response(webStream(0, size - 1), {
       status: 200,
       headers: { ...base, 'content-length': String(size) },
