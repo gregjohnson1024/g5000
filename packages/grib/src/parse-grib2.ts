@@ -27,8 +27,11 @@ export function parseGrib2Json(
   source: WindField['source'] | CurrentField['source'],
   runTime: number,
 ): WindField | CurrentField {
-  const uVar = source === 'RTOFS' ? 'UOGRD' : 'UGRD';
-  const vVar = source === 'RTOFS' ? 'VOGRD' : 'VGRD';
+  // Only wind fields flow through this GRIB-variable selection. CMEMS currents
+  // are fetched as JSON via a Python helper and never parsed here, so the
+  // eastward/northward variables are always the wind ones.
+  const uVar = 'UGRD';
+  const vVar = 'VGRD';
 
   const us = messages.filter((m) => m.variable === uVar);
   const vs = messages.filter((m) => m.variable === vVar);

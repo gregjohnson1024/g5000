@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Bbox } from './types.js';
 
-export type CacheModel = 'gfs' | 'ecmwf' | 'rtofs';
+export type CacheModel = 'gfs' | 'ecmwf';
 export type CacheVariable = 'u10' | 'v10' | 'mslp' | 'uogrd' | 'vogrd';
 
 export interface CacheKey {

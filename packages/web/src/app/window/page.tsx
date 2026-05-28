@@ -160,7 +160,7 @@ export default function WindowPage() {
             onChange={(e) => setUseCurrents(e.target.checked)}
             className="bg-slate-900 border border-slate-700 rounded"
           />
-          Use surface currents (RTOFS)
+          Use surface currents (CMEMS)
         </label>
       </div>
       <button

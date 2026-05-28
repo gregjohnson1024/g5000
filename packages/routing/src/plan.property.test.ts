@@ -224,7 +224,7 @@ function uniformCurrent(uVal: number, vVal: number): CurrentField {
   const times = [0, 86400 * 14];
   const u = times.map(() => lats.map(() => lons.map(() => uVal)));
   const v = times.map(() => lats.map(() => lons.map(() => vVal)));
-  return { lats, lons, times, u, v, source: 'RTOFS', runTime: 0 };
+  return { lats, lons, times, u, v, source: 'CMEMS', runTime: 0 };
 }
 
 // TODO (v2): Same prune-vs-polar interaction documented above the coastline
@@ -241,7 +241,7 @@ function uniformCurrent(uVal: number, vVal: number): CurrentField {
 // The currents math IS exercised by:
 //   - propagate() unit tests (vector-add of c.u/c.v with wind-driven motion)
 //   - the Bermuda → Newport integration test (Task 41) which runs against
-//     real RTOFS currents and a smooth real polar.
+//     real CMEMS currents and a smooth real polar.
 // A property-level symmetry test at the routing core requires either a
 // smoother polar or a richer prune key (bucket by (bearing, progress)).
 // Both are v2 refinements.

@@ -15,7 +15,7 @@ Dataset: cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m
 Usage:
     fetch-copernicus-currents.py <latMin> <latMax> <lonMin> <lonMax> <YYYY-MM-DD>
 
-Output (stdout): JSON in the same shape parse-rtofs.py would have produced:
+Output (stdout): JSON in the shape the routing planner's current loader expects:
     {
       "lats":    [...],                  # ascending
       "lons":    [...],                  # ascending
@@ -70,8 +70,7 @@ def main() -> int:
 
     # copernicusmarine.subset returns the path of a downloaded NetCDF file
     # OR (with --return-content-only) a Dataset directly. We use the file
-    # path so xarray can open lazily and we keep the parsing path identical
-    # to the RTOFS case (just a different upstream source).
+    # path so xarray can open lazily.
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = Path(tmpdir) / "cmems_currents.nc"
         try:

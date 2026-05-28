@@ -65,7 +65,7 @@ describe('interpolateWind', () => {
 
 describe('interpolateCurrent', () => {
   it('reuses the same interpolation against a CurrentField', () => {
-    const cf: CurrentField = { ...FIELD, source: 'RTOFS' };
+    const cf: CurrentField = { ...FIELD, source: 'CMEMS' };
     const out = interpolateCurrent(cf, 30, -75, 1000);
     expect(out.u).toBeCloseTo(5, 6);
     expect(out.v).toBeCloseTo(2, 6);

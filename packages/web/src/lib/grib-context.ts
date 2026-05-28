@@ -77,9 +77,8 @@ export async function loadWindFor(
 
 /**
  * Current loader for the routing planner. Reads Copernicus Marine (CMEMS)
- * daily-mean surface currents via the helper in `./current-fetch`. NOAA
- * retired the RTOFS NOMADS subset filter in early 2026, so the planner
- * now uses the same provider as the chart overlay.
+ * daily-mean surface currents via the helper in `./current-fetch`, the same
+ * provider as the chart overlay.
  *
  * CMEMS delivers one 2D grid per day; we fetch enough days to bracket the
  * planner's horizon and stack them into a `CurrentField` whose `times`
