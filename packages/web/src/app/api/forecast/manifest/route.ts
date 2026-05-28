@@ -63,6 +63,7 @@ export async function GET(): Promise<Response> {
   const availability: Record<WindModel, { latestRunUnix: number; nextRunAvailableUnix: number }> = {
     gfs: runAvailability('gfs'),
     ecmwf: runAvailability('ecmwf'),
+    hrrr: runAvailability('hrrr'),
   };
   // The run a fetch *right now* would actually target, per model. Use this —
   // not `availability.latestRunUnix` — to decide whether a newer run is
@@ -72,6 +73,7 @@ export async function GET(): Promise<Response> {
   const expectedRun: Record<WindModel, number> = {
     gfs: expectedRunUnix('gfs'),
     ecmwf: expectedRunUnix('ecmwf'),
+    hrrr: expectedRunUnix('hrrr'),
   };
   return Response.json({
     ok: true,

@@ -7,6 +7,7 @@ import {
   type WindGrid,
   type WindModel,
 } from '../../../../lib/wind-fetch';
+import { fetchHrrrGrid, hrrrHorizonHours, pickHrrrRun, inHrrrDomain } from '../../../../lib/hrrr-fetch';
 import { cache, bboxKey } from '../../wind/route';
 import { pruneGlobalCache, capGlobalCache } from '../../../../lib/ecmwf-global-cache';
 
@@ -26,7 +27,7 @@ interface Body {
 // wall-clock is bounded by the slower model, not the sum. Per-model caps keep
 // the autopilot's event loop from saturating (peak ~7 concurrent fetches);
 // ECMWF's is smaller because it rate-limits (429s) under load.
-const POOL_CONCURRENCY: Record<WindModel, number> = { gfs: 4, ecmwf: 3 };
+const POOL_CONCURRENCY: Record<WindModel, number> = { gfs: 4, ecmwf: 3, hrrr: 4 };
 
 // Monotonic job token. Each POST bumps it; workers from a superseded job stop
 // pulling new tasks, so rapid ROI drags don't stack overlapping fetch jobs.
@@ -53,7 +54,17 @@ let progress: { gen: number; total: number; done: number; running: boolean } = {
  * this, an hourly request set hammers ECMWF with guaranteed-404 hours.
  */
 function hoursForModel(model: WindModel, hours: number[]): number[] {
-  return model === 'ecmwf' ? hours.filter((h) => h % 3 === 0) : hours;
+  if (model === 'ecmwf') return hours.filter((h) => h % 3 === 0);
+  if (model === 'hrrr') {
+    // HRRR is hourly but short-horizon: f00–f18 on most runs, f00–f48 only on
+    // the synoptic 00/06/12/18z runs. Cap at the horizon of the run a fetch
+    // would target now so we don't queue guaranteed-404 hours past the model's
+    // window.
+    const run = pickHrrrRun(Date.now() / 1000);
+    const horizon = hrrrHorizonHours(run.runHourUtc);
+    return hours.filter((h) => h <= horizon);
+  }
+  return hours;
 }
 
 async function runJob(
@@ -69,6 +80,7 @@ async function runJob(
   const expectedRun: Record<WindModel, number> = {
     gfs: expectedRunUnix('gfs'),
     ecmwf: expectedRunUnix('ecmwf'),
+    hrrr: expectedRunUnix('hrrr'),
   };
   let settled = 0; // ok + failed + skipped, across both pools
   const fetchOne = async (model: WindModel, hour: number): Promise<void> => {
@@ -81,7 +93,9 @@ async function runJob(
       const grid: WindGrid =
         model === 'ecmwf'
           ? await fetchWindGridEcmwf(bbox, hour, undefined, signal)
-          : await fetchWindGrid(bbox, hour, undefined, signal);
+          : model === 'hrrr'
+            ? await fetchHrrrGrid(bbox, hour, undefined, signal)
+            : await fetchWindGrid(bbox, hour, undefined, signal);
       cache.set(bboxKey(model, bbox, grid.forecastHour), { at: Date.now(), grid });
     } catch {
       /* failed (ECMWF run unpublished) or aborted (superseded) — counts settled */
@@ -172,7 +186,12 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ ok: false, error: { message: 'bbox is degenerate' } }, { status: 422 });
   }
   const models: WindModel[] = (body.models?.length ? body.models : ['gfs']).filter(
-    (m) => m === 'gfs' || m === 'ecmwf',
+    (m) =>
+      m === 'gfs' ||
+      m === 'ecmwf' ||
+      // HRRR is CONUS-only; drop it for a mid-ocean box so the job doesn't queue
+      // guaranteed-to-throw fetches.
+      (m === 'hrrr' && inHrrrDomain(bbox)),
   );
   const hours: number[] = (body.hours?.length ? body.hours : [0]).filter(
     (h) => Number.isFinite(h) && h >= 0 && h <= 240,

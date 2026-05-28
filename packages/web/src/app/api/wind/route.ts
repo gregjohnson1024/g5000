@@ -6,6 +6,7 @@ import {
   type Bbox,
   type WindModel,
 } from '../../../lib/wind-fetch';
+import { fetchHrrrGrid } from '../../../lib/hrrr-fetch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,7 +31,8 @@ export async function GET(req: Request): Promise<Response> {
   const hours = Number(url.searchParams.get('hours') ?? '0');
   const radius = Number(url.searchParams.get('radius') ?? '6');
   const modelParam = (url.searchParams.get('model') ?? 'gfs').toLowerCase();
-  const model: WindModel = modelParam === 'ecmwf' ? 'ecmwf' : 'gfs';
+  const model: WindModel =
+    modelParam === 'ecmwf' ? 'ecmwf' : modelParam === 'hrrr' ? 'hrrr' : 'gfs';
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return Response.json({ ok: false, error: { message: 'lat & lon required' } }, { status: 400 });
   }
@@ -65,7 +67,11 @@ export async function GET(req: Request): Promise<Response> {
   }
   try {
     const grid =
-      model === 'ecmwf' ? await fetchWindGridEcmwf(bbox, fh) : await fetchWindGrid(bbox, fh);
+      model === 'ecmwf'
+        ? await fetchWindGridEcmwf(bbox, fh)
+        : model === 'hrrr'
+          ? await fetchHrrrGrid(bbox, fh)
+          : await fetchWindGrid(bbox, fh);
     windCache.set(key, { at: now, grid });
     return Response.json({ ok: true, grid, cached: false });
   } catch (e) {

@@ -14,9 +14,9 @@ export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const model = (url.searchParams.get('model') ?? '').toLowerCase();
   const hour = Number(url.searchParams.get('hour'));
-  if (model !== 'gfs' && model !== 'ecmwf') {
+  if (model !== 'gfs' && model !== 'ecmwf' && model !== 'hrrr') {
     return Response.json(
-      { ok: false, error: { message: 'model must be gfs or ecmwf' } },
+      { ok: false, error: { message: 'model must be gfs, ecmwf or hrrr' } },
       { status: 400 },
     );
   }
