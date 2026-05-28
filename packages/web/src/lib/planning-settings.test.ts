@@ -8,6 +8,7 @@ it('returns engine defaults when settings and overrides are empty', () => {
   expect(o.stepMinutes).toBe(PLANNING_DEFAULTS.stepMinutes);
   expect(o.avoidLand).toBe(true);
   expect(o.captureIsochrones).toBe(false);
+  // Default minSailKt=0 → autoMotor resolves to undefined (never motor)
   expect(o.autoMotor).toBeUndefined();
 });
 
@@ -15,7 +16,7 @@ it('settings override defaults, request overrides settings', () => {
   const settings = {
     pruneBucketDeg: 5,
     avoidLand: true,
-    autoMotor: { enabled: true, minSailKt: 3, motorKt: 6 },
+    autoMotor: { minSailKt: 3, motorKt: 6 },
   };
   const o = resolvePlanOptions(settings, { avoidLand: false, maxHours: 48 });
   expect(o.pruneBucketDeg).toBe(5); // from settings
@@ -23,26 +24,20 @@ it('settings override defaults, request overrides settings', () => {
   expect(o.maxHours).toBe(48); // request
 });
 
-it('converts auto-motor knots to m/s and only when enabled', () => {
-  const on = resolvePlanOptions(
-    { autoMotor: { enabled: true, minSailKt: 3, motorKt: 5 } },
-    undefined,
-  );
+it('converts auto-motor knots to m/s; minSailKt=0 yields undefined', () => {
+  const on = resolvePlanOptions({ autoMotor: { minSailKt: 3, motorKt: 5 } }, undefined);
   expect(on.autoMotor!.minSail).toBeCloseTo(3 * KN, 5);
   expect(on.autoMotor!.motor).toBeCloseTo(5 * KN, 5);
-  const off = resolvePlanOptions(
-    { autoMotor: { enabled: false, minSailKt: 3, motorKt: 5 } },
-    undefined,
-  );
+
+  const off = resolvePlanOptions({ autoMotor: { minSailKt: 0, motorKt: 5 } }, undefined);
   expect(off.autoMotor).toBeUndefined();
 });
 
-it('a present request with no autoMotor turns it off even if settings enable it', () => {
-  // Chart user unchecks Auto-motor → sends options without autoMotor. The
-  // settings default must NOT reinstate it.
+it('a present request autoMotor overrides settings', () => {
   const o = resolvePlanOptions(
-    { autoMotor: { enabled: true, minSailKt: 3, motorKt: 5 } },
-    { avoidLand: false },
+    { autoMotor: { minSailKt: 3, motorKt: 5 } },
+    { autoMotor: { minSail: 2 * KN, motor: 4 * KN } },
   );
-  expect(o.autoMotor).toBeUndefined();
+  expect(o.autoMotor!.minSail).toBeCloseTo(2 * KN, 5);
+  expect(o.autoMotor!.motor).toBeCloseTo(4 * KN, 5);
 });

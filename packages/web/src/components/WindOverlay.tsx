@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { contours } from 'd3-contour';
 import { FILL_STOPS } from '../lib/wind-scale';
+import { projectGeo, makeBarb } from '../lib/wind-barb';
 
 export type WindModel = 'gfs' | 'ecmwf';
 
@@ -32,111 +33,6 @@ const MS_TO_KN = 1 / 0.514444;
 
 // Speed bin → fill colour lives in lib/wind-scale so the legend reuses it.
 
-function project(
-  fromLat: number,
-  fromLon: number,
-  meters: number,
-  bearingRad: number,
-): [number, number] {
-  const dN = meters * Math.cos(bearingRad);
-  const dE = meters * Math.sin(bearingRad);
-  const dLat = dN / M_PER_DEG_LAT;
-  const dLon = dE / (M_PER_DEG_LAT * Math.cos((fromLat * Math.PI) / 180));
-  return [fromLon + dLon, fromLat + dLat];
-}
-
-/**
- * Build wind-barb GeoJSON features at a grid point. Standard meteorological
- * convention: shaft points INTO the wind (open end toward where wind is
- * coming from), barbs at the grid-point end angled back. Northern-hemisphere
- * barbs on the left side of the shaft.
- */
-function makeBarb(
-  lat: number,
-  lon: number,
-  speedKn: number,
-  windFromBearingRad: number,
-  shaftLenM: number,
-): GeoJSON.Feature[] {
-  if (speedKn < 2.5) {
-    // Calm: just a small circle around the grid point. Render as a tiny
-    // degenerate line so the same paint layer covers it.
-    const tinyTip = project(lat, lon, 50, 0);
-    return [
-      {
-        type: 'Feature',
-        properties: { kind: 'shaft' },
-        geometry: { type: 'LineString', coordinates: [[lon, lat], tinyTip] },
-      },
-    ];
-  }
-  const shaftEnd = project(lat, lon, shaftLenM, windFromBearingRad);
-  const features: GeoJSON.Feature[] = [
-    {
-      type: 'Feature',
-      properties: { kind: 'shaft' },
-      geometry: { type: 'LineString', coordinates: [[lon, lat], shaftEnd] },
-    },
-  ];
-
-  // Decompose speed in 5-kn rounding
-  const rounded = Math.round(speedKn / 5) * 5;
-  const pennants = Math.floor(rounded / 50);
-  const fulls = Math.floor((rounded - pennants * 50) / 10);
-  const halfs = Math.floor((rounded - pennants * 50 - fulls * 10) / 5);
-
-  // Barbs are drawn on the LEFT side of the shaft when looking along the
-  // shaft direction (toward wind source). Perpendicular bearing = shaft - 90°.
-  const perpBearing = windFromBearingRad - Math.PI / 2;
-  // Tick lengths
-  const fullLen = shaftLenM * 0.45;
-  const halfLen = shaftLenM * 0.25;
-  const pennantLen = shaftLenM * 0.45;
-  // Step size between adjacent ticks along the shaft (from open end inward).
-  const stepM = shaftLenM * 0.18;
-  // Position of the first tick — at the OPEN end of shaft (where wind comes
-  // from), then walk back toward the grid point.
-  let distFromGrid = shaftLenM;
-
-  // Pennants first (closest to open end)
-  for (let i = 0; i < pennants; i++) {
-    const base = project(lat, lon, distFromGrid, windFromBearingRad);
-    const inner = project(lat, lon, distFromGrid - stepM, windFromBearingRad);
-    const tip = project(base[1], base[0], pennantLen, perpBearing);
-    features.push({
-      type: 'Feature',
-      properties: { kind: 'pennant' },
-      geometry: { type: 'Polygon', coordinates: [[base, tip, inner, base]] },
-    });
-    distFromGrid -= stepM;
-  }
-  // Full barbs
-  for (let i = 0; i < fulls; i++) {
-    const base = project(lat, lon, distFromGrid, windFromBearingRad);
-    const tip = project(base[1], base[0], fullLen, perpBearing);
-    features.push({
-      type: 'Feature',
-      properties: { kind: 'barb' },
-      geometry: { type: 'LineString', coordinates: [base, tip] },
-    });
-    distFromGrid -= stepM;
-  }
-  // Half barbs (one max per the decomposition above)
-  if (halfs > 0) {
-    // If there are no fulls and no pennants, the half barb shouldn't sit
-    // right at the shaft's open end (looks like a stray spike) — pull it
-    // one step inward.
-    if (fulls === 0 && pennants === 0) distFromGrid -= stepM;
-    const base = project(lat, lon, distFromGrid, windFromBearingRad);
-    const tip = project(base[1], base[0], halfLen, perpBearing);
-    features.push({
-      type: 'Feature',
-      properties: { kind: 'barb' },
-      geometry: { type: 'LineString', coordinates: [base, tip] },
-    });
-  }
-  return features;
-}
 
 /**
  * Helper: convert a flat field's grid coords back to lat/lon and emit a

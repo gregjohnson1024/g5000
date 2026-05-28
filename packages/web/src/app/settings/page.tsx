@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { SatelliteCachePanel } from './SatelliteCachePanel';
-import { PLANNING_DEFAULTS, type PlanningSettings } from '../../lib/planning-settings.js';
+import { PLANNING_DEFAULTS, type PlanningSettings } from '../../lib/planning-settings';
 
 type SourceMode = 'live' | 'demo' | 'replay';
 interface SourceModeStatus {
@@ -151,18 +151,9 @@ function PlanningSection() {
         />
         Avoid land (uncheck to skip the land check on open-ocean routes — faster)
       </label>
-      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={p.autoMotor.enabled}
-            onChange={(e) =>
-              setP((s) => ({ ...s, autoMotor: { ...s.autoMotor, enabled: e.target.checked } }))
-            }
-          />
-          Auto-motor
-        </label>
-        <div className="text-sm pl-6">
+      <fieldset className="border border-slate-800 rounded p-2 space-y-1">
+        <legend className="text-sm px-1">Auto-motor</legend>
+        <div className="text-sm">
           motor when slower than
           <input
             type="number"
@@ -193,7 +184,7 @@ function PlanningSection() {
           />{' '}
           kn
         </div>
-        <p className="text-[11px] text-slate-500 pl-6">Set the threshold high to always motor.</p>
+        <p className="text-[11px] text-slate-500">0 kn threshold = never motor. Set high to always motor.</p>
       </fieldset>
       <div className="flex items-center gap-3">
         <button onClick={save} className="bg-emerald-700 px-3 py-1 rounded text-sm">

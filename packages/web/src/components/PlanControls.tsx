@@ -20,6 +20,7 @@ export interface PlanParams {
     stepMinutes?: number;
     maxHours?: number;
     autoMotor?: { minSail: number; motor: number };
+    captureIsochrones?: boolean;
   };
 }
 
@@ -62,6 +63,10 @@ export function PlanControls(props: {
   onColorMode: (m: RouteColorMode) => void;
   /** Grey out the "by TWA" option (e.g. the drawn route is motoring). */
   colorTwaDisabled?: boolean;
+  showIsochrones: boolean;
+  onShowIsochrones: (v: boolean) => void;
+  showRouteWind: boolean;
+  onShowRouteWind: (v: boolean) => void;
 }) {
   const tz = props.tz;
   // Departure is stored as an absolute UNIX-seconds anchor; the displayed
@@ -75,7 +80,7 @@ export function PlanControls(props: {
   const [models, setModels] = useState({ gfs: true, ecmwf: true });
   // Auto-motor: motor when the polar speed drops below minSail, capping the
   // engine contribution at motorKt. Seeded from saved Settings/Planning prefs.
-  const [auto, setAuto] = useState({ enabled: false, minSailKt: 3, motorKt: 5 });
+  const [auto, setAuto] = useState({ minSailKt: 0, motorKt: 5 });
   // Advanced isochrone-router knobs, also seeded from settings.
   const [adv, setAdv] = useState({
     avoidLand: true,
@@ -92,8 +97,7 @@ export function PlanControls(props: {
         if (pl) {
           if (pl.autoMotor)
             setAuto({
-              enabled: !!pl.autoMotor.enabled,
-              minSailKt: pl.autoMotor.minSailKt ?? 3,
+              minSailKt: pl.autoMotor.minSailKt ?? 0,
               motorKt: pl.autoMotor.motorKt ?? 5,
             });
           setAdv((a) => ({
@@ -124,9 +128,11 @@ export function PlanControls(props: {
         pruneBucketDeg: adv.pruneBucketDeg,
         stepMinutes: adv.stepMinutes,
         maxHours: adv.maxHours,
-        autoMotor: auto.enabled
-          ? { minSail: auto.minSailKt * KN, motor: auto.motorKt * KN }
-          : undefined,
+        autoMotor:
+          auto.minSailKt > 0
+            ? { minSail: auto.minSailKt * KN, motor: auto.motorKt * KN }
+            : undefined,
+        captureIsochrones: props.showIsochrones || undefined,
       },
     });
   };
@@ -168,39 +174,29 @@ export function PlanControls(props: {
           onChange={(e) => setUseCurrents(e.target.checked)}
           className={checkboxClass}
         />
-        Use surface currents (RTOFS)
+        Use surface currents (CMEMS)
       </label>
       <div className="space-y-1 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={auto.enabled}
-            onChange={(e) => setAuto((a) => ({ ...a, enabled: e.target.checked }))}
-            className={checkboxClass}
+        <span className="text-slate-400">Auto-motor</span>
+        <div className="flex flex-wrap items-center gap-1 pl-2 text-xs text-slate-400">
+          motor when slower than
+          <NumberInput
+            min={0}
+            step={0.5}
+            value={auto.minSailKt}
+            onChange={(minSailKt) => setAuto((a) => ({ ...a, minSailKt }))}
+            width="inline"
           />
-          Auto-motor
-        </label>
-        {auto.enabled && (
-          <div className="flex flex-wrap items-center gap-1 pl-6 text-xs text-slate-400">
-            motor when slower than
-            <NumberInput
-              min={0}
-              step={0.5}
-              value={auto.minSailKt}
-              onChange={(minSailKt) => setAuto((a) => ({ ...a, minSailKt }))}
-              width="inline"
-            />
-            kn, at
-            <NumberInput
-              min={0}
-              step={0.5}
-              value={auto.motorKt}
-              onChange={(motorKt) => setAuto((a) => ({ ...a, motorKt }))}
-              width="inline"
-            />
-            kn
-          </div>
-        )}
+          kn, at
+          <NumberInput
+            min={0}
+            step={0.5}
+            value={auto.motorKt}
+            onChange={(motorKt) => setAuto((a) => ({ ...a, motorKt }))}
+            width="inline"
+          />
+          kn
+        </div>
       </div>
       <details className="text-sm">
         <summary className="cursor-pointer text-slate-300">Advanced</summary>
@@ -214,25 +210,45 @@ export function PlanControls(props: {
             />
             Avoid land
           </label>
-          <label className="block">
-            Frontier size (°)
-            <NumberInput
-              min={0.5}
-              step={0.5}
-              value={adv.pruneBucketDeg}
-              onChange={(pruneBucketDeg) => setAdv((a) => ({ ...a, pruneBucketDeg }))}
-              width="full"
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              Frontier size (°)
+              <NumberInput
+                min={0.5}
+                step={0.5}
+                value={adv.pruneBucketDeg}
+                onChange={(pruneBucketDeg) => setAdv((a) => ({ ...a, pruneBucketDeg }))}
+                width="full"
+              />
+            </label>
+            <label className="block">
+              Isochrone step (min)
+              <NumberInput
+                min={5}
+                step={5}
+                value={adv.stepMinutes}
+                onChange={(stepMinutes) => setAdv((a) => ({ ...a, stepMinutes }))}
+                width="full"
+              />
+            </label>
+          </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={props.showIsochrones}
+              onChange={(e) => props.onShowIsochrones(e.target.checked)}
+              className={checkboxClass}
             />
+            Show isochrones
           </label>
-          <label className="block">
-            Isochrone length (min)
-            <NumberInput
-              min={5}
-              step={5}
-              value={adv.stepMinutes}
-              onChange={(stepMinutes) => setAdv((a) => ({ ...a, stepMinutes }))}
-              width="full"
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={props.showRouteWind}
+              onChange={(e) => props.onShowRouteWind(e.target.checked)}
+              className={checkboxClass}
             />
+            Show route wind
           </label>
           <label className="block">
             Max days

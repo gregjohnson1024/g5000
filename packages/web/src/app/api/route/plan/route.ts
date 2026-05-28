@@ -17,7 +17,10 @@ interface Body {
   departure: number;
   model: 'GFS' | 'ECMWF';
   useCurrents?: boolean;
-  options?: Record<string, unknown> & { autoMotor?: { minSail: number; motor: number } };
+  options?: Record<string, unknown> & {
+    autoMotor?: { minSail: number; motor: number };
+    captureIsochrones?: boolean;
+  };
 }
 
 function bboxAround(a: Body['start'], b: Body['end']) {
@@ -79,7 +82,7 @@ export async function POST(req: Request): Promise<Response> {
       polarId: 'active',
       coastline,
       currents,
-      options: { ...resolved, useCurrents: !!b.useCurrents },
+      options: { ...resolved, useCurrents: !!b.useCurrents, captureIsochrones: !!b.options?.captureIsochrones },
     });
     return Response.json({ ok: true, route });
   } catch (err) {

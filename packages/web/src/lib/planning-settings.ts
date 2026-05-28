@@ -7,7 +7,7 @@ export interface PlanningSettings {
   headingResolutionDeg?: number;
   maxHours?: number;
   avoidLand?: boolean;
-  autoMotor?: { enabled: boolean; minSailKt: number; motorKt: number };
+  autoMotor?: { minSailKt: number; motorKt: number };
 }
 
 export const PLANNING_DEFAULTS = {
@@ -17,7 +17,7 @@ export const PLANNING_DEFAULTS = {
   headingResolutionDeg: 5,
   maxHours: 168,
   avoidLand: true,
-  autoMotor: { enabled: false, minSailKt: 3, motorKt: 5 },
+  autoMotor: { minSailKt: 0, motorKt: 5 },
 } as const;
 
 /** Plain numeric/boolean PlanOptions plus the m/s autoMotor the engine wants. */
@@ -46,9 +46,11 @@ export function resolvePlanOptions(
   const pick = <K extends keyof typeof PLANNING_DEFAULTS>(k: K, rv: unknown): number | boolean =>
     (rv ?? s[k as keyof PlanningSettings] ?? PLANNING_DEFAULTS[k]) as number | boolean;
 
-  const am = s.autoMotor;
+  const am = s.autoMotor ?? PLANNING_DEFAULTS.autoMotor;
+  // minSailKt=0 means "never motor"; resolve to undefined so the planner skips
+  // the motor path entirely rather than evaluating a threshold that never fires.
   const settingsAutoMotor =
-    am && am.enabled
+    am.minSailKt > 0
       ? { minSail: am.minSailKt * KN_TO_MS, motor: am.motorKt * KN_TO_MS }
       : undefined;
 

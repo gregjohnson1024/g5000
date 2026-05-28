@@ -1,9 +1,25 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Route } from '@g5000/routing';
 import { PlanControls, type PlanParams } from '../../components/PlanControls';
 import type { RouteColorMode } from '../../components/RoutePolyline';
 import type { TzMode } from '../../lib/tz';
+
+function fmtRouteDuration(secs: number): string {
+  const totalMin = Math.round(secs / 60);
+  const d = Math.floor(totalMin / (24 * 60));
+  const h = Math.floor((totalMin % (24 * 60)) / 60);
+  const m = totalMin % 60;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  return d > 0 ? `${d}d ${hh}:${mm}` : `${hh}:${mm}`;
+}
+
+const INCOMPLETE_REASON: Record<string, string> = {
+  exceeded_max_hours: 'exceeded time',
+  no_wind: 'no wind',
+  land_blocked: 'land block',
+};
 
 interface Wp {
   id: string;
@@ -64,16 +80,24 @@ export function RoutePlanPanel(props: {
   colorTwaDisabled?: boolean;
   onRouted: (routes: Partial<Record<'GFS' | 'ECMWF', Route>>) => void;
   onClear: () => void;
+  showIsochrones: boolean;
+  onShowIsochrones: (v: boolean) => void;
+  showRouteWind: boolean;
+  onShowRouteWind: (v: boolean) => void;
 }) {
   const { waypoints, startId, endId } = props;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const start = waypoints.find((w) => w.id === startId);
   const end = waypoints.find((w) => w.id === endId);
 
   const onPlan = async (params: PlanParams): Promise<void> => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     setLoading(true);
     setError(null);
     setSummary(null);
@@ -96,6 +120,7 @@ export function RoutePlanPanel(props: {
               useCurrents: params.useCurrents,
               options: params.options,
             }),
+            signal: ctrl.signal,
           });
           const j = (await res.json()) as {
             ok: boolean;
@@ -105,20 +130,32 @@ export function RoutePlanPanel(props: {
           if (!j.ok || !j.route) errs.push(`${model}: ${j.error?.message ?? 'plan failed'}`);
           else results[model] = j.route;
         } catch (e) {
+          if (e instanceof Error && e.name === 'AbortError') return;
           errs.push(`${model}: ${e instanceof Error ? e.message : String(e)}`);
         }
       }),
     );
+    if (ctrl.signal.aborted) {
+      setLoading(false);
+      return;
+    }
     setLoading(false);
     if (errs.length) setError(errs.join(' · '));
     if (Object.keys(results).length) {
       const parts = (Object.entries(results) as Array<['GFS' | 'ECMWF', Route]>).map(
         ([m, r]) =>
-          `${m}: ${(r.distance / 1852).toFixed(0)} NM / ${((r.end - r.start) / 3600).toFixed(1)} h${r.incomplete ? ' (incomplete)' : ''}`,
+          `${m}: ${(r.distance / 1852).toFixed(0)} NM / ${fmtRouteDuration(r.end - r.start)}${r.incomplete ? ` (incomplete — ${INCOMPLETE_REASON[r.reason ?? ''] ?? 'unknown reason'})` : ''}`,
       );
       setSummary(parts.join(' · '));
       props.onRouted(results);
     }
+  };
+
+  const onCancel = (): void => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setError(null);
   };
 
   return (
@@ -154,7 +191,19 @@ export function RoutePlanPanel(props: {
             colorMode={props.colorMode}
             onColorMode={props.onColorMode}
             colorTwaDisabled={props.colorTwaDisabled}
+            showIsochrones={props.showIsochrones}
+            onShowIsochrones={props.onShowIsochrones}
+            showRouteWind={props.showRouteWind}
+            onShowRouteWind={props.onShowRouteWind}
           />
+          {loading && (
+            <button
+              onClick={onCancel}
+              className="w-full px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 rounded"
+            >
+              Cancel planning
+            </button>
+          )}
           {summary && <p className="text-xs text-emerald-400">{summary}</p>}
           {error && <p className="text-xs text-rose-400">Error: {error}</p>}
           {props.hasRoute && (

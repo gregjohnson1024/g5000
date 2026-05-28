@@ -241,12 +241,15 @@ export function WaypointsLayer({
       map.dragPan.enable();
       map.getCanvas().style.cursor = onSelectRef.current || onMoveRef.current ? 'pointer' : '';
       const ov = dragOverrideRef.current;
-      dragOverrideRef.current = null;
       if (d.moved && ov && onMoveRef.current) {
         suppressClickRef.current = true; // swallow the trailing click
         onMoveRef.current(d.id, ov.lat, ov.lon);
+        sync(); // render at drop position while override is still set
+        dragOverrideRef.current = null;
+      } else {
+        dragOverrideRef.current = null;
+        sync();
       }
-      sync(); // settle to the final / prop position
     };
     map.on('click', DOT_LAYER, onDotClick);
     map.on('mousedown', DOT_LAYER, onDotMouseDown);
