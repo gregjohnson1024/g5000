@@ -4,7 +4,7 @@ import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { pickEcmwfRun } from '@g5000/grib';
 import { cropFromGlobalCache, writeGlobalGrid } from './ecmwf-global-cache';
-import { pickHrrrRun } from './hrrr-fetch';
+import { pickHrrrRun } from './hrrr-helpers';
 
 // ECMWF Open Data IFS is mirrored on AWS S3 (public bucket, no auth, no rate
 // limit). Prefer it over data.ecmwf.int which 429s aggressively after a

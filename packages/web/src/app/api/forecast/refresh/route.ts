@@ -7,7 +7,12 @@ import {
   type WindGrid,
   type WindModel,
 } from '../../../../lib/wind-fetch';
-import { fetchHrrrGrid, hrrrHorizonHours, pickHrrrRun, inHrrrDomain } from '../../../../lib/hrrr-fetch';
+import {
+  fetchHrrrGrid,
+  hrrrHorizonHours,
+  pickHrrrRun,
+  inHrrrDomain,
+} from '../../../../lib/hrrr-fetch';
 import { cache, bboxKey } from '../../wind/route';
 import { pruneGlobalCache, capGlobalCache } from '../../../../lib/ecmwf-global-cache';
 

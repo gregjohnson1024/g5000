@@ -5,7 +5,7 @@ import { contours } from 'd3-contour';
 import { FILL_STOPS } from '../lib/wind-scale';
 import { projectGeo, makeBarb } from '../lib/wind-barb';
 
-export type WindModel = 'gfs' | 'ecmwf';
+export type WindModel = 'gfs' | 'ecmwf' | 'hrrr';
 
 export interface WindGrid {
   lats: number[];
@@ -32,7 +32,6 @@ const M_PER_DEG_LAT = 111_320;
 const MS_TO_KN = 1 / 0.514444;
 
 // Speed bin → fill colour lives in lib/wind-scale so the legend reuses it.
-
 
 /**
  * Helper: convert a flat field's grid coords back to lat/lon and emit a

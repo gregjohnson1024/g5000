@@ -25,6 +25,14 @@ describe('modelLayerView', () => {
     expect(v.windModel).toBe('ecmwf');
     expect(v.currentHidden).toBe(true);
   });
+  it('hrrr → wind shown, windModel hrrr', () => {
+    const v = modelLayerView('hrrr');
+    expect(v.windHidden).toBe(false);
+    expect(v.windModel).toBe('hrrr');
+    expect(v.isWindModel).toBe(true);
+    expect(v.currentHidden).toBe(true);
+    expect(v.isCurrent).toBe(false);
+  });
   it('cmems → current shown, no wind', () => {
     const v = modelLayerView('cmems');
     expect(v.windHidden).toBe(true);

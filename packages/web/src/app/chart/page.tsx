@@ -32,6 +32,7 @@ import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
+import { inHrrrDomain, hrrrHorizonHours, pickHrrrRun } from '../../lib/hrrr-helpers';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { RoutePlanPanel } from './RoutePlanPanel';
@@ -108,13 +109,23 @@ function ChartPageInner() {
   } | null>(null);
   const [currentRefreshKey, setCurrentRefreshKey] = useState(1);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
-  const [availableHours, setAvailableHours] = useState<{ gfs: number[]; ecmwf: number[] }>({
+  const [availableHours, setAvailableHours] = useState<{
+    gfs: number[];
+    ecmwf: number[];
+    hrrr: number[];
+  }>({
     gfs: [],
     ecmwf: [],
+    hrrr: [],
   });
-  const [latestRunAt, setLatestRunAt] = useState<{ gfs: number | null; ecmwf: number | null }>({
+  const [latestRunAt, setLatestRunAt] = useState<{
+    gfs: number | null;
+    ecmwf: number | null;
+    hrrr: number | null;
+  }>({
     gfs: null,
     ecmwf: null,
+    hrrr: null,
   });
   // Lat/lon under the mouse — populated while the cursor is over the map,
   // cleared when it leaves. Used by the bottom-left cursor-position panel
@@ -152,7 +163,7 @@ function ChartPageInner() {
       const raw = window.localStorage.getItem('chart:layers');
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<LayersState>;
-        const validModels: ChartModel[] = ['none', 'gfs', 'ecmwf', 'cmems'];
+        const validModels: ChartModel[] = ['none', 'gfs', 'ecmwf', 'hrrr', 'cmems'];
         setLayers({
           osm: parsed.osm ?? true,
           enc: parsed.enc ?? false,
@@ -439,24 +450,29 @@ function ChartPageInner() {
             near(b.lonMax, roi.lonMax));
         const gfs = new Set<number>();
         const ecmwf = new Set<number>();
+        const hrrr = new Set<number>();
         let gfsRun: number | null = null;
         let ecmwfRun: number | null = null;
+        let hrrrRun: number | null = null;
         for (const e of j.entries as Array<{
-          model: 'gfs' | 'ecmwf';
+          model: 'gfs' | 'ecmwf' | 'hrrr';
           forecastHour: number;
           runAt: number;
           bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number };
         }>) {
           if (!matches(e.bbox)) continue;
-          (e.model === 'gfs' ? gfs : ecmwf).add(e.forecastHour);
+          const bucket = e.model === 'gfs' ? gfs : e.model === 'hrrr' ? hrrr : ecmwf;
+          bucket.add(e.forecastHour);
           if (e.model === 'gfs') gfsRun = Math.max(gfsRun ?? 0, e.runAt);
+          else if (e.model === 'hrrr') hrrrRun = Math.max(hrrrRun ?? 0, e.runAt);
           else ecmwfRun = Math.max(ecmwfRun ?? 0, e.runAt);
         }
         setAvailableHours({
           gfs: [...gfs].sort((a, b) => a - b),
           ecmwf: [...ecmwf].sort((a, b) => a - b),
+          hrrr: [...hrrr].sort((a, b) => a - b),
         });
-        setLatestRunAt({ gfs: gfsRun, ecmwf: ecmwfRun });
+        setLatestRunAt({ gfs: gfsRun, ecmwf: ecmwfRun, hrrr: hrrrRun });
       } catch {
         /* ignore */
       }
@@ -677,7 +693,7 @@ function ChartPageInner() {
   // forecast hour for the active wind model and unlock the slider so the
   // overlay tracks the ghost boats as they advance.
   const onWindHour = (t: number): void => {
-    const model: 'gfs' | 'ecmwf' = mv.windModel ?? 'gfs';
+    const model: 'gfs' | 'ecmwf' | 'hrrr' = mv.windModel ?? 'gfs';
     const run = latestRunAt[model];
     if (run == null) return;
     const h = nearestForecastHour(run, t, availableHours[model]);
@@ -1117,11 +1133,18 @@ function ChartPageInner() {
                     // still in progress. The thumb still snaps to cached hours.
                     const minH = list[0]!;
                     const availMaxH = list[list.length - 1]!;
+                    // HRRR is short-horizon (≤18 h, or ≤48 h on synoptic runs),
+                    // far shorter than GFS/ECMWF's 168 h — clamp the intended
+                    // range so the slider doesn't render a long empty band.
+                    const intendedHours =
+                      activeWindModel === 'hrrr'
+                        ? WIND_FORECAST_HOURS.filter(
+                            (h) => h <= hrrrHorizonHours(pickHrrrRun(nowS).runHourUtc),
+                          )
+                        : WIND_FORECAST_HOURS;
                     const expectedMaxH = Math.max(
                       availMaxH,
-                      ...WIND_FORECAST_HOURS.filter(
-                        (h) => !runAt || runAt + h * 3600 >= nowS - 1800,
-                      ),
+                      ...intendedHours.filter((h) => !runAt || runAt + h * 3600 >= nowS - 1800),
                     );
                     const span = expectedMaxH - minH;
                     const availPct = span > 0 ? ((availMaxH - minH) / span) * 100 : 100;
@@ -1176,6 +1199,12 @@ function ChartPageInner() {
                 </span>{' '}
                 (+{windGrid.forecastHour}h)
               </div>
+            </div>
+          )}
+          {layers.model === 'hrrr' && forecastBbox && !inHrrrDomain(forecastBbox) && (
+            <div className="text-xs text-amber-300">
+              HRRR covers US waters only — no data for this area. Move the forecast region inside
+              the continental US, or pick GFS/ECMWF for offshore.
             </div>
           )}
           {mv.isWindModel && windStatus && (

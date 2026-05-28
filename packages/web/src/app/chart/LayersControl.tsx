@@ -114,6 +114,11 @@ export function LayersControl({
               onClick={() => onSelectModel('ecmwf')}
             />
             <ModelRow
+              label="HRRR (3 km)"
+              active={state.model === 'hrrr'}
+              onClick={() => onSelectModel('hrrr')}
+            />
+            <ModelRow
               label="CMEMS (currents)"
               active={state.model === 'cmems'}
               onClick={() => onSelectModel('cmems')}

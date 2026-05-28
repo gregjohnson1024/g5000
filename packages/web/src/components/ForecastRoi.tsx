@@ -12,6 +12,7 @@ import {
   type Bbox,
   type Corner,
 } from './forecast-roi-math';
+import { inHrrrDomain } from '../lib/hrrr-helpers';
 
 const SOURCE_ID = 'forecast-roi-source';
 const OUTLINE_LAYER_ID = 'forecast-roi-outline';
@@ -31,7 +32,15 @@ const REFRESH_HOURS: number[] = [
   ...Array.from({ length: 121 }, (_, i) => i),
   ...Array.from({ length: 16 }, (_, i) => 123 + i * 3),
 ];
+// HRRR is CONUS-only, so it's appended per-box (see refreshModelsFor) rather
+// than living in this constant — a mid-ocean ROI shouldn't queue HRRR fetches.
 const REFRESH_MODELS = ['gfs', 'ecmwf'] as const;
+
+/** Models to refresh for a given ROI: always GFS + ECMWF, plus HRRR when the
+ *  box is inside the HRRR (CONUS+coastal) domain. */
+function refreshModelsFor(bbox: Bbox): string[] {
+  return inHrrrDomain(bbox) ? [...REFRESH_MODELS, 'hrrr'] : [...REFRESH_MODELS];
+}
 
 /** CMEMS ocean-current forecast days warmed alongside wind on each refresh.
  *  Daily-mean grids, so 0..3 covers today + the next three days — roughly the
@@ -498,7 +507,7 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bbox: next, models: REFRESH_MODELS, hours: REFRESH_HOURS }),
+        body: JSON.stringify({ bbox: next, models: refreshModelsFor(next), hours: REFRESH_HOURS }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       myGen = ((await r.json()) as { gen?: number }).gen;
