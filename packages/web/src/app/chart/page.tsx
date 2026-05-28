@@ -9,6 +9,9 @@ import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
 import { WaypointsLayer } from '../../components/WaypointsLayer';
+import { TrackOverlay, type TrackColorMode } from '../../components/TrackOverlay';
+import { IsochroneLayer } from '../../components/IsochroneLayer';
+import { RouteWindLayer } from '../../components/RouteWindLayer';
 import { WaypointEditPopup } from '../../components/WaypointEditPopup';
 import { fmtLatLonDmm } from '../../lib/format-coords';
 // DriftArrow removed at user's request; computation kept on /helm via the
@@ -23,6 +26,7 @@ import { LaylinesLayer } from '../../components/LaylinesLayer';
 import { EncLayer } from '../../components/EncLayer';
 import { SatelliteLayer } from '../../components/SatelliteLayer';
 import { EncBuoyLayer } from '../../components/EncBuoyLayer';
+import { BathyLayer } from '../../components/BathyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
@@ -40,6 +44,14 @@ import { TzToggle } from '../../components/TzToggle';
 import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import { nearestForecastHour, type PlaybackState } from '../../lib/route-playback';
 import type { Route } from '@g5000/routing';
+import type { Track } from '../../lib/tracks';
+
+interface TrackLayerPref {
+  visible: boolean;
+  colorMode: TrackColorMode;
+}
+/** Shared with /tracks: which saved tracks to draw on the chart and how. */
+const TRACK_LAYERS_KEY = 'chart:trackLayers';
 
 /**
  * Minutes of travel projected ahead from each vessel's current position
@@ -125,6 +137,7 @@ function ChartPageInner() {
     enc: false,
     satellite: false,
     buoys: false,
+    bathy: false,
     ais: true,
     aisCog: true,
     model: 'none' as ChartModel,
@@ -141,6 +154,7 @@ function ChartPageInner() {
           enc: parsed.enc ?? false,
           satellite: parsed.satellite ?? false,
           buoys: parsed.buoys ?? false,
+          bathy: parsed.bathy ?? false,
           ais: parsed.ais ?? true,
           aisCog: parsed.aisCog ?? true,
           model: validModels.includes(parsed.model as ChartModel)
@@ -265,6 +279,8 @@ function ChartPageInner() {
     Array<{ id: string; name: string; lat: number; lon: number }>
   >([]);
   const [routes, setRoutes] = useState<Partial<Record<'GFS' | 'ECMWF', Route>>>({});
+  const [showIsochrones, setShowIsochrones] = useState(false);
+  const [showRouteWind, setShowRouteWind] = useState(false);
   const [playbackStates, setPlaybackStates] = useState<
     Partial<Record<'GFS' | 'ECMWF', PlaybackState>>
   >({});
@@ -284,6 +300,49 @@ function ChartPageInner() {
     }
   }, [routeColorMode]);
   const [error, setError] = useState<string | undefined>();
+
+  // Saved-track overlays. /tracks writes which tracks to show (+ colour mode)
+  // to the `chart:trackLayers` localStorage key; we read it on mount and re-read
+  // when another tab changes it (the `storage` event only fires cross-document,
+  // which is exactly the two-tab case — within one tab, navigating back to
+  // /chart remounts this page and re-reads fresh). Visible tracks' points are
+  // lazily fetched and cached so toggling doesn't re-hit the server.
+  const [trackLayers, setTrackLayers] = useState<Record<string, TrackLayerPref>>({});
+  const [trackCache, setTrackCache] = useState<Record<string, Track>>({});
+  useEffect(() => {
+    const read = (): void => {
+      try {
+        const raw = window.localStorage.getItem(TRACK_LAYERS_KEY);
+        setTrackLayers(raw ? (JSON.parse(raw) as Record<string, TrackLayerPref>) : {});
+      } catch {
+        setTrackLayers({});
+      }
+    };
+    read();
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key === TRACK_LAYERS_KEY) read();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Fetch + cache points for any newly-visible track.
+  useEffect(() => {
+    const wanted = Object.entries(trackLayers)
+      .filter(([, v]) => v.visible)
+      .map(([id]) => id);
+    for (const id of wanted) {
+      if (trackCache[id]) continue;
+      void fetch(`/api/tracks/${id}`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((j: { ok: boolean; track?: Track }) => {
+          if (j.ok && j.track) setTrackCache((prev) => ({ ...prev, [id]: j.track! }));
+        })
+        .catch(() => {
+          /* ignore — track may have been deleted */
+        });
+    }
+  }, [trackLayers, trackCache]);
 
   // Draw the colour-coded route line for each model that has a route, and
   // remove the layer for any model that doesn't. GFS = amber, ECMWF = cyan.
@@ -682,6 +741,8 @@ function ChartPageInner() {
           onLongPress={dropWaypointAt}
           suppressLongPressLayers={['waypoints-dot']}
         />
+        {showIsochrones && <IsochroneLayer map={mapInstance} routes={routes} />}
+        {showRouteWind && <RouteWindLayer map={mapInstance} routes={routes} />}
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
         <CogExtension
           map={mapInstance}
@@ -713,7 +774,6 @@ function ChartPageInner() {
                 }
               : undefined
           }
-          hidden={mv.roiHidden}
         />
         <WaypointsLayer
           map={mapInstance}
@@ -732,6 +792,20 @@ function ChartPageInner() {
           onSelectWaypoint={waypointDropActive ? undefined : (id) => setSelectedWaypointId(id)}
           onMoveWaypoint={waypointDropActive ? undefined : handleMoveWaypoint}
         />
+        {Object.entries(trackLayers)
+          .filter(([id, v]) => v.visible && trackCache[id])
+          // Skip the active (still-recording) track — LiveBoatMarker already
+          // draws it as the green live trail, so an overlay would double it.
+          .filter(([id]) => trackCache[id]!.endedAt !== null)
+          .map(([id, v]) => (
+            <TrackOverlay
+              key={id}
+              map={mapInstance}
+              id={`track-overlay-${id}`}
+              points={trackCache[id]!.points}
+              colorMode={v.colorMode}
+            />
+          ))}
         <WindOverlay
           map={mapInstance}
           centerLat={livePos?.lat ?? null}
@@ -781,6 +855,7 @@ function ChartPageInner() {
         <EncLayer map={mapInstance} visible={layers.enc} />
         <SatelliteLayer map={mapInstance} visible={layers.satellite} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
+        <BathyLayer map={mapInstance} visible={layers.bathy} />
         {(() => {
           const sel = selectedWaypointId
             ? waypoints.find((w) => w.id === selectedWaypointId)
@@ -861,12 +936,17 @@ function ChartPageInner() {
           colorTwaDisabled={hasMotoring}
           onRouted={handleRouted}
           onClear={handleClearRoute}
+          showIsochrones={showIsochrones}
+          onShowIsochrones={setShowIsochrones}
+          showRouteWind={showRouteWind}
+          onShowRouteWind={setShowRouteWind}
         />
         {Object.keys(routes).length > 0 && (
           <>
             <PlaybackScrubber
               map={mapInstance}
               routes={routes}
+              tz={tz}
               onStates={setPlaybackStates}
               onWindHour={onWindHour}
             />
@@ -1096,6 +1176,28 @@ function ChartPageInner() {
           )}
           {mv.isWindModel && windStatus && (
             <div className="text-xs text-emerald-300">{windStatus}</div>
+          )}
+          {mv.isWindModel && forecastBbox && mapInstance && (
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  mapInstance.fitBounds(
+                    [
+                      [forecastBbox.lonMin, forecastBbox.latMin],
+                      [forecastBbox.lonMax, forecastBbox.latMax],
+                    ],
+                    { padding: 40, duration: 600 },
+                  );
+                } catch {
+                  /* style not ready */
+                }
+              }}
+              className="w-full px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
+              title="Zoom to the forecast region to see and drag the corner handles"
+            >
+              Fit to forecast region
+            </button>
           )}
           {mv.isWindModel && <WindLegend />}
         </div>

@@ -15,8 +15,9 @@ function colorExpr(
       return ['match', ['get', 'tack'], 'port', '#ef4444', 'starboard', '#22c55e', base];
     case 'sog':
       // Through-water/over-ground speed in m/s (~0–20 kn): slow blue → fast red.
+      // interpolate-hcl blends in perceptual colour space — no muddy RGB midpoints.
       return [
-        'interpolate',
+        'interpolate-hcl',
         ['linear'],
         ['get', 'sog'],
         0,
@@ -33,7 +34,7 @@ function colorExpr(
     case 'twa':
       // |TWA| radians: upwind blue → reach green/amber → run red.
       return [
-        'interpolate',
+        'interpolate-hcl',
         ['linear'],
         ['get', 'twa'],
         0,

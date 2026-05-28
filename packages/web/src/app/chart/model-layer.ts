@@ -6,8 +6,6 @@ export interface ModelLayerView {
   windHidden: boolean;
   /** CurrentOverlay hidden unless CMEMS is selected. */
   currentHidden: boolean;
-  /** ForecastRoi hidden unless a wind model is selected. */
-  roiHidden: boolean;
   /** True when gfs/ecmwf — gates the forecast timeline + manifest poll. */
   isWindModel: boolean;
   /** True when cmems — gates the Refresh CMEMS button. */
@@ -22,7 +20,6 @@ export function modelLayerView(model: ChartModel): ModelLayerView {
   return {
     windHidden: !isWindModel,
     currentHidden: !isCurrent,
-    roiHidden: !isWindModel,
     isWindModel,
     isCurrent,
     windModel: isWindModel ? model : null,

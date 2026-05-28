@@ -17,6 +17,15 @@ interface SliceData {
   annotations: TrackAnnotation[];
 }
 
+type TrackColorMode = 'none' | 'sog';
+interface TrackLayerPref {
+  visible: boolean;
+  colorMode: TrackColorMode;
+}
+/** Per-track chart-overlay prefs, shared with /chart via this localStorage key.
+ *  /chart reads it to decide which saved tracks to draw and how to colour them. */
+const TRACK_LAYERS_KEY = 'chart:trackLayers';
+
 const M_PER_NM = 1852;
 
 function fmtUtc(iso: string): string {
@@ -67,6 +76,32 @@ export default function TracksPage() {
     toLabel: string;
   } | null>(null);
   const [sliceData, setSliceData] = useState<SliceData | null>(null);
+  // Per-track chart-overlay prefs, persisted to localStorage and read by /chart.
+  const [trackLayers, setTrackLayers] = useState<Record<string, TrackLayerPref>>({});
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TRACK_LAYERS_KEY);
+      if (raw) setTrackLayers(JSON.parse(raw) as Record<string, TrackLayerPref>);
+    } catch {
+      /* corrupt / private mode — start empty */
+    }
+  }, []);
+  const writeTrackLayers = (next: Record<string, TrackLayerPref>): void => {
+    setTrackLayers(next);
+    try {
+      localStorage.setItem(TRACK_LAYERS_KEY, JSON.stringify(next));
+    } catch {
+      /* quota / private mode — ignore */
+    }
+  };
+  const toggleVisible = (id: string): void => {
+    const cur = trackLayers[id] ?? { visible: false, colorMode: 'none' as TrackColorMode };
+    writeTrackLayers({ ...trackLayers, [id]: { ...cur, visible: !cur.visible } });
+  };
+  const setColorMode = (id: string, colorMode: TrackColorMode): void => {
+    const cur = trackLayers[id] ?? { visible: false, colorMode: 'none' as TrackColorMode };
+    writeTrackLayers({ ...trackLayers, [id]: { ...cur, colorMode } });
+  };
 
   const reload = useCallback(async () => {
     try {
@@ -119,6 +154,12 @@ export default function TracksPage() {
       const r = await fetch(`/api/tracks/${id}`, { method: 'DELETE' });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error?.message ?? 'delete failed');
+      // Drop any stale chart-overlay pref so the key doesn't grow unbounded.
+      if (trackLayers[id]) {
+        const next = { ...trackLayers };
+        delete next[id];
+        writeTrackLayers(next);
+      }
       await reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -228,6 +269,7 @@ export default function TracksPage() {
                 <th className="p-2 text-right">Duration</th>
                 <th className="p-2 text-right">Distance (NM)</th>
                 <th className="p-2 text-right">Points</th>
+                <th className="p-2 text-center">Chart</th>
                 <th className="p-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -273,6 +315,38 @@ export default function TracksPage() {
                           {(t.totalDistanceM / M_PER_NM).toFixed(1)}
                         </td>
                         <td className="p-2 text-right font-mono">{t.pointCount}</td>
+                        <td className="p-2 text-center whitespace-nowrap">
+                          {active ? (
+                            <span
+                              className="text-[10px] text-emerald-400"
+                              title="The live recording is always drawn in green on the chart"
+                            >
+                              live
+                            </span>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={trackLayers[t.id]?.visible ?? false}
+                                onChange={() => toggleVisible(t.id)}
+                                title="Show this track on the chart"
+                                className="accent-violet-500"
+                              />
+                              <select
+                                value={trackLayers[t.id]?.colorMode ?? 'none'}
+                                onChange={(e) =>
+                                  setColorMode(t.id, e.target.value as TrackColorMode)
+                                }
+                                disabled={!(trackLayers[t.id]?.visible ?? false)}
+                                title="Line colouring on the chart"
+                                className="bg-slate-900 border border-slate-700 rounded text-xs px-1 py-0.5 disabled:opacity-40"
+                              >
+                                <option value="none">Plain</option>
+                                <option value="sog">SOG</option>
+                              </select>
+                            </div>
+                          )}
+                        </td>
                         <td className="p-2 text-right space-x-1">
                           {editingId === t.id ? (
                             <>
@@ -312,7 +386,7 @@ export default function TracksPage() {
                         </td>
                       </tr>
                       <tr key={`${t.id}-annotations`} className="border-b border-slate-900">
-                        <td colSpan={9} className="px-2 pb-2">
+                        <td colSpan={10} className="px-2 pb-2">
                           <button
                             type="button"
                             onClick={() => void toggleExpand(t.id)}
