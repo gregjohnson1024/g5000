@@ -187,7 +187,7 @@ export default function SniffPage() {
   };
 
   return (
-    <main className="p-4 min-h-screen bg-black space-y-4">
+    <main className="p-4 flex-1 overflow-y-auto bg-black space-y-4">
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-200">PGN Sniffer</h1>
         <div className="flex gap-2 items-center text-xs">

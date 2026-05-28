@@ -9,7 +9,7 @@ import { WindShiftPlot } from '../../components/WindShiftPlot';
 
 export default function RacePage(): React.ReactElement {
   return (
-    <main className="p-4 min-h-screen bg-black">
+    <main className="p-4 flex-1 overflow-y-auto bg-black">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Race</h1>
         <RaceAudible />

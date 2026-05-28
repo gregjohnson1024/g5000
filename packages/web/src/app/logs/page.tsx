@@ -70,7 +70,7 @@ export default function LogsPage() {
   const visible = entries.filter((e) => levels[e.level]);
 
   return (
-    <main className="p-6 flex flex-col h-[calc(100vh-3rem)]">
+    <main className="p-6 flex flex-col flex-1 min-h-0">
       <div className="flex items-center gap-3 mb-3 flex-wrap">
         <h1 className="text-2xl font-semibold">Server logs</h1>
         <span className="text-xs text-slate-400 font-mono">

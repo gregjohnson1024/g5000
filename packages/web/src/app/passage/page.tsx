@@ -246,7 +246,7 @@ export default function PassagePage() {
   }, []);
 
   return (
-    <main className="p-4 min-h-screen bg-black space-y-4">
+    <main className="p-4 flex-1 overflow-y-auto bg-black space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-xl font-semibold text-slate-300">Passage</h1>
         <div className="flex items-center gap-3">

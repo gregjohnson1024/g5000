@@ -261,7 +261,7 @@ export default function HelmPage() {
   }, []);
 
   return (
-    <main className="p-4 min-h-screen bg-black relative">
+    <main className="p-4 flex-1 overflow-y-auto bg-black relative">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
         <div className="flex items-center gap-3">

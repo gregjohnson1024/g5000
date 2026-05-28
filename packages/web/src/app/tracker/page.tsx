@@ -9,7 +9,7 @@ const PW = {
 
 export default function TrackerPage() {
   return (
-    <main className="p-4 min-h-screen bg-black flex flex-col">
+    <main className="p-4 flex-1 min-h-0 bg-black flex flex-col">
       <div className="flex items-baseline justify-between mb-3">
         <h1 className="text-xl font-semibold text-slate-300">Tracker</h1>
         <div className="text-xs text-slate-500 font-mono">
