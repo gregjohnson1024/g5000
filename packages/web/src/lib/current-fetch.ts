@@ -2,11 +2,10 @@
  * Copernicus Marine (CMEMS) surface-current grid fetch + persistent cache
  * for the chart overlay.
  *
- * NOAA retired the NOMADS RTOFS subset filter in early 2026, so we use
- * Copernicus Marine's global ocean physics analysis forecast product
- * (cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m — daily means, 1/12°, surface
- * depth). The Python `copernicusmarine` client handles authentication and
- * subsetting; this module shells out to a helper script that returns JSON.
+ * Source is Copernicus Marine's global ocean physics analysis forecast
+ * product (cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m — daily means, 1/12°,
+ * surface depth). The Python `copernicusmarine` client handles authentication
+ * and subsetting; this module shells out to a helper script that returns JSON.
  */
 
 import { spawn } from 'node:child_process';

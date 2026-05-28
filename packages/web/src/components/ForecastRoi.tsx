@@ -28,11 +28,18 @@ const PROGRESS_FILL_LAYER = 'forecast-roi-progress-fill-line';
 const REFRESH_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
 const REFRESH_MODELS = ['gfs', 'ecmwf'] as const;
 
+/** CMEMS ocean-current forecast days warmed alongside wind on each refresh.
+ *  Daily-mean grids, so 0..3 covers today + the next three days — roughly the
+ *  same horizon the wind hours span, without dogpiling the slow (10-30 s each,
+ *  serial) Copernicus Marine S3 subset fetches. */
+const REFRESH_CURRENT_DAYS: number[] = [0, 1, 2, 3];
+
 function makeHandleEl(): HTMLDivElement {
   const el = document.createElement('div');
   el.style.cssText =
-    'width:14px;height:14px;background:#fbbf24;border:2px solid #1e293b;' +
-    'border-radius:3px;cursor:nwse-resize;box-shadow:0 0 0 1px rgba(0,0,0,0.4);';
+    'width:20px;height:20px;background:#fbbf24;border:2px solid #1e293b;' +
+    'border-radius:4px;cursor:nwse-resize;' +
+    'box-shadow:0 0 0 1px rgba(255,255,255,0.5),0 2px 4px rgba(0,0,0,0.5);';
   return el;
 }
 
@@ -469,6 +476,18 @@ export function ForecastRoi({ map, defaultBbox, hidden = false }: ForecastRoiPro
     setProgress(0);
     setBoxDirty(false);
     setNewerAvailable(false); // we're fetching the current run for this box now
+    // Warm the CMEMS ocean-current cache for the same ROI, in parallel with the
+    // wind fetch. Fire-and-forget: the current route is synchronous (no progress
+    // endpoint) and each day's S3 subset is slow, so we do NOT await it or couple
+    // the wind progress bar to it. The chart's <CurrentOverlay> picks up the
+    // warmed grids from /api/current/grid once they land in cache. Unlike wind,
+    // we don't DELETE this on a box drag — there's no abort path for the Python
+    // helper, so we just let any in-flight current fetch finish writing to cache.
+    void fetch('/api/current/refresh', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bbox: next, days: REFRESH_CURRENT_DAYS }),
+    }).catch(() => {});
     let myGen: number | undefined;
     try {
       const r = await fetch('/api/forecast/refresh', {
