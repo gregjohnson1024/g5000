@@ -4,6 +4,7 @@ import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { pickEcmwfRun } from '@g5000/grib';
 import { cropFromGlobalCache, writeGlobalGrid } from './ecmwf-global-cache';
+import { pickHrrrRun } from './hrrr-fetch';
 
 // ECMWF Open Data IFS is mirrored on AWS S3 (public bucket, no auth, no rate
 // limit). Prefer it over data.ecmwf.int which 429s aggressively after a
@@ -71,7 +72,7 @@ async function fetchEcmwfMessagesS3(opts: {
   );
 }
 
-export type WindModel = 'gfs' | 'ecmwf';
+export type WindModel = 'gfs' | 'ecmwf' | 'hrrr';
 
 // Persistent on-disk wind cache. Survives autopilot restarts so a planner
 // can use yesterday's forecast immediately without re-fetching from
@@ -232,6 +233,17 @@ export function expectedRunUnix(model: WindModel, now: Date = new Date()): numbe
       ) / 1000
     );
   }
+  if (model === 'hrrr') {
+    const run = pickHrrrRun(now.getTime() / 1000);
+    return (
+      Date.UTC(
+        Number(run.runDateUtc.slice(0, 4)),
+        Number(run.runDateUtc.slice(5, 7)) - 1,
+        Number(run.runDateUtc.slice(8, 10)),
+        run.runHourUtc,
+      ) / 1000
+    );
+  }
   return pickRun(now).runUnix;
 }
 
@@ -304,7 +316,7 @@ export function windFieldFromCache(
   times: number[];
   u: number[][][];
   v: number[][][];
-  source: 'GFS' | 'ECMWF';
+  source: 'GFS' | 'ECMWF' | 'HRRR';
   runTime: number;
 } {
   const grids: WindGrid[] = [];
@@ -353,7 +365,7 @@ export function windFieldFromCache(
     times: series.map((g) => g.validAt),
     u: series.map((g) => g.u),
     v: series.map((g) => g.v),
-    source: model === 'gfs' ? 'GFS' : 'ECMWF',
+    source: model === 'gfs' ? 'GFS' : model === 'hrrr' ? 'HRRR' : 'ECMWF',
     runTime: ref.runAt,
   };
 }
@@ -400,6 +412,8 @@ export const PUBLICATION_LAG_HOURS: Record<WindModel, number> = {
   // with pickEcmwfRun's lag in @g5000/grib so `runAvailability` doesn't claim a
   // run is available before the fetcher will actually pull it.
   ecmwf: 9,
+  // HRRR runs hourly and posts ~50–90 min after the hour; pickHrrrRun lags 2 h.
+  hrrr: 2,
 };
 
 /**
@@ -411,6 +425,16 @@ export function runAvailability(
   at: Date = new Date(),
 ): { latestRunUnix: number; nextRunAvailableUnix: number } {
   const lag = PUBLICATION_LAG_HOURS[model];
+  if (model === 'hrrr') {
+    // HRRR runs every hour, not on the 6-hourly synoptic cycle. Walk back the
+    // lag and truncate to the top of that hour.
+    const t = new Date(at.getTime() - lag * 3600 * 1000);
+    const latestRunUnix =
+      Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), t.getUTCHours()) / 1000;
+    const nextRunNominal = latestRunUnix + 3600;
+    const nextRunAvailableUnix = nextRunNominal + lag * 3600;
+    return { latestRunUnix, nextRunAvailableUnix };
+  }
   // Walk back `lag` hours; the run "before" that wall-clock time is the
   // most recent that's been fully published.
   const t = new Date(at.getTime() - lag * 3600 * 1000);
@@ -473,7 +497,7 @@ export function buildGfsUrl(o: {
   return `${NOMADS}?${params.toString()}`;
 }
 
-function spawnText(cmd: string, args: string[]): Promise<string> {
+export function spawnText(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolveP, rejectP) => {
     const p = spawn(cmd, args);
     let out = '';
@@ -497,7 +521,7 @@ function spawnText(cmd: string, args: string[]): Promise<string> {
  *       33.000     -65.000      5.42
  * Returns one record per grid point.
  */
-function parseGridData(text: string): Array<{ lat: number; lon: number; v: number }> {
+export function parseGridData(text: string): Array<{ lat: number; lon: number; v: number }> {
   const out: Array<{ lat: number; lon: number; v: number }> = [];
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
