@@ -109,3 +109,45 @@ relocations ~0). Confidence is the auditor's, after verifying against source.
 4. **Tier 4** — explicit go-ahead per item; tile-proxy factory and ConfigStore registry are the biggest wins but riskiest.
 
 Total mechanical reduction available before decomposition: **≈ −1,100 LOC** with low risk.
+
+---
+
+## Status — applied 2026-05-29 (all tiers)
+
+Executed as 9 verify-gated phases on `develop`; every phase: file-disjoint apply
+agents → (for relocations/factories) adversarial behavior-equivalence review →
+`tsc -b` + full vitest, committed only when green. `next build` run as a gate on
+every web-touching phase.
+
+| Phase | Commit | Result |
+|-------|--------|--------|
+| Tier 1 dead code | `dc76ae0` | done (~−540) |
+| Tier 2A core/compute/bridge/db dedup + polars$ retire | `a72d7b0` | done |
+| Tier 2B web formatters/geo/units | `625e2f3` | done |
+| Tier 2C map overlays + wind-fetch | `998f006` | done |
+| Tier 3A passage/ais/wind-fetch decomp | `8b3dbe2` | done (reviews equivalent) |
+| Tier 3B main() + chart timeline | `2e8b428` | done (reviews equivalent) |
+| Tier 4A config-store registry / raster hook / driver base | `d42cd3e` | done |
+| Tier 4B tile-proxy factory + parseJsonBody | `ebd63ca` | done (+31 char tests) |
+
+God-components after Tier 3: chart 1502→~1277, passage 993→576, ais 1006→427,
+`main()` 635→213, wind-fetch 788→426.
+
+**Deferred (intentionally not applied):**
+- Chart `useLocalStorageState` + `useForecastManifest` hook extractions (#30 partial)
+  — restructure effect/SSR-hydration ordering for modest LOC; higher risk than a
+  pure relocation, low reward. Left in `chart/page.tsx`.
+- `DriftArrow.tsx` (unmounted-but-preserved, like Seamark/Laylines) — not deleted.
+- ais `northUp` dead branch — kept per author's future-toggle comment.
+- WindOverlay 30 s refetch (manifest-poll object-identity churn) — a perf/bug fix,
+  not a relocation; out of scope for a behavior-preserving pass.
+- Minor: `inspect/page.tsx` keeps its local `MS_TO_KN = 1.943844` (≠ `1/0.514444`)
+  to preserve its exact output.
+
+**Doc fix still owed:** CLAUDE.md (Deployment) + the deploy-procedure memory cite
+`computeSailTimeline` "exported from `@g5000/routing`" — grep-confirmed it does not
+exist. Stale reference to correct.
+
+**Pre-promote gate (must pass before promoting `develop`→`main`/Pi):** `npm run build`
+(done, green) + boot in demo mode and exercise a source-mode swap to runtime-verify
+the new `main()` teardown path (no automated test covers `apps/g5000/index.ts`).
