@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   fmtHourLabel,
   fmtTimestamp,
+  formatDuration,
   parseDatetimeLocalInput,
   readTzMode,
   toDatetimeLocalInput,
   writeTzMode,
   type TzMode,
 } from '../../lib/tz';
+import { bearingDeg, greatCircleNm } from '../../lib/geo';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtLatLonDmm } from '../../lib/format-coords';
 
@@ -43,27 +45,6 @@ const BERMUDA = {
   label: "St George's, Bermuda",
 };
 
-function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R_NM = 3440.065;
-  const toRad = (d: number): number => (d * Math.PI) / 180;
-  const p1 = toRad(lat1);
-  const p2 = toRad(lat2);
-  const dp = toRad(lat2 - lat1);
-  const dl = toRad(lon2 - lon1);
-  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
-function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const toRad = (d: number): number => (d * Math.PI) / 180;
-  const p1 = toRad(lat1);
-  const p2 = toRad(lat2);
-  const dl = toRad(lon2 - lon1);
-  const y = Math.sin(dl) * Math.cos(p2);
-  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-}
-
 interface DistanceStats {
   d1hM: number;
   d3hM: number;
@@ -80,14 +61,6 @@ interface DistanceStats {
     distanceM: number;
     complete: boolean;
   }>;
-}
-
-function fmtDuration(secs: number): string {
-  const h = Math.floor(secs / 3600);
-  const d = Math.floor(h / 24);
-  if (d >= 1) return `${d}d ${h % 24}h`;
-  if (h >= 1) return `${h}h ${Math.floor((secs % 3600) / 60)}m`;
-  return `${Math.floor(secs / 60)}m`;
 }
 
 function Sparkline({
@@ -255,7 +228,7 @@ export default function PassagePage() {
             <div className="text-xs text-slate-500 font-mono">
               {stats.trackId}
               {stats.trackStartAt &&
-                ` · ${fmtDuration((stats.lastPointAt ?? Date.now() / 1000) - stats.trackStartAt)} elapsed`}
+                ` · ${formatDuration((stats.lastPointAt ?? Date.now() / 1000) - stats.trackStartAt)} elapsed`}
             </div>
           )}
         </div>
@@ -808,8 +781,14 @@ function DistanceTile({
 }
 
 function BermudaTile({ eta }: { eta: EtaSnapshot }) {
-  const distNm = greatCircleNm(eta.currentLat, eta.currentLon, BERMUDA.lat, BERMUDA.lon);
-  const brgDeg = initialBearingDeg(eta.currentLat, eta.currentLon, BERMUDA.lat, BERMUDA.lon);
+  const distNm = greatCircleNm(
+    { lat: eta.currentLat, lon: eta.currentLon },
+    { lat: BERMUDA.lat, lon: BERMUDA.lon },
+  );
+  const brgDeg = bearingDeg(
+    { lat: eta.currentLat, lon: eta.currentLon },
+    { lat: BERMUDA.lat, lon: BERMUDA.lon },
+  );
   return (
     <section className="bg-slate-900 border border-cyan-700 rounded p-4 flex items-baseline justify-between gap-4 flex-wrap">
       <div>
@@ -849,7 +828,7 @@ function LogTile({
       ? `since ${weekdayFor(log.anchorAt, tz)} ${fmtTimestamp(log.anchorAt, tz)}`
       : 'no anchor set';
   const elapsedText =
-    log.anchorAt !== null ? ` · ${fmtDuration(Date.now() / 1000 - log.anchorAt)} elapsed` : '';
+    log.anchorAt !== null ? ` · ${formatDuration(Date.now() / 1000 - log.anchorAt)} elapsed` : '';
   return (
     <section className="bg-slate-900 border border-emerald-700 rounded p-4 space-y-3">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -992,7 +971,7 @@ function EtaTile({
         <div>
           <div className="text-xs uppercase tracking-wider text-slate-500">Time remaining</div>
           <div className="text-xl text-slate-100">
-            {eta.etaSecRemaining !== null ? fmtDuration(eta.etaSecRemaining) : '—'}
+            {eta.etaSecRemaining !== null ? formatDuration(eta.etaSecRemaining) : '—'}
           </div>
         </div>
       </div>

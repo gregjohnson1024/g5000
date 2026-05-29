@@ -1,6 +1,7 @@
 import { getSourceModeController } from '@g5000/core';
 import { activeTrack, createTrack, appendPoint, type Track, type TrackPoint } from './tracks';
 import { positionStreamUrl } from './g5000-client';
+import { haversineM } from './geo';
 
 /**
  * Server-side track recorder. Connects to the g5000 app's
@@ -31,16 +32,6 @@ export interface Recorder {
 declare global {
   // eslint-disable-next-line no-var
   var __g5kTrackRecorder__: Recorder | undefined;
-}
-
-function haversineM(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const R = 6_371_000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
-  const φ1 = (a.lat * Math.PI) / 180;
-  const φ2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 /**
@@ -145,7 +136,9 @@ export async function maybeAppend(rec: Recorder, pt: TrackPoint): Promise<void> 
   const nowMs = Date.now();
   const elapsedMs = nowMs - rec.lastAppendedAt;
   if (elapsedMs < MIN_INTERVAL_MS) return;
-  const dist = rec.lastPoint ? haversineM(rec.lastPoint, pt) : Infinity;
+  const dist = rec.lastPoint
+    ? haversineM(rec.lastPoint.lat, rec.lastPoint.lon, pt.lat, pt.lon)
+    : Infinity;
   const shouldAppend =
     rec.lastPoint === null || dist >= MIN_DISTANCE_M || elapsedMs >= MIN_INTERVAL_MS_FORCE;
   if (!shouldAppend) return;

@@ -13,7 +13,9 @@ import { TrackOverlay, type TrackColorMode } from '../../components/TrackOverlay
 import { IsochroneLayer } from '../../components/IsochroneLayer';
 import { RouteWindLayer } from '../../components/RouteWindLayer';
 import { WaypointEditPopup } from '../../components/WaypointEditPopup';
-import { fmtLatLonDmm } from '../../lib/format-coords';
+import { fmtLatDmm, fmtLonDmm, fmtLatLonDmm } from '../../lib/format-coords';
+import { greatCircleNm, bearingDeg } from '../../lib/geo';
+import { MS_TO_KN, RAD_TO_DEG, wrap360, cardinal16 } from '../../lib/units';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
@@ -1287,25 +1289,21 @@ function LiveValues({ p }: { p: LivePos | null }) {
   if (!p) {
     return <div className="text-xs text-slate-500">Waiting for live fix…</div>;
   }
-  const MS_TO_KN = 1 / 0.514444;
-  const RAD_TO_DEG = 180 / Math.PI;
   // Compact marine DMM matching the shared format-coords helper:
   // `33 42.232n` (no °/′ symbols, lowercase hemisphere).
-  const fmtCoord = (deg: number, axis: 'lat' | 'lon'): string => {
-    const hemi = deg >= 0 ? (axis === 'lat' ? 'n' : 'e') : axis === 'lat' ? 's' : 'w';
-    const abs = Math.abs(deg);
-    const d = Math.floor(abs);
-    const m = (abs - d) * 60;
-    return `${d} ${m.toFixed(3)}${hemi}`;
-  };
-  const wrap360 = (deg: number): number => ((deg % 360) + 360) % 360;
+  const lat = fmtLatDmm(p.lat);
+  const lon = fmtLonDmm(p.lon);
   const cogDeg = typeof p.cog === 'number' ? wrap360(p.cog * RAD_TO_DEG) : null;
   const hdgDeg = typeof p.hdg === 'number' ? wrap360(p.hdg * RAD_TO_DEG) : null;
   const sogKn = typeof p.sog === 'number' ? p.sog * MS_TO_KN : null;
   return (
     <div className="text-xs space-y-0.5 bg-slate-900/60 border border-slate-800 rounded p-2">
-      <div className="font-mono text-slate-200">{fmtCoord(p.lat, 'lat')}</div>
-      <div className="font-mono text-slate-200">{fmtCoord(p.lon, 'lon')}</div>
+      <div className="font-mono text-slate-200">
+        {`${lat.deg} ${lat.min}${lat.hemi.toLowerCase()}`}
+      </div>
+      <div className="font-mono text-slate-200">
+        {`${lon.deg} ${lon.min}${lon.hemi.toLowerCase()}`}
+      </div>
       <div className="text-slate-400">
         SOG:{' '}
         <span className="text-slate-200 font-mono">
@@ -1351,7 +1349,10 @@ function CursorReadout({
   if (!cursor) return null;
   const hasBoat = !!boat && Number.isFinite(boat.lat) && Number.isFinite(boat.lon);
   const rangeBearing = hasBoat
-    ? haversineAndBearing({ lat: boat!.lat, lon: boat!.lon }, cursor)
+    ? {
+        distNm: greatCircleNm({ lat: boat!.lat, lon: boat!.lon }, cursor),
+        bearingDeg: bearingDeg({ lat: boat!.lat, lon: boat!.lon }, cursor),
+      }
     : null;
   // Nearest isobath depth from the GEBCO contour layer. Works even when the
   // visible layer is toggled off because BathyLayer keeps it mounted with
@@ -1397,7 +1398,6 @@ function formatCursorUv(
   if (!grid) return null;
   const uv = sampleUV(grid, cursor.lat, cursor.lon);
   if (!uv) return null;
-  const MS_TO_KN = 1 / 0.514444;
   const speedKn = Math.hypot(uv.u, uv.v) * MS_TO_KN;
   if (kind === 'wind') {
     const fromDeg = (Math.atan2(-uv.u, -uv.v) * 180) / Math.PI;
@@ -1407,49 +1407,6 @@ function formatCursorUv(
   const setDeg = (Math.atan2(uv.u, uv.v) * 180) / Math.PI;
   const d = ((setDeg % 360) + 360) % 360;
   return `Current ${speedKn.toFixed(1)} kn · set ${cardinal16(d)} (${d.toFixed(0).padStart(3, '0')}°)`;
-}
-
-/** 16-point compass abbreviation for a true bearing in degrees. */
-function cardinal16(deg: number): string {
-  const pts = [
-    'N',
-    'NNE',
-    'NE',
-    'ENE',
-    'E',
-    'ESE',
-    'SE',
-    'SSE',
-    'S',
-    'SSW',
-    'SW',
-    'WSW',
-    'W',
-    'WNW',
-    'NW',
-    'NNW',
-  ];
-  return pts[Math.round(deg / 22.5) % 16]!;
-}
-
-/** Great-circle distance (NM) and initial bearing (deg, 0-360, true). */
-function haversineAndBearing(
-  a: { lat: number; lon: number },
-  b: { lat: number; lon: number },
-): { distNm: number; bearingDeg: number } {
-  const R_NM = 3440.065;
-  const DEG = Math.PI / 180;
-  const phi1 = a.lat * DEG;
-  const phi2 = b.lat * DEG;
-  const dphi = (b.lat - a.lat) * DEG;
-  const dlam = (b.lon - a.lon) * DEG;
-  const h = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
-  const distNm = 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(h)));
-  const y = Math.sin(dlam) * Math.cos(phi2);
-  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dlam);
-  let bearingDeg = (Math.atan2(y, x) * 180) / Math.PI;
-  if (bearingDeg < 0) bearingDeg += 360;
-  return { distNm, bearingDeg };
 }
 
 /**

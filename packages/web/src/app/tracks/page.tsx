@@ -1,6 +1,7 @@
 'use client';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import type { TrackAnnotation } from '../../lib/tracks';
+import { formatDuration, fmtUtcMinute } from '../../lib/tz';
 
 interface TrackMeta {
   id: string;
@@ -30,21 +31,15 @@ const M_PER_NM = 1852;
 
 function fmtUtc(iso: string): string {
   if (!iso) return '—';
-  return iso.slice(0, 16).replace('T', ' ') + 'Z';
+  return fmtUtcMinute(Date.parse(iso) / 1000);
 }
 
+// Sub-minute spans show seconds ("Ns"); above that, defer to the shared
+// coarse formatter (Nm / Nh Nm / Nd Nh) so the ladder stays identical.
 function fmtDurationMs(ms: number): string {
   const seconds = Math.max(0, Math.round(ms / 1000));
   if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    return `${h}h ${m}m`;
-  }
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  return `${d}d ${h}h`;
+  return formatDuration(seconds);
 }
 
 function fmtDurationFromIso(start: string, end: string | null): string {
@@ -57,7 +52,7 @@ function fmtDurationFromIso(start: string, end: string | null): string {
 // Full UTC timestamp for an annotation's hover title, e.g. "2026-05-23 14:32Z".
 function fmtUtcMs(ms: number): string {
   if (!Number.isFinite(ms)) return '—';
-  return new Date(ms).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+  return fmtUtcMinute(ms / 1000);
 }
 
 export default function TracksPage() {

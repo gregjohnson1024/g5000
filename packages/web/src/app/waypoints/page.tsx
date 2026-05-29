@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { parseCoordinate, parseLatLon, formatCoordinate } from '../../lib/coords';
+import { greatCircleNm, bearingDeg } from '../../lib/geo';
 
 interface Waypoint {
   id: string;
@@ -14,27 +15,6 @@ interface Waypoint {
 interface CurrentPos {
   lat: number;
   lon: number;
-}
-
-function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R_NM = 3440.065;
-  const toRad = (d: number): number => (d * Math.PI) / 180;
-  const p1 = toRad(lat1);
-  const p2 = toRad(lat2);
-  const dp = toRad(lat2 - lat1);
-  const dl = toRad(lon2 - lon1);
-  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
-function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const toRad = (d: number): number => (d * Math.PI) / 180;
-  const p1 = toRad(lat1);
-  const p2 = toRad(lat2);
-  const dl = toRad(lon2 - lon1);
-  const y = Math.sin(dl) * Math.cos(p2);
-  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
 export default function WaypointsPage() {
@@ -354,14 +334,10 @@ export default function WaypointsPage() {
                   <td className="p-2 font-mono text-slate-200">
                     {currentPos ? (
                       <>
-                        {greatCircleNm(currentPos.lat, currentPos.lon, w.lat, w.lon).toFixed(1)}{' '}
+                        {greatCircleNm(currentPos, w).toFixed(1)}{' '}
                         <span className="text-slate-500">NM</span>{' '}
                         <span className="text-xs text-slate-500">
-                          {String(
-                            Math.round(
-                              initialBearingDeg(currentPos.lat, currentPos.lon, w.lat, w.lon),
-                            ),
-                          ).padStart(3, '0')}
+                          {String(Math.round(bearingDeg(currentPos, w))).padStart(3, '0')}
                           °T
                         </span>
                       </>

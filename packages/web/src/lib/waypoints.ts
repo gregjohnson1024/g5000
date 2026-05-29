@@ -1,4 +1,5 @@
 import { getSharedConfigStore, type Waypoint } from '@g5000/db';
+import { slugify } from './slug';
 
 export type { Waypoint };
 
@@ -93,13 +94,7 @@ export async function createWaypoint(
   input: Omit<Waypoint, 'id' | 'createdAt'> & { id?: string },
 ): Promise<Waypoint> {
   const list = await readWaypoints();
-  const id =
-    input.id?.trim() ||
-    input.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') ||
-    `wp-${Date.now()}`;
+  const id = input.id?.trim() || slugify(input.name) || `wp-${Date.now()}`;
   if (list.some((w) => w.id === id)) {
     throw new Error(`waypoint id "${id}" already exists`);
   }

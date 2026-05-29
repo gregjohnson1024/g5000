@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './paths';
+import { haversineM } from './geo';
 import type { TrackAnnotation } from './track-annotations';
 export { openPeriodStart, type TrackAnnotation } from './track-annotations';
 
@@ -61,20 +62,12 @@ function trackPath(id: string): string {
   return join(TRACKS_DIR, `${id}.json`);
 }
 
-function haversineM(a: TrackPoint, b: TrackPoint): number {
-  const R = 6_371_000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
-  const φ1 = (a.lat * Math.PI) / 180;
-  const φ2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
 function summarise(t: Track): TrackMeta {
   let dist = 0;
   for (let i = 1; i < t.points.length; i++) {
-    dist += haversineM(t.points[i - 1]!, t.points[i]!);
+    const a = t.points[i - 1]!;
+    const b = t.points[i]!;
+    dist += haversineM(a.lat, a.lon, b.lat, b.lon);
   }
   return {
     id: t.id,

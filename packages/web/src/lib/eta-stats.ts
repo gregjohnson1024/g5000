@@ -1,10 +1,10 @@
 import { activeTrack } from './tracks';
 import { computeDistanceStats } from './distance-stats';
+import { haversineM, bearingDeg } from './geo';
 
 const M_TO_NM = 1 / 1852;
 const MS_TO_KN = 1 / 0.514444;
 const ETA_3H_SEC = 3 * 3600;
-const R_M = 6371000;
 
 export interface EtaSnapshot {
   destinationLat: number;
@@ -24,25 +24,6 @@ export interface EtaSnapshot {
   currentLat: number;
   currentLon: number;
   currentAtUnixSec: number;
-}
-
-function haversineNm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLon = ((bLon - aLon) * Math.PI) / 180;
-  const φ1 = (aLat * Math.PI) / 180;
-  const φ2 = (bLat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R_M * Math.asin(Math.sqrt(h)) * M_TO_NM;
-}
-
-function bearingDeg(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const φ1 = (aLat * Math.PI) / 180;
-  const φ2 = (bLat * Math.PI) / 180;
-  const Δλ = ((bLon - aLon) * Math.PI) / 180;
-  const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-  const θ = Math.atan2(y, x);
-  return ((θ * 180) / Math.PI + 360) % 360;
 }
 
 /**
@@ -66,7 +47,7 @@ export async function computeEta(
   const avgSpeedMs = d3hM > 0 ? d3hM / ETA_3H_SEC : 0;
   const avgSpeedKn3h = avgSpeedMs > 0 ? avgSpeedMs * MS_TO_KN : null;
 
-  const distanceNm = haversineNm(last.lat, last.lon, destLat, destLon);
+  const distanceNm = haversineM(last.lat, last.lon, destLat, destLon) * M_TO_NM;
   const distanceM = distanceNm / M_TO_NM;
 
   const etaSecRemaining = avgSpeedMs > 0 ? Math.floor(distanceM / avgSpeedMs) : null;
@@ -77,7 +58,7 @@ export async function computeEta(
     destinationLon: destLon,
     destinationLabel,
     distanceNm,
-    bearingDeg: bearingDeg(last.lat, last.lon, destLat, destLon),
+    bearingDeg: bearingDeg({ lat: last.lat, lon: last.lon }, { lat: destLat, lon: destLon }),
     avgSpeedKn3h,
     etaUnixSec,
     etaSecRemaining,

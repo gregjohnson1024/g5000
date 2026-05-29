@@ -5,9 +5,9 @@ import { computeCpa, type CpaResult } from '@g5000/compute';
 import type { AisTarget, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
 import { aisDetailRows, fmtTcpa } from '../../lib/ais-detail';
+import { MS_TO_KN, wrap360 } from '../../lib/units';
 
 const NM = 1852;
-const MS_TO_KN = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
 const RANGE_OPTIONS_NM = [1, 2, 4, 8, 20, 30];
 const DEFAULT_RANGE_NM = 30;
@@ -960,7 +960,7 @@ export function AisClientView() {
                       </td>
                       <td className="py-1 text-right">
                         {target.cog !== undefined
-                          ? `${String(Math.round((((target.cog * RAD_TO_DEG) % 360) + 360) % 360)).padStart(3, '0')}°`
+                          ? `${String(Math.round(wrap360(target.cog * RAD_TO_DEG))).padStart(3, '0')}°`
                           : '—'}
                       </td>
                       <td className="py-1 text-right">

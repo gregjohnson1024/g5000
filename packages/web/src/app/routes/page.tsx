@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { greatCircleNm } from '../../lib/geo';
 import RouteBuilder from './RouteBuilder';
 
 interface Waypoint {
@@ -20,23 +21,12 @@ interface Route {
   updatedAt: string;
 }
 
-function greatCircleNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R_NM = 3440.065;
-  const toRad = (d: number): number => (d * Math.PI) / 180;
-  const p1 = toRad(lat1);
-  const p2 = toRad(lat2);
-  const dp = toRad(lat2 - lat1);
-  const dl = toRad(lon2 - lon1);
-  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
 function totalDistanceNm(route: Route, wpMap: Map<string, Waypoint>): number {
   let total = 0;
   for (let i = 0; i < route.waypointIds.length - 1; i++) {
     const a = wpMap.get(route.waypointIds[i]!);
     const b = wpMap.get(route.waypointIds[i + 1]!);
-    if (a && b) total += greatCircleNm(a.lat, a.lon, b.lat, b.lon);
+    if (a && b) total += greatCircleNm(a, b);
   }
   return total;
 }

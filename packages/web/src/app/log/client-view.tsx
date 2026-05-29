@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
 import { fmtLatLonDmm } from '../../lib/format-coords';
+import { MS_TO_KN } from '../../lib/units';
 
 const RAD_TO_DEG = 180 / Math.PI;
-const MS_TO_KN = 1 / 0.514444;
 const KINDS = ['note', 'weather', 'equipment', 'incident', 'crew'] as const;
 type ManualKind = (typeof KINDS)[number];
 

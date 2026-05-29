@@ -1,14 +1,7 @@
 import { getSharedConfigStore, type Route } from '@g5000/db';
+import { slugify } from './slug';
 
 export type { Route };
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 async function read(): Promise<Route[]> {
   return getSharedConfigStore().getRoutes();

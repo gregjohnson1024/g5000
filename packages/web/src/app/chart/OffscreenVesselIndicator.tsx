@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { LivePos } from '../../components/LiveBoatMarker';
 import { computeOffscreenAnchor, type OffscreenAnchor } from './offscreen-vessel-edge';
+import { greatCircleNm } from '../../lib/geo';
 
 const PILL_PAD = 32;
 
@@ -99,7 +100,9 @@ export function OffscreenVesselIndicator({
       });
       setAnchor(raw ? avoidCornerControls(raw, width, height, PILL_PAD) : null);
       const center = map.getCenter();
-      setDistanceNm(haversineNm(center.lat, center.lng, livePos.lat, livePos.lon));
+      setDistanceNm(
+        greatCircleNm({ lat: center.lat, lon: center.lng }, { lat: livePos.lat, lon: livePos.lon }),
+      );
     };
     recompute();
     map.on('move', recompute);
@@ -131,18 +134,4 @@ export function OffscreenVesselIndicator({
       <span>{distanceNm.toFixed(1)} NM</span>
     </button>
   );
-}
-
-const NM_PER_KM = 1 / 1.852;
-
-function haversineNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R_KM = 6371;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R_KM * c * NM_PER_KM;
 }

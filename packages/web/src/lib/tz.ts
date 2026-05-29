@@ -81,3 +81,20 @@ export function fmtHourLabel(unixSec: number, tz: TzMode): string {
   const mon = d.toLocaleString('en-GB', { month: 'short' });
   return `${hh}:${mm} ${dd} ${mon}`;
 }
+
+/** Coarse human duration from a span in seconds: "Nd Nh" / "Nh Nm" / "Nm".
+ *  Copied verbatim from passage/page.tsx fmtDuration. */
+export function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const d = Math.floor(h / 24);
+  if (d >= 1) return `${d}d ${h % 24}h`;
+  if (h >= 1) return `${h}h ${Math.floor((seconds % 3600) / 60)}m`;
+  return `${Math.floor(seconds / 60)}m`;
+}
+
+/** UNIX seconds → "YYYY-MM-DD HH:MM Z" (UTC, minute resolution).
+ *  Copied from forecast/page.tsx fmtUtc — note the suffix is 'Z' with no
+ *  leading space, matching the source byte-for-byte. */
+export function fmtUtcMinute(unixSec: number): string {
+  return new Date(unixSec * 1000).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+}

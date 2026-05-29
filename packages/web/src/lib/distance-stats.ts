@@ -1,15 +1,5 @@
 import { activeTrack, type TrackPoint } from './tracks';
-
-const R_M = 6_371_000;
-
-function haversineM(a: TrackPoint, b: TrackPoint): number {
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
-  const φ1 = (a.lat * Math.PI) / 180;
-  const φ2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R_M * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+import { haversineM } from './geo';
 
 /**
  * Sum the haversine distance over the subset of `points` whose timestamps
@@ -32,7 +22,7 @@ export function distanceInWindow(points: TrackPoint[], fromS: number, toS: numbe
   for (let i = lo; i < points.length; i++) {
     const p = points[i]!;
     if (p.t > toS) break;
-    if (prev) dist += haversineM(prev, p);
+    if (prev) dist += haversineM(prev.lat, prev.lon, p.lat, p.lon);
     prev = p;
   }
   return dist;

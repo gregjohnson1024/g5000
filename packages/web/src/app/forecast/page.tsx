@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { fmtUtcMinute } from '../../lib/tz';
 
 type WindModel = 'gfs' | 'ecmwf';
 
@@ -44,10 +45,6 @@ function unionBbox(a: Bbox, b: Bbox): Bbox {
     lonMin: Math.min(a.lonMin, b.lonMin),
     lonMax: Math.max(a.lonMax, b.lonMax),
   };
-}
-
-function fmtUtc(unix: number): string {
-  return new Date(unix * 1000).toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 }
 
 function fmtAge(seconds: number): string {
@@ -224,10 +221,10 @@ export default function ForecastPage() {
               return (
                 <tr key={m} className="border-b border-slate-900">
                   <td className="p-2 font-mono">{m.toUpperCase()}</td>
-                  <td className="p-2 font-mono">{fmtUtc(a.latestRunUnix)}</td>
+                  <td className="p-2 font-mono">{fmtUtcMinute(a.latestRunUnix)}</td>
                   <td className="p-2 text-slate-300">{fmtAge(ageSec)} ago</td>
                   <td className="p-2 text-slate-300">
-                    {fmtUtc(a.nextRunAvailableUnix)} ({fmtDuration(untilNext)})
+                    {fmtUtcMinute(a.nextRunAvailableUnix)} ({fmtDuration(untilNext)})
                   </td>
                 </tr>
               );
@@ -295,8 +292,8 @@ export default function ForecastPage() {
                 <tr key={i} className="border-b border-slate-900">
                   <td className="p-2 font-mono">{e.model.toUpperCase()}</td>
                   <td className="p-2 font-mono">+{e.forecastHour}h</td>
-                  <td className="p-2 font-mono">{fmtUtc(e.runAt)}</td>
-                  <td className="p-2 font-mono">{fmtUtc(e.validAt)}</td>
+                  <td className="p-2 font-mono">{fmtUtcMinute(e.runAt)}</td>
+                  <td className="p-2 font-mono">{fmtUtcMinute(e.validAt)}</td>
                   <td className="p-2 font-mono text-xs text-slate-400">
                     {e.bbox.latMin.toFixed(1)}…{e.bbox.latMax.toFixed(1)} N ·{' '}
                     {e.bbox.lonMin.toFixed(1)}…{e.bbox.lonMax.toFixed(1)} E

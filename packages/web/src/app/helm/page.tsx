@@ -11,8 +11,9 @@ import { AudibleAlarm } from '../../components/AudibleAlarm';
 import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { RaceMiniTimer } from './RaceMiniTimer';
 import { RaceTiles } from '../../components/RaceTiles';
+import { MS_TO_KN } from '../../lib/units';
+import { fmtLatDmm, fmtLonDmm } from '../../lib/format-coords';
 
-const MS_TO_KNOTS = 1 / 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
 
 function scalar(s: JsonSafeSample | undefined): number | null {
@@ -29,22 +30,18 @@ function geo(s: JsonSafeSample | undefined): { lat: number; lon: number } | null
 // `33 42.232n` — integer degrees, decimal minutes, lowercase hemisphere
 // glued to the minute number with no separator.
 function fmtLat(lat: number): string {
-  const abs = Math.abs(lat);
-  const deg = Math.floor(abs);
-  const min = ((abs - deg) * 60).toFixed(3);
-  return `${deg} ${min}${lat >= 0 ? 'n' : 's'}`;
+  const { deg, min, hemi } = fmtLatDmm(lat);
+  return `${deg} ${min}${hemi.toLowerCase()}`;
 }
 
 function fmtLon(lon: number): string {
-  const abs = Math.abs(lon);
-  const deg = Math.floor(abs);
-  const min = ((abs - deg) * 60).toFixed(3);
-  return `${deg} ${min}${lon >= 0 ? 'e' : 'w'}`;
+  const { deg, min, hemi } = fmtLonDmm(lon);
+  return `${deg} ${min}${hemi.toLowerCase()}`;
 }
 
 function fmtSpeed(s: JsonSafeSample | undefined): string {
   const v = scalar(s);
-  return v === null ? '—' : `${(v * MS_TO_KNOTS).toFixed(1)}`;
+  return v === null ? '—' : `${(v * MS_TO_KN).toFixed(1)}`;
 }
 
 function fmtAngleSigned(s: JsonSafeSample | undefined): string {
@@ -323,7 +320,7 @@ export default function HelmPage() {
 
         <HelmTile
           label="Avg SOG"
-          value={avgSog ? (avgSog.ms * MS_TO_KNOTS).toFixed(1) : '—'}
+          value={avgSog ? (avgSog.ms * MS_TO_KN).toFixed(1) : '—'}
           unit="kn"
           sub={
             avgSog
