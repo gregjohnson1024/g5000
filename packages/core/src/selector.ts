@@ -1,4 +1,4 @@
-import type { Bus } from './bus.js';
+import { compilePattern, type Bus } from './bus.js';
 import type { Sample } from './types.js';
 
 /**
@@ -79,40 +79,6 @@ function matchSourceIndex(source: string, sources: readonly string[]): number {
 }
 
 /**
- * Compile the same dot-segmented channel pattern syntax the Bus uses.
- * Duplicated rather than imported because `compilePattern` isn't exported
- * from bus.ts. Keep behaviour in sync if bus.ts ever changes.
- */
-function compileChannelPattern(pattern: string): (channel: string) => boolean {
-  if (!pattern.includes('*')) {
-    return (ch) => ch === pattern;
-  }
-  const segs = pattern.split('.');
-  for (let i = 0; i < segs.length - 1; i++) {
-    if (segs[i] === '**') {
-      throw new Error(`Pattern "${pattern}": ** must appear only as the trailing segment`);
-    }
-  }
-  const trailingDoubleStar = segs[segs.length - 1] === '**';
-  const fixed = trailingDoubleStar ? segs.slice(0, -1) : segs;
-  return (ch) => {
-    const chSegs = ch.split('.');
-    if (trailingDoubleStar) {
-      if (chSegs.length < fixed.length) return false;
-    } else if (chSegs.length !== fixed.length) {
-      return false;
-    }
-    for (let i = 0; i < fixed.length; i++) {
-      const f = fixed[i];
-      const c = chSegs[i];
-      if (f === '*') continue;
-      if (f !== c) return false;
-    }
-    return true;
-  };
-}
-
-/**
  * Find the first rule in `config` whose channelPattern matches `channel`.
  * Returns the matching rule or null. First match wins (config order).
  *
@@ -123,7 +89,7 @@ export function findRuleForChannel(
   channel: string,
 ): SourcePriorityRule | null {
   for (const rule of config) {
-    if (compileChannelPattern(rule.channelPattern)(channel)) return rule;
+    if (compilePattern(rule.channelPattern)(channel)) return rule;
   }
   return null;
 }

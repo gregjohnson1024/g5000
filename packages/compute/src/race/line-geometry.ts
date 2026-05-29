@@ -1,3 +1,5 @@
+import { wrapToPi, wrapTwoPi } from './geo.js';
+
 const EARTH_R_M = 6_371_000;
 
 export interface LatLon {
@@ -27,7 +29,7 @@ export function initialBearingRad(a: LatLon, b: LatLon): number {
   const y = Math.sin(dλ) * Math.cos(φ2);
   const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dλ);
   const θ = Math.atan2(y, x);
-  return (θ + 2 * Math.PI) % (2 * Math.PI);
+  return wrapTwoPi(θ);
 }
 
 /** Bearing from line.port to line.stbd, [0, 2π). */
@@ -107,8 +109,6 @@ export function lineBiasRad(lineBearingRad: number, twdRad: number): number {
   // We want bias = 0 when wind comes from the line normal direction
   // (i.e. wind blows perpendicular through the line). Positive bias means
   // wind is rotated toward port end → port is favored.
-  let d = twdRad - (normalToward + Math.PI); // from-wind vs the upwind side
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
+  const d = wrapToPi(twdRad - (normalToward + Math.PI)); // from-wind vs the upwind side
   return d;
 }

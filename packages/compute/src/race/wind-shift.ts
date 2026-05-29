@@ -1,3 +1,5 @@
+import { wrapToPi } from './geo.js';
+
 export interface WindShiftConfig {
   baselineWindowMs: number;
   currentWindowMs: number;
@@ -52,9 +54,7 @@ function windowMedianRad(w: Window): number | null {
   let bestIdx = 0;
   let bestDist = Infinity;
   for (let i = 0; i < n; i++) {
-    let d = w.samples[i]!.twdRad - meanRad;
-    while (d > Math.PI) d -= 2 * Math.PI;
-    while (d < -Math.PI) d += 2 * Math.PI;
+    const d = wrapToPi(w.samples[i]!.twdRad - meanRad);
     const dAbs = Math.abs(d);
     if (dAbs < bestDist) {
       bestDist = dAbs;
@@ -65,10 +65,7 @@ function windowMedianRad(w: Window): number | null {
 }
 
 function circularDiffRad(a: number, b: number): number {
-  let d = a - b;
-  while (d > Math.PI) d -= 2 * Math.PI;
-  while (d < -Math.PI) d += 2 * Math.PI;
-  return d;
+  return wrapToPi(a - b);
 }
 
 export interface WindShiftDetector {

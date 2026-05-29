@@ -212,13 +212,6 @@ describe('ConfigStore', () => {
     expect(v[0]!.channelPattern).toBe('wind.apparent.angle');
   });
 
-  it('legacy polars$ alias tracks activePolar$ (backward compat)', async () => {
-    // polars$ is still exported as an alias for activePolar$.
-    const a = await firstValueFrom(store.polars$);
-    const b = await firstValueFrom(store.activePolar$);
-    expect(a).toEqual(b);
-  });
-
   it('returns DEFAULT_AIS_ALARM_CONFIG on a fresh database', async () => {
     const c = await firstValueFrom(store.aisAlarmConfig$);
     expect(c).toEqual(DEFAULT_AIS_ALARM_CONFIG);

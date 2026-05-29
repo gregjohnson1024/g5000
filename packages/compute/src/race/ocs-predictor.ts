@@ -1,4 +1,5 @@
 import type { LatLon } from './line-geometry.js';
+import { projectGreatCircle } from './geo.js';
 
 export interface OcsInput {
   pos: LatLon;
@@ -31,22 +32,6 @@ export function predictOcs(input: OcsInput): boolean | null {
 
   const projected = projectGreatCircle(pos, cogRad, sogMs * lookAheadSec);
   return segmentsIntersect(pos, projected, line.port, line.stbd);
-}
-
-/** Project from `start` along bearing `cogRad` for `distanceM` meters. */
-function projectGreatCircle(start: LatLon, cogRad: number, distanceM: number): LatLon {
-  const R = 6_371_000;
-  const δ = distanceM / R;
-  const φ1 = (start.lat * Math.PI) / 180;
-  const λ1 = (start.lon * Math.PI) / 180;
-  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(cogRad));
-  const λ2 =
-    λ1 +
-    Math.atan2(
-      Math.sin(cogRad) * Math.sin(δ) * Math.cos(φ1),
-      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2),
-    );
-  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
 }
 
 /**

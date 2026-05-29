@@ -97,7 +97,7 @@ describe('startPolarPipeline', () => {
     //
     // v3 ConfigStore: no setPolars(); instead write a new revision and let
     // activePolar$ resolve the newest (boatId, activeMode) revision.
-    const polar = await firstValueFromBehavior(store.polars$);
+    const polar = await firstValueFromBehavior(store.activePolar$);
     const wardrobe = await firstValueFromBehavior(store.sails$);
     await store.createRevision({
       id: `01HZEROEDIT${Date.now().toString(36).toUpperCase()}`,

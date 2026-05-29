@@ -47,6 +47,19 @@ interface DriverEntry {
 }
 
 /**
+ * Build an RxJS subscription error handler that logs `message` plus the error.
+ * Each pipeline below passes its own full label string (two carry an extra
+ * "(subscription terminated)" suffix), so this takes the complete first
+ * console.error argument verbatim rather than reconstructing it.
+ */
+function withErrorLog(message: string) {
+  return (err: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error(message, err);
+  };
+}
+
+/**
  * Build a fresh DriverHub bound to `bus`. The hub uses the shared device
  * registry and PGN firehose singletons — same as the previous static
  * `runBridge` wiring — so existing consumers of those (the /devices page,
@@ -69,10 +82,7 @@ export function createDriverHub(bus: Bus): DriverHub {
     subs.push(
       decoded$.pipe(mergeMap((pgn) => from(mapPgnToSamples(pgn)))).subscribe({
         next: (sample) => bus.publish(sample),
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[driver-hub] CAN pipeline error (subscription terminated)', err);
-        },
+        error: withErrorLog('[driver-hub] CAN pipeline error (subscription terminated)'),
       }),
     );
 
@@ -80,10 +90,7 @@ export function createDriverHub(bus: Bus): DriverHub {
     subs.push(
       decoded$.subscribe({
         next: (pgn) => registry.observe(pgn),
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[driver-hub] device-registry pipeline error', err);
-        },
+        error: withErrorLog('[driver-hub] device-registry pipeline error'),
       }),
     );
 
@@ -100,10 +107,7 @@ export function createDriverHub(bus: Bus): DriverHub {
             fields: pgn.fields,
             rxTimestamp: pgn.rxTimestamp,
           }),
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[driver-hub] firehose pipeline error', err);
-        },
+        error: withErrorLog('[driver-hub] firehose pipeline error'),
       }),
     );
 
@@ -114,10 +118,7 @@ export function createDriverHub(bus: Bus): DriverHub {
         next: (pgn) => {
           if (isAisPgn(pgn.pgn)) handleAisPgn(pgn.pgn, pgn.fields);
         },
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[driver-hub] AIS pipeline error', err);
-        },
+        error: withErrorLog('[driver-hub] AIS pipeline error'),
       }),
     );
 
@@ -129,10 +130,7 @@ export function createDriverHub(bus: Bus): DriverHub {
             handleAlertPgn(pgn);
           }
         },
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[driver-hub] alerts pipeline error', err);
-        },
+        error: withErrorLog('[driver-hub] alerts pipeline error'),
       }),
     );
 
@@ -140,10 +138,7 @@ export function createDriverHub(bus: Bus): DriverHub {
     subs.push(
       driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
         next: (sample) => bus.publish(sample),
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[driver-hub] 0183 pipeline error (subscription terminated)', err);
-        },
+        error: withErrorLog('[driver-hub] 0183 pipeline error (subscription terminated)'),
       }),
     );
 

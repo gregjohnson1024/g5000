@@ -16,6 +16,8 @@
  * not great circles, so a planar CPA is what we actually want.
  */
 
+import { wrapTwoPi } from '../angles.js';
+
 export interface CpaInput {
   /** Latitude in degrees, +N. */
   lat: number;
@@ -95,7 +97,7 @@ export function computeCpa(own: CpaInput, target: CpaInput): CpaResult {
   // Bearing from own to target in compass convention (0 = N, increasing east).
   // atan2(east, north) gives compass radians; wrap into [0, 2π).
   const bearing = Math.atan2(rx, ry);
-  const bearingWrapped = ((bearing % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const bearingWrapped = wrapTwoPi(bearing);
 
   return {
     cpaMeters: cpa,

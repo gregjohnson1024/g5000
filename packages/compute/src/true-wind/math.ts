@@ -1,4 +1,9 @@
 import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@g5000/db';
+// `bilinearInterpolate2D` and `locate` live in the shared grid-interp module.
+// Re-exported here so existing importers of this module (and the package
+// barrel's `export *`) keep seeing `bilinearInterpolate2D` unchanged.
+export { bilinearInterpolate2D, locate } from '../grid-interp.js';
+import { bilinearInterpolate2D, locate } from '../grid-interp.js';
 
 export interface TrueWindInputs {
   /** Apparent wind speed at the masthead, m/s. */
@@ -123,45 +128,6 @@ export function computeTrueWind(inp: TrueWindInputs): TrueWindOutputs {
   const twa = Math.atan2(twBoatY, twBoatX);
 
   return { tws, twa, twd, awsCal, awaCal, bspCal: bspCalValue };
-}
-
-/**
- * Bilinear interpolation on a regular grid. Inputs outside the grid are
- * clamped to the nearest edge. `xBins` and `yBins` must be strictly
- * increasing.
- */
-export function bilinearInterpolate2D(
-  xBins: number[],
-  yBins: number[],
-  grid: number[][],
-  x: number,
-  y: number,
-): number {
-  const xi = locate(xBins, x);
-  const yi = locate(yBins, y);
-  const x0 = xBins[xi.lo]!;
-  const x1 = xBins[xi.hi]!;
-  const y0 = yBins[yi.lo]!;
-  const y1 = yBins[yi.hi]!;
-  const fx = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
-  const fy = y1 === y0 ? 0 : (y - y0) / (y1 - y0);
-  const c00 = grid[xi.lo]![yi.lo]!;
-  const c01 = grid[xi.lo]![yi.hi]!;
-  const c10 = grid[xi.hi]![yi.lo]!;
-  const c11 = grid[xi.hi]![yi.hi]!;
-  return c00 * (1 - fx) * (1 - fy) + c10 * fx * (1 - fy) + c01 * (1 - fx) * fy + c11 * fx * fy;
-}
-
-function locate(bins: number[], v: number): { lo: number; hi: number } {
-  if (bins.length === 0) return { lo: 0, hi: 0 };
-  if (v <= bins[0]!) return { lo: 0, hi: 0 };
-  if (v >= bins[bins.length - 1]!) {
-    return { lo: bins.length - 1, hi: bins.length - 1 };
-  }
-  for (let i = 0; i < bins.length - 1; i++) {
-    if (v >= bins[i]! && v <= bins[i + 1]!) return { lo: i, hi: i + 1 };
-  }
-  return { lo: bins.length - 1, hi: bins.length - 1 };
 }
 
 export function applyBspCal(bsp: number, cal: BspCal): number {

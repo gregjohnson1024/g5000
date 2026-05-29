@@ -38,7 +38,7 @@ export class Bus {
  * trailing segments and MUST appear as the last segment (validated at
  * subscribe time so typos like "wind.**.angle" fail loudly).
  */
-function compilePattern(pattern: string): (channel: string) => boolean {
+export function compilePattern(pattern: string): (channel: string) => boolean {
   if (!pattern.includes('*')) {
     return (ch) => ch === pattern;
   }

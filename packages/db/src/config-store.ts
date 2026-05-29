@@ -234,8 +234,8 @@ export class ConfigStore {
     //
     // Legacy v1 wardrobes (with embedded `polar` per config and no `modes`)
     // are no longer supported. All known production installs (the Pi) have
-    // been on v2 for >1 deploy cycle, so the v1 path was dropped along with
-    // migrate-wardrobe-v2.ts.
+    // been on v2 for >1 deploy cycle, so the v1 path was dropped; only the
+    // v2→v3 migrator (migrate-wardrobe-v3.ts) remains.
     const wardrobeRows = db.select().from(sailWardrobe).where(eq(sailWardrobe.id, SINGLETON)).all();
     let wardrobeValue: SailWardrobe;
     if (!wardrobeRows[0]) {
@@ -455,10 +455,6 @@ export class ConfigStore {
   /** Observable of the current revisions map for the active boat. */
   get polarRevisions$(): Observable<Map<string, PolarRevision>> {
     return this.subjects.polarRevisions.asObservable();
-  }
-  /** Legacy alias — backed by activePolar$ for backward compatibility. */
-  get polars$(): Observable<PolarTable> {
-    return this.activePolar$;
   }
   /**
    * Crossover settings (recommendation hysteresis, forecast cadence) for the

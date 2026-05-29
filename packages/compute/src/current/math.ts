@@ -17,6 +17,8 @@
  * `HDG + leeway` here.
  */
 
+import { wrapTwoPi } from '../angles.js';
+
 export interface SetDriftInput {
   /** Speed Over Ground (m/s). */
   sog: number;
@@ -46,7 +48,6 @@ export function computeSetDrift(input: SetDriftInput): SetDriftResult {
   const driftMs = Math.hypot(curE, curN);
   // When drift is effectively zero the set angle is meaningless. Return 0
   // rather than NaN so callers don't have to special-case it.
-  const setRad =
-    driftMs < 1e-6 ? 0 : ((Math.atan2(curE, curN) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const setRad = driftMs < 1e-6 ? 0 : wrapTwoPi(Math.atan2(curE, curN));
   return { setRad, driftMs };
 }

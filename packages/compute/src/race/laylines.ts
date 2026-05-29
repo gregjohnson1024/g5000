@@ -1,6 +1,7 @@
 import type { CurrentField } from '@g5000/grib';
 import { interpolateCurrent } from '@g5000/grib';
 import type { LatLon } from './line-geometry.js';
+import { projectGreatCircle } from './geo.js';
 
 export interface LaylineInput {
   pos: LatLon;
@@ -16,23 +17,6 @@ export interface LaylineInput {
 
 const NM_TO_M = 1852;
 const MAX_SEGMENTS = 20;
-const R_EARTH_M = 6_371_000;
-
-function project(start: LatLon, bearingRad: number, distanceM: number): LatLon {
-  const δ = distanceM / R_EARTH_M;
-  const φ1 = (start.lat * Math.PI) / 180;
-  const λ1 = (start.lon * Math.PI) / 180;
-  const φ2 = Math.asin(
-    Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(bearingRad),
-  );
-  const λ2 =
-    λ1 +
-    Math.atan2(
-      Math.sin(bearingRad) * Math.sin(δ) * Math.cos(φ1),
-      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2),
-    );
-  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
-}
 
 /**
  * Project a layline polyline from `pos` along `headingRad`. When
@@ -45,7 +29,7 @@ function project(start: LatLon, bearingRad: number, distanceM: number): LatLon {
 export function projectLayline(input: LaylineInput): LatLon[] {
   const totalM = input.distanceNm * NM_TO_M;
   if (!input.integrateCurrent || !input.currentField) {
-    return [input.pos, project(input.pos, input.headingRad, totalM)];
+    return [input.pos, projectGreatCircle(input.pos, input.headingRad, totalM)];
   }
   const segCount = Math.min(
     MAX_SEGMENTS,
@@ -69,13 +53,13 @@ export function projectLayline(input: LaylineInput): LatLon[] {
   let cursor = input.pos;
   for (let i = 0; i < segCount; i++) {
     // Sample current at the midpoint of the through-water-only projection.
-    const midpoint = project(cursor, input.headingRad, segM / 2);
+    const midpoint = projectGreatCircle(cursor, input.headingRad, segM / 2);
     // Clamp sample point to field bounds — outside the field, treat current as zero.
     const sampleLat = Math.max(latMin, Math.min(latMax, midpoint.lat));
     const sampleLon = Math.max(lonMin, Math.min(lonMax, midpoint.lon));
     const curr = interpolateCurrent(field, sampleLat, sampleLon, tClamped);
     // Through-water end for this segment.
-    const twEnd = project(cursor, input.headingRad, segM);
+    const twEnd = projectGreatCircle(cursor, input.headingRad, segM);
     // Add current displacement: u m/s east, v m/s north, over segS seconds.
     const currEastM = curr.u * segS;
     const currNorthM = curr.v * segS;
@@ -84,7 +68,7 @@ export function projectLayline(input: LaylineInput): LatLon[] {
     if (currDistM > 1e-3) {
       // bearing: east = π/2, north = 0
       const currBearingRad = Math.atan2(currEastM, currNorthM);
-      cursor = project(twEnd, currBearingRad, currDistM);
+      cursor = projectGreatCircle(twEnd, currBearingRad, currDistM);
     } else {
       cursor = twEnd;
     }

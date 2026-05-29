@@ -4,6 +4,13 @@
  * is filled with sensible-but-overridable rig estimates.
  */
 
+// Source-priority types live in @g5000/core (selector.ts), where the
+// arbitration logic that consumes them lives. Re-export them here so existing
+// `from './defaults.js'` / `@g5000/db`-root importers keep resolving them and
+// so DEFAULT_SOURCE_PRIORITY (below) can annotate against SourcePriorityConfig.
+import type { SourcePriorityRule, SourcePriorityConfig } from '@g5000/core';
+export type { SourcePriorityRule, SourcePriorityConfig };
+
 export interface BoatConfig {
   /** Mast height above the masthead unit's measurement reference, meters. */
   mastHeight: number;
@@ -252,41 +259,11 @@ export type DampingConfig = Record<string, number>;
 export const DEFAULT_DAMPING_CONFIG: DampingConfig = {};
 
 /**
- * Source-priority arbitration rules. When two devices publish the same
- * channel (e.g. GPS over N2K and over 0183, two wind sensors, …), a selector
- * picks the highest-priority source whose last sample is younger than a
- * freshness window. The bus itself is unchanged — every source still
- * publishes. Compute pipelines opt in via `subscribeSelected`.
- *
- * See `@g5000/core` `selector.ts` for the matching rules.
- */
-export interface SourcePriorityRule {
-  /** Channel pattern (exact channel name or `wind.**`-style wildcard). */
-  channelPattern: string;
-  /**
-   * Ordered list of source patterns. Lower index = higher priority.
-   * Each entry matches against Sample.source either by exact equality or
-   * by trailing-`*` prefix wildcard (e.g. `n2k:*`).
-   */
-  sources: string[];
-  /**
-   * Freshness window in seconds. If the preferred source hasn't published a
-   * sample within this window, the selector falls through to the next source
-   * in the list.
-   */
-  freshnessSeconds: number;
-  /**
-   * Sources to never select for this channel, even if all `sources` entries
-   * are stale. Same pattern syntax as `sources`.
-   */
-  blocked?: string[];
-}
-
-export type SourcePriorityConfig = SourcePriorityRule[];
-
-/**
  * Default source-priority config: empty array. With no rules, every channel
  * falls back to last-write-wins on the bus (current behaviour).
+ *
+ * The `SourcePriorityRule` / `SourcePriorityConfig` types are defined in
+ * `@g5000/core` (selector.ts) and re-exported from this module (see top).
  */
 export const DEFAULT_SOURCE_PRIORITY: SourcePriorityConfig = [];
 

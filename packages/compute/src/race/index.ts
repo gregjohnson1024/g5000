@@ -16,6 +16,7 @@ import {
 } from './line-geometry.js';
 import { vmc } from './vmc.js';
 import { predictOcs } from './ocs-predictor.js';
+import { wrapToPi, wrapTwoPi } from './geo.js';
 import { interpolatePolarSpeed, optimalTwaForVmg } from '../polars/math.js';
 
 export { startPolarTargetsPredicate, createWindShiftDetector, projectLayline, vmc, predictOcs };
@@ -147,8 +148,8 @@ export function startRaceComputePipeline(
     lastLaylineMs = tMs;
     const cfg = raceState.get().settings;
     const upwindTwa = optimalTwaForVmg(polar, latest.tws, 'upwind');
-    const portHeading = (latest.twd + Math.PI - upwindTwa + 2 * Math.PI) % (2 * Math.PI);
-    const stbdHeading = (latest.twd + Math.PI + upwindTwa) % (2 * Math.PI);
+    const portHeading = wrapTwoPi(latest.twd + Math.PI - upwindTwa);
+    const stbdHeading = wrapTwoPi(latest.twd + Math.PI + upwindTwa);
     const tws = latest.tws;
     // Through-water speed for layline projection — TBS at the optimal-VMG TWA.
     const tbs = interpolatePolarSpeed(polar, tws, upwindTwa);
@@ -243,9 +244,7 @@ export function startRaceComputePipeline(
     if (latest.cog !== undefined && latest.sog !== undefined) {
       const normalToLine =
         freshLine.preStartSide === 'port' ? bearing - Math.PI / 2 : bearing + Math.PI / 2;
-      let dθ = latest.cog - normalToLine;
-      while (dθ > Math.PI) dθ -= 2 * Math.PI;
-      while (dθ < -Math.PI) dθ += 2 * Math.PI;
+      const dθ = wrapToPi(latest.cog - normalToLine);
       const ttl = timeToLineSeconds(dtl, latest.sog, dθ);
       if (ttl !== null) {
         bus.publish({
