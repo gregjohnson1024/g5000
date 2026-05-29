@@ -5,10 +5,9 @@ import { computeCpa, type CpaResult } from '@g5000/compute';
 import type { AisTarget, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
 import { aisDetailRows, fmtTcpa } from '../../lib/ais-detail';
-import { MS_TO_KN, wrap360 } from '../../lib/units';
+import { MS_TO_KN, RAD_TO_DEG, wrap360 } from '../../lib/units';
 
 const NM = 1852;
-const RAD_TO_DEG = 180 / Math.PI;
 const RANGE_OPTIONS_NM = [1, 2, 4, 8, 20, 30];
 const DEFAULT_RANGE_NM = 30;
 /** localStorage key for the user's preferred radar range. Survives tab

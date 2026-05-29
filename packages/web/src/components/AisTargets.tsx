@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl';
 import type { AisTarget } from '@g5000/core';
 import { computeCpa, type CpaResult } from '@g5000/compute';
 import { aisDetailRows } from '../lib/ais-detail';
+import { projectGeo } from '../lib/wind-barb';
 
 export interface AisTargetsProps {
   /** Map instance from `onLoad`. Pass `null` until the map is ready. */
@@ -24,7 +25,6 @@ export interface AisTargetsProps {
   own?: { lat: number; lon: number; cog: number | null; sog: number | null } | null;
 }
 
-const M_PER_DEG_LAT = 111_320;
 const TARGET_SOURCE_ID = 'ais-targets';
 const TARGET_CIRCLE_ID = 'ais-targets-circle';
 const COG_SOURCE_ID = 'ais-cog-extensions';
@@ -223,19 +223,12 @@ export function AisTargets({
           // Flat-earth projection — at 360 min × ~20 kn this is ~120 NM and
           // the great-circle bias is still well below chart-pixel precision
           // at typical zooms. Slower targets stay even smaller.
-          const distM = t.sog! * totalSec;
-          const dLat = (distM * Math.cos(t.cog!)) / M_PER_DEG_LAT;
-          const dLon =
-            (distM * Math.sin(t.cog!)) /
-            (M_PER_DEG_LAT * Math.max(0.05, Math.cos((t.lat! * Math.PI) / 180)));
+          const tip = projectGeo(t.lat!, t.lon!, t.sog! * totalSec, t.cog!);
           return {
             type: 'Feature' as const,
             geometry: {
               type: 'LineString' as const,
-              coordinates: [
-                [t.lon!, t.lat!],
-                [t.lon! + dLon, t.lat! + dLat],
-              ],
+              coordinates: [[t.lon!, t.lat!], tip],
             },
             properties: { mmsi: t.mmsi },
           };

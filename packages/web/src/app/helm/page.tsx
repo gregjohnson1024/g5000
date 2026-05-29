@@ -11,10 +11,8 @@ import { AudibleAlarm } from '../../components/AudibleAlarm';
 import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { RaceMiniTimer } from './RaceMiniTimer';
 import { RaceTiles } from '../../components/RaceTiles';
-import { MS_TO_KN } from '../../lib/units';
+import { MS_TO_KN, RAD_TO_DEG } from '../../lib/units';
 import { fmtLatDmm, fmtLonDmm } from '../../lib/format-coords';
-
-const RAD_TO_DEG = 180 / Math.PI;
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;

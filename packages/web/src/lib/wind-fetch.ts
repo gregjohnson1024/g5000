@@ -539,6 +539,68 @@ export function parseGridData(text: string): Array<{ lat: number; lon: number; v
   return out;
 }
 
+type GribRecord = { lat: number; lon: number; v: number };
+
+/**
+ * Assemble parsed U/V/PRMSL records into a normalised `WindGrid`. Builds the
+ * sorted lat/lon axes from the U records, allocates the 2-D arrays (NaN-filled),
+ * and scatters each record into its [latIdx][lonIdx] cell via the index maps.
+ * PRMSL is omitted entirely when no pressure records are supplied. `validAt`
+ * is recomputed from `runAt + forecastHour * 3600`. Throws if U or V is empty.
+ */
+function recordsToGrid(
+  uRecs: GribRecord[],
+  vRecs: GribRecord[],
+  pRecs: GribRecord[],
+  meta: { runAt: number; forecastHour: number; model: WindModel },
+): WindGrid {
+  if (uRecs.length === 0 || vRecs.length === 0) {
+    throw new Error('eccodes returned no grid points');
+  }
+  const latsSet = new Set<number>();
+  const lonsSet = new Set<number>();
+  for (const r of uRecs) {
+    latsSet.add(r.lat);
+    lonsSet.add(r.lon);
+  }
+  const lats = [...latsSet].sort((a, b) => a - b);
+  const lons = [...lonsSet].sort((a, b) => a - b);
+  const u: number[][] = lats.map(() => lons.map(() => NaN));
+  const v: number[][] = lats.map(() => lons.map(() => NaN));
+  const prmsl: number[][] | undefined =
+    pRecs.length > 0 ? lats.map(() => lons.map(() => NaN)) : undefined;
+  const latIx = new Map(lats.map((l, i) => [l, i]));
+  const lonIx = new Map(lons.map((l, i) => [l, i]));
+  for (const r of uRecs) {
+    const yi = latIx.get(r.lat);
+    const xi = lonIx.get(r.lon);
+    if (yi !== undefined && xi !== undefined) u[yi]![xi] = r.v;
+  }
+  for (const r of vRecs) {
+    const yi = latIx.get(r.lat);
+    const xi = lonIx.get(r.lon);
+    if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
+  }
+  if (prmsl) {
+    for (const r of pRecs) {
+      const yi = latIx.get(r.lat);
+      const xi = lonIx.get(r.lon);
+      if (yi !== undefined && xi !== undefined) prmsl[yi]![xi] = r.v;
+    }
+  }
+  return {
+    lats,
+    lons,
+    u,
+    v,
+    prmsl,
+    validAt: meta.runAt + meta.forecastHour * 3600,
+    runAt: meta.runAt,
+    forecastHour: meta.forecastHour,
+    model: meta.model,
+  };
+}
+
 /**
  * Download a GFS 10m-wind subset for `bbox` at `forecastHour` of the most
  * recent run, decode via eccodes, and return a normalised grid.
@@ -590,42 +652,11 @@ export async function fetchWindGrid(
     const uRecs = parseGridData(uTxt);
     const vRecs = parseGridData(vTxt);
     const pRecs = pTxt ? parseGridData(pTxt) : [];
-    if (uRecs.length === 0 || vRecs.length === 0) {
-      throw new Error('eccodes returned no grid points');
-    }
-    const latsSet = new Set<number>();
-    const lonsSet = new Set<number>();
-    for (const r of uRecs) {
-      latsSet.add(r.lat);
-      lonsSet.add(r.lon);
-    }
-    const lats = [...latsSet].sort((a, b) => a - b);
-    const lons = [...lonsSet].sort((a, b) => a - b);
-    const u: number[][] = lats.map(() => lons.map(() => NaN));
-    const v: number[][] = lats.map(() => lons.map(() => NaN));
-    const prmsl: number[][] | undefined =
-      pRecs.length > 0 ? lats.map(() => lons.map(() => NaN)) : undefined;
-    const latIx = new Map(lats.map((l, i) => [l, i]));
-    const lonIx = new Map(lons.map((l, i) => [l, i]));
-    for (const r of uRecs) {
-      const yi = latIx.get(r.lat);
-      const xi = lonIx.get(r.lon);
-      if (yi !== undefined && xi !== undefined) u[yi]![xi] = r.v;
-    }
-    for (const r of vRecs) {
-      const yi = latIx.get(r.lat);
-      const xi = lonIx.get(r.lon);
-      if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
-    }
-    if (prmsl) {
-      for (const r of pRecs) {
-        const yi = latIx.get(r.lat);
-        const xi = lonIx.get(r.lon);
-        if (yi !== undefined && xi !== undefined) prmsl[yi]![xi] = r.v;
-      }
-    }
-    const validAt = run.runUnix + forecastHour * 3600;
-    return { lats, lons, u, v, prmsl, validAt, runAt: run.runUnix, forecastHour, model: 'gfs' };
+    return recordsToGrid(uRecs, vRecs, pRecs, {
+      runAt: run.runUnix,
+      forecastHour,
+      model: 'gfs',
+    });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -665,40 +696,7 @@ async function decodeUVGrib(
     const uRecs = parseGridData(uTxt);
     const vRecs = parseGridData(vTxt);
     const pRecs = pTxt ? parseGridData(pTxt) : [];
-    if (uRecs.length === 0 || vRecs.length === 0)
-      throw new Error('eccodes returned no grid points');
-    const latsSet = new Set<number>();
-    const lonsSet = new Set<number>();
-    for (const r of uRecs) {
-      latsSet.add(r.lat);
-      lonsSet.add(r.lon);
-    }
-    const lats = [...latsSet].sort((a, b) => a - b);
-    const lons = [...lonsSet].sort((a, b) => a - b);
-    const u: number[][] = lats.map(() => lons.map(() => NaN));
-    const v: number[][] = lats.map(() => lons.map(() => NaN));
-    const prmsl: number[][] | undefined =
-      pRecs.length > 0 ? lats.map(() => lons.map(() => NaN)) : undefined;
-    const latIx = new Map(lats.map((l, i) => [l, i]));
-    const lonIx = new Map(lons.map((l, i) => [l, i]));
-    for (const r of uRecs) {
-      const yi = latIx.get(r.lat);
-      const xi = lonIx.get(r.lon);
-      if (yi !== undefined && xi !== undefined) u[yi]![xi] = r.v;
-    }
-    for (const r of vRecs) {
-      const yi = latIx.get(r.lat);
-      const xi = lonIx.get(r.lon);
-      if (yi !== undefined && xi !== undefined) v[yi]![xi] = r.v;
-    }
-    if (prmsl) {
-      for (const r of pRecs) {
-        const yi = latIx.get(r.lat);
-        const xi = lonIx.get(r.lon);
-        if (yi !== undefined && xi !== undefined) prmsl[yi]![xi] = r.v;
-      }
-    }
-    return { lats, lons, u, v, prmsl, validAt: runAt + fh * 3600, runAt, forecastHour: fh, model };
+    return recordsToGrid(uRecs, vRecs, pRecs, { runAt, forecastHour: fh, model });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -741,9 +739,10 @@ function cropGrid(grid: WindGrid, bbox: Bbox): WindGrid {
  * (0/6/12/18 z) with forecast hours at 0/3/6/.../240; this function rounds
  * the request to the nearest 3 h step.
  *
- * ECMWF's CDN is aggressively rate-limited. We retry up to two times on
- * a 429, with exponential backoff (4 s, 12 s). The underlying
- * fetchEcmwfMessages does not retry itself.
+ * Messages come from the public ECMWF S3 mirror (no auth, no rate limiting)
+ * via concurrent per-variable byte-range reads, each with a 30 s timeout. There
+ * is no 429 retry here — the S3 mirror is used precisely to avoid the
+ * data.ecmwf.int CDN's aggressive rate limiting.
  */
 export async function fetchWindGridEcmwf(
   bbox: Bbox,

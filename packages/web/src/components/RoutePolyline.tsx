@@ -1,6 +1,7 @@
 'use client';
 import type maplibregl from 'maplibre-gl';
 import type { Route } from '@g5000/routing';
+import { SOG_COLOR_EXPR } from '../lib/sog-color';
 
 export type RouteColorMode = 'none' | 'tack' | 'sog' | 'twa';
 
@@ -16,21 +17,7 @@ function colorExpr(
     case 'sog':
       // Through-water/over-ground speed in m/s (~0–20 kn): slow blue → fast red.
       // interpolate-hcl blends in perceptual colour space — no muddy RGB midpoints.
-      return [
-        'interpolate-hcl',
-        ['linear'],
-        ['get', 'sog'],
-        0,
-        '#1e3a8a',
-        2.5,
-        '#3b82f6',
-        5,
-        '#22c55e',
-        7.5,
-        '#f59e0b',
-        10,
-        '#ef4444',
-      ];
+      return SOG_COLOR_EXPR as maplibregl.ExpressionSpecification;
     case 'twa':
       // |TWA| radians: upwind blue → reach green/amber → run red.
       return [

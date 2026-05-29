@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { contours } from 'd3-contour';
+import { buildSpeedContours, buildStepExpr } from '../lib/contour-field';
+import { projectGeo } from '../lib/wind-barb';
 
 export interface CurrentGrid {
   lats: number[];
@@ -35,19 +36,6 @@ const FILL_STOPS: Array<[number, string]> = [
   [4.0, '#dc2626e0'], // 4+: red (Gulf Stream core)
 ];
 
-function project(
-  fromLat: number,
-  fromLon: number,
-  meters: number,
-  bearingRad: number,
-): [number, number] {
-  const dN = meters * Math.cos(bearingRad);
-  const dE = meters * Math.sin(bearingRad);
-  const dLat = dN / M_PER_DEG_LAT;
-  const dLon = dE / (M_PER_DEG_LAT * Math.cos((fromLat * Math.PI) / 180));
-  return [fromLon + dLon, fromLat + dLat];
-}
-
 /**
  * Build a small directional arrow as a single LineString with a shaft +
  * two arrowhead tick legs. Bearing is the FLOW direction (where the
@@ -65,12 +53,12 @@ function makeArrow(
   bearingRad: number,
 ): GeoJSON.Feature {
   const start: [number, number] = [lon, lat];
-  const end = project(lat, lon, shaftLenM, bearingRad);
+  const end = projectGeo(lat, lon, shaftLenM, bearingRad);
   // Arrowhead legs at ±150° from the bearing, attached to the end point.
   // 150° = bearing of the LEG (pointing back toward start, splayed out).
   const headLen = shaftLenM * 0.35;
-  const headLeft = project(end[1], end[0], headLen, bearingRad + (150 * Math.PI) / 180);
-  const headRight = project(end[1], end[0], headLen, bearingRad - (150 * Math.PI) / 180);
+  const headLeft = projectGeo(end[1], end[0], headLen, bearingRad + (150 * Math.PI) / 180);
+  const headRight = projectGeo(end[1], end[0], headLen, bearingRad - (150 * Math.PI) / 180);
   return {
     type: 'Feature',
     properties: {},
@@ -81,80 +69,8 @@ function makeArrow(
   };
 }
 
-/**
- * Convert a flat row-major field back to lat/lon space and emit a
- * FeatureCollection of MultiPolygon features at the chosen thresholds.
- * Mirrors WindOverlay.contourField but only for closed (filled) contours.
- */
-function contourField(
-  field: Float64Array,
-  W: number,
-  H: number,
-  lats: number[],
-  lons: number[],
-  thresholds: number[],
-): GeoJSON.FeatureCollection {
-  const gen = contours().size([W, H]).thresholds(thresholds)(Array.from(field));
-  const features: GeoJSON.Feature[] = [];
-  const toLatLon = (pt: number[]): number[] => {
-    const gx = pt[0] ?? 0;
-    const gy = pt[1] ?? 0;
-    const xi = Math.max(0, Math.min(W - 1, gx));
-    const yi = Math.max(0, Math.min(H - 1, gy));
-    const xLow = Math.floor(xi);
-    const xFrac = xi - xLow;
-    const lon = lons[xLow]! * (1 - xFrac) + (lons[xLow + 1] ?? lons[xLow]!) * xFrac;
-    const yLow = Math.floor(yi);
-    const yFrac = yi - yLow;
-    const latIdxLow = H - 1 - yLow;
-    const latIdxHigh = H - 1 - Math.min(H - 1, yLow + 1);
-    const lat = lats[latIdxLow]! * (1 - yFrac) + lats[latIdxHigh]! * yFrac;
-    return [lon, lat];
-  };
-  for (const c of gen) {
-    const value = c.value;
-    const polys: number[][][][] = [];
-    for (const poly of c.coordinates as number[][][][]) {
-      const ringsOut: number[][][] = poly.map((ring) => ring.map(toLatLon));
-      polys.push(ringsOut);
-    }
-    features.push({
-      type: 'Feature',
-      properties: { value },
-      geometry: { type: 'MultiPolygon', coordinates: polys },
-    });
-  }
-  return { type: 'FeatureCollection', features };
-}
-
-/**
- * Build a d3-contour speed field (knots) from a current grid and return
- * a FeatureCollection with one MultiPolygon per threshold band. Each
- * feature has a `speed` property = the lower threshold of the band,
- * driving the fill-color step expression.
- */
-function buildSpeedContours(grid: CurrentGrid): GeoJSON.FeatureCollection {
-  const { lats, lons, u, v } = grid;
-  const W = lons.length;
-  const H = lats.length;
-  // d3-contour treats row 0 as the TOP — flip Y so highest lat is at y=0.
-  const speed = new Float64Array(W * H);
-  for (let y = 0; y < H; y++) {
-    const yi = H - 1 - y;
-    for (let x = 0; x < W; x++) {
-      const uu = u[yi]![x] ?? 0;
-      const vv = v[yi]![x] ?? 0;
-      speed[y * W + x] = Math.hypot(uu, vv) * MS_TO_KN;
-    }
-  }
-  const thresholds = FILL_STOPS.map((s) => s[0]);
-  const fc = contourField(speed, W, H, lats, lons, thresholds);
-  // Rename `value` → `speed` so the fill layer's step expression matches.
-  for (const f of fc.features) {
-    f.properties = { speed: (f.properties as { value: number }).value };
-  }
-  return fc;
-}
+// contourField + buildSpeedContours now live in lib/contour-field (shared with
+// WindOverlay). CurrentOverlay passes its OWN local FILL_STOPS (current-kn bins).
 
 export interface CurrentOverlayProps {
   map: maplibregl.Map | null;
@@ -265,18 +181,10 @@ export function CurrentOverlay({
         });
         // Build step expression. Thresholds MUST be literal numbers and
         // come BEFORE their corresponding output. The base output (used
-        // below the first threshold) is FILL_STOPS[0][1].
-        const stepArgs: (string | number)[] = [];
-        for (let i = 1; i < FILL_STOPS.length; i++) {
-          const stop = FILL_STOPS[i]!;
-          stepArgs.push(stop[0], stop[1]);
-        }
-        const stepExpr: maplibregl.DataDrivenPropertyValueSpecification<string> = [
-          'step',
-          ['get', 'speed'],
-          FILL_STOPS[0]![1],
-          ...stepArgs,
-        ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>;
+        // below the first threshold) is FILL_STOPS[0][1]. Built in lib/contour-field.
+        const stepExpr = buildStepExpr(
+          FILL_STOPS,
+        ) as maplibregl.DataDrivenPropertyValueSpecification<string>;
         map.addLayer(
           {
             id: LAYER_FILL,
@@ -317,7 +225,7 @@ export function CurrentOverlay({
         return;
       }
       if (showFill && fillSrc) {
-        fillSrc.setData(buildSpeedContours(grid));
+        fillSrc.setData(buildSpeedContours(grid, FILL_STOPS));
       } else if (fillSrc) {
         fillSrc.setData({ type: 'FeatureCollection', features: [] });
       }

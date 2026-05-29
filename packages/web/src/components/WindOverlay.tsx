@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { contours } from 'd3-contour';
 import { FILL_STOPS } from '../lib/wind-scale';
 import { projectGeo, makeBarb } from '../lib/wind-barb';
+import { contourField, buildSpeedContours, buildStepExpr } from '../lib/contour-field';
 
 export type WindModel = 'gfs' | 'ecmwf' | 'hrrr';
 
@@ -32,98 +32,8 @@ const M_PER_DEG_LAT = 111_320;
 const MS_TO_KN = 1 / 0.514444;
 
 // Speed bin → fill colour lives in lib/wind-scale so the legend reuses it.
-
-/**
- * Helper: convert a flat field's grid coords back to lat/lon and emit a
- * FeatureCollection of LineString (`type='line'`) or Polygon features at
- * the chosen thresholds. `closed` decides between lines (false) and fills
- * (true).
- */
-function contourField(
-  field: Float64Array,
-  W: number,
-  H: number,
-  lats: number[],
-  lons: number[],
-  thresholds: number[],
-  closed: boolean,
-): GeoJSON.FeatureCollection {
-  const gen = contours().size([W, H]).thresholds(thresholds)(Array.from(field));
-  const features: GeoJSON.Feature[] = [];
-  const toLatLon = (pt: number[]): number[] => {
-    const gx = pt[0] ?? 0;
-    const gy = pt[1] ?? 0;
-    const xi = Math.max(0, Math.min(W - 1, gx));
-    const yi = Math.max(0, Math.min(H - 1, gy));
-    const xLow = Math.floor(xi);
-    const xFrac = xi - xLow;
-    const lon = lons[xLow]! * (1 - xFrac) + (lons[xLow + 1] ?? lons[xLow]!) * xFrac;
-    const yLow = Math.floor(yi);
-    const yFrac = yi - yLow;
-    const latIdxLow = H - 1 - yLow;
-    const latIdxHigh = H - 1 - Math.min(H - 1, yLow + 1);
-    const lat = lats[latIdxLow]! * (1 - yFrac) + lats[latIdxHigh]! * yFrac;
-    return [lon, lat];
-  };
-  for (const c of gen) {
-    const value = c.value;
-    if (closed) {
-      const polys: number[][][][] = [];
-      for (const poly of c.coordinates as number[][][][]) {
-        const ringsOut: number[][][] = poly.map((ring) => ring.map(toLatLon));
-        polys.push(ringsOut);
-      }
-      features.push({
-        type: 'Feature',
-        properties: { value },
-        geometry: { type: 'MultiPolygon', coordinates: polys },
-      });
-    } else {
-      // For lines, take the outer rings as LineStrings.
-      const lines: number[][][] = [];
-      for (const poly of c.coordinates as number[][][][]) {
-        for (const ring of poly) {
-          lines.push(ring.map(toLatLon));
-        }
-      }
-      features.push({
-        type: 'Feature',
-        properties: { value },
-        geometry: { type: 'MultiLineString', coordinates: lines },
-      });
-    }
-  }
-  return { type: 'FeatureCollection', features };
-}
-
-/**
- * Build a d3-contour speed field from a wind grid and return a FeatureCollection
- * with one Polygon per threshold band. Each feature has a `speed` property = the
- * lower threshold of the band, used to drive the fill-color step expression.
- */
-function buildSpeedContours(grid: WindGrid): GeoJSON.FeatureCollection {
-  const { lats, lons, u, v } = grid;
-  const W = lons.length;
-  const H = lats.length;
-  // d3-contour expects a flat row-major array. d3-contour treats row 0 as
-  // the TOP — we'll flip Y so highest lat is at y=0 to match.
-  const speed = new Float64Array(W * H);
-  for (let y = 0; y < H; y++) {
-    const yi = H - 1 - y; // flip so y=0 is highest lat
-    for (let x = 0; x < W; x++) {
-      const uu = u[yi]![x] ?? 0;
-      const vv = v[yi]![x] ?? 0;
-      speed[y * W + x] = Math.hypot(uu, vv) * MS_TO_KN;
-    }
-  }
-  const thresholds = FILL_STOPS.map((s) => s[0]);
-  const fc = contourField(speed, W, H, lats, lons, thresholds, true);
-  // Rename `value` → `speed` so the fill layer's step expression matches.
-  for (const f of fc.features) {
-    f.properties = { speed: (f.properties as { value: number }).value };
-  }
-  return fc;
-}
+// contourField + buildSpeedContours now live in lib/contour-field (shared with
+// CurrentOverlay); buildIsobars below still calls contourField with closed=false.
 
 /**
  * Build isobar lines (LineStrings) at every 2 hPa.
@@ -278,18 +188,10 @@ export function WindOverlay({
         });
         // step expression: step(input, base, threshold1, output1, threshold2, output2, …)
         // The thresholds MUST be literal numbers (not computed expressions),
-        // and they come BEFORE their corresponding outputs.
-        const stepArgs: (string | number)[] = [];
-        for (let i = 1; i < FILL_STOPS.length; i++) {
-          const stop = FILL_STOPS[i]!;
-          stepArgs.push(stop[0], stop[1]);
-        }
-        const stepExpr: maplibregl.DataDrivenPropertyValueSpecification<string> = [
-          'step',
-          ['get', 'speed'],
-          FILL_STOPS[0]![1],
-          ...stepArgs,
-        ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>;
+        // and they come BEFORE their corresponding outputs. Built in lib/contour-field.
+        const stepExpr = buildStepExpr(
+          FILL_STOPS as [number, string][],
+        ) as maplibregl.DataDrivenPropertyValueSpecification<string>;
         map.addLayer(
           {
             id: LAYER_FILL,
@@ -401,7 +303,7 @@ export function WindOverlay({
         isoSrc.setData({ type: 'FeatureCollection', features: [] });
       }
       if (showFill && fillSrc) {
-        fillSrc.setData(buildSpeedContours(grid));
+        fillSrc.setData(buildSpeedContours(grid, FILL_STOPS as [number, string][]));
       } else if (fillSrc) {
         fillSrc.setData({ type: 'FeatureCollection', features: [] });
       }

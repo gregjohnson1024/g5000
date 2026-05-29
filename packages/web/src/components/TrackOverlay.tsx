@@ -2,27 +2,14 @@
 import { useEffect } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { TrackPoint } from '../lib/tracks';
+import { SOG_COLOR_EXPR } from '../lib/sog-color';
 
 export type TrackColorMode = 'none' | 'sog';
 
 /** SOG ramp in m/s (~0–20 kn): slow navy → fast red. Matches RoutePolyline's
  *  `sog` expression so a recorded track and a planned route read on one scale.
  *  interpolate-hcl keeps the midpoints vibrant (no muddy RGB blends). */
-const SOG_EXPR: maplibregl.ExpressionSpecification = [
-  'interpolate-hcl',
-  ['linear'],
-  ['get', 'sog'],
-  0,
-  '#1e3a8a',
-  2.5,
-  '#3b82f6',
-  5,
-  '#22c55e',
-  7.5,
-  '#f59e0b',
-  10,
-  '#ef4444',
-];
+const SOG_EXPR = SOG_COLOR_EXPR as maplibregl.ExpressionSpecification;
 
 /** Solid colour for `none` mode. Violet so an ended track is visually distinct
  *  from the live recording's green trail (LiveBoatMarker). */

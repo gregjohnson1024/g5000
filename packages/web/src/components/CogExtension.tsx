@@ -2,25 +2,11 @@
 import { useEffect } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { LivePos } from './LiveBoatMarker';
+import { projectGeo } from '../lib/wind-barb';
 
 const SOURCE_ID = 'cog-extension';
 const LAYER_LINE = 'cog-extension-line';
 const LAYER_TIP = 'cog-extension-tip';
-
-const M_PER_DEG_LAT = 111_320;
-
-function project(
-  fromLat: number,
-  fromLon: number,
-  meters: number,
-  bearingRad: number,
-): [number, number] {
-  const dN = meters * Math.cos(bearingRad);
-  const dE = meters * Math.sin(bearingRad);
-  const dLat = dN / M_PER_DEG_LAT;
-  const dLon = dE / (M_PER_DEG_LAT * Math.cos((fromLat * Math.PI) / 180));
-  return [fromLon + dLon, fromLat + dLat];
-}
 
 export interface CogExtensionProps {
   map: maplibregl.Map | null;
@@ -105,7 +91,7 @@ export function CogExtension({
       src.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
-    const tip = project(p.lat, p.lon, totalM, p.cog);
+    const tip = projectGeo(p.lat, p.lon, totalM, p.cog);
     const features: GeoJSON.Feature[] = [
       {
         type: 'Feature',
