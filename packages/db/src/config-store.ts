@@ -57,28 +57,68 @@ import { migrateWardrobeV2toV3, type V2Wardrobe } from './migrate-wardrobe-v3.js
 const SINGLETON = 'singleton';
 
 /**
+ * The exact value-type carried by each subject/observable, keyed by subject
+ * name. This single declaration is the source of truth for both the
+ * `subjects` field shape and the constructor's `initial` parameter — the two
+ * used to be spelled out separately, which let them drift. Value-types are
+ * written explicitly here (not inferred) so the per-key getters
+ * (`boatConfig$(): Observable<BoatConfig>`, etc.) stay precisely typed.
+ */
+type SubjectValues = {
+  boatConfig: BoatConfig;
+  awsAwaCal: AwsAwaCalTable;
+  bspCal: BspCal;
+  compassDeviation: CompassDeviation;
+  sails: SailWardrobe;
+  dampingConfig: DampingConfig;
+  sourcePriority: SourcePriorityConfig;
+  aisAlarm: AisAlarmConfig;
+  passageLog: PassageLog;
+  polarRevisions: Map<string, PolarRevision>;
+  crossoverSettings: CrossoverSettings;
+  waypoints: Waypoint[];
+  routes: Route[];
+  boatState: BoatState;
+};
+
+/** Subjects keyed exactly like {@link SubjectValues}, each a hot BehaviorSubject. */
+type Subjects = { [K in keyof SubjectValues]: BehaviorSubject<SubjectValues[K]> };
+
+/**
+ * The trivial pass-through setters (`upsert(table, value)` + `subject.next`)
+ * are generated from this registry: each maps a subject key to its `(id,
+ * value JSON)` Drizzle table. Validating setters (sails, sourcePriority,
+ * aisAlarm, damping, passageLog) and the non-`(id, value)` subjects
+ * (crossoverSettings, polarRevisions) deliberately stay out of here.
+ */
+type SimpleKey =
+  | 'boatConfig'
+  | 'awsAwaCal'
+  | 'bspCal'
+  | 'compassDeviation'
+  | 'waypoints'
+  | 'routes'
+  | 'boatState';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
+  boatConfig: boatConfigTable,
+  awsAwaCal,
+  bspCal,
+  compassDeviation,
+  waypoints: waypointsTable,
+  routes: routesTable,
+  boatState: boatStateTable,
+};
+
+/**
  * Opens (and migrates as needed) an SQLite-backed config store. Each cal
  * kind exposes a BehaviorSubject-style observable. Setters write through
  * to SQLite *and* emit on the observable, so subscribers see hot reloads
  * without polling.
  */
 export class ConfigStore {
-  private readonly subjects: {
-    boatConfig: BehaviorSubject<BoatConfig>;
-    awsAwaCal: BehaviorSubject<AwsAwaCalTable>;
-    bspCal: BehaviorSubject<BspCal>;
-    compassDeviation: BehaviorSubject<CompassDeviation>;
-    sails: BehaviorSubject<SailWardrobe>;
-    dampingConfig: BehaviorSubject<DampingConfig>;
-    sourcePriority: BehaviorSubject<SourcePriorityConfig>;
-    aisAlarm: BehaviorSubject<AisAlarmConfig>;
-    passageLog: BehaviorSubject<PassageLog>;
-    polarRevisions: BehaviorSubject<Map<string, PolarRevision>>;
-    crossoverSettings: BehaviorSubject<CrossoverSettings>;
-    waypoints: BehaviorSubject<Waypoint[]>;
-    routes: BehaviorSubject<Route[]>;
-    boatState: BehaviorSubject<BoatState>;
-  };
+  private readonly subjects: Subjects;
 
   private readonly __activeBoatId: BoatId;
 
@@ -90,41 +130,19 @@ export class ConfigStore {
   private constructor(
     private readonly raw: Database.Database,
     private readonly db: BetterSQLite3Database,
-    initial: {
-      boatConfig: BoatConfig;
-      awsAwaCal: AwsAwaCalTable;
-      bspCal: BspCal;
-      compassDeviation: CompassDeviation;
-      sails: SailWardrobe;
-      dampingConfig: DampingConfig;
-      sourcePriority: SourcePriorityConfig;
-      aisAlarm: AisAlarmConfig;
-      passageLog: PassageLog;
-      polarRevisions: Map<string, PolarRevision>;
-      crossoverSettings: CrossoverSettings;
-      waypoints: Waypoint[];
-      routes: Route[];
-      boatState: BoatState;
-    },
+    initial: SubjectValues,
     activeBoatId: BoatId,
   ) {
     this.__activeBoatId = activeBoatId;
-    this.subjects = {
-      boatConfig: new BehaviorSubject(initial.boatConfig),
-      awsAwaCal: new BehaviorSubject(initial.awsAwaCal),
-      bspCal: new BehaviorSubject(initial.bspCal),
-      compassDeviation: new BehaviorSubject(initial.compassDeviation),
-      sails: new BehaviorSubject(initial.sails),
-      dampingConfig: new BehaviorSubject(initial.dampingConfig),
-      sourcePriority: new BehaviorSubject(initial.sourcePriority),
-      aisAlarm: new BehaviorSubject(initial.aisAlarm),
-      passageLog: new BehaviorSubject(initial.passageLog),
-      polarRevisions: new BehaviorSubject(initial.polarRevisions),
-      crossoverSettings: new BehaviorSubject(initial.crossoverSettings),
-      waypoints: new BehaviorSubject(initial.waypoints),
-      routes: new BehaviorSubject(initial.routes),
-      boatState: new BehaviorSubject(initial.boatState),
-    };
+    // Build one BehaviorSubject per key from `initial`. The heterogeneous
+    // mapped-type object can't be constructed in a loop without a localized
+    // cast; the `Subjects` field type (and the typecheck) guard the result.
+    const subjects = {} as Subjects;
+    for (const key of Object.keys(initial) as (keyof SubjectValues)[]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (subjects as any)[key] = new BehaviorSubject(initial[key]);
+    }
+    this.subjects = subjects;
   }
 
   static async open(filePath: string): Promise<ConfigStore> {
@@ -482,8 +500,7 @@ export class ConfigStore {
     return this.subjects.waypoints.value;
   }
   async setWaypoints(value: Waypoint[]): Promise<void> {
-    this.upsert(waypointsTable, value);
-    this.subjects.waypoints.next(value);
+    return this.setSimple('waypoints', value);
   }
 
   get routes$(): Observable<Route[]> {
@@ -493,8 +510,7 @@ export class ConfigStore {
     return this.subjects.routes.value;
   }
   async setRoutes(value: Route[]): Promise<void> {
-    this.upsert(routesTable, value);
-    this.subjects.routes.next(value);
+    return this.setSimple('routes', value);
   }
 
   get boatState$(): Observable<BoatState> {
@@ -504,25 +520,20 @@ export class ConfigStore {
     return this.subjects.boatState.value;
   }
   async setBoatState(value: BoatState): Promise<void> {
-    this.upsert(boatStateTable, value);
-    this.subjects.boatState.next(value);
+    return this.setSimple('boatState', value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {
-    this.upsert(boatConfigTable, value);
-    this.subjects.boatConfig.next(value);
+    return this.setSimple('boatConfig', value);
   }
   async setAwsAwaCal(value: AwsAwaCalTable): Promise<void> {
-    this.upsert(awsAwaCal, value);
-    this.subjects.awsAwaCal.next(value);
+    return this.setSimple('awsAwaCal', value);
   }
   async setBspCal(value: BspCal): Promise<void> {
-    this.upsert(bspCal, value);
-    this.subjects.bspCal.next(value);
+    return this.setSimple('bspCal', value);
   }
   async setCompassDeviation(value: CompassDeviation): Promise<void> {
-    this.upsert(compassDeviation, value);
-    this.subjects.compassDeviation.next(value);
+    return this.setSimple('compassDeviation', value);
   }
   async setSails(value: SailWardrobe): Promise<void> {
     if (value.schemaVersion !== 3) {
@@ -640,20 +651,19 @@ export class ConfigStore {
 
   async close(): Promise<void> {
     this.raw.close();
-    this.subjects.boatConfig.complete();
-    this.subjects.awsAwaCal.complete();
-    this.subjects.bspCal.complete();
-    this.subjects.compassDeviation.complete();
-    this.subjects.sails.complete();
-    this.subjects.dampingConfig.complete();
-    this.subjects.sourcePriority.complete();
-    this.subjects.aisAlarm.complete();
-    this.subjects.passageLog.complete();
-    this.subjects.polarRevisions.complete();
-    this.subjects.crossoverSettings.complete();
-    this.subjects.waypoints.complete();
-    this.subjects.routes.complete();
-    this.subjects.boatState.complete();
+    for (const subject of Object.values(this.subjects)) {
+      subject.complete();
+    }
+  }
+
+  /**
+   * The shared body of the trivial pass-through setters: write through to the
+   * key's `(id, value JSON)` table, then emit. `value` is typed to the key's
+   * exact subject value-type, so the public wrappers keep precise signatures.
+   */
+  private async setSimple<K extends SimpleKey>(key: K, value: SubjectValues[K]): Promise<void> {
+    this.upsert(SIMPLE_SETTER_TABLES[key], value);
+    this.subjects[key].next(value);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

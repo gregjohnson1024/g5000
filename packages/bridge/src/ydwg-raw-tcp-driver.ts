@@ -1,4 +1,4 @@
-import { Subject, BehaviorSubject, EMPTY, type Observable } from 'rxjs';
+import { Subject, EMPTY, type Observable } from 'rxjs';
 import * as net from 'node:net';
 import type {
   RawCanFrame,
@@ -7,7 +7,7 @@ import type {
   DriverHealth,
   OutgoingPgn,
 } from './wire-driver.js';
-import { encodePgnToCanFrames } from './tx/fast-packet.js';
+import { createHealthSubject, txPgnViaFrames } from './driver-common.js';
 
 /**
  * Minimal shape we need from a socket. Production: `net.Socket`. Tests pass
@@ -77,12 +77,7 @@ export class YdwgRawTcpDriver implements WireDriver {
   readonly health: Observable<DriverHealth>;
 
   private readonly rxSubject = new Subject<RawCanFrame>();
-  private readonly healthSubject = new BehaviorSubject<DriverHealth>({
-    connected: false,
-    bytesPerSecond: 0,
-    framesPerSecond: 0,
-    errorCount: 0,
-  });
+  private readonly healthSubject = createHealthSubject();
   private readonly socketFactory: () => YdwgSocket;
   private readonly initialBackoffMs: number;
   private readonly maxBackoffMs: number;
@@ -151,10 +146,7 @@ export class YdwgRawTcpDriver implements WireDriver {
     // with the Fast Packet order byte already set for long ones). Each frame
     // goes out via the existing txCan path so all socket-format logic stays
     // in one place.
-    const frames = encodePgnToCanFrames(pgn);
-    for (const frame of frames) {
-      await this.txCan(frame);
-    }
+    await txPgnViaFrames((frame) => this.txCan(frame), pgn);
   }
 
   private connect(): void {

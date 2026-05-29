@@ -1,4 +1,4 @@
-import { Subject, BehaviorSubject, EMPTY, type Observable } from 'rxjs';
+import { Subject, EMPTY, type Observable } from 'rxjs';
 import type {
   RawCanFrame,
   Raw0183Sentence,
@@ -6,7 +6,7 @@ import type {
   DriverHealth,
   OutgoingPgn,
 } from './wire-driver.js';
-import { encodePgnToCanFrames } from './tx/fast-packet.js';
+import { createHealthSubject, txPgnViaFrames } from './driver-common.js';
 
 /**
  * Minimal shape we need from a SocketCAN raw channel. Production: the
@@ -86,12 +86,7 @@ export class SocketCanDriver implements WireDriver {
   private channel: SocketCanRawChannel | null = null;
   private readonly opts: SocketCanDriverOptions;
   private readonly rxCanSubject = new Subject<RawCanFrame>();
-  private readonly healthSubject = new BehaviorSubject<DriverHealth>({
-    connected: false,
-    bytesPerSecond: 0,
-    framesPerSecond: 0,
-    errorCount: 0,
-  });
+  private readonly healthSubject = createHealthSubject();
   private frames = 0;
   private bytes = 0;
   private errors = 0;
@@ -197,9 +192,6 @@ export class SocketCanDriver implements WireDriver {
   }
 
   async txPgn(pgn: OutgoingPgn): Promise<void> {
-    const frames = encodePgnToCanFrames(pgn);
-    for (const f of frames) {
-      await this.txCan(f);
-    }
+    await txPgnViaFrames((frame) => this.txCan(frame), pgn);
   }
 }

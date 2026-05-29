@@ -1,4 +1,4 @@
-import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
+import { Subject, type Observable, EMPTY } from 'rxjs';
 import canboat from '@canboat/canboatjs';
 import { readN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
 import type {
@@ -8,6 +8,7 @@ import type {
   DriverHealth,
   OutgoingPgn,
 } from './wire-driver.js';
+import { createHealthSubject } from './driver-common.js';
 
 const { pgnToActisenseSerialFormat } = canboat as unknown as {
   pgnToActisenseSerialFormat: (pgn: {
@@ -66,12 +67,7 @@ export class Ngt1Driver implements WireDriver {
   readonly health: Observable<DriverHealth>;
 
   private readonly rxSubject = new Subject<RawCanFrame>();
-  private readonly healthSubject = new BehaviorSubject<DriverHealth>({
-    connected: false,
-    bytesPerSecond: 0,
-    framesPerSecond: 0,
-    errorCount: 0,
-  });
+  private readonly healthSubject = createHealthSubject();
   private readonly source: Ngt1Source;
   private buffer: Buffer = Buffer.alloc(0);
   private dataHandler = this.onData.bind(this);

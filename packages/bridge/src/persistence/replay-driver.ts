@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
-import { Subject, BehaviorSubject, type Observable } from 'rxjs';
+import { Subject, type Observable } from 'rxjs';
 import type {
   RawCanFrame,
   Raw0183Sentence,
@@ -9,6 +9,7 @@ import type {
   DriverHealth,
   OutgoingPgn,
 } from '../wire-driver.js';
+import { createHealthSubject } from '../driver-common.js';
 
 export interface ReplayDriverOptions {
   filePath: string;
@@ -49,12 +50,7 @@ export class ReplayDriver implements WireDriver {
 
   private readonly canSubject = new Subject<RawCanFrame>();
   private readonly otSubject = new Subject<Raw0183Sentence>();
-  private readonly healthSubject = new BehaviorSubject<DriverHealth>({
-    connected: false,
-    bytesPerSecond: 0,
-    framesPerSecond: 0,
-    errorCount: 0,
-  });
+  private readonly healthSubject = createHealthSubject();
 
   private aborted = false;
 

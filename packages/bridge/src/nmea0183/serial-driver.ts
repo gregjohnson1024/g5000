@@ -1,4 +1,4 @@
-import { Subject, type Observable, BehaviorSubject, EMPTY } from 'rxjs';
+import { Subject, type Observable, EMPTY } from 'rxjs';
 import type {
   RawCanFrame,
   Raw0183Sentence,
@@ -6,6 +6,7 @@ import type {
   DriverHealth,
   OutgoingPgn,
 } from '../wire-driver.js';
+import { createHealthSubject } from '../driver-common.js';
 
 /**
  * The minimal shape of a serial source: any object that emits `Buffer`
@@ -29,12 +30,7 @@ export class SerialPort0183Driver implements WireDriver {
   readonly health: Observable<DriverHealth>;
 
   private readonly rxSubject = new Subject<Raw0183Sentence>();
-  private readonly healthSubject = new BehaviorSubject<DriverHealth>({
-    connected: false,
-    bytesPerSecond: 0,
-    framesPerSecond: 0,
-    errorCount: 0,
-  });
+  private readonly healthSubject = createHealthSubject();
   private readonly source: Sentence0183Source;
   private readonly port: number;
   private buffer = '';
