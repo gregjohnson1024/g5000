@@ -1,4 +1,5 @@
 import { computeEngineHours, readEngineLog, setEngineBaseline } from '../../../../lib/engine-log';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,15 +22,9 @@ interface PutBody {
 }
 
 export async function PUT(req: Request): Promise<Response> {
-  let body: PutBody;
-  try {
-    body = (await req.json()) as PutBody;
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<PutBody>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const file = await setEngineBaseline(body);
   const summary = computeEngineHours(file);
   return Response.json({ ok: true, baseline: file.baseline, summary });

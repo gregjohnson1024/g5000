@@ -7,6 +7,7 @@ import { loadDefaultCoastline } from '../../../../lib/coastline';
 import { readJson } from '../../../../lib/persistence';
 import { SETTINGS } from '../../../../lib/paths';
 import { resolvePlanOptions, type PlanningSettings } from '../../../../lib/planning-settings';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,15 +43,9 @@ function validate(b: unknown): b is Body {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<unknown>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   if (!validate(body)) {
     return Response.json(
       { ok: false, error: { kind: 'bad_request', message: 'missing required fields' } },

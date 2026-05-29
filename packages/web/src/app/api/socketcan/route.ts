@@ -5,6 +5,7 @@ import {
 } from '@g5000/bridge';
 import { SETTINGS } from '../../../lib/paths';
 import { readJson, writeJson } from '../../../lib/persistence';
+import { parseJsonBody } from '../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -65,15 +66,9 @@ interface PostBody {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: PostBody;
-  try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<PostBody>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
 
   if (typeof body.enabled !== 'boolean') {
     return Response.json(

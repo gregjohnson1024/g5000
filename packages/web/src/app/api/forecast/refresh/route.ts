@@ -15,6 +15,7 @@ import {
 } from '../../../../lib/hrrr-fetch';
 import { cache, bboxKey } from '../../wind/route';
 import { pruneGlobalCache, capGlobalCache } from '../../../../lib/ecmwf-global-cache';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -171,12 +172,9 @@ export function DELETE(): Response {
  * Response: `{ ok: true, started: true, tasks }` (202).
  */
 export async function POST(req: Request): Promise<Response> {
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return Response.json({ ok: false, error: { message: 'invalid JSON' } }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<Body>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const bbox = body.bbox;
   if (
     !bbox ||

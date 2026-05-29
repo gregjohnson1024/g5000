@@ -1,4 +1,5 @@
 import { currentCache, fetchCurrentGrid } from '../../../../lib/current-fetch';
+import { parseJsonBody } from '../../../../lib/req';
 import type { Bbox } from '@g5000/grib';
 
 export const dynamic = 'force-dynamic';
@@ -20,12 +21,9 @@ interface Body {
  * ok/error so a single failed day doesn't take down the whole refresh.
  */
 export async function POST(req: Request): Promise<Response> {
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return Response.json({ ok: false, error: { message: 'invalid JSON' } }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<Body>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const bbox = body.bbox;
   if (
     !bbox ||

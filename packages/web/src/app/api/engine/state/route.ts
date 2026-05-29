@@ -4,6 +4,7 @@ import {
   readEngineLog,
   type EngineEntry,
 } from '../../../../lib/engine-log';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -39,15 +40,9 @@ interface PostBody {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: PostBody;
-  try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<PostBody>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const t = typeof body.t === 'number' && Number.isFinite(body.t) ? body.t : Date.now() / 1000;
   if (!body.port || !body.stbd) {
     return Response.json(

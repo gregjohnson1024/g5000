@@ -1,5 +1,6 @@
 import { getWaypoint, updateWaypoint, deleteWaypoint } from '../../../../lib/waypoints';
 import { routesUsingWaypoint } from '../../../../lib/routes';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,12 +18,9 @@ export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
 
 export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
   const { id } = await params;
-  let body: Record<string, unknown>;
-  try {
-    body = (await req.json()) as Record<string, unknown>;
-  } catch {
-    return Response.json({ ok: false, error: { message: 'invalid JSON' } }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<Record<string, unknown>>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const patch: Record<string, unknown> = {};
   if (typeof body.name === 'string' && body.name.trim().length > 0) patch.name = body.name.trim();
   if (typeof body.lat === 'number' && Number.isFinite(body.lat) && Math.abs(body.lat) <= 90)

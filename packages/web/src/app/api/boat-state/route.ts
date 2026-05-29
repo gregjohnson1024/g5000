@@ -1,4 +1,5 @@
 import { getSharedConfigStore, type BoatState } from '@g5000/db';
+import { parseJsonBody } from '../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,12 +11,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ ok: false, error: { message: 'invalid JSON' } }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<unknown>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   const b = body as {
     daggerboards?: { port?: unknown; starboard?: unknown };
     engines?: { port?: { running?: unknown }; starboard?: { running?: unknown } };

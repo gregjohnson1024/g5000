@@ -1,4 +1,5 @@
 import { getSharedAlerts } from '@g5000/core';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,15 +21,9 @@ interface Body {
  * `{ ok: false, error: 'no alert transmitter registered ...' }`.
  */
 export async function POST(req: Request): Promise<Response> {
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<Body>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   if (!body || typeof body.key !== 'string' || !body.key) {
     return Response.json(
       { ok: false, error: { kind: 'bad_request', message: 'missing key' } },

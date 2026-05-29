@@ -3,6 +3,7 @@ import type { PolarTable } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { loadWindFor, loadCurrentFor } from '../../../../lib/grib-context';
 import { loadDefaultCoastline } from '../../../../lib/coastline';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -57,15 +58,9 @@ function validate(b: unknown): b is Body {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<unknown>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   if (!validate(body)) {
     return Response.json(
       { ok: false, error: { kind: 'bad_request', message: 'missing or invalid fields' } },

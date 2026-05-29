@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { PLANS_DIR } from '../../../lib/paths';
 import { writeJson, readJson, listJson } from '../../../lib/persistence';
+import { parseJsonBody } from '../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,15 +14,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<unknown>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   if (!body || typeof body !== 'object') {
     return Response.json(
       { ok: false, error: { kind: 'bad_request', message: 'body must be an object' } },

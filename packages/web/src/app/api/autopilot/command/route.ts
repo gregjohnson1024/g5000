@@ -1,4 +1,5 @@
 import { getSharedAutopilotTx, type AutopilotCommandName } from '@g5000/core';
+import { parseJsonBody } from '../../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -36,15 +37,9 @@ export async function POST(req: Request): Promise<Response> {
       { status: 403 },
     );
   }
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return Response.json(
-      { ok: false, error: { kind: 'bad_request', message: 'invalid JSON' } },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBody<Body>(req, 'bad_request');
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   if (!VALID_EVENTS.includes(body.event)) {
     return Response.json(
       {

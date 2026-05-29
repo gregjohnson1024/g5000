@@ -1,4 +1,5 @@
 import { listWaypoints, createWaypoint, type Waypoint } from '../../../lib/waypoints';
+import { parseJsonBody } from '../../../lib/req';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,12 +18,9 @@ interface CreateBody {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  let body: CreateBody;
-  try {
-    body = (await req.json()) as CreateBody;
-  } catch {
-    return Response.json({ ok: false, error: { message: 'invalid JSON' } }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<CreateBody>(req);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body;
   if (typeof body.name !== 'string' || body.name.trim().length === 0) {
     return Response.json({ ok: false, error: { message: 'name required' } }, { status: 422 });
   }
