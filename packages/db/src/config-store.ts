@@ -627,42 +627,11 @@ export class ConfigStore {
     this.upsert(dampingConfigTable, cleaned);
     this.subjects.dampingConfig.next(cleaned);
   }
-  /**
-   * @deprecated In v3 the wardrobe no longer carries per-config polar
-   * pointers. The web routes that called this need to be rewritten to
-   * `createRevision()` directly; the active polar is just the most-recent
-   * revision for `(boatId, activeMode)`. Kept as a throwing stub so the
-   * intent of any remaining caller is obvious at runtime.
-   */
-  async setPolars(_value: PolarTable): Promise<void> {
-    throw new Error(
-      'setPolars() is deprecated in v3 — use createRevision() directly; activePolar$ resolves to the newest revision for (boatId, activeMode)',
-    );
-  }
-
   async createRevision(rev: PolarRevision): Promise<void> {
     insertRevision(this.db, rev);
     const next = new Map(this.subjects.polarRevisions.value);
     next.set(rev.id, rev);
     this.subjects.polarRevisions.next(next);
-  }
-
-  /**
-   * @deprecated In v3 there is no explicit "active revision" pointer — the
-   * active polar is the newest revision for `(boatId, activeMode)`. To make
-   * an older revision active again, the caller should write a new revision
-   * (copying the older table) so it becomes the newest. Kept as a throwing
-   * stub for now; the web route `/api/polar/active` needs to be rewritten
-   * in a later task.
-   */
-  async setActiveRevision(
-    _sailConfigId: string,
-    _mode: PolarMode,
-    _revisionId: string,
-  ): Promise<void> {
-    throw new Error(
-      'setActiveRevision() is deprecated in v3 — write a new revision (copying the desired table) to make it the newest for (boatId, mode)',
-    );
   }
 
   listRevisions(filter: ListFilter = {}): PolarRevision[] {

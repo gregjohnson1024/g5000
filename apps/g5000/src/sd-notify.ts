@@ -33,7 +33,7 @@ export function notifyReady(): void {
   send('--ready');
 }
 
-export function notifyWatchdog(): void {
+function notifyWatchdog(): void {
   // `systemd-notify WATCHDOG=1` — newer CLIs accept this; older ones use
   // `--status=`. The key=value form works on every Debian/Pi build I've
   // seen so far. If this ever breaks, fall back to writing the message

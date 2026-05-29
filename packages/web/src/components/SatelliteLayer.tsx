@@ -62,22 +62,3 @@ export function SatelliteLayer({ map, visible }: { map: maplibregl.Map | null; v
 
   return null;
 }
-
-/**
- * Drop MapLibre's in-memory tile cache for the satellite layer and re-fetch
- * visible tiles from disk. Use after seeding. The proxy ignores the `?v=`
- * param, so the disk cache benefit is preserved. Mirrors refreshEncTiles.
- */
-export function refreshSatTiles(map: maplibregl.Map | null): boolean {
-  if (!map) return false;
-  try {
-    const src = map.getSource(SOURCE_ID);
-    if (src && 'setTiles' in src && typeof src.setTiles === 'function') {
-      src.setTiles([`/api/sat-tiles/{z}/{x}/{y}?v=${Date.now()}`]);
-      return true;
-    }
-  } catch {
-    /* map torn down mid-call */
-  }
-  return false;
-}

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { WindField, CurrentField } from './types.js';
+import type { WindField } from './types.js';
 
 /**
  * One parsed message from `wgrib2 -json` output.
@@ -13,8 +13,7 @@ import type { WindField, CurrentField } from './types.js';
  * in `runWgrib2()` below and is exercised by integration tests.
  */
 export interface Grib2JsonMessage {
-  variable: 'UGRD' | 'VGRD' | 'UOGRD' | 'VOGRD' | 'PRMSL';
-  level: string;
+  variable: 'UGRD' | 'VGRD' | 'PRMSL';
   /** Unix seconds for the *valid* time of this message. */
   forecastTime: number;
   grid: { lats: number[]; lons: number[] };
@@ -24,9 +23,9 @@ export interface Grib2JsonMessage {
 
 export function parseGrib2Json(
   messages: Grib2JsonMessage[],
-  source: WindField['source'] | CurrentField['source'],
+  source: WindField['source'],
   runTime: number,
-): WindField | CurrentField {
+): WindField {
   // Only wind fields flow through this GRIB-variable selection. CMEMS currents
   // are fetched as JSON via a Python helper and never parsed here, so the
   // eastward/northward variables are always the wind ones.
@@ -73,7 +72,7 @@ export function parseGrib2Json(
     v.push(vMsg.values);
   }
 
-  return { lats, lons, times, u, v, source, runTime } as WindField | CurrentField;
+  return { lats, lons, times, u, v, source, runTime };
 }
 
 function arraysEqual(a: number[], b: number[]): boolean {
@@ -123,7 +122,6 @@ export async function runWgrib2(gribPath: string): Promise<Grib2JsonMessage[]> {
         Number(runRaw.slice(8, 10)),
       ) / 1000;
     const variable = parts[3]!;
-    const level = parts[4]!.trim();
     // Forecast description like "6 hour fcst" or "anl"; "anl" → 0h.
     const fcstField = parts[5]!.trim();
     const fcstHourMatch = fcstField.match(/(\d+)\s*hour\s*fcst/);
@@ -131,7 +129,7 @@ export async function runWgrib2(gribPath: string): Promise<Grib2JsonMessage[]> {
     const ft = runTimeUnix + fcstHours * 3600;
 
     // Skip variables outside our whitelist.
-    if (!['UGRD', 'VGRD', 'UOGRD', 'VOGRD', 'PRMSL'].includes(variable)) continue;
+    if (!['UGRD', 'VGRD', 'PRMSL'].includes(variable)) continue;
 
     // Dump this message's grid + values via -csv. Pass `-inv /dev/null` so
     // wgrib2 doesn't prepend its inventory text to the CSV stream.
@@ -147,7 +145,6 @@ export async function runWgrib2(gribPath: string): Promise<Grib2JsonMessage[]> {
     const { lats, lons, values } = parseWgrib2Csv(csv);
     messages.push({
       variable: variable as Grib2JsonMessage['variable'],
-      level,
       forecastTime: ft,
       grid: { lats, lons },
       values,

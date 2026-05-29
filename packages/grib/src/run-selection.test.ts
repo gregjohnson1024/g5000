@@ -1,27 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildEcmwfUrls, pickEcmwfRun } from './fetch-ecmwf.js';
-
-describe('buildEcmwfUrls', () => {
-  it('builds full + index URLs for a step', () => {
-    const u = buildEcmwfUrls({ runDateUtc: '2026-05-12', runHourUtc: 0, forecastHour: 3 });
-    expect(u.grib).toBe(
-      'https://data.ecmwf.int/forecasts/20260512/00z/ifs/0p25/oper/20260512000000-3h-oper-fc.grib2',
-    );
-    expect(u.index).toBe(
-      'https://data.ecmwf.int/forecasts/20260512/00z/ifs/0p25/oper/20260512000000-3h-oper-fc.index',
-    );
-  });
-
-  it('zero-pads run hour', () => {
-    const u = buildEcmwfUrls({ runDateUtc: '2026-05-12', runHourUtc: 6, forecastHour: 0 });
-    expect(u.grib).toContain('/06z/ifs/0p25/oper/20260512060000-0h-oper-fc.grib2');
-  });
-
-  it('handles double-digit forecast hour', () => {
-    const u = buildEcmwfUrls({ runDateUtc: '2026-05-12', runHourUtc: 12, forecastHour: 144 });
-    expect(u.grib).toContain('20260512120000-144h-oper-fc.grib2');
-  });
-});
+import { pickEcmwfRun } from './run-selection.js';
 
 describe('pickEcmwfRun', () => {
   it('uses 6-hourly runs with ~9h lag', () => {

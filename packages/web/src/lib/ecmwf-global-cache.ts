@@ -199,7 +199,7 @@ export async function pruneGlobalCache(
 }
 
 /** Default LRU cap for the global cache — a backstop beyond the time-based prune. */
-export const GLOBAL_CACHE_CAP_BYTES = 1024 ** 3; // 1 GiB
+const GLOBAL_CACHE_CAP_BYTES = 1024 ** 3; // 1 GiB
 
 /**
  * Enforce a hard size cap on the global cache by evicting least-recently-used

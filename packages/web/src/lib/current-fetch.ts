@@ -229,14 +229,6 @@ export function findReusableGrid(
   return null;
 }
 
-function todayUtcDate(): string {
-  const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
-}
-
 /**
  * Spawn the Python helper to fetch + parse a Copernicus Marine current
  * grid for the given bbox + day. Returns the parsed JSON.
@@ -331,5 +323,3 @@ export async function fetchCurrentGrid(bbox: Bbox, forecastDay = 0): Promise<Cur
   await currentCache.set(gridExtentKey(grid, dateUtc), { at: Date.now(), grid });
   return grid;
 }
-
-export { todayUtcDate };

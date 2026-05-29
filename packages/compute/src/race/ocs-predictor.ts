@@ -1,5 +1,4 @@
 import type { LatLon } from './line-geometry.js';
-import { haversineMeters } from './line-geometry.js';
 
 export interface OcsInput {
   pos: LatLon;
@@ -68,6 +67,3 @@ function segmentsIntersect(p1: LatLon, p2: LatLon, p3: LatLon, p4: LatLon): bool
   const u = (sx * d1y - sy * d1x) / denom;
   return t >= 0 && t <= 1 && u >= 0 && u <= 1;
 }
-
-// haversineMeters re-exported for callers that need straight distance.
-export { haversineMeters };
