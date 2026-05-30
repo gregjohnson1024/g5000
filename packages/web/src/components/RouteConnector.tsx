@@ -18,10 +18,19 @@ export function attachRouteConnector(map: maplibregl.Map, id: string, points: Pa
     detachRouteConnector(map, id);
     return;
   }
-  const data: GeoJSON.Feature = {
-    type: 'Feature',
-    properties: {},
-    geometry: { type: 'LineString', coordinates: points.map((p) => [p.lon, p.lat]) },
+  const data: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: points.slice(0, -1).map((p, i) => ({
+      type: 'Feature',
+      properties: { segIndex: i },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [p.lon, p.lat],
+          [points[i + 1]!.lon, points[i + 1]!.lat],
+        ],
+      },
+    })),
   };
   const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
   if (src) {
