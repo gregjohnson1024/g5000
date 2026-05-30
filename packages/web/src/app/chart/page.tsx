@@ -5,6 +5,7 @@ import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
 import { StatusBadge } from '../../components/StatusBadge';
 import { attachRoute, detachRoute, type RouteColorMode } from '../../components/RoutePolyline';
+import { attachRouteConnector } from '../../components/RouteConnector';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
 import { ForecastRoi } from '../../components/ForecastRoi';
@@ -289,6 +290,7 @@ function ChartPageInner() {
     Array<{ id: string; name: string; lat: number; lon: number }>
   >([]);
   const [routes, setRoutes] = useState<Partial<Record<'GFS' | 'ECMWF', Route>>>({});
+  const [routeWaypointPath, setRouteWaypointPath] = useState<{ lat: number; lon: number }[]>([]);
   const [showIsochrones, setShowIsochrones] = useState(false);
   const [showRouteWind, setShowRouteWind] = useState(false);
   const [playbackStates, setPlaybackStates] = useState<
@@ -365,6 +367,14 @@ function ChartPageInner() {
       else detachRoute(map, ROUTE_LAYER[m]);
     });
   }, [routes, mapInstance, routeColorMode]);
+
+  // Draw the route connector — straight lines through the selected waypoints,
+  // independent of the optimised path above. Updates live as the selection
+  // changes; clears itself when fewer than two waypoints are selected.
+  useEffect(() => {
+    if (!mapInstance) return;
+    attachRouteConnector(mapInstance, 'route-connector', routeWaypointPath);
+  }, [routeWaypointPath, mapInstance]);
 
   // Any leg motoring? Disables TWA colouring (meaningless under engine) and
   // is what makes those segments draw dashed.
@@ -994,6 +1004,7 @@ function ChartPageInner() {
           colorTwaDisabled={hasMotoring}
           onRouted={handleRouted}
           onClear={handleClearRoute}
+          onWaypointPath={setRouteWaypointPath}
           showIsochrones={showIsochrones}
           onShowIsochrones={setShowIsochrones}
           showRouteWind={showRouteWind}

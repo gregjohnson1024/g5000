@@ -82,6 +82,9 @@ export function RoutePlanPanel(props: {
   colorTwaDisabled?: boolean;
   onRouted: (routes: Partial<Record<'GFS' | 'ECMWF', Route>>) => void;
   onClear: () => void;
+  /** Emits the ordered selected waypoints [start, ...via, end] (or [] when
+   *  fewer than 2 are selected) so the chart can draw the route connector. */
+  onWaypointPath?: (points: { lat: number; lon: number }[]) => void;
   showIsochrones: boolean;
   onShowIsochrones: (v: boolean) => void;
   showRouteWind: boolean;
@@ -144,6 +147,14 @@ export function RoutePlanPanel(props: {
       .filter((w): w is Wp => !!w)
       .map((w) => ({ lat: w.lat, lon: w.lon }));
   }
+
+  const waypointPath = start && end ? [start, ...via, end] : [];
+  const waypointPathKey = JSON.stringify(waypointPath);
+  useEffect(() => {
+    props.onWaypointPath?.(waypointPath);
+    // waypointPathKey is the meaningful change signal; props.onWaypointPath is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waypointPathKey]);
 
   const onPlan = async (params: PlanParams): Promise<void> => {
     abortRef.current?.abort();
