@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ContextTarget, HitWaypoint } from '../../lib/route-hit-test';
 
 export interface ChartContextMenuProps {
@@ -20,16 +20,24 @@ export interface ChartContextMenuProps {
 const ITEM = 'w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 whitespace-nowrap';
 
 export function ChartContextMenu(p: ChartContextMenuProps): React.ReactElement {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(p.onClose);
+  onCloseRef.current = p.onClose;
+
   useEffect(() => {
-    const close = () => p.onClose();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && p.onClose();
+    const onPointer = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) onCloseRef.current();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current();
+    };
     window.addEventListener('keydown', onKey);
-    window.addEventListener('pointerdown', close, { capture: true });
+    window.addEventListener('pointerdown', onPointer);
     return () => {
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('pointerdown', close, { capture: true });
+      window.removeEventListener('pointerdown', onPointer);
     };
-  }, [p]);
+  }, []);
 
   const t = p.target;
   const items: React.ReactNode[] = [];
@@ -64,9 +72,9 @@ export function ChartContextMenu(p: ChartContextMenuProps): React.ReactElement {
 
   return (
     <div
+      ref={menuRef}
       className="absolute z-50 bg-slate-900 border border-slate-700 rounded shadow-lg py-1"
       style={{ left: p.screen.x, top: p.screen.y }}
-      onPointerDown={(e) => e.stopPropagation()}
     >
       {items}
     </div>

@@ -41,7 +41,7 @@ import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { RoutePlanPanel } from './RoutePlanPanel';
 import { useRoutePlan } from './use-route-plan';
-import { startOf, endOf, insertAt as insertAtId } from '../../lib/route-plan';
+import { startOf, endOf } from '../../lib/route-plan';
 import { ChartContextMenu } from './ChartContextMenu';
 import { resolveTarget, type ContextTarget, type HitWaypoint } from '../../lib/route-hit-test';
 import { PlaybackScrubber } from './PlaybackScrubber';
@@ -734,6 +734,7 @@ function ChartPageInner() {
       const feats = mapInstance.queryRenderedFeatures([e.point.x, e.point.y], {
         layers: ['waypoints-dot', 'route-connector'].filter((id) => mapInstance.getLayer(id)),
       });
+      // globalThis.Map — the 'Map' chart component import shadows the built-in Map here.
       const byId = new globalThis.Map<string, HitWaypoint>(
         waypoints.map((w) => [w.id, { id: w.id, name: w.name, lat: w.lat, lon: w.lon }]),
       );
@@ -891,9 +892,7 @@ function ChartPageInner() {
               void dropWaypointAt({ lat, lon }).then((id) => id && routePlan.setEnd(id))
             }
             onInsertHere={(lat, lon, idx) =>
-              void dropWaypointAt({ lat, lon }).then(
-                (id) => id && routePlan.setIds(insertAtId(routePlan.ids, idx, id)),
-              )
+              void dropWaypointAt({ lat, lon }).then((id) => id && routePlan.insertAt(idx, id))
             }
             onClearRoute={() => routePlan.clear()}
           />
