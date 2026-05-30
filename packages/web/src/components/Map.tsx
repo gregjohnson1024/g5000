@@ -15,6 +15,7 @@ export interface MapProps {
   center: { lat: number; lon: number };
   zoom: number;
   onClick?: (latLon: { lat: number; lon: number }) => void;
+  onContextMenu?: (e: { lat: number; lon: number; point: { x: number; y: number } }) => void;
   /** Fired on a press-and-hold (mouse or touch) that stays put for
    * LONG_PRESS_MS without panning. The trailing click is suppressed. */
   onLongPress?: (latLon: { lat: number; lon: number }) => void;
@@ -33,6 +34,7 @@ export function Map({
   center,
   zoom,
   onClick,
+  onContextMenu,
   onLongPress,
   suppressLongPressLayers,
   onLoad,
@@ -45,10 +47,12 @@ export function Map({
   // `start`/`end` props from the parent and never sees state updates —
   // every click would set start, never end.
   const onClickRef = useRef(onClick);
+  const onContextMenuRef = useRef(onContextMenu);
   const onLongPressRef = useRef(onLongPress);
   const suppressLayersRef = useRef(suppressLongPressLayers);
   const onLoadRef = useRef(onLoad);
   onClickRef.current = onClick;
+  onContextMenuRef.current = onContextMenu;
   onLongPressRef.current = onLongPress;
   suppressLayersRef.current = suppressLongPressLayers;
   onLoadRef.current = onLoad;
@@ -151,6 +155,14 @@ export function Map({
         return;
       }
       onClickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+    });
+    map.on('contextmenu', (e) => {
+      e.preventDefault();
+      onContextMenuRef.current?.({
+        lat: e.lngLat.lat,
+        lon: e.lngLat.lng,
+        point: { x: e.point.x, y: e.point.y },
+      });
     });
     map.on('load', () => {
       // Canonical z-order sentinel. Wind layers add with
