@@ -34,11 +34,13 @@ export class MastService implements MastRuntime {
     svc.watcher = watch(filePath, { ignoreInitial: true });
     svc.watcher.on('add', () => void svc.reloadNow());
     svc.watcher.on('change', () => void svc.reloadNow());
+    svc.watcher.on('error', (e) => console.error('[mast] watcher error:', e));
     return svc;
   }
 
   /** Read + validate the file; on success swap the layout, on failure keep the last good one. */
   async reloadNow(): Promise<void> {
+    // Concurrent calls are safe here: last successful validation wins. Acceptable for a hand-edited config file.
     let text: string;
     try {
       text = await readFile(this.filePath, 'utf-8');
@@ -68,6 +70,7 @@ export class MastService implements MastRuntime {
   get override$(): Observable<string | null> {
     return this.overrideSubject.asObservable();
   }
+  /** Returns the live layout by reference — callers MUST treat it as read-only. */
   getLayout(): MastLayout {
     return this.layoutSubject.value;
   }
@@ -81,5 +84,7 @@ export class MastService implements MastRuntime {
   async stop(): Promise<void> {
     await this.watcher?.close();
     this.watcher = null;
+    this.layoutSubject.complete();
+    this.overrideSubject.complete();
   }
 }

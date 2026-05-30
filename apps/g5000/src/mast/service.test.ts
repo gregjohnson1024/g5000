@@ -42,6 +42,15 @@ describe('MastService', () => {
     await svc.stop();
   });
 
+  it('keeps the last good layout when a valid-JSON file fails validation', async () => {
+    writeFileSync(file, JSON.stringify(valid));
+    const svc = await MastService.start(file);
+    writeFileSync(file, JSON.stringify({ version: 1, pages: [] })); // parses, but fails validation (empty pages)
+    await svc.reloadNow();
+    expect(svc.getLayout().pages[0]!.id).toBe('p');
+    await svc.stop();
+  });
+
   it('tracks the override and clears it', async () => {
     const svc = await MastService.start(file);
     expect(svc.getOverride()).toBeNull();
