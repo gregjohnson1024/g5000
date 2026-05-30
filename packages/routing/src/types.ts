@@ -49,6 +49,9 @@ export interface Route {
   polarId: string;
   incomplete?: boolean;
   reason?: 'exceeded_max_hours' | 'no_wind' | 'land_blocked';
+  /** Path-segment index (0 = start→first waypoint) that failed to complete.
+   *  Set only when a multi-leg plan (planVia) returns incomplete. */
+  incompleteVia?: number;
   /** Captured frontier at each planner step. Present only when
    *  `options.captureIsochrones` is true. */
   isochrones?: Isochrone[];
