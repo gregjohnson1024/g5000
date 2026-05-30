@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
@@ -40,6 +40,8 @@ import { inHrrrDomain } from '../../lib/hrrr-helpers';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { RoutePlanPanel } from './RoutePlanPanel';
+import { useRoutePlan } from './use-route-plan';
+import { startOf, endOf } from '../../lib/route-plan';
 import { PlaybackScrubber } from './PlaybackScrubber';
 import { RouteDetailsBox } from './RouteDetailsBox';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
@@ -290,7 +292,7 @@ function ChartPageInner() {
     Array<{ id: string; name: string; lat: number; lon: number }>
   >([]);
   const [routes, setRoutes] = useState<Partial<Record<'GFS' | 'ECMWF', Route>>>({});
-  const [routeWaypointPath, setRouteWaypointPath] = useState<{ lat: number; lon: number }[]>([]);
+  const routePlan = useRoutePlan();
   const [showIsochrones, setShowIsochrones] = useState(false);
   const [showRouteWind, setShowRouteWind] = useState(false);
   const [playbackStates, setPlaybackStates] = useState<
@@ -367,6 +369,17 @@ function ChartPageInner() {
       else detachRoute(map, ROUTE_LAYER[m]);
     });
   }, [routes, mapInstance, routeColorMode]);
+
+  // Derive the connector path from the unified plan so the straight-line
+  // preview stays in step with the pickers without a separate state slice.
+  const routeWaypointPath = useMemo(
+    () =>
+      routePlan.ids
+        .map((id) => waypoints.find((w) => w.id === id))
+        .filter((w): w is (typeof waypoints)[number] => !!w)
+        .map((w) => ({ lat: w.lat, lon: w.lon })),
+    [routePlan.ids, waypoints],
+  );
 
   // Draw the route connector — straight lines through the selected waypoints,
   // independent of the optimised path above. Updates live as the selection
@@ -600,10 +613,10 @@ function ChartPageInner() {
 
   const [waypointDropActive, setWaypointDropActive] = useState(false);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
-  // Route Start/End waypoint ids (owned here so the marks can be badged
-  // green/red on the chart).
-  const [routeStartId, setRouteStartId] = useState('');
-  const [routeEndId, setRouteEndId] = useState('');
+  // Route Start/End waypoint ids derived from the unified routePlan so the
+  // marks can be badged green/red on the chart.
+  const routeStartId = startOf(routePlan.ids) ?? '';
+  const routeEndId = endOf(routePlan.ids) ?? '';
 
   // Crosshair cursor while waypoint-drop mode is active.
   useEffect(() => {
@@ -995,16 +1008,13 @@ function ChartPageInner() {
           waypoints={waypoints}
           tz={tz}
           hasRoute={Object.keys(routes).length > 0}
-          startId={routeStartId}
-          endId={routeEndId}
-          onStartId={setRouteStartId}
-          onEndId={setRouteEndId}
+          ids={routePlan.ids}
+          onIdsChange={routePlan.setIds}
           colorMode={routeColorMode}
           onColorMode={setRouteColorMode}
           colorTwaDisabled={hasMotoring}
           onRouted={handleRouted}
           onClear={handleClearRoute}
-          onWaypointPath={setRouteWaypointPath}
           showIsochrones={showIsochrones}
           onShowIsochrones={setShowIsochrones}
           showRouteWind={showRouteWind}

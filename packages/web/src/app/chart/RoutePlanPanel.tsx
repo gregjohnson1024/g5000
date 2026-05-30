@@ -5,7 +5,8 @@ import { PlanControls, type PlanParams } from '../../components/PlanControls';
 import type { RouteColorMode } from '../../components/RoutePolyline';
 import type { TzMode } from '../../lib/tz';
 import { reorder } from '../routes/reorder';
-import { orderedPlanFromRoute, type SavedRouteLite } from '../../lib/plan-via';
+import { type SavedRouteLite } from '../../lib/plan-via';
+import { removeAt, insertAt, setStart, setEnd, startOf, endOf, viaOf } from '../../lib/route-plan';
 
 function fmtRouteDuration(secs: number): string {
   const totalMin = Math.round(secs / 60);
@@ -71,33 +72,26 @@ export function RoutePlanPanel(props: {
   waypoints: Wp[];
   tz: TzMode;
   hasRoute: boolean;
-  /** Selected Start/End waypoint ids, lifted to the parent so it can badge
-   *  the start (green) and end (red) marks on the chart. */
-  startId: string;
-  endId: string;
-  onStartId: (id: string) => void;
-  onEndId: (id: string) => void;
+  /** Unified ordered waypoint IDs [start, ...via, end], owned by the parent. */
+  ids: string[];
+  onIdsChange: (ids: string[]) => void;
   colorMode: RouteColorMode;
   onColorMode: (m: RouteColorMode) => void;
   colorTwaDisabled?: boolean;
   onRouted: (routes: Partial<Record<'GFS' | 'ECMWF', Route>>) => void;
   onClear: () => void;
-  /** Emits the ordered selected waypoints [start, ...via, end] (or [] when
-   *  fewer than 2 are selected) so the chart can draw the route connector. */
-  onWaypointPath?: (points: { lat: number; lon: number }[]) => void;
   showIsochrones: boolean;
   onShowIsochrones: (v: boolean) => void;
   showRouteWind: boolean;
   onShowRouteWind: (v: boolean) => void;
 }) {
-  const { waypoints, startId, endId } = props;
+  const { waypoints } = props;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [mode, setMode] = useState<'waypoints' | 'route'>('waypoints');
   const [routes, setRoutes] = useState<SavedRouteLite[]>([]);
   const [routeId, setRouteId] = useState<string>('');
-  const [viaIds, setViaIds] = useState<string[]>([]); // ad-hoc intermediates
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -109,52 +103,19 @@ export function RoutePlanPanel(props: {
       .catch(() => {});
   }, []);
 
-  // In saved-route mode, keep the chart's start/end mark badges in sync with
-  // the selected route's endpoints — the parent badges marks by startId/endId.
-  useEffect(() => {
-    if (mode !== 'route') return;
-    const route = routes.find((r) => r.id === routeId);
-    if (!route) return;
-    const present = new Set(waypoints.map((w) => w.id));
-    const resolved = route.waypointIds.filter((id) => present.has(id));
-    if (resolved.length >= 2) {
-      props.onStartId(resolved[0]!);
-      props.onEndId(resolved[resolved.length - 1]!);
-    }
-  }, [mode, routeId, routes, waypoints, props]);
-
   const wpById = new Map(waypoints.map((w) => [w.id, w]));
+  const ids = props.ids;
+  const startId = startOf(ids) ?? '';
+  const endId = endOf(ids) ?? '';
+  const viaIds = viaOf(ids);
 
-  // Resolve the ordered plan (start/end/via) for the active mode.
-  let start: { lat: number; lon: number } | undefined;
-  let end: { lat: number; lon: number } | undefined;
-  let via: { lat: number; lon: number }[] = [];
-  if (mode === 'route') {
-    const route = routes.find((r) => r.id === routeId);
-    const ordered = route ? orderedPlanFromRoute(route, waypoints) : null;
-    if (ordered) {
-      start = ordered.start;
-      end = ordered.end;
-      via = ordered.via;
-    }
-  } else {
-    const s = wpById.get(startId);
-    const e = wpById.get(endId);
-    start = s ? { lat: s.lat, lon: s.lon } : undefined;
-    end = e ? { lat: e.lat, lon: e.lon } : undefined;
-    via = viaIds
-      .map((id) => wpById.get(id))
-      .filter((w): w is Wp => !!w)
-      .map((w) => ({ lat: w.lat, lon: w.lon }));
-  }
-
-  const waypointPath = start && end ? [start, ...via, end] : [];
-  const waypointPathKey = JSON.stringify(waypointPath);
-  useEffect(() => {
-    props.onWaypointPath?.(waypointPath);
-    // waypointPathKey is the meaningful change signal; props.onWaypointPath is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypointPathKey]);
+  const resolve = (id: string) => {
+    const w = wpById.get(id);
+    return w ? { lat: w.lat, lon: w.lon } : undefined;
+  };
+  const start = resolve(startId);
+  const end = resolve(endId);
+  const via = viaIds.map(resolve).filter((p): p is { lat: number; lon: number } => !!p);
 
   const onPlan = async (params: PlanParams): Promise<void> => {
     abortRef.current?.abort();
@@ -248,7 +209,11 @@ export function RoutePlanPanel(props: {
               Route
               <select
                 value={routeId}
-                onChange={(e) => setRouteId(e.target.value)}
+                onChange={(e) => {
+                  setRouteId(e.target.value);
+                  const r = routes.find((x) => x.id === e.target.value);
+                  if (r) props.onIdsChange(r.waypointIds.filter((id) => wpById.has(id)));
+                }}
                 className={selectClass}
               >
                 <option value="">— select route —</option>
@@ -266,7 +231,7 @@ export function RoutePlanPanel(props: {
                 value={startId}
                 waypoints={waypoints}
                 disabledId={endId}
-                onChange={props.onStartId}
+                onChange={(id) => props.onIdsChange(setStart(ids, id))}
               />
               {viaIds.map((id, i) => (
                 <div key={`${id}-${i}`} className="flex items-end gap-1">
@@ -276,11 +241,11 @@ export function RoutePlanPanel(props: {
                       value={id}
                       waypoints={waypoints}
                       disabledId=""
-                      onChange={(v) => setViaIds((xs) => xs.map((x, j) => (j === i ? v : x)))}
+                      onChange={(v) => props.onIdsChange(ids.map((x, j) => (j === i + 1 ? v : x)))}
                     />
                   </div>
                   <button
-                    onClick={() => setViaIds((xs) => (i > 0 ? reorder(xs, i, i - 1) : xs))}
+                    onClick={() => props.onIdsChange(i > 0 ? reorder(ids, i + 1, i) : ids)}
                     className="px-2 py-1 text-xs bg-slate-800 rounded"
                     title="Move up"
                   >
@@ -288,7 +253,7 @@ export function RoutePlanPanel(props: {
                   </button>
                   <button
                     onClick={() =>
-                      setViaIds((xs) => (i < xs.length - 1 ? reorder(xs, i, i + 1) : xs))
+                      props.onIdsChange(i + 1 < viaIds.length ? reorder(ids, i + 1, i + 2) : ids)
                     }
                     className="px-2 py-1 text-xs bg-slate-800 rounded"
                     title="Move down"
@@ -296,7 +261,7 @@ export function RoutePlanPanel(props: {
                     ↓
                   </button>
                   <button
-                    onClick={() => setViaIds((xs) => xs.filter((_, j) => j !== i))}
+                    onClick={() => props.onIdsChange(removeAt(ids, i + 1))}
                     className="px-2 py-1 text-xs bg-slate-800 rounded"
                     title="Remove"
                   >
@@ -305,8 +270,13 @@ export function RoutePlanPanel(props: {
                 </div>
               ))}
               <button
-                onClick={() => setViaIds((xs) => [...xs, ''])}
-                disabled={waypoints.length === 0}
+                onClick={() => {
+                  const candidate =
+                    waypoints.find((w) => !ids.includes(w.id))?.id ?? waypoints[0]?.id;
+                  if (candidate)
+                    props.onIdsChange(insertAt(ids, Math.max(1, ids.length - 1), candidate));
+                }}
+                disabled={waypoints.length === 0 || waypoints.every((w) => ids.includes(w.id))}
                 className="text-xs px-2 py-1 bg-slate-800 rounded disabled:opacity-40"
               >
                 + add via waypoint
@@ -316,7 +286,7 @@ export function RoutePlanPanel(props: {
                 value={endId}
                 waypoints={waypoints}
                 disabledId={startId}
-                onChange={props.onEndId}
+                onChange={(id) => props.onIdsChange(setEnd(ids, id))}
               />
             </>
           )}
