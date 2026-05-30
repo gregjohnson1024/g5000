@@ -24,18 +24,21 @@ export function wireAlarmsHistory(deps: { store: ConfigStore; registry: AlarmsRe
   alarmsRegistry.fire = (req) => {
     rawFire(req);
     // Only append a history row on a fresh fire (no current active entry).
+    // The append + map.set happen synchronously, so a same-tick double-fire
+    // sees the populated map on the second call and does NOT duplicate the row.
     const snapshot = alarmsRegistry.get(req.id);
     if (snapshot && !rowIdByAlarmId.has(req.id)) {
-      appendAlarmHistory(store, {
-        alarmId: req.id,
-        severity: req.severity,
-        firedAt: snapshot.firedAt,
-        context: snapshot.context as Record<string, unknown> | undefined,
-      })
-        .then((rowId) => rowIdByAlarmId.set(req.id, rowId))
-        .catch(() => {
-          /* don't fail the alarm on a DB hiccup */
+      try {
+        const rowId = appendAlarmHistory(store, {
+          alarmId: req.id,
+          severity: req.severity,
+          firedAt: snapshot.firedAt,
+          context: snapshot.context as Record<string, unknown> | undefined,
         });
+        rowIdByAlarmId.set(req.id, rowId);
+      } catch {
+        /* don't fail the alarm on a DB hiccup */
+      }
     }
   };
 
@@ -44,7 +47,11 @@ export function wireAlarmsHistory(deps: { store: ConfigStore; registry: AlarmsRe
     rawClear(id);
     const rowId = rowIdByAlarmId.get(id);
     if (rowId !== undefined) {
-      updateAlarmHistoryClear(store, rowId, new Date().toISOString()).catch(() => {});
+      try {
+        updateAlarmHistoryClear(store, rowId, new Date().toISOString());
+      } catch {
+        /* best-effort persist — never block the alarm transition */
+      }
       // For non-sticky alarms, re-fires should open a NEW history row, so drop
       // the mapping here. For sticky alarms (mob, anchor-watch), the alarm
       // stays active until ack — the ack wrapper still needs the rowId to
@@ -61,7 +68,11 @@ export function wireAlarmsHistory(deps: { store: ConfigStore; registry: AlarmsRe
     rawAck(id);
     const rowId = rowIdByAlarmId.get(id);
     if (rowId !== undefined) {
-      updateAlarmHistoryAck(store, rowId, new Date().toISOString()).catch(() => {});
+      try {
+        updateAlarmHistoryAck(store, rowId, new Date().toISOString());
+      } catch {
+        /* best-effort persist — never block the alarm transition */
+      }
       rowIdByAlarmId.delete(id);
     }
   };

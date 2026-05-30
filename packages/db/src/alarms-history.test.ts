@@ -24,25 +24,25 @@ describe('AlarmsHistory', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('starts empty', async () => {
-    const rows = await listAlarmHistory(store, { limit: 10 });
+  it('starts empty', () => {
+    const rows = listAlarmHistory(store, { limit: 10 });
     expect(rows).toEqual([]);
   });
 
-  it('appends rows and lists them newest-first', async () => {
-    const id1 = await appendAlarmHistory(store, {
+  it('appends rows and lists them newest-first', () => {
+    const id1 = appendAlarmHistory(store, {
       alarmId: 'shallow-water',
       severity: 'CRITICAL',
       firedAt: '2026-05-18T12:00:00Z',
       context: { depth: 1.8 },
     });
-    const id2 = await appendAlarmHistory(store, {
+    const id2 = appendAlarmHistory(store, {
       alarmId: 'over-speed',
       severity: 'WARN',
       firedAt: '2026-05-18T12:05:00Z',
     });
 
-    const rows = await listAlarmHistory(store, { limit: 10 });
+    const rows = listAlarmHistory(store, { limit: 10 });
     expect(rows).toHaveLength(2);
     expect(rows[0]?.id).toBe(id2);
     expect(rows[0]?.alarmId).toBe('over-speed');
@@ -50,37 +50,37 @@ describe('AlarmsHistory', () => {
     expect(rows[1]?.context).toEqual({ depth: 1.8 });
   });
 
-  it('respects limit', async () => {
+  it('respects limit', () => {
     for (let i = 0; i < 5; i++) {
-      await appendAlarmHistory(store, {
+      appendAlarmHistory(store, {
         alarmId: 'over-speed',
         severity: 'WARN',
         firedAt: `2026-05-18T12:0${i}:00Z`,
       });
     }
-    const rows = await listAlarmHistory(store, { limit: 3 });
+    const rows = listAlarmHistory(store, { limit: 3 });
     expect(rows).toHaveLength(3);
   });
 
-  it('updateAlarmHistoryClear sets clearedAt on a row', async () => {
-    const id = await appendAlarmHistory(store, {
+  it('updateAlarmHistoryClear sets clearedAt on a row', () => {
+    const id = appendAlarmHistory(store, {
       alarmId: 'shallow-water',
       severity: 'CRITICAL',
       firedAt: '2026-05-18T12:00:00Z',
     });
-    await updateAlarmHistoryClear(store, id, '2026-05-18T12:01:00Z');
-    const rows = await listAlarmHistory(store, { limit: 10 });
+    updateAlarmHistoryClear(store, id, '2026-05-18T12:01:00Z');
+    const rows = listAlarmHistory(store, { limit: 10 });
     expect(rows[0]?.clearedAt).toBe('2026-05-18T12:01:00Z');
   });
 
-  it('updateAlarmHistoryAck sets ackedAt on a row', async () => {
-    const id = await appendAlarmHistory(store, {
+  it('updateAlarmHistoryAck sets ackedAt on a row', () => {
+    const id = appendAlarmHistory(store, {
       alarmId: 'mob',
       severity: 'CRITICAL',
       firedAt: '2026-05-18T12:00:00Z',
     });
-    await updateAlarmHistoryAck(store, id, '2026-05-18T12:02:00Z');
-    const rows = await listAlarmHistory(store, { limit: 10 });
+    updateAlarmHistoryAck(store, id, '2026-05-18T12:02:00Z');
+    const rows = listAlarmHistory(store, { limit: 10 });
     expect(rows[0]?.ackedAt).toBe('2026-05-18T12:02:00Z');
   });
 });

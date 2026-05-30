@@ -10,7 +10,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   try {
     const store = getSharedConfigStore();
-    const rows = await listAlarmHistory(store, { limit });
+    const rows = listAlarmHistory(store, { limit });
     return NextResponse.json({ rows });
   } catch {
     return NextResponse.json({ rows: [] });

@@ -19,12 +19,16 @@ export interface AppendAlarmHistoryArgs {
   context?: Record<string, unknown>;
 }
 
-export async function appendAlarmHistory(
-  store: ConfigStore,
-  args: AppendAlarmHistoryArgs,
-): Promise<number> {
+// These helpers are intentionally SYNCHRONOUS. The drizzle better-sqlite3
+// driver runs queries synchronously, so an `async` wrapper here was a no-op
+// `await` over a non-Promise — and that fake async opened a real race: the
+// fire-history writer set its dedup map inside a `.then()`, so a synchronous
+// double-fire wrote a duplicate row. Keeping them sync lets callers update
+// their bookkeeping in the same tick. Do NOT re-add `async` (see
+// apps/g5000/src/alarms-history.ts and its test).
+export function appendAlarmHistory(store: ConfigStore, args: AppendAlarmHistoryArgs): number {
   const db = store.drizzle;
-  const result = await db
+  const result = db
     .insert(alarmsHistory)
     .values({
       alarmId: args.alarmId,
@@ -37,30 +41,26 @@ export async function appendAlarmHistory(
   return result.id;
 }
 
-export async function updateAlarmHistoryClear(
+export function updateAlarmHistoryClear(
   store: ConfigStore,
   rowId: number,
   clearedAt: string,
-): Promise<void> {
+): void {
   const db = store.drizzle;
-  await db.update(alarmsHistory).set({ clearedAt }).where(eq(alarmsHistory.id, rowId)).run();
+  db.update(alarmsHistory).set({ clearedAt }).where(eq(alarmsHistory.id, rowId)).run();
 }
 
-export async function updateAlarmHistoryAck(
-  store: ConfigStore,
-  rowId: number,
-  ackedAt: string,
-): Promise<void> {
+export function updateAlarmHistoryAck(store: ConfigStore, rowId: number, ackedAt: string): void {
   const db = store.drizzle;
-  await db.update(alarmsHistory).set({ ackedAt }).where(eq(alarmsHistory.id, rowId)).run();
+  db.update(alarmsHistory).set({ ackedAt }).where(eq(alarmsHistory.id, rowId)).run();
 }
 
-export async function listAlarmHistory(
+export function listAlarmHistory(
   store: ConfigStore,
   opts: { limit: number; before?: string },
-): Promise<AlarmHistoryRow[]> {
+): AlarmHistoryRow[] {
   const db = store.drizzle;
-  const rows = await db
+  const rows = db
     .select()
     .from(alarmsHistory)
     .orderBy(desc(alarmsHistory.firedAt))
