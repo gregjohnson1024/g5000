@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
@@ -41,7 +41,9 @@ import { ChartToolbar } from './ChartToolbar';
 import { ChartFollowControl } from './ChartFollowControl';
 import { RoutePlanPanel } from './RoutePlanPanel';
 import { useRoutePlan } from './use-route-plan';
-import { startOf, endOf } from '../../lib/route-plan';
+import { startOf, endOf, insertAt as insertAtId } from '../../lib/route-plan';
+import { ChartContextMenu } from './ChartContextMenu';
+import { resolveTarget, type ContextTarget, type HitWaypoint } from '../../lib/route-hit-test';
 import { PlaybackScrubber } from './PlaybackScrubber';
 import { RouteDetailsBox } from './RouteDetailsBox';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
@@ -613,6 +615,10 @@ function ChartPageInner() {
 
   const [waypointDropActive, setWaypointDropActive] = useState(false);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{
+    target: ContextTarget;
+    screen: { x: number; y: number };
+  } | null>(null);
   // Route Start/End waypoint ids derived from the unified routePlan so the
   // marks can be badged green/red on the chart.
   const routeStartId = startOf(routePlan.ids) ?? '';
@@ -646,7 +652,14 @@ function ChartPageInner() {
 
   // Auto-names via nextWaypointName, POSTs to /api/waypoints, and adds the pin
   // to state immediately. Shared by drop-mode clicks and the long-press gesture.
-  const dropWaypointAt = async ({ lat, lon }: { lat: number; lon: number }) => {
+  // Returns the new waypoint's id on success, or null on failure.
+  const dropWaypointAt = async ({
+    lat,
+    lon,
+  }: {
+    lat: number;
+    lon: number;
+  }): Promise<string | null> => {
     const name = nextWaypointName(waypoints.map((w) => w.name));
     try {
       const res = await fetch('/api/waypoints', {
@@ -668,11 +681,14 @@ function ChartPageInner() {
       if (res.ok && j.ok && j.waypoint) {
         const wp = j.waypoint;
         setWaypoints((prev) => [...prev, { id: wp.id, name: wp.name, lat: wp.lat, lon: wp.lon }]);
+        return wp.id;
       } else {
         setError('waypoint drop failed');
+        return null;
       }
     } catch {
       setError('waypoint drop failed');
+      return null;
     }
   };
 
@@ -697,6 +713,40 @@ function ChartPageInner() {
       })
       .catch(() => setError('waypoint move failed'));
   };
+
+  // Delete a waypoint by id: DELETEs from server, removes from state, and
+  // removes from the active route so orphan ids don't linger.
+  const handleDeleteWaypoint = async (id: string): Promise<void> => {
+    try {
+      await fetch(`/api/waypoints/${id}`, { method: 'DELETE' });
+    } catch {
+      /* ignore network errors — state update still happens */
+    }
+    setWaypoints((prev) => prev.filter((w) => w.id !== id));
+    routePlan.removeId(id);
+    setSelectedWaypointId(null);
+  };
+
+  // Right-click context menu: resolve the hit target and show the menu.
+  const handleContextMenu = useCallback(
+    (e: { lat: number; lon: number; point: { x: number; y: number } }) => {
+      if (!mapInstance) return;
+      const feats = mapInstance.queryRenderedFeatures([e.point.x, e.point.y], {
+        layers: ['waypoints-dot', 'route-connector'].filter((id) => mapInstance.getLayer(id)),
+      });
+      const byId = new globalThis.Map<string, HitWaypoint>(
+        waypoints.map((w) => [w.id, { id: w.id, name: w.name, lat: w.lat, lon: w.lon }]),
+      );
+      const target = resolveTarget(feats as never, {
+        lat: e.lat,
+        lon: e.lon,
+        routeIds: routePlan.ids,
+        waypointById: byId,
+      });
+      setCtxMenu({ target, screen: { x: e.point.x, y: e.point.y } });
+    },
+    [mapInstance, waypoints, routePlan.ids],
+  );
 
   // Persist the routes. Start/end are deliberately omitted — see comment on
   // the restore effect above.
@@ -820,9 +870,34 @@ function ChartPageInner() {
             setMapInstance(m);
           }}
           onClick={waypointDropActive ? handleDropClick : undefined}
+          onContextMenu={handleContextMenu}
           onLongPress={dropWaypointAt}
           suppressLongPressLayers={['waypoints-dot']}
         />
+        {ctxMenu && (
+          <ChartContextMenu
+            target={ctxMenu.target}
+            screen={ctxMenu.screen}
+            onClose={() => setCtxMenu(null)}
+            onAddToRoute={(id) => routePlan.append(id)}
+            onRemoveFromRoute={(id) => routePlan.removeId(id)}
+            onSetStart={(id) => routePlan.setStart(id)}
+            onSetEnd={(id) => routePlan.setEnd(id)}
+            onDeleteWaypoint={(w) => void handleDeleteWaypoint(w.id)}
+            onAddHere={(lat, lon) =>
+              void dropWaypointAt({ lat, lon }).then((id) => id && routePlan.append(id))
+            }
+            onRouteToHere={(lat, lon) =>
+              void dropWaypointAt({ lat, lon }).then((id) => id && routePlan.setEnd(id))
+            }
+            onInsertHere={(lat, lon, idx) =>
+              void dropWaypointAt({ lat, lon }).then(
+                (id) => id && routePlan.setIds(insertAtId(routePlan.ids, idx, id)),
+              )
+            }
+            onClearRoute={() => routePlan.clear()}
+          />
+        )}
         {showIsochrones && <IsochroneLayer map={mapInstance} routes={routes} />}
         {showRouteWind && <RouteWindLayer map={mapInstance} routes={routes} />}
         <LiveBoatMarker map={mapInstance} onUpdate={setLivePos} flyToOnFirstFix={false} />
@@ -962,6 +1037,7 @@ function ChartPageInner() {
               }}
               onDeleted={(id) => {
                 setWaypoints((prev) => prev.filter((w) => w.id !== id));
+                routePlan.removeId(id);
                 setSelectedWaypointId(null);
               }}
               onClose={() => setSelectedWaypointId(null)}
