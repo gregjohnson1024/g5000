@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import {
   DEFAULT_ALARMS_CONFIG,
   getSharedConfigStore,
+  isAlarmsConfig,
   saveAlarmsConfig,
   type AlarmsConfig,
 } from '@g5000/db';
@@ -28,11 +29,17 @@ export async function PUT(req: Request): Promise<NextResponse> {
   const ref = getRef();
   if (!ref) return NextResponse.json({ ok: false, error: 'config ref unbound' }, { status: 503 });
 
-  let body: AlarmsConfig;
+  let body: unknown;
   try {
-    body = (await req.json()) as AlarmsConfig;
+    body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 });
+  }
+
+  // Validate the shape before it touches the live config. A malformed or empty
+  // payload would otherwise silently disable every alarm (see isAlarmsConfig).
+  if (!isAlarmsConfig(body)) {
+    return NextResponse.json({ ok: false, error: 'invalid alarms config shape' }, { status: 400 });
   }
 
   // Replace the ref so predicates see the new config on their next sample.

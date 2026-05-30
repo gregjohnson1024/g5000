@@ -6,6 +6,7 @@ import { ConfigStore } from './config-store.js';
 import {
   loadAlarmsConfig,
   saveAlarmsConfig,
+  isAlarmsConfig,
   DEFAULT_ALARMS_CONFIG,
   type AlarmsConfig,
 } from './alarms-config.js';
@@ -62,5 +63,49 @@ describe('AlarmsConfig persistence', () => {
     for (const id of ['mob', 'anchor-watch', 'shallow-water', 'over-speed', 'low-battery']) {
       expect(cfg.enabled[id]).toBe(true);
     }
+  });
+});
+
+describe('isAlarmsConfig guard', () => {
+  it('accepts the default config', () => {
+    expect(isAlarmsConfig(DEFAULT_ALARMS_CONFIG)).toBe(true);
+  });
+
+  it('accepts a structurally complete config with extra enabled ids', () => {
+    const cfg = {
+      ...DEFAULT_ALARMS_CONFIG,
+      enabled: { ...DEFAULT_ALARMS_CONFIG.enabled, 'custom-alarm': false },
+    };
+    expect(isAlarmsConfig(cfg)).toBe(true);
+  });
+
+  it('rejects an empty object (the silent-disable footgun)', () => {
+    // PUT {} previously replaced the live config with garbage, leaving every
+    // predicate to read cfg.enabled[ID] as undefined => silently disabled.
+    expect(isAlarmsConfig({})).toBe(false);
+  });
+
+  it('rejects null and non-objects', () => {
+    expect(isAlarmsConfig(null)).toBe(false);
+    expect(isAlarmsConfig(undefined)).toBe(false);
+    expect(isAlarmsConfig('whatever')).toBe(false);
+    expect(isAlarmsConfig(42)).toBe(false);
+  });
+
+  it('rejects a config missing the thresholds block', () => {
+    expect(isAlarmsConfig({ enabled: { mob: true } })).toBe(false);
+  });
+
+  it('rejects a config missing a required threshold key', () => {
+    const { overSpeed: _drop, ...partialThresholds } = DEFAULT_ALARMS_CONFIG.thresholds;
+    expect(isAlarmsConfig({ enabled: {}, thresholds: partialThresholds })).toBe(false);
+  });
+
+  it('rejects an enabled map whose values are not all booleans', () => {
+    const cfg = {
+      ...DEFAULT_ALARMS_CONFIG,
+      enabled: { ...DEFAULT_ALARMS_CONFIG.enabled, mob: 'yes' },
+    };
+    expect(isAlarmsConfig(cfg)).toBe(false);
   });
 });

@@ -31,4 +31,16 @@ describe('/api/alarms/config', () => {
     const after = await (await GET()).json();
     expect(after.enabled['over-speed']).toBe(false);
   });
+
+  it('PUT rejects a malformed body with 400 and leaves the live config intact', async () => {
+    // An empty/partial payload used to silently overwrite the live config,
+    // disabling every alarm. The route must reject it and keep the old config.
+    const req = new Request('http://test', { method: 'PUT', body: JSON.stringify({}) });
+    const res = await PUT(req);
+    expect(res.status).toBe(400);
+
+    const after = await (await GET()).json();
+    expect(after.enabled.mob).toBe(true);
+    expect(after.thresholds.shallowWater.thresholdM).toBeGreaterThan(0);
+  });
 });

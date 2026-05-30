@@ -42,6 +42,43 @@ export const DEFAULT_ALARMS_CONFIG: AlarmsConfig = {
   },
 };
 
+/** Threshold keys that a complete AlarmsConfig.thresholds block must carry. */
+const REQUIRED_THRESHOLD_KEYS = [
+  'anchor',
+  'shallowWater',
+  'overSpeed',
+  'lowBattery',
+] as const satisfies ReadonlyArray<keyof AlarmsConfig['thresholds']>;
+
+/**
+ * Runtime shape check for an AlarmsConfig coming off the wire (e.g. PUT
+ * /api/alarms/config). The structural `as AlarmsConfig` cast at the route
+ * boundary is a lie — without this guard a malformed or empty `{}` payload
+ * silently replaces the live config, leaving every predicate to read
+ * `cfg.enabled[ID]` as undefined => falsy => silently disabled. The failure is
+ * invisible until an alarm doesn't fire when it should. Validate, reject loudly.
+ *
+ * Intentionally shallow: it confirms the two top-level blocks exist with the
+ * right primitive shapes, not that every threshold's numbers are sane. The
+ * point is to reject garbage, not to re-type the whole tree.
+ */
+export function isAlarmsConfig(v: unknown): v is AlarmsConfig {
+  if (typeof v !== 'object' || v === null) return false;
+  const x = v as Record<string, unknown>;
+
+  // enabled: a map of id -> boolean.
+  if (typeof x.enabled !== 'object' || x.enabled === null) return false;
+  const enabled = x.enabled as Record<string, unknown>;
+  if (!Object.values(enabled).every((b) => typeof b === 'boolean')) return false;
+
+  // thresholds: an object carrying every required sub-block as an object.
+  if (typeof x.thresholds !== 'object' || x.thresholds === null) return false;
+  const thresholds = x.thresholds as Record<string, unknown>;
+  return REQUIRED_THRESHOLD_KEYS.every(
+    (k) => typeof thresholds[k] === 'object' && thresholds[k] !== null,
+  );
+}
+
 const ID = 'singleton';
 
 export async function loadAlarmsConfig(store: ConfigStore): Promise<AlarmsConfig> {
