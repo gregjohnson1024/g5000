@@ -11,6 +11,8 @@ import type { RouteColorMode } from './RoutePolyline';
 export interface PlanParams {
   start: { lat: number; lon: number };
   end: { lat: number; lon: number };
+  /** Ordered intermediate waypoints between start and end. Empty = direct. */
+  via?: { lat: number; lon: number }[];
   departure: number;
   models: Array<'GFS' | 'ECMWF'>;
   useCurrents: boolean;
@@ -53,6 +55,7 @@ function NumberInput(props: {
 export function PlanControls(props: {
   start?: { lat: number; lon: number };
   end?: { lat: number; lon: number };
+  via?: { lat: number; lon: number }[];
   onPlan: (params: PlanParams) => void;
   loading: boolean;
   /** Page-level timezone display preference. Controls how the Departure
@@ -120,6 +123,7 @@ export function PlanControls(props: {
     props.onPlan({
       start: props.start,
       end: props.end,
+      via: props.via,
       departure: Math.floor(departureAnchor),
       models: selected,
       useCurrents,

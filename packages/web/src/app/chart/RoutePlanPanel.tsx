@@ -1,9 +1,11 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Route } from '@g5000/routing';
 import { PlanControls, type PlanParams } from '../../components/PlanControls';
 import type { RouteColorMode } from '../../components/RoutePolyline';
 import type { TzMode } from '../../lib/tz';
+import { reorder } from '../routes/reorder';
+import { orderedPlanFromRoute, type SavedRouteLite } from '../../lib/plan-via';
 
 function fmtRouteDuration(secs: number): string {
   const totalMin = Math.round(secs / 60);
@@ -89,10 +91,45 @@ export function RoutePlanPanel(props: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [mode, setMode] = useState<'waypoints' | 'route'>('waypoints');
+  const [routes, setRoutes] = useState<SavedRouteLite[]>([]);
+  const [routeId, setRouteId] = useState<string>('');
+  const [viaIds, setViaIds] = useState<string[]>([]); // ad-hoc intermediates
   const abortRef = useRef<AbortController | null>(null);
 
-  const start = waypoints.find((w) => w.id === startId);
-  const end = waypoints.find((w) => w.id === endId);
+  useEffect(() => {
+    void fetch('/api/routes')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.ok && Array.isArray(j.routes)) setRoutes(j.routes as SavedRouteLite[]);
+      })
+      .catch(() => {});
+  }, []);
+
+  const wpById = new Map(waypoints.map((w) => [w.id, w]));
+
+  // Resolve the ordered plan (start/end/via) for the active mode.
+  let start: { lat: number; lon: number } | undefined;
+  let end: { lat: number; lon: number } | undefined;
+  let via: { lat: number; lon: number }[] = [];
+  if (mode === 'route') {
+    const route = routes.find((r) => r.id === routeId);
+    const ordered = route ? orderedPlanFromRoute(route, waypoints) : null;
+    if (ordered) {
+      start = ordered.start;
+      end = ordered.end;
+      via = ordered.via;
+    }
+  } else {
+    const s = wpById.get(startId);
+    const e = wpById.get(endId);
+    start = s ? { lat: s.lat, lon: s.lon } : undefined;
+    end = e ? { lat: e.lat, lon: e.lon } : undefined;
+    via = viaIds
+      .map((id) => wpById.get(id))
+      .filter((w): w is Wp => !!w)
+      .map((w) => ({ lat: w.lat, lon: w.lon }));
+  }
 
   const onPlan = async (params: PlanParams): Promise<void> => {
     abortRef.current?.abort();
@@ -116,6 +153,7 @@ export function RoutePlanPanel(props: {
               start: params.start,
               end: params.end,
               departure: params.departure,
+              via: params.via,
               model,
               useCurrents: params.useCurrents,
               options: params.options,
@@ -168,23 +206,99 @@ export function RoutePlanPanel(props: {
         </p>
       ) : (
         <>
-          <WaypointSelect
-            label="Start"
-            value={startId}
-            waypoints={waypoints}
-            disabledId={endId}
-            onChange={props.onStartId}
-          />
-          <WaypointSelect
-            label="End"
-            value={endId}
-            waypoints={waypoints}
-            disabledId={startId}
-            onChange={props.onEndId}
-          />
+          <div className="flex gap-2 text-xs">
+            {(['waypoints', 'route'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-2 py-1 rounded ${mode === m ? 'bg-emerald-700' : 'bg-slate-800'}`}
+              >
+                {m === 'waypoints' ? 'Pick waypoints' : 'Saved route'}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'route' ? (
+            <label className="block text-sm">
+              Route
+              <select
+                value={routeId}
+                onChange={(e) => setRouteId(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">— select route —</option>
+                {routes.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <>
+              <WaypointSelect
+                label="Start"
+                value={startId}
+                waypoints={waypoints}
+                disabledId={endId}
+                onChange={props.onStartId}
+              />
+              {viaIds.map((id, i) => (
+                <div key={`${id}-${i}`} className="flex items-end gap-1">
+                  <div className="flex-1">
+                    <WaypointSelect
+                      label={`Via ${i + 1}`}
+                      value={id}
+                      waypoints={waypoints}
+                      disabledId=""
+                      onChange={(v) => setViaIds((xs) => xs.map((x, j) => (j === i ? v : x)))}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setViaIds((xs) => (i > 0 ? reorder(xs, i, i - 1) : xs))}
+                    className="px-2 py-1 text-xs bg-slate-800 rounded"
+                    title="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() =>
+                      setViaIds((xs) => (i < xs.length - 1 ? reorder(xs, i, i + 1) : xs))
+                    }
+                    className="px-2 py-1 text-xs bg-slate-800 rounded"
+                    title="Move down"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => setViaIds((xs) => xs.filter((_, j) => j !== i))}
+                    className="px-2 py-1 text-xs bg-slate-800 rounded"
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setViaIds((xs) => [...xs, ''])}
+                disabled={waypoints.length === 0}
+                className="text-xs px-2 py-1 bg-slate-800 rounded disabled:opacity-40"
+              >
+                + add via waypoint
+              </button>
+              <WaypointSelect
+                label="End"
+                value={endId}
+                waypoints={waypoints}
+                disabledId={startId}
+                onChange={props.onEndId}
+              />
+            </>
+          )}
           <PlanControls
-            start={start ? { lat: start.lat, lon: start.lon } : undefined}
-            end={end ? { lat: end.lat, lon: end.lon } : undefined}
+            start={start}
+            end={end}
+            via={via}
             onPlan={onPlan}
             loading={loading}
             tz={props.tz}
