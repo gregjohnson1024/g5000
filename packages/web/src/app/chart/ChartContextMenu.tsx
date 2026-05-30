@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ContextTarget, HitWaypoint } from '../../lib/route-hit-test';
 
 export interface ChartContextMenuProps {
@@ -20,6 +20,7 @@ export interface ChartContextMenuProps {
 const ITEM = 'w-full text-left px-3 py-1.5 text-sm hover:bg-slate-700 whitespace-nowrap';
 
 export function ChartContextMenu(p: ChartContextMenuProps): React.ReactElement {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(p.onClose);
   onCloseRef.current = p.onClose;
@@ -61,7 +62,24 @@ export function ChartContextMenu(p: ChartContextMenuProps): React.ReactElement {
     else item(`Add ${w.name} to route`, () => p.onAddToRoute(w.id));
     item(`Set ${w.name} as start`, () => p.onSetStart(w.id));
     item(`Set ${w.name} as destination`, () => p.onSetEnd(w.id));
-    item(`Delete ${w.name}`, () => p.onDeleteWaypoint(w));
+    items.push(
+      confirmDelete ? (
+        <button
+          key="confirm-delete"
+          className={`${ITEM} text-rose-400`}
+          onClick={() => {
+            p.onDeleteWaypoint(w);
+            p.onClose();
+          }}
+        >
+          {`Confirm delete ${w.name}`}
+        </button>
+      ) : (
+        <button key="delete" className={ITEM} onClick={() => setConfirmDelete(true)}>
+          {`Delete ${w.name}`}
+        </button>
+      ),
+    );
   } else if (t.kind === 'leg') {
     item('Insert waypoint here', () => p.onInsertHere(t.lat, t.lon, t.insertIndex));
   } else {
