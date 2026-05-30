@@ -1,0 +1,12 @@
+{
+  "name": "@g5000/mast",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@g5000/core": "*"
+  }
+}

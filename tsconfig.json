@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/mast" },
     { "path": "./packages/db" },
     { "path": "./packages/compute" },
     { "path": "./packages/bridge" },
