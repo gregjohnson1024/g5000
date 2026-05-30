@@ -106,6 +106,20 @@ export function RoutePlanPanel(props: {
       .catch(() => {});
   }, []);
 
+  // In saved-route mode, keep the chart's start/end mark badges in sync with
+  // the selected route's endpoints — the parent badges marks by startId/endId.
+  useEffect(() => {
+    if (mode !== 'route') return;
+    const route = routes.find((r) => r.id === routeId);
+    if (!route) return;
+    const present = new Set(waypoints.map((w) => w.id));
+    const resolved = route.waypointIds.filter((id) => present.has(id));
+    if (resolved.length >= 2) {
+      props.onStartId(resolved[0]!);
+      props.onEndId(resolved[resolved.length - 1]!);
+    }
+  }, [mode, routeId, routes, waypoints, props]);
+
   const wpById = new Map(waypoints.map((w) => [w.id, w]));
 
   // Resolve the ordered plan (start/end/via) for the active mode.
