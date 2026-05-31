@@ -111,6 +111,7 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     if (pos === 'not-sailing' || latest.targetSpeed === undefined || latest.targetTwa === undefined || latest.targetSpeed <= 0) {
       inGrooveBuf.length = 0;
       twaBuf.length = 0;
+      bspBuf.length = 0;
       return;
     }
 

@@ -1127,6 +1127,7 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
       // Clear in-groove accumulation so a motoring gap doesn't bleed into the next leg.
       inGrooveBuf.length = 0;
       twaBuf.length = 0;
+      bspBuf.length = 0;
       return;
     }
 
