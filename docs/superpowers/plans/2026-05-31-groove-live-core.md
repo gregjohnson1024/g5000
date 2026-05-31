@@ -1006,7 +1006,6 @@ Expected: FAIL — module not found.
 
 ```ts
 import { Bus, Channels } from '@g5000/core';
-import type { Sample } from '@g5000/core';
 import type { GrooveSettings } from '@g5000/db';
 import { classifyPointOfSail, type PointOfSail } from './point-of-sail.js';
 import { isInGroove, vmgEfficiencyPct, vmgMs, targetTwaErrorRad } from './metrics.js';
@@ -1061,6 +1060,14 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
   const publishEnum = (channel: string, value: string, t_ns: bigint): void => {
     bus.publish({ channel, t_ns, value: { kind: 'enum', value }, source: 'groove' });
   };
+  // Prune one buffer in place. Generic over the concrete sample type so the
+  // call typechecks for both FlagSample[] and NumSample[] (a single loop over
+  // a mixed array would fail to unify the element types).
+  const pruneInPlace = <T extends { t_ns: bigint }>(buf: T[], cutoff_ns: bigint): void => {
+    const kept = pruneBefore(buf, cutoff_ns);
+    buf.length = 0;
+    buf.push(...kept);
+  };
 
   function recompute(t_ns: bigint): void {
     const s = settingsRef.current;
@@ -1068,11 +1075,10 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     const cutoff = t_ns - windowNs;
 
     // Prune all buffers in place.
-    for (const buf of [inGrooveBuf, twaBuf, bspBuf, rudderBuf]) {
-      const kept = pruneBefore(buf, cutoff);
-      buf.length = 0;
-      buf.push(...kept);
-    }
+    pruneInPlace(inGrooveBuf, cutoff);
+    pruneInPlace(twaBuf, cutoff);
+    pruneInPlace(bspBuf, cutoff);
+    pruneInPlace(rudderBuf, cutoff);
 
     // Helm source (always publishable).
     let helmSource: 'human' | 'autopilot' = 'human';
