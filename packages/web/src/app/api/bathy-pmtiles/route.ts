@@ -39,8 +39,12 @@ export function GET(req: Request): Response {
     'content-type': 'application/octet-stream',
     'accept-ranges': 'bytes',
     // Cacheable for offline use, but revalidate on reload (NOT immutable) so a
-    // rebuilt archive is picked up instead of a stale partial.
-    'cache-control': 'public, max-age=31536000',
+    // rebuilt archive is picked up instead of a stale partial. In development,
+    // no-store: a dev server killed mid-range-stream can otherwise cache a
+    // truncated partial that corrupts pmtiles' offset math ("Failed to Decode
+    // Data.") until a manual Empty-Cache-and-Hard-Reload.
+    'cache-control':
+      process.env.NODE_ENV === 'production' ? 'public, max-age=31536000' : 'no-store',
     etag,
   };
 

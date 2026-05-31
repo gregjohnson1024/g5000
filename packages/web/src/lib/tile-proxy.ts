@@ -29,7 +29,13 @@ import { ROOT } from './paths';
  */
 
 const USER_AGENT = 'g5000-marine-router/1.0 (https://g5000.sulabassana.net)';
-const HIT_MISS_CACHE_CONTROL = 'public, max-age=2592000';
+// HIT/MISS responses cache 30 d in production for offline use on the boat. In
+// development we serve `no-store`: a dev server that's killed mid-stream can
+// otherwise cache a truncated tile, and MapLibre then keeps failing to decode
+// it ("Failed to Decode Data.") from cache until a manual Empty-Cache-and-Hard-
+// Reload. no-store keeps dev honest without weakening the prod offline cache.
+const HIT_MISS_CACHE_CONTROL =
+  process.env.NODE_ENV === 'production' ? 'public, max-age=2592000' : 'no-store';
 
 // 67-byte fully-transparent 1x1 PNG. Pre-encoded so we never re-encode at
 // request time. Used for EMPTY (off-coverage zoom) and the soft error
