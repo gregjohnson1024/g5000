@@ -308,6 +308,52 @@ export const DEFAULT_CROSSOVER_SETTINGS: CrossoverSettings = {
 };
 
 /**
+ * Per-boat tunables for the live "groove" metrics. Angles in degrees, speeds
+ * in knots in storage (UI-friendly); the compute pipeline converts to SI.
+ */
+export interface GrooveSettings {
+  /** TWA tolerance band degrees upwind. */
+  twaToleranceDeg: number;
+  /** Multiplier on tolerance downwind. */
+  downwindToleranceFactor: number;
+  /** Fraction of target boat speed for in-groove. */
+  speedFraction: number;
+  /** Rolling window seconds. */
+  windowSec: number;
+  /** Below this TWS (kn) → not-sailing. */
+  twsFloorKn: number;
+  /** Below this STW (kn) → not-sailing. */
+  steerageFloorKn: number;
+  /** Lower |TWA| boundary of reaching band (degrees). */
+  reachingBandLoDeg: number;
+  /** Upper |TWA| boundary of reaching band (degrees). */
+  reachingBandHiDeg: number;
+  /** Ignore rudder moves below this angle when counting reversals. */
+  rudderDeadbandDeg: number;
+  /** Coefficient in λ=k·heel/STW², 0 disables leeway correction. */
+  leewayK: number;
+  /** Clamp on |leeway| in degrees. */
+  leewayMaxDeg: number;
+  /** If no autopilot.mode within this many seconds, assume human helm. */
+  helmSourceTtlSec: number;
+}
+
+export const DEFAULT_GROOVE_SETTINGS: GrooveSettings = {
+  twaToleranceDeg: 5,
+  downwindToleranceFactor: 1.5,
+  speedFraction: 0.95,
+  windowSec: 60,
+  twsFloorKn: 3,
+  steerageFloorKn: 1,
+  reachingBandLoDeg: 70,
+  reachingBandHiDeg: 110,
+  rudderDeadbandDeg: 0.5,
+  leewayK: 0,
+  leewayMaxDeg: 10,
+  helmSourceTtlSec: 30,
+};
+
+/**
  * Passage log — the maritime "log" (distance instrument). Persists a single
  * anchor timestamp; the /passage page sums over-ground distance from
  * `anchorAt` to now using the active track. The anchor is seeded on first

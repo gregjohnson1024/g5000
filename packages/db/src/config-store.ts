@@ -10,6 +10,7 @@ import {
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_CROSSOVER_SETTINGS,
   DEFAULT_DAMPING_CONFIG,
+  DEFAULT_GROOVE_SETTINGS,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
@@ -22,6 +23,7 @@ import {
   type CompassDeviation,
   type CrossoverSettings,
   type DampingConfig,
+  type GrooveSettings,
   type PassageLog,
   type PolarMode,
   type PolarRevision,
@@ -37,6 +39,7 @@ import {
   compassDeviation,
   crossoverSettings as crossoverSettingsTable,
   dampingConfig as dampingConfigTable,
+  grooveSettings as grooveSettingsTable,
   passageLog as passageLogTable,
   sailWardrobe,
   sourcePriorityConfig as sourcePriorityConfigTable,
@@ -78,6 +81,7 @@ type SubjectValues = {
   passageLog: PassageLog;
   polarRevisions: Map<string, PolarRevision>;
   crossoverSettings: CrossoverSettings;
+  grooveSettings: GrooveSettings;
   waypoints: Waypoint[];
   routes: Route[];
   boatState: BoatState;
@@ -92,7 +96,7 @@ type Subjects = { [K in keyof SubjectValues]: BehaviorSubject<SubjectValues[K]> 
  * are generated from this registry: each maps a subject key to its `(id,
  * value JSON)` Drizzle table. Validating setters (sails, sourcePriority,
  * aisAlarm, damping, passageLog) and the non-`(id, value)` subjects
- * (crossoverSettings, polarRevisions) deliberately stay out of here.
+ * (crossoverSettings, polarRevisions, grooveSettings) deliberately stay out of here.
  */
 type SimpleKey =
   | 'boatConfig'
@@ -223,6 +227,10 @@ export class ConfigStore {
         PRIMARY KEY (boat_id, mode)
       );
       CREATE TABLE IF NOT EXISTS crossover_settings (
+        boat_id TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS groove_settings (
         boat_id TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
@@ -371,6 +379,20 @@ export class ConfigStore {
         }
       : DEFAULT_CROSSOVER_SETTINGS;
 
+    // Load the groove_settings row for the active boat. Merged over
+    // DEFAULT_GROOVE_SETTINGS so new fields get sensible fallbacks.
+    const gsRows = db
+      .select()
+      .from(grooveSettingsTable)
+      .where(eq(grooveSettingsTable.boatId, activeBoatId))
+      .all() as Array<{ boatId: string; value: string }>;
+    const grooveSettingsValue: GrooveSettings = gsRows[0]
+      ? {
+          ...DEFAULT_GROOVE_SETTINGS,
+          ...(JSON.parse(gsRows[0].value) as Partial<GrooveSettings>),
+        }
+      : DEFAULT_GROOVE_SETTINGS;
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
@@ -386,6 +408,7 @@ export class ConfigStore {
       passageLog: passageLogValue,
       polarRevisions: revisionsMap,
       crossoverSettings: crossoverSettingsValue,
+      grooveSettings: grooveSettingsValue,
       waypoints: loadOrInsert<Waypoint[]>(waypointsTable, []),
       routes: loadOrInsert<Route[]>(routesTable, []),
       boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
@@ -498,6 +521,30 @@ export class ConfigStore {
       )
       .run(this.__activeBoatId, JSON.stringify(value));
     this.subjects.crossoverSettings.next(value);
+  }
+
+  /**
+   * Groove settings (per-boat tunables for the live "groove" metrics) for the
+   * active boat. Seeded at open() from the groove_settings row for
+   * `activeBoatId`, merged over DEFAULT_GROOVE_SETTINGS so missing keys
+   * fall back. Single-row table keyed on `boatId`.
+   */
+  get grooveSettings$(): Observable<GrooveSettings> {
+    return this.subjects.grooveSettings.asObservable();
+  }
+
+  /** Synchronous read of the current groove settings (BehaviorSubject.value). */
+  getGrooveSettings(): GrooveSettings {
+    return this.subjects.grooveSettings.value;
+  }
+
+  async setGrooveSettings(value: GrooveSettings): Promise<void> {
+    this.raw
+      .prepare(
+        'INSERT INTO groove_settings (boat_id, value) VALUES (?, ?) ON CONFLICT (boat_id) DO UPDATE SET value = excluded.value',
+      )
+      .run(this.__activeBoatId, JSON.stringify(value));
+    this.subjects.grooveSettings.next(value);
   }
 
   get waypoints$(): Observable<Waypoint[]> {

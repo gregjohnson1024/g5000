@@ -9,6 +9,7 @@ import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_DAMPING_CONFIG,
+  DEFAULT_GROOVE_SETTINGS,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
   DEFAULT_WARDROBE,
@@ -449,5 +450,14 @@ describe('ConfigStore', () => {
       store = await ConfigStore.open(dbPath);
       expect(store.getMastLayout()).toEqual(layout);
     });
+  });
+
+  it('seeds groove settings with defaults on a fresh store and persists across reopen', async () => {
+    expect(store.getGrooveSettings()).toEqual(DEFAULT_GROOVE_SETTINGS);
+    const next = { ...DEFAULT_GROOVE_SETTINGS, windowSec: 90 };
+    await store.setGrooveSettings(next);
+    await store.close();
+    store = await ConfigStore.open(dbPath);
+    expect(store.getGrooveSettings()).toEqual(next);
   });
 });
