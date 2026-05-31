@@ -85,6 +85,22 @@ const mappers: Record<number, MapperFn> = {
     ];
   },
 
+  // PGN 127245 — Rudder. "Position" is the actual rudder angle (rad);
+  // "Angle Order" is the commanded value (the autopilot's commanded rudder
+  // is decoded separately from PGN 127237).
+  127245: (pgn) => {
+    const pos = pgn.fields['Position'];
+    if (typeof pos !== 'number') return [];
+    return [
+      {
+        channel: Channels.Boat.RudderAngle,
+        t_ns: pgn.rxTimestamp,
+        value: scalar(pos, 'rad'),
+        source: sourceTag(pgn),
+      },
+    ];
+  },
+
   // PGN 127237 — Heading/Track Control (standard autopilot).
   // We surface a useful subset; canboatjs's decoded field names match the
   // canboat database conventions: "Steering Mode", "Heading-To-Steer (Course)",

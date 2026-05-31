@@ -230,6 +230,13 @@ describe('mapPgnToSamples', () => {
     expect(channels.has(Channels.Autopilot.TargetHeading)).toBe(false);
   });
 
+  it('maps PGN 127245 rudder Position to boat.rudder.angle', () => {
+    const decoded = make(127245, { Instance: 0, Position: -0.12 });
+    const samples = mapPgnToSamples(decoded);
+    expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.RudderAngle]);
+    expect(samples[0]?.value).toEqual({ kind: 'scalar', value: -0.12, unit: 'rad' });
+  });
+
   it('does NOT publish samples for AIS PGNs (they feed the registry instead)', () => {
     // AIS PGNs deliberately have no mapper entry — they go through the
     // separate ais-handler pipeline so we don't proliferate per-MMSI channels
