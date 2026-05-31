@@ -79,7 +79,7 @@ Hercules exposes three independent corrections as user-visible toggles, each com
 - Mast-rotation correction adjusts AWA when a rotating-mast boat changes mast angle.
 - Leeway correction adjusts AWA against the leeway angle estimate.
 
-We compute true wind from AWA/AWS/BSP/HDG but don't expose these per-correction toggles. Sula doesn't have a heel sensor, mast-rotation sensor, or leeway-angle output, so the immediate value to us is zero — but it's a clean architecture point worth replicating when/if those sensors arrive.
+We compute true wind from AWA/AWS/BSP/HDG but don't expose these per-correction toggles. Sula has heel and pitch sensors (PGN 127257 attitude). It does **not** have a mast-rotation sensor or a hardware leeway-angle output — leeway is now estimated from heel (see the `boat.leeway` channel). The mast-rotation and leeway-output toggles still have no immediate value for us, but heel correction is a realistic near-term addition.
 
 ### Start-line "bias advantage in meters" (manual p24)
 
