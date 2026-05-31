@@ -55,11 +55,9 @@ async function main(): Promise<void> {
   teardown.push(() => store.close());
   const mastLayoutPath =
     process.env.MAST_LAYOUT_PATH ?? fileURLToPath(new URL('../mast-layout.json', import.meta.url));
-  const mast = await MastService.start(mastLayoutPath);
+  const mast = await MastService.start(store, mastLayoutPath);
   setSharedMastRuntime(mast);
   teardown.push(() => mast.stop());
-  // eslint-disable-next-line no-console
-  console.log(`[mast] watching ${mastLayoutPath}`);
   // One-time migration: import legacy ~/.g5000-router/waypoints.json into
   // ConfigStore if the store is empty and the file exists.
   await migrateWaypointsJson(store, path.join(SOCKETCAN_ROOT, 'waypoints.json'));
