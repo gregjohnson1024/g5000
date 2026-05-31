@@ -28,10 +28,6 @@
 .mast-tile-label {
   font-size: 6cqmin;
 }
-.mast-tile-value {
-  /* scales to the cell; tune the factor on real hardware if needed */
-  font-size: 26cqmin;
-}
 .mast-tile-units {
   font-size: 6cqmin;
 }
