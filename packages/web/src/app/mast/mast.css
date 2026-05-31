@@ -12,6 +12,8 @@
   color: var(--mast-fg);
   overflow: hidden;
 }
+/* Night mode collapses all semantic colors to a single red to preserve night vision;
+   threshold color-coding is intentionally sacrificed after dark. */
 .mast-root.mast-night {
   --mast-bg: #000000;
   --mast-fg: #ff4d4d;

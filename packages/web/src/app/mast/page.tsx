@@ -21,10 +21,10 @@ function geo(s: JsonSafeSample | undefined): { lat: number; lon: number } | null
 
 export default function MastPage() {
   const { channels, connected: dataConnected } = useSse();
-  const { layout, override, connected: ctrlConnected } = useMastControl();
+  const { layout, override } = useMastControl();
   const engineRunning = useEngineState();
 
-  if (!layout || !ctrlConnected) {
+  if (!layout) {
     return (
       <div className="mast-root flex items-center justify-center">
         <div className="text-[5vh]" style={{ color: 'var(--mast-muted)' }}>
