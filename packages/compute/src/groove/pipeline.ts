@@ -17,8 +17,12 @@ import {
 const DEG = Math.PI / 180;
 const KN_TO_MS = 0.514444;
 
+// Active autopilot steering modes (PGN 127237 "Steering Mode"). Matched as
+// prefixes to tolerate variant spellings (e.g. "Wind Vane"). NOTE: the exact
+// canboat enum strings are instrument-dependent — verify against live data
+// during on-boat autopilot validation.
 const ACTIVE_AP_MODES = ['Heading Control', 'Track Control', 'Wind', 'Vane', 'Nav', 'No Drift'];
-const isApEngaged = (mode: string): boolean => ACTIVE_AP_MODES.some((m) => mode.includes(m));
+const isApEngaged = (mode: string): boolean => ACTIVE_AP_MODES.some((m) => mode.startsWith(m));
 
 export interface GrooveSettingsRef {
   current: GrooveSettings;
@@ -70,13 +74,9 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     pruneInPlace(rudderBuf, cutoff);
 
     let helmSource: 'human' | 'autopilot' = 'human';
-    if (
-      latest.apMode !== undefined &&
-      latest.apModeT_ns !== undefined &&
-      Number(t_ns - latest.apModeT_ns) / 1e9 <= s.helmSourceTtlSec &&
-      isApEngaged(latest.apMode)
-    ) {
-      helmSource = 'autopilot';
+    if (latest.apMode !== undefined && latest.apModeT_ns !== undefined && isApEngaged(latest.apMode)) {
+      const apAgeS = Number(t_ns - latest.apModeT_ns) / 1e9;
+      if (apAgeS >= 0 && apAgeS <= s.helmSourceTtlSec) helmSource = 'autopilot';
     }
     publishEnum(Channels.Groove.HelmSource, helmSource, t_ns);
 

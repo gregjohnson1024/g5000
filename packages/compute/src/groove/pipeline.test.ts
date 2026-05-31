@@ -22,6 +22,7 @@ describe('groove pipeline', () => {
 
     const seen = new Map<string, Sample>();
     bus.subscribe('groove.**', (s) => seen.set(s.channel, s));
+    bus.subscribe('boat.**', (s) => seen.set(s.channel, s));
 
     for (let i = 0; i < 20; i++) {
       const t = i * 0.5;
@@ -29,6 +30,7 @@ describe('groove pipeline', () => {
       bus.publish(scalar(Channels.Race.TargetSpeed, 6, t));
       bus.publish(scalar(Channels.Wind.TrueSpeed, 10 * KN, t));
       bus.publish(scalar(Channels.Boat.SpeedWater, 6, t));
+      bus.publish(scalar(Channels.Motion.Heel, 0.1, t));
       bus.publish(scalar(Channels.Wind.TrueAngle, 44 * DEG, t));
     }
 
@@ -39,6 +41,7 @@ describe('groove pipeline', () => {
     if (tig?.kind === 'scalar') expect(tig.value).toBeGreaterThan(90);
     const eff = seen.get(Channels.Groove.VmgEfficiency)?.value;
     if (eff?.kind === 'scalar') expect(eff.value).toBeGreaterThan(95);
+    expect(seen.has(Channels.Boat.Leeway)).toBe(true);
 
     handle.dispose();
   });
