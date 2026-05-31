@@ -10,6 +10,13 @@ const scalar = (value: number, t_ms: number): JsonSafeSample => ({
   source: 'test',
 });
 
+const enumSample = (value: string, t_ms: number): JsonSafeSample => ({
+  channel: 'x',
+  t_ms,
+  value: { kind: 'enum', value },
+  source: 'test',
+});
+
 const tile = (over: Partial<MastTile> = {}): MastTile => ({
   field: 'boat.speed.water',
   label: 'BSP',
@@ -40,5 +47,12 @@ describe('formatTile', () => {
     const t = tile({ units: 'pct', decimals: 0, thresholds: [{ gte: 100, color: 'green' }] });
     // pct passes through raw; value 105 ≥ 100 → green
     expect(formatTile(t, scalar(105, 1000), 1000).color).toBe('green');
+  });
+  it('renders enum channels as their string value', () => {
+    const t = tile({ units: 'raw', decimals: 0 });
+    const r = formatTile(t, enumSample('upwind', 1000), 1000);
+    expect(r.text).toBe('upwind');
+    expect(r.color).toBe('default');
+    expect(r.stale).toBe(false);
   });
 });

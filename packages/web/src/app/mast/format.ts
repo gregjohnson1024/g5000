@@ -51,6 +51,11 @@ function matchThreshold(value: number, thresholds: MastThreshold[] | undefined):
 }
 
 export function formatTile(tile: MastTile, sample: JsonSafeSample | undefined, nowMs: number): FormattedTile {
+  // Enum channels (pointOfSail, helmSource, inGroove, …) pass through verbatim.
+  if (sample !== undefined && sample.value.kind === 'enum') {
+    const stale = nowMs - sample.t_ms > STALE_THRESHOLD_MS;
+    return { text: sample.value.value, stale, color: 'default' };
+  }
   const si = scalarValue(sample);
   if (si === null || sample === undefined) return { text: '—', stale: true, color: 'default' };
   const display = convert(si, tile.units);
