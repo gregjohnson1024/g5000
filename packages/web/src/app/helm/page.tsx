@@ -19,6 +19,11 @@ function scalar(s: JsonSafeSample | undefined): number | null {
   return s.value.value;
 }
 
+function enumVal(s: JsonSafeSample | undefined): string | null {
+  if (!s || s.value.kind !== 'enum') return null;
+  return s.value.value;
+}
+
 function geo(s: JsonSafeSample | undefined): { lat: number; lon: number } | null {
   if (!s || s.value.kind !== 'geo') return null;
   return s.value.value;
@@ -124,6 +129,14 @@ export default function HelmPage() {
 
   const heel = channels.get('motion.heel');
   const pitch = channels.get('motion.pitch');
+
+  // Groove performance channels (groove pipeline; absent when no polar loaded).
+  const grooveTimeInGroove = scalar(channels.get('groove.timeInGroove'));
+  const grooveVmgEfficiency = scalar(channels.get('groove.vmgEfficiency'));
+  const grooveTwaSteadiness = scalar(channels.get('groove.twaSteadiness'));
+  const grooveSteeringEffort = scalar(channels.get('groove.steeringEffort'));
+  const grooveHelmSource = enumVal(channels.get('groove.helmSource'));
+  const groovePointOfSail = enumVal(channels.get('groove.pointOfSail'));
   const position = geo(channels.get('nav.gps.position'));
   const positionLat = position ? fmtLat(position.lat) : null;
   const positionLon = position ? fmtLon(position.lon) : null;
@@ -408,6 +421,58 @@ export default function HelmPage() {
         <HelmTile label="Pitch" value={fmtAngleSigned(pitch)} unit="°" small />
 
         <SailRecommendationTile />
+
+        {/* ── Groove performance cluster ──────────────────────────────────
+            Requires the groove pipeline + a loaded polar. When the polar is
+            absent the scalar channels are not published; tiles show '—' and
+            stay neutral. The pointOfSail badge still renders when published.  */}
+        <HelmTile
+          label="In groove"
+          value={grooveTimeInGroove === null ? '—' : grooveTimeInGroove.toFixed(0)}
+          unit={grooveTimeInGroove === null ? undefined : '%'}
+          severity={
+            grooveTimeInGroove === null
+              ? 'neutral'
+              : grooveTimeInGroove >= 80
+                ? 'good'
+                : grooveTimeInGroove >= 50
+                  ? 'ok'
+                  : 'bad'
+          }
+          sub={groovePointOfSail ?? undefined}
+        />
+        <HelmTile
+          label="VMG eff"
+          value={grooveVmgEfficiency === null ? '—' : grooveVmgEfficiency.toFixed(0)}
+          unit={grooveVmgEfficiency === null ? undefined : '%'}
+          severity={
+            grooveVmgEfficiency === null
+              ? 'neutral'
+              : grooveVmgEfficiency >= 98
+                ? 'good'
+                : grooveVmgEfficiency >= 90
+                  ? 'ok'
+                  : 'bad'
+          }
+        />
+        {/* race.vmc is already displayed in <RaceTiles /> — not duplicated here. */}
+        <HelmTile
+          label={grooveHelmSource === 'autopilot' ? 'Pilot activity' : 'Helm steadiness'}
+          value={
+            grooveTwaSteadiness === null
+              ? '—'
+              : (grooveTwaSteadiness * RAD_TO_DEG).toFixed(1)
+          }
+          unit={grooveTwaSteadiness === null ? undefined : '°'}
+          severity="neutral"
+          small
+        >
+          {grooveSteeringEffort !== null && (
+            <div className="text-xs text-slate-500">
+              {grooveSteeringEffort.toFixed(1)} corr·min⁻¹
+            </div>
+          )}
+        </HelmTile>
 
         {/* Position — two stacked coordinates rather than the one-number-per-tile
             idiom every other tile follows. Hemisphere suffixes ride at unit
