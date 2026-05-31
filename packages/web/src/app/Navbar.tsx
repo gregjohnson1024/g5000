@@ -60,6 +60,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: '/boat', label: 'Boat' },
       { href: '/sails', label: 'Sails' },
       { href: '/sails/crossover', label: 'Crossover' },
+      { href: '/mast-config', label: 'Mast' },
     ],
   },
   {
