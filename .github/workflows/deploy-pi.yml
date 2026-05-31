@@ -47,6 +47,14 @@ jobs:
         working-directory: ${{ env.AUTOPILOT_DIR }}
         run: |
           git fetch origin main
+          # The "Install deps" step below runs `npm install`, which can rewrite
+          # the tracked package-lock.json and leave the working tree dirty.
+          # That dirty lockfile blocks the next deploy's ff-only pull
+          # ("local changes would be overwritten by merge"). The committed
+          # lockfile is authoritative on this deploy-only checkout, so discard
+          # any local drift before pulling. Scoped to package-lock.json so
+          # genuine local config (e.g. .env) is never touched.
+          git checkout -- package-lock.json 2>/dev/null || true
           git pull --ff-only origin main
           git log -1 --oneline
 
