@@ -1,4 +1,4 @@
-import type { MastRuntime } from '@g5000/mast';
+import type { MastRuntime } from './types.js';
 
 // Store the singleton on globalThis so that module re-evaluations within the
 // same process (e.g. Next.js / Turbopack loading the package a second time)
