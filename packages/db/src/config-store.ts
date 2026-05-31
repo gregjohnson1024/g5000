@@ -43,7 +43,9 @@ import {
   waypoints as waypointsTable,
   routes as routesTable,
   boatState as boatStateTable,
+  mastLayout as mastLayoutTable,
 } from './schema.js';
+import type { MastLayout } from '@g5000/mast';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
 import { type BoatState, DEFAULT_BOAT_STATE } from './boat-state.js';
 import {
@@ -79,6 +81,7 @@ type SubjectValues = {
   waypoints: Waypoint[];
   routes: Route[];
   boatState: BoatState;
+  mastLayout: MastLayout | null;
 };
 
 /** Subjects keyed exactly like {@link SubjectValues}, each a hot BehaviorSubject. */
@@ -98,7 +101,8 @@ type SimpleKey =
   | 'compassDeviation'
   | 'waypoints'
   | 'routes'
-  | 'boatState';
+  | 'boatState'
+  | 'mastLayout';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
@@ -109,6 +113,7 @@ const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
   waypoints: waypointsTable,
   routes: routesTable,
   boatState: boatStateTable,
+  mastLayout: mastLayoutTable,
 };
 
 /**
@@ -224,6 +229,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS waypoints (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS routes (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS boat_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS mast_layout (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -383,6 +389,7 @@ export class ConfigStore {
       waypoints: loadOrInsert<Waypoint[]>(waypointsTable, []),
       routes: loadOrInsert<Route[]>(routesTable, []),
       boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
+      mastLayout: loadOrInsert<MastLayout | null>(mastLayoutTable, null),
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -521,6 +528,16 @@ export class ConfigStore {
   }
   async setBoatState(value: BoatState): Promise<void> {
     return this.setSimple('boatState', value);
+  }
+
+  get mastLayout$(): Observable<MastLayout | null> {
+    return this.subjects.mastLayout.asObservable();
+  }
+  getMastLayout(): MastLayout | null {
+    return this.subjects.mastLayout.value;
+  }
+  async setMastLayout(value: MastLayout | null): Promise<void> {
+    return this.setSimple('mastLayout', value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {

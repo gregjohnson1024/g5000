@@ -143,3 +143,8 @@ export const boatState = sqliteTable('boat_state', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded BoatState
 });
+
+export const mastLayout = sqliteTable('mast_layout', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded MastLayout | null
+});

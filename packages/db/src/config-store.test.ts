@@ -21,6 +21,7 @@ import {
 } from './defaults.js';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
 import type { BoatState } from './boat-state.js';
+import type { MastLayout } from '@g5000/mast';
 
 describe('ConfigStore', () => {
   let dir: string;
@@ -404,6 +405,49 @@ describe('ConfigStore', () => {
       await store.close();
       store = await ConfigStore.open(dbPath);
       expect(store.getBoatState().daggerboards.starboard).toBe(100);
+    });
+  });
+
+  describe('ConfigStore mastLayout', () => {
+    it('returns null on a fresh database', () => {
+      expect(store.getMastLayout()).toBeNull();
+    });
+
+    it('round-trips a layout and emits on the observable', async () => {
+      const layout: MastLayout = {
+        version: 1,
+        pages: [
+          {
+            id: 'p',
+            label: 'P',
+            grid: '1',
+            condition: { always: true },
+            tiles: [{ field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 }],
+          },
+        ],
+      };
+      await store.setMastLayout(layout);
+      expect(store.getMastLayout()).toEqual(layout);
+      expect(await firstValueFrom(store.mastLayout$)).toEqual(layout);
+    });
+
+    it('persists across reopen', async () => {
+      const layout: MastLayout = {
+        version: 1,
+        pages: [
+          {
+            id: 'p',
+            label: 'P',
+            grid: '1',
+            condition: { always: true },
+            tiles: [{ field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 }],
+          },
+        ],
+      };
+      await store.setMastLayout(layout);
+      await store.close();
+      store = await ConfigStore.open(dbPath);
+      expect(store.getMastLayout()).toEqual(layout);
     });
   });
 });
