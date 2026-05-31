@@ -21,6 +21,7 @@ import { startWatchdog } from './sd-notify.js';
 import { wireAlarmsHistory } from './alarms-history.js';
 import { createLiveFactory, createDemoFactory, type BaseTeardownHolder } from './live-factory.js';
 import { startRaceSubsystem } from './race-subsystem.js';
+import { startGrooveSubsystem } from './groove-subsystem.js';
 import { startHlink, startWebServer } from './server-setup.js';
 
 const HTTP_PORT = Number(process.env.PORT ?? 3000);
@@ -203,6 +204,9 @@ async function main(): Promise<void> {
   // replay-driven integration tests can exercise race compute.
   const stopRaceSubsystem = await startRaceSubsystem({ bus, store });
   teardown.push(stopRaceSubsystem);
+
+  const stopGrooveSubsystem = await startGrooveSubsystem({ bus, store });
+  teardown.push(stopGrooveSubsystem);
 
   // 2b. H-LINK TCP server — B&G ASCII protocol over TCP, read-only.
   //     Exposes bus data to tactical-sailing software (Deckman, Expedition
