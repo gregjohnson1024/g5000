@@ -17,6 +17,8 @@ export const Channels = {
     HeadingMagnetic: 'boat.heading.magnetic',
     HeadingTrue: 'boat.heading.true',
     RudderAngle: 'boat.rudder.angle',
+    /** Leeway angle estimate, radians (signed; lee positive). */
+    Leeway: 'boat.leeway',
   },
   Nav: {
     Position: 'nav.gps.position',
@@ -88,5 +90,29 @@ export const Channels = {
     LaylinePort: 'race.laylines.port',
     /** Polyline projection of the starboard-tack layline. */
     LaylineStbd: 'race.laylines.stbd',
+  },
+  Groove: {
+    /** Point of sail: 'upwind' | 'reaching' | 'downwind' | 'not-sailing'. */
+    PointOfSail: 'groove.pointOfSail',
+    /** Who is steering: 'human' | 'autopilot'. */
+    HelmSource: 'groove.helmSource',
+    /** Instantaneous in-groove flag: enum 'in' | 'out'. */
+    InGroove: 'groove.inGroove',
+    /** Time-weighted % of the rolling window spent in-groove. */
+    TimeInGroove: 'groove.timeInGroove',
+    /** VMG efficiency %, point-of-sail-correct. */
+    VmgEfficiency: 'groove.vmgEfficiency',
+    /** VMG to/from the wind, m/s. */
+    Vmg: 'groove.vmg',
+    /** |TWA| − targetTwa, radians (signed: + footing, − pinching). */
+    TargetTwaError: 'groove.targetTwaError',
+    /** Circular std-dev of TWA over the window, radians. */
+    TwaSteadiness: 'groove.twaSteadiness',
+    /** Coefficient of variation of STW over the window (dimensionless). */
+    SpeedCv: 'groove.speedCv',
+    /** Rudder reversals per minute over the window. */
+    SteeringEffort: 'groove.steeringEffort',
+    /** Max rising slope of STW over the window, m/s². */
+    BuildRate: 'groove.buildRate',
   },
 } as const;
