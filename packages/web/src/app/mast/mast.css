@@ -1,0 +1,27 @@
+.mast-root {
+  --mast-bg: #ffffff;
+  --mast-fg: #0b0e14;
+  --mast-muted: #6b7280;
+  --mast-green: #15803d;
+  --mast-amber: #b45309;
+  --mast-red: #b91c1c;
+  position: fixed;
+  inset: 0;
+  z-index: 51;
+  background: var(--mast-bg);
+  color: var(--mast-fg);
+  overflow: hidden;
+}
+/* Night mode collapses all semantic colors to a single red to preserve night vision;
+   threshold color-coding is intentionally sacrificed after dark. */
+.mast-root.mast-night {
+  --mast-bg: #000000;
+  --mast-fg: #ff4d4d;
+  --mast-muted: #7a1f1f;
+  --mast-green: #ff4d4d;
+  --mast-amber: #ff4d4d;
+  --mast-red: #ff4d4d;
+}
+.mast-tile-value.mast-stale {
+  color: var(--mast-muted);
+}

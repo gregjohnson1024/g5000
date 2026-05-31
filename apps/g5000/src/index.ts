@@ -4,6 +4,8 @@ import { homedir } from 'node:os';
 import { mkdir } from 'node:fs/promises';
 import { getSharedBus, createAlarmsRegistry, setSharedAlarms } from '@g5000/core';
 import { ConfigStore, setSharedConfigStore, loadAlarmsConfig, type AlarmsConfig } from '@g5000/db';
+import { MastService } from './mast/service.js';
+import { setSharedMastRuntime } from '@g5000/mast';
 import {
   startPolarPipeline,
   startAlarmsPipeline,
@@ -51,6 +53,13 @@ async function main(): Promise<void> {
   const store = await ConfigStore.open(CONFIG_DB_PATH);
   setSharedConfigStore(store);
   teardown.push(() => store.close());
+  const mastLayoutPath =
+    process.env.MAST_LAYOUT_PATH ?? fileURLToPath(new URL('../mast-layout.json', import.meta.url));
+  const mast = await MastService.start(mastLayoutPath);
+  setSharedMastRuntime(mast);
+  teardown.push(() => mast.stop());
+  // eslint-disable-next-line no-console
+  console.log(`[mast] watching ${mastLayoutPath}`);
   // One-time migration: import legacy ~/.g5000-router/waypoints.json into
   // ConfigStore if the store is empty and the file exists.
   await migrateWaypointsJson(store, path.join(SOCKETCAN_ROOT, 'waypoints.json'));

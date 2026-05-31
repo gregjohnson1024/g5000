@@ -1,0 +1,42 @@
+import type { MastLayout } from './types.js';
+
+/** Safe built-in layout used when mast-layout.json is missing or invalid. */
+export const DEFAULT_MAST_LAYOUT: MastLayout = {
+  version: 1,
+  pages: [
+    {
+      id: 'sailing',
+      label: 'Sailing',
+      grid: '4',
+      condition: { always: true },
+      tiles: [
+        { field: 'boat.speed.water', label: 'BSP', units: 'kn', decimals: 2 },
+        { field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 },
+        { field: 'wind.true.angle', label: 'TWA', units: 'deg', decimals: 0 },
+        { field: 'wind.true.speed', label: 'TWS', units: 'kn', decimals: 1 },
+      ],
+    },
+    {
+      id: 'upwind',
+      label: 'Upwind',
+      grid: '4',
+      condition: { mode: 'upwind' },
+      tiles: [
+        { field: 'wind.true.angle', label: 'TWA', units: 'deg', decimals: 0 },
+        { field: 'boat.speed.water', label: 'BSP', units: 'kn', decimals: 2 },
+        { field: 'wind.true.speed', label: 'TWS', units: 'kn', decimals: 1 },
+        { field: 'race.percentPolar', label: '%POL', units: 'pct', decimals: 0 },
+      ],
+    },
+    {
+      id: 'depth',
+      label: 'Anchor / Depth',
+      grid: '2',
+      condition: { mode: 'stationary' },
+      tiles: [
+        { field: 'nav.depth', label: 'DEPTH', units: 'm', decimals: 1 },
+        { field: 'electrical.battery.voltage', label: 'BATT', units: 'v', decimals: 1 },
+      ],
+    },
+  ],
+};

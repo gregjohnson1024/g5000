@@ -197,11 +197,27 @@ Production runs on RPi5 `sula-bassana` reachable via Tailscale (`100.64.0.117`),
 
 The Pi pulls from `origin/main` only — see _Branching model_ above for the promote step that gets work from `develop` onto `main` before deploying. Skipping the promote step and trying to `git pull` on the Pi will silently no-op (Pi is already at main's tip) and your "deploy" won't actually ship the develop-side changes.
 
-Pi rebuild order (matters because of `composite` refs): `tsc -b core db compute bridge grib routing coastline` → build `g5000 app` → build `web` → `systemctl restart g5000-autopilot`.
+Pi rebuild order (matters because of `composite` refs): `tsc -b core mast db compute bridge grib routing coastline` → build `g5000 app` → build `web` → `systemctl restart g5000-autopilot`.
 
 > **Note:** `grib` MUST be in that tsc step even though `g5000 app` doesn't depend on it — `packages/web` imports types from `@g5000/grib` (e.g. `CurrentField` in `grib-context.ts`) and `next build` resolves those via the package's compiled `dist/*.d.ts`. Omit it and a stale `dist/types.d.ts` will make `next build` fail with confusing `Type "X" is not assignable to type "Y"` errors. Failed `next build` also wipes `.next/BUILD_ID`, which prevents the g5000 app from booting on the next restart — so leaving `grib` out turns a build error into a production outage. The same trap applies to `routing` and `coastline`: `packages/web/src/app/api/route/plan/route.ts` imports `plan` from `@g5000/routing`, and `next build` resolves it through `dist/`. If `routing/dist/` is stale (the package was updated but its dist wasn't rebuilt), the web build fails with `'plan' is not exported from '@g5000/routing'` even though the symbol exists in source. Both packages must be in the rebuild chain.
 
 > **Stale-dist gotcha:** `tsc -b` is incremental — if it thinks nothing changed it skips work and leaves old `dist/` files in place. If you suspect a dist is stale (especially after rebases or branch swaps), `rm -rf packages/<name>/dist && npx tsc -b packages/<name> --force` is the nuclear option. The pattern that bit a recent deploy: `tsc -b packages/web` claimed clean on the Mac because `compute/dist/index.js` still had a removed export from before a refactor; the Pi's clean rebuild surfaced the real error.
+
+### Mast display
+
+The `/mast` view and the `@g5000/mast` package are part of the normal build (add
+`packages/mast` to the `tsc -b` order above — same foot-gun class as the historical
+`grib` omission).
+
+**Layout edits do NOT require a rebuild or restart.** The git-tracked layout file
+`apps/g5000/mast-layout.json` is read from the working tree at runtime by a file
+watcher in MastService. To reconfigure: edit that JSON (e.g. with Claude Code),
+`git pull` on the Pi — the watcher validates and hot-loads it, pushing the new layout
+to the screen over SSE. An invalid edit is logged and the last good layout is kept.
+`tsc -b` / `next build` / `systemctl restart` are needed ONLY when the mast *code*
+(not the layout) changes. The layout path can be overridden with the `MAST_LAYOUT_PATH`
+environment variable (it defaults to `apps/g5000/mast-layout.json`, resolved relative to
+the app module, so it is independent of the process working directory).
 
 ## When designing new features
 
