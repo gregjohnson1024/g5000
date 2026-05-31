@@ -9,17 +9,17 @@ const COLOR_VAR: Record<FormattedTile['color'], string> = {
 
 export function Tile({ label, units, fmt }: { label: string; units: string; fmt: FormattedTile }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full">
-      <div className="text-[2vh] uppercase tracking-widest" style={{ color: 'var(--mast-muted)' }}>
+    <div className="mast-tile flex flex-col items-center justify-center h-full w-full">
+      <div className="mast-tile-label uppercase tracking-widest" style={{ color: 'var(--mast-muted)' }}>
         {label}
       </div>
       <div
-        className={`mast-tile-value font-bold leading-none text-[16vh] tabular-nums${fmt.stale ? ' mast-stale' : ''}`}
+        className={`mast-tile-value font-bold leading-none tabular-nums${fmt.stale ? ' mast-stale' : ''}`}
         style={{ color: fmt.stale ? undefined : COLOR_VAR[fmt.color] }}
       >
         {fmt.text}
       </div>
-      <div className="text-[2.5vh]" style={{ color: 'var(--mast-muted)' }}>
+      <div className="mast-tile-units" style={{ color: 'var(--mast-muted)' }}>
         {units}
       </div>
     </div>
