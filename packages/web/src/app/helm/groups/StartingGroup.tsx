@@ -2,7 +2,6 @@
 
 import type { JsonSafeSample } from '@g5000/core';
 import { HelmTile } from '../HelmTile';
-import { RaceMiniTimer } from '../RaceMiniTimer';
 import { scalar, enumVal } from '../tile-helpers';
 import { RAD_TO_DEG } from '../../../lib/units';
 
@@ -20,9 +19,6 @@ export function StartingGroup({
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      <div className="col-span-2 md:col-span-3">
-        <RaceMiniTimer />
-      </div>
       <HelmTile
         label="DTL"
         value={dtl === null ? '—' : Math.abs(dtl).toFixed(0)}
