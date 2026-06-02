@@ -55,4 +55,18 @@ describe('formatTile', () => {
     expect(r.color).toBe('default');
     expect(r.stale).toBe(false);
   });
+
+  // tide.* channel coverage
+  it('renders tide.state enum (rising) as text', () => {
+    const t = tile({ field: 'tide.state', units: 'raw', decimals: 0 });
+    const r = formatTile(t, enumSample('rising', 1000), 1000);
+    expect(r.text).toBe('rising');
+    expect(r.color).toBe('default');
+    expect(r.stale).toBe(false);
+  });
+  it('renders tide.heightNow scalar with units m to one decimal', () => {
+    const t = tile({ field: 'tide.heightNow', units: 'm', decimals: 1 });
+    const r = formatTile(t, scalar(3.2, 1000), 1000);
+    expect(r.text).toBe('3.2');
+  });
 });
