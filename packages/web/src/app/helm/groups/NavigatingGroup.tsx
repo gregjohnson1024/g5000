@@ -4,7 +4,7 @@ import type { JsonSafeSample } from '@g5000/core';
 import { HelmTile } from '../HelmTile';
 import { PositionTile } from '../PositionTile';
 import { useRollingStats } from '../use-rolling-stats';
-import { scalar, geo, fmtHeadingRad, fmtLat, fmtLon } from '../tile-helpers';
+import { scalar, enumVal, geo, fmtHeadingRad, fmtLat, fmtLon } from '../tile-helpers';
 import { MS_TO_KN } from '../../../lib/units';
 
 /** Navigating tab: position, made-good, course averages, drift, sea-state. */
@@ -16,6 +16,19 @@ export function NavigatingGroup({
   const { avgSog, avgCog, avgHdg, motion } = useRollingStats();
   const vmcMs = scalar(channels.get('race.vmc'));
   const position = geo(channels.get('nav.gps.position'));
+
+  const tideHeightNow = scalar(channels.get('tide.heightNow'));
+  const tideState = enumVal(channels.get('tide.state'));
+  const tideStation = enumVal(channels.get('tide.station'));
+  const tideNextType = enumVal(channels.get('tide.nextEventType'));
+  const tideNextInSec = scalar(channels.get('tide.nextEventInSec'));
+  const tideNextHeight = scalar(channels.get('tide.nextEventHeight'));
+
+  const fmtCountdown = (s: number): string => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h}:${String(m).padStart(2, '0')}`;
+  };
   const positionLat = position ? fmtLat(position.lat) : null;
   const positionLon = position ? fmtLon(position.lon) : null;
 
@@ -69,6 +82,24 @@ export function NavigatingGroup({
             ? `h ${((motion.heelRmsRad * 180) / Math.PI).toFixed(1)}° p ${((motion.pitchRmsRad * 180) / Math.PI).toFixed(1)}°`
             : '15 min'
         }
+        small
+      />
+      <HelmTile
+        label="Tide"
+        value={tideHeightNow === null ? '—' : tideHeightNow.toFixed(1)}
+        unit={tideHeightNow === null ? '' : 'm'}
+        sub={tideStation ?? tideState ?? undefined}
+        small
+      />
+      <HelmTile
+        label="Next tide"
+        value={
+          tideNextType !== null && tideNextInSec !== null
+            ? `${tideNextType} ${fmtCountdown(tideNextInSec)}`
+            : '—'
+        }
+        unit=""
+        sub={tideNextHeight !== null ? `${tideNextHeight.toFixed(1)} m` : undefined}
         small
       />
     </div>

@@ -97,9 +97,12 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
         active = next;
         lastFetchDay = today;
       } catch (e) {
+        // Do NOT advance `active` on failure: keep it on the last
+        // successfully-fetched station so publishes stay self-consistent
+        // (name matches events) and the next tick still sees changed===true
+        // and retries the fetch.
         // eslint-disable-next-line no-console
         console.warn('[tide] events fetch failed; keeping cached', e);
-        active = next;
       }
     } else if (next) {
       active = next;
