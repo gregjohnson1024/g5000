@@ -115,4 +115,18 @@ export const Channels = {
     /** Max rising slope of STW over the window, m/s². */
     BuildRate: 'groove.buildRate',
   },
+  Tide: {
+    /** Active tide station name. */
+    Station: 'tide.station',
+    /** Interpolated height now, metres above Chart Datum (suppressed when no bracketing pair). */
+    HeightNow: 'tide.heightNow',
+    /** Tide state: 'rising' | 'falling' | 'stand' (height concept, not current slack). */
+    State: 'tide.state',
+    /** Next tidal event type: 'HW' | 'LW'. */
+    NextEventType: 'tide.nextEventType',
+    /** Seconds until the next tidal event. */
+    NextEventInSec: 'tide.nextEventInSec',
+    /** Height of the next tidal event, metres above Chart Datum. */
+    NextEventHeight: 'tide.nextEventHeight',
+  },
 } as const;
