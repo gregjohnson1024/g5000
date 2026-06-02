@@ -5,8 +5,8 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "predev": "node ../../scripts/dev-precheck.mjs && tsc -b ../../packages/core ../../packages/mast ../../packages/db ../../packages/compute ../../packages/bridge",
-    "prebuild": "tsc -b ../../packages/core ../../packages/mast ../../packages/db ../../packages/compute ../../packages/bridge",
+    "predev": "node ../../scripts/dev-precheck.mjs && tsc -b ../../packages/core ../../packages/tide ../../packages/mast ../../packages/db ../../packages/compute ../../packages/bridge",
+    "prebuild": "tsc -b ../../packages/core ../../packages/tide ../../packages/mast ../../packages/db ../../packages/compute ../../packages/bridge",
     "dev": "tsx watch --ignore '../../packages/web/.next/**' --ignore '../../packages/web/.turbo/**' --ignore 'data/**' src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -b",
@@ -18,6 +18,7 @@
     "@g5000/core": "*",
     "@g5000/db": "*",
     "@g5000/mast": "*",
+    "@g5000/tide": "*",
     "@g5000/web": "*",
     "next": "^16",
     "react": "^19",
