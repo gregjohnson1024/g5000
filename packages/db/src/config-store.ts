@@ -13,6 +13,7 @@ import {
   DEFAULT_GROOVE_SETTINGS,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
+  DEFAULT_TIDE_CONFIG,
   DEFAULT_WARDROBE,
   SAIL_CATEGORIES,
   type AisAlarmConfig,
@@ -30,6 +31,7 @@ import {
   type PolarTable,
   type SailWardrobe,
   type SourcePriorityConfig,
+  type TideConfig,
 } from './defaults.js';
 import {
   aisAlarmConfig as aisAlarmConfigTable,
@@ -40,6 +42,7 @@ import {
   crossoverSettings as crossoverSettingsTable,
   dampingConfig as dampingConfigTable,
   grooveSettings as grooveSettingsTable,
+  tideConfig as tideConfigTable,
   passageLog as passageLogTable,
   sailWardrobe,
   sourcePriorityConfig as sourcePriorityConfigTable,
@@ -82,6 +85,7 @@ type SubjectValues = {
   polarRevisions: Map<string, PolarRevision>;
   crossoverSettings: CrossoverSettings;
   grooveSettings: GrooveSettings;
+  tideConfig: TideConfig;
   waypoints: Waypoint[];
   routes: Route[];
   boatState: BoatState;
@@ -96,7 +100,7 @@ type Subjects = { [K in keyof SubjectValues]: BehaviorSubject<SubjectValues[K]> 
  * are generated from this registry: each maps a subject key to its `(id,
  * value JSON)` Drizzle table. Validating setters (sails, sourcePriority,
  * aisAlarm, damping, passageLog) and the non-`(id, value)` subjects
- * (crossoverSettings, polarRevisions, grooveSettings) deliberately stay out of here.
+ * (crossoverSettings, polarRevisions, grooveSettings, tideConfig) deliberately stay out of here.
  */
 type SimpleKey =
   | 'boatConfig'
@@ -231,6 +235,10 @@ export class ConfigStore {
         value TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS groove_settings (
+        boat_id TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS tide_config (
         boat_id TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
@@ -393,6 +401,20 @@ export class ConfigStore {
         }
       : DEFAULT_GROOVE_SETTINGS;
 
+    // Load the tide_config row for the active boat. Merged over
+    // DEFAULT_TIDE_CONFIG so new fields get sensible fallbacks.
+    const tcRows = db
+      .select()
+      .from(tideConfigTable)
+      .where(eq(tideConfigTable.boatId, activeBoatId))
+      .all() as Array<{ boatId: string; value: string }>;
+    const tideConfigValue: TideConfig = tcRows[0]
+      ? {
+          ...DEFAULT_TIDE_CONFIG,
+          ...(JSON.parse(tcRows[0].value) as Partial<TideConfig>),
+        }
+      : DEFAULT_TIDE_CONFIG;
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
@@ -409,6 +431,7 @@ export class ConfigStore {
       polarRevisions: revisionsMap,
       crossoverSettings: crossoverSettingsValue,
       grooveSettings: grooveSettingsValue,
+      tideConfig: tideConfigValue,
       waypoints: loadOrInsert<Waypoint[]>(waypointsTable, []),
       routes: loadOrInsert<Route[]>(routesTable, []),
       boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
@@ -545,6 +568,30 @@ export class ConfigStore {
       )
       .run(this.__activeBoatId, JSON.stringify(value));
     this.subjects.grooveSettings.next(value);
+  }
+
+  /**
+   * Tide configuration (pinned station, fallback station, cached station list)
+   * for the active boat. Seeded at open() from the tide_config row for
+   * `activeBoatId`, merged over DEFAULT_TIDE_CONFIG so missing keys fall back.
+   * Single-row table keyed on `boatId`.
+   */
+  get tideConfig$(): Observable<TideConfig> {
+    return this.subjects.tideConfig.asObservable();
+  }
+
+  /** Synchronous read of the current tide config (BehaviorSubject.value). */
+  getTideConfig(): TideConfig {
+    return this.subjects.tideConfig.value;
+  }
+
+  async setTideConfig(value: TideConfig): Promise<void> {
+    this.raw
+      .prepare(
+        'INSERT INTO tide_config (boat_id, value) VALUES (?, ?) ON CONFLICT (boat_id) DO UPDATE SET value = excluded.value',
+      )
+      .run(this.__activeBoatId, JSON.stringify(value));
+    this.subjects.tideConfig.next(value);
   }
 
   get waypoints$(): Observable<Waypoint[]> {

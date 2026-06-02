@@ -12,6 +12,7 @@ import {
   DEFAULT_GROOVE_SETTINGS,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
+  DEFAULT_TIDE_CONFIG,
   DEFAULT_WARDROBE,
   type AisAlarmConfig,
   type BoatConfig,
@@ -459,5 +460,14 @@ describe('ConfigStore', () => {
     await store.close();
     store = await ConfigStore.open(dbPath);
     expect(store.getGrooveSettings()).toEqual(next);
+  });
+
+  it('seeds tide config with defaults and persists a set across reopen', async () => {
+    expect(store.getTideConfig()).toEqual(DEFAULT_TIDE_CONFIG);
+    const next = { ...DEFAULT_TIDE_CONFIG, pinnedStationId: '0001' };
+    await store.setTideConfig(next);
+    await store.close();
+    store = await ConfigStore.open(dbPath);
+    expect(store.getTideConfig()).toEqual(next);
   });
 });

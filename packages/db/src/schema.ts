@@ -134,6 +134,11 @@ export const grooveSettings = sqliteTable('groove_settings', {
   value: text('value').notNull(),
 });
 
+export const tideConfig = sqliteTable('tide_config', {
+  boatId: text('boat_id').primaryKey(),
+  value: text('value').notNull(),
+});
+
 export const waypoints = sqliteTable('waypoints', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded Waypoint[]

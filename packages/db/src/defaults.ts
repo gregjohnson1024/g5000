@@ -10,6 +10,7 @@
 // so DEFAULT_SOURCE_PRIORITY (below) can annotate against SourcePriorityConfig.
 import type { SourcePriorityRule, SourcePriorityConfig } from '@g5000/core';
 export type { SourcePriorityRule, SourcePriorityConfig };
+import type { Station } from '@g5000/tide';
 
 export interface BoatConfig {
   /** Mast height above the masthead unit's measurement reference, meters. */
@@ -365,6 +366,25 @@ export interface PassageLog {
   /** UNIX seconds; null only in transient default-construction code paths. */
   anchorAt: number | null;
 }
+
+/**
+ * Per-boat tide configuration. Tracks the pinned station, fallback default
+ * station, and a locally cached station list (refreshed ~weekly).
+ */
+export interface TideConfig {
+  /** Pinned station id; null = follow nearest-to-boat. */
+  pinnedStationId: string | null;
+  /** Fallback station when no GPS; null = none. */
+  defaultStationId: string | null;
+  /** Cached static station list (refreshed ~weekly). */
+  stationsCache: { fetchedAtMs: number; stations: Station[] } | null;
+}
+
+export const DEFAULT_TIDE_CONFIG: TideConfig = {
+  pinnedStationId: null,
+  defaultStationId: null,
+  stationsCache: null,
+};
 
 export const DEFAULT_WARDROBE: SailWardrobe = {
   schemaVersion: 3,
