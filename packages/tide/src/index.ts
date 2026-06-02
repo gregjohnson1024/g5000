@@ -1,1 +1,5 @@
-export {};
+export type { Station, TidalEvent, TideState } from './types.js';
+export { interpolateHeight, heightNow, tideState } from './curve.js';
+export { haversineKm, nearestStation } from './nearest.js';
+export { nextEvent } from './next-event.js';
+export { tideSnapshot, type TideSnapshot } from './snapshot.js';
