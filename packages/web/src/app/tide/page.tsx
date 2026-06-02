@@ -93,7 +93,7 @@ export default function TidePage() {
   const refreshActive = useCallback(async () => {
     const r = await fetch('/api/tide/active');
     if (!r.ok) return;
-    const j = (await r.json()) as { ok: boolean; stationId: string | null };
+    const j = (await r.json().catch(() => ({ ok: false, stationId: null }))) as { ok: boolean; stationId: string | null };
     if (j.ok) setPinnedId(j.stationId ?? null);
   }, []);
 
