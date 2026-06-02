@@ -22,6 +22,7 @@ import { wireAlarmsHistory } from './alarms-history.js';
 import { createLiveFactory, createDemoFactory, type BaseTeardownHolder } from './live-factory.js';
 import { startRaceSubsystem } from './race-subsystem.js';
 import { startGrooveSubsystem } from './groove-subsystem.js';
+import { startTideSubsystem } from './tide-subsystem.js';
 import { startHlink, startWebServer } from './server-setup.js';
 
 const HTTP_PORT = Number(process.env.PORT ?? 3000);
@@ -207,6 +208,9 @@ async function main(): Promise<void> {
 
   const stopGrooveSubsystem = await startGrooveSubsystem({ bus, store });
   teardown.push(stopGrooveSubsystem);
+
+  const stopTideSubsystem = await startTideSubsystem({ bus, store });
+  teardown.push(stopTideSubsystem);
 
   // 2b. H-LINK TCP server — B&G ASCII protocol over TCP, read-only.
   //     Exposes bus data to tactical-sailing software (Deckman, Expedition
