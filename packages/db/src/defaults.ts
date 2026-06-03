@@ -368,22 +368,22 @@ export interface PassageLog {
 }
 
 /**
- * Per-boat tide configuration. Tracks the pinned station, fallback default
- * station, and a locally cached station list (refreshed ~weekly).
+ * Per-boat tide configuration. Supports multiple tide data sources with
+ * per-source station caches and a pinned station tied to a specific source.
  */
 export interface TideConfig {
-  /** Pinned station id; null = follow nearest-to-boat. */
-  pinnedStationId: string | null;
-  /** Fallback station when no GPS; null = none. */
-  defaultStationId: string | null;
-  /** Cached static station list (refreshed ~weekly). */
-  stationsCache: { fetchedAtMs: number; stations: Station[] } | null;
+  /** Which source: 'auto' = pick by region; or force one. */
+  tideSource: 'auto' | 'admiralty' | 'chs';
+  /** Pinned station (carries its source); honored only when it matches the active source. */
+  pinnedStation: { sourceId: 'admiralty' | 'chs'; stationId: string } | null;
+  /** Per-source static station-list cache (refreshed ~weekly). */
+  stationsCacheBySource: Partial<Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>>;
 }
 
 export const DEFAULT_TIDE_CONFIG: TideConfig = {
-  pinnedStationId: null,
-  defaultStationId: null,
-  stationsCache: null,
+  tideSource: 'auto',
+  pinnedStation: null,
+  stationsCacheBySource: {},
 };
 
 export const DEFAULT_WARDROBE: SailWardrobe = {

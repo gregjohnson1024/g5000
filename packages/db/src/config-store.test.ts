@@ -464,7 +464,7 @@ describe('ConfigStore', () => {
 
   it('seeds tide config with defaults and persists a set across reopen', async () => {
     expect(store.getTideConfig()).toEqual(DEFAULT_TIDE_CONFIG);
-    const next = { ...DEFAULT_TIDE_CONFIG, pinnedStationId: '0001' };
+    const next = { ...DEFAULT_TIDE_CONFIG, tideSource: 'chs' as const };
     await store.setTideConfig(next);
     await store.close();
     store = await ConfigStore.open(dbPath);
