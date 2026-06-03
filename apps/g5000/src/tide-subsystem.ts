@@ -1,6 +1,6 @@
 import { Bus, Channels } from '@g5000/core';
 import type { ConfigStore } from '@g5000/db';
-import { tideSnapshot, nearestStation, listStations, getTidalEvents, type Station, type TidalEvent } from '@g5000/tide';
+import { tideSnapshot, nearestStation, createTideSources, selectSource, type TideSource, type Station, type TidalEvent } from '@g5000/tide';
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -36,80 +36,90 @@ export interface TideSubsystemDeps {
 }
 
 /**
- * Tide bus publisher. Graceful-off when ADMIRALTY_TIDAL_API_KEY is unset.
- * - Loads the station list (ConfigStore cache, refreshed weekly).
- * - Active station = pinned, else nearest to nav.gps.position (hysteresis).
- * - Daily fetch of the active station's events (rolling cache keeps a past event).
- * - ~30 s interpolation tick publishes tide.* from the cached events.
+ * Multi-source tide bus publisher. Builds ADMIRALTY (key-gated) + CHS (no-key)
+ * sources; each tick selects the active source by region/override, fetches its
+ * station list (per-source weekly cache) and the active station's events
+ * (rolling cache keeps a past event), and publishes tide.* + tide.source.
+ * When no source is active (no GPS / outside coverage / unavailable) it
+ * publishes nothing.
  */
 export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() => Promise<void>> {
   const { bus, store } = deps;
-  const key = process.env.ADMIRALTY_TIDAL_API_KEY;
-  if (!key) {
-    // eslint-disable-next-line no-console
-    console.log('[tide] ADMIRALTY_TIDAL_API_KEY unset — tide service disabled');
-    return async () => {};
-  }
+  const sources = createTideSources({ getAdmiraltyKey: () => process.env.ADMIRALTY_TIDAL_API_KEY });
 
-  let stations: Station[] = store.getTideConfig().stationsCache?.stations ?? [];
+  let activeSource: TideSource | null = null;
+  let stations: Station[] = [];
   let active: Station | null = null;
   let activeEvents: TidalEvent[] = [];
   let lastFetchDay = -1;
   let lastPos: { lat: number; lon: number } | null = null;
   const unsubs: Array<() => void> = [];
 
-  async function ensureStations(): Promise<void> {
-    const cache = store.getTideConfig().stationsCache;
+  async function ensureStations(source: TideSource): Promise<void> {
+    const cache = store.getTideConfig().stationsCacheBySource[source.id];
     if (cache && Date.now() - cache.fetchedAtMs < WEEK_MS && cache.stations.length > 0) {
       stations = cache.stations;
       return;
     }
     try {
-      stations = await listStations(key!);
-      await store.setTideConfig({ ...store.getTideConfig(), stationsCache: { fetchedAtMs: Date.now(), stations } });
+      stations = await source.listStations();
+      const cfg = store.getTideConfig();
+      await store.setTideConfig({
+        ...cfg,
+        stationsCacheBySource: { ...cfg.stationsCacheBySource, [source.id]: { fetchedAtMs: Date.now(), stations } },
+      });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[tide] station list fetch failed; using cache', e);
     }
   }
 
-  function resolveActive(): Station | null {
-    const cfg = store.getTideConfig();
-    if (cfg.pinnedStationId) {
-      return stations.find((s) => s.id === cfg.pinnedStationId) ?? active;
-    }
+  function resolveStation(source: TideSource): Station | null {
+    const pin = store.getTideConfig().pinnedStation;
+    if (pin && pin.sourceId === source.id) return stations.find((s) => s.id === pin.stationId) ?? active;
     if (lastPos) return nearestStation(stations, lastPos, active);
-    if (cfg.defaultStationId) return stations.find((s) => s.id === cfg.defaultStationId) ?? null;
     return active;
   }
 
-  async function refreshEventsIfNeeded(): Promise<void> {
-    const next = resolveActive();
+  async function refresh(): Promise<void> {
+    const cfg = store.getTideConfig();
+    const nextSource = selectSource(sources, cfg, lastPos);
+    if (!nextSource) {
+      activeSource = null;
+      active = null;
+      activeEvents = [];
+      return;
+    }
+    if (nextSource.id !== activeSource?.id) {
+      activeSource = nextSource;
+      active = null;
+      activeEvents = [];
+      lastFetchDay = -1;
+      await ensureStations(nextSource);
+    }
+    const nextStation = resolveStation(nextSource);
     const today = Math.floor(Date.now() / DAY_MS);
-    const changed = next?.id !== active?.id;
-    if (next && (changed || today !== lastFetchDay)) {
+    const stationChanged = nextStation?.id !== active?.id;
+    if (nextStation && (stationChanged || today !== lastFetchDay)) {
       try {
-        const fresh = await getTidalEvents(key!, next.id, 7);
+        const fresh = await nextSource.getTidalEvents(nextStation.id, 7);
         const now = Date.now();
         const pastKept = activeEvents.filter((e) => e.timeMs <= now).slice(-1);
-        const merged = changed ? fresh : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
+        const merged = stationChanged ? fresh : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
         activeEvents = merged.filter((e, i, arr) => i === 0 || e.timeMs !== arr[i - 1]!.timeMs);
-        active = next;
+        active = nextStation;
         lastFetchDay = today;
       } catch (e) {
-        // Do NOT advance `active` on failure: keep it on the last
-        // successfully-fetched station so publishes stay self-consistent
-        // (name matches events) and the next tick still sees changed===true
-        // and retries the fetch.
+        // Do NOT advance `active` on failure: keep name+events consistent and
+        // retry next tick (stationChanged stays true). If this was the first
+        // fetch after a source change, `active` stays null → publishes suppressed.
         // eslint-disable-next-line no-console
         console.warn('[tide] events fetch failed; keeping cached', e);
       }
-    } else if (next) {
-      active = next;
+    } else if (nextStation) {
+      active = nextStation;
     }
   }
-
-  await ensureStations();
 
   unsubs.push(
     bus.subscribe(Channels.Nav.Position, (s) => {
@@ -118,16 +128,23 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
   );
 
   const tick = async (): Promise<void> => {
-    await refreshEventsIfNeeded();
-    if (active && activeEvents.length > 0) {
-      publishTideSnapshot(bus, active.name, activeEvents, Date.now());
+    await refresh();
+    if (activeSource && active && activeEvents.length > 0) {
+      const now = Date.now();
+      bus.publish({
+        channel: Channels.Tide.Source,
+        t_ns: BigInt(Math.round(now * 1e6)),
+        value: { kind: 'enum', value: activeSource.id },
+        source: 'tide',
+      });
+      publishTideSnapshot(bus, active.name, activeEvents, now);
     }
   };
   await tick();
   const timer = setInterval(() => void tick(), TICK_MS);
 
   // eslint-disable-next-line no-console
-  console.log('[tide] tide service online');
+  console.log('[tide] tide service online (multi-source)');
   return async () => {
     clearInterval(timer);
     for (const u of unsubs) u();
