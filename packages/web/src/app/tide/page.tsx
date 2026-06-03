@@ -4,6 +4,27 @@ import { useEffect, useState, useCallback, Fragment } from 'react';
 import { interpolateHeight, tideSnapshot } from '@g5000/tide';
 import type { Station, TidalEvent } from '@g5000/tide';
 
+// ── Types ────────────────────────────────────────────────────────────────────
+type SourceId = 'admiralty' | 'chs';
+
+interface PickerEntry {
+  sourceId: SourceId;
+  station: Station;
+}
+
+// Composite key used as <select> option value.
+function entryKey(e: PickerEntry): string {
+  return `${e.sourceId}:${e.station.id}`;
+}
+
+function parseEntryKey(key: string): { sourceId: SourceId; stationId: string } {
+  const colon = key.indexOf(':');
+  return {
+    sourceId: key.slice(0, colon) as SourceId,
+    stationId: key.slice(colon + 1),
+  };
+}
+
 // ── SVG dimensions ──────────────────────────────────────────────────────────
 const SVG_W = 700;
 const SVG_H = 120;
@@ -73,10 +94,17 @@ function groupByDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
 }
 
 export default function TidePage() {
-  const [notConfigured, setNotConfigured] = useState(false);
-  const [stations, setStations] = useState<Station[]>([]);
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // pickerList is the flattened, sorted list of {sourceId, station} entries.
+  const [pickerList, setPickerList] = useState<PickerEntry[]>([]);
+  // stationsLoaded tracks whether the initial fetch has completed.
+  const [stationsLoaded, setStationsLoaded] = useState(false);
+  // tideSource from /api/tide/active (auto|admiralty|chs).
+  const [tideSource, setTideSource] = useState<string | null>(null);
+  // pinnedStationId + pinnedSourceId from /api/tide/active.
+  const [pinnedStationId, setPinnedStationId] = useState<string | null>(null);
+  const [pinnedSourceId, setPinnedSourceId] = useState<string | null>(null);
+  // selectedKey is a composite "sourceId:stationId" string.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [events, setEvents] = useState<TidalEvent[]>([]);
   const [filter, setFilter] = useState('');
   const [loadingEvents, setLoadingEvents] = useState(false);
@@ -89,54 +117,86 @@ export default function TidePage() {
     return () => clearInterval(id);
   }, []);
 
-  // Fetch active pin and update state.
+  // Fetch active pin state and update.
   const refreshActive = useCallback(async () => {
     const r = await fetch('/api/tide/active');
     if (!r.ok) return;
-    const j = (await r.json().catch(() => ({ ok: false, stationId: null }))) as { ok: boolean; stationId: string | null };
-    if (j.ok) setPinnedId(j.stationId ?? null);
+    const j = (await r.json().catch(() => ({ ok: false }))) as {
+      ok: boolean;
+      tideSource?: string;
+      pinnedStationId?: string | null;
+      pinnedSourceId?: string | null;
+    };
+    if (j.ok) {
+      setTideSource(j.tideSource ?? null);
+      setPinnedStationId(j.pinnedStationId ?? null);
+      setPinnedSourceId(j.pinnedSourceId ?? null);
+    }
   }, []);
 
   // Mount: fetch stations + active.
   useEffect(() => {
     void (async () => {
       const r = await fetch('/api/tide/stations');
-      // Parse body exactly once; treat network errors or missing ok as unconfigured.
-      const j = await r.json().catch(() => ({ ok: false, stations: [] })) as {
+      const j = await r.json().catch(() => ({ ok: false, sources: {} })) as {
         ok: boolean;
-        stations: Station[];
+        sources: Record<string, Station[]>;
       };
-      if (!r.ok || !j.ok) {
-        setNotConfigured(true);
-        return;
-      }
-      const sorted = [...j.stations].sort((a, b) => a.name.localeCompare(b.name));
-      setStations(sorted);
 
-      // Also fetch active to set default selection.
+      // Flatten all source arrays into picker entries; sort by name.
+      const entries: PickerEntry[] = [];
+      if (r.ok && j.ok) {
+        for (const [srcId, stationArr] of Object.entries(j.sources)) {
+          for (const station of stationArr) {
+            entries.push({ sourceId: srcId as SourceId, station });
+          }
+        }
+        entries.sort((a, b) => a.station.name.localeCompare(b.station.name));
+      }
+      setPickerList(entries);
+      setStationsLoaded(true);
+
+      // Fetch active to determine default selection.
       const ar = await fetch('/api/tide/active');
       if (ar.ok) {
-        const aj = (await ar.json()) as { ok: boolean; stationId: string | null };
-        if (aj.ok && aj.stationId) {
-          setPinnedId(aj.stationId);
-          // Use pinned station as default selection only if it exists in list.
-          const inList = sorted.some((s) => s.id === aj.stationId);
-          setSelectedId(inList ? aj.stationId : (sorted[0]?.id ?? null));
+        const aj = (await ar.json()) as {
+          ok: boolean;
+          tideSource?: string;
+          pinnedStationId?: string | null;
+          pinnedSourceId?: string | null;
+        };
+        if (aj.ok) {
+          setTideSource(aj.tideSource ?? null);
+          const psId = aj.pinnedStationId ?? null;
+          const pSrc = aj.pinnedSourceId ?? null;
+          setPinnedStationId(psId);
+          setPinnedSourceId(pSrc);
+          // Use pinned entry as default only if it exists in the list.
+          if (psId && pSrc) {
+            const pinnedKey = `${pSrc}:${psId}`;
+            const inList = entries.some((e) => entryKey(e) === pinnedKey);
+            setSelectedKey(inList ? pinnedKey : (entries[0] ? entryKey(entries[0]) : null));
+          } else {
+            setSelectedKey(entries[0] ? entryKey(entries[0]) : null);
+          }
         } else {
-          setSelectedId(sorted[0]?.id ?? null);
+          setSelectedKey(entries[0] ? entryKey(entries[0]) : null);
         }
       } else {
-        setSelectedId(sorted[0]?.id ?? null);
+        setSelectedKey(entries[0] ? entryKey(entries[0]) : null);
       }
     })();
   }, []);
 
-  // Fetch events whenever selected station changes.
+  // Fetch events whenever selected entry changes.
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedKey) return;
+    const { sourceId, stationId } = parseEntryKey(selectedKey);
     setLoadingEvents(true);
     void (async () => {
-      const r = await fetch(`/api/tide/events?stationId=${encodeURIComponent(selectedId)}`);
+      const r = await fetch(
+        `/api/tide/events?stationId=${encodeURIComponent(stationId)}&source=${encodeURIComponent(sourceId)}`,
+      );
       if (!r.ok) {
         setEvents([]);
         setLoadingEvents(false);
@@ -144,7 +204,6 @@ export default function TidePage() {
       }
       const j = (await r.json()) as { ok: boolean; events: TidalEvent[] };
       if (j.ok) {
-        // Sort ascending by timeMs (defensive).
         const sorted = [...j.events].sort((a, b) => a.timeMs - b.timeMs);
         setEvents(sorted);
       } else {
@@ -152,27 +211,43 @@ export default function TidePage() {
       }
       setLoadingEvents(false);
     })();
-  }, [selectedId]);
+  }, [selectedKey]);
 
   const handlePin = useCallback(async () => {
-    if (!selectedId) return;
-    const isCurrentlyPinned = pinnedId === selectedId;
+    if (!selectedKey) return;
+    const { sourceId, stationId } = parseEntryKey(selectedKey);
+    const isCurrentlyPinned =
+      pinnedStationId === stationId && pinnedSourceId === sourceId;
     setPinning(true);
     await fetch('/api/tide/pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stationId: isCurrentlyPinned ? null : selectedId }),
+      body: JSON.stringify(
+        isCurrentlyPinned ? { stationId: null } : { stationId, sourceId },
+      ),
     });
     await refreshActive();
     setPinning(false);
-  }, [selectedId, pinnedId, refreshActive]);
+  }, [selectedKey, pinnedStationId, pinnedSourceId, refreshActive]);
 
   // ── Derived display data ───────────────────────────────────────────────────
-  const filtered = stations.filter(
-    (s) =>
-      s.name.toLowerCase().includes(filter.toLowerCase()) || s.id === selectedId,
+  const multiSource = new Set(pickerList.map((e) => e.sourceId)).size > 1;
+
+  const filtered = pickerList.filter(
+    (e) =>
+      e.station.name.toLowerCase().includes(filter.toLowerCase()) ||
+      entryKey(e) === selectedKey,
   );
-  const selectedStation = stations.find((s) => s.id === selectedId) ?? null;
+
+  const selectedEntry = selectedKey
+    ? (pickerList.find((e) => entryKey(e) === selectedKey) ?? null)
+    : null;
+
+  const isPinned =
+    !!selectedEntry &&
+    pinnedStationId === selectedEntry.station.id &&
+    pinnedSourceId === selectedEntry.sourceId;
+
   const curvePts = events.length >= 2 ? buildCurvePts(events) : [];
   const polyline = ptsToPolyline(curvePts);
   const snapshot = events.length >= 2 ? tideSnapshot(events, now) : null;
@@ -190,14 +265,18 @@ export default function TidePage() {
   const dayGroups = groupByDay(events);
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  if (notConfigured) {
+
+  // No-source state: loaded but nothing came back.
+  if (stationsLoaded && pickerList.length === 0) {
     return (
       <main className="p-6 max-w-3xl mx-auto text-slate-100">
         <h1 className="text-2xl font-semibold mb-4">Tide Planning</h1>
         <div className="p-4 bg-amber-900/40 border border-amber-700 rounded text-amber-200">
-          <p className="font-medium">Tide API not configured</p>
+          <p className="font-medium">No tide source available yet</p>
           <p className="mt-1 text-sm text-amber-300">
-            Set <code className="font-mono bg-amber-900/60 px-1 rounded">ADMIRALTY_TIDAL_API_KEY</code> to enable tide data.
+            Waiting for position, or set{' '}
+            <code className="font-mono bg-amber-900/60 px-1 rounded">ADMIRALTY_TIDAL_API_KEY</code>{' '}
+            for UK waters.
           </p>
         </div>
       </main>
@@ -206,7 +285,22 @@ export default function TidePage() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto text-slate-100">
-      <h1 className="text-2xl font-semibold mb-4">Tide Planning</h1>
+      <div className="flex items-baseline gap-3 mb-4">
+        <h1 className="text-2xl font-semibold">Tide Planning</h1>
+        {selectedEntry && (
+          <span className="text-sm text-slate-400">
+            Source:{' '}
+            <span className="font-medium text-slate-200 uppercase">
+              {selectedEntry.sourceId}
+            </span>
+            {tideSource && (
+              <span className="ml-2 text-xs text-slate-500">
+                (mode: {tideSource})
+              </span>
+            )}
+          </span>
+        )}
+      </div>
 
       {/* Station picker */}
       <div className="mb-4 flex flex-col sm:flex-row gap-2">
@@ -218,34 +312,44 @@ export default function TidePage() {
           className="flex-none w-full sm:w-48 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-slate-400"
         />
         <select
-          value={selectedId ?? ''}
+          value={selectedKey ?? ''}
           onChange={(e) => {
-            setSelectedId(e.target.value || null);
+            setSelectedKey(e.target.value || null);
           }}
           className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 focus:outline-none focus:border-slate-400"
-          disabled={stations.length === 0}
+          disabled={pickerList.length === 0}
         >
-          {stations.length === 0 && <option value="">Loading stations…</option>}
-          {filtered.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {pinnedId === s.id ? ' ★' : ''}
-            </option>
-          ))}
+          {pickerList.length === 0 && !stationsLoaded && (
+            <option value="">Loading stations…</option>
+          )}
+          {filtered.map((e) => {
+            const key = entryKey(e);
+            const isEntryPinned =
+              pinnedStationId === e.station.id && pinnedSourceId === e.sourceId;
+            const label = multiSource
+              ? `${e.station.name} (${e.sourceId})`
+              : e.station.name;
+            return (
+              <option key={key} value={key}>
+                {label}
+                {isEntryPinned ? ' ★' : ''}
+              </option>
+            );
+          })}
         </select>
 
-        {selectedStation && (
+        {selectedEntry && (
           <button
             type="button"
             disabled={pinning}
             onClick={() => void handlePin()}
             className={`px-3 py-1.5 rounded text-sm font-medium disabled:opacity-40 ${
-              pinnedId === selectedId
+              isPinned
                 ? 'bg-amber-700 hover:bg-amber-600 text-white'
                 : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
             }`}
           >
-            {pinning ? '…' : pinnedId === selectedId ? 'Un-pin' : 'Pin this station'}
+            {pinning ? '…' : isPinned ? 'Un-pin' : 'Pin this station'}
           </button>
         )}
       </div>
@@ -254,7 +358,7 @@ export default function TidePage() {
       {!loadingEvents && curvePts.length > 0 && (
         <div className="mb-4 bg-slate-900 border border-slate-700 rounded p-3">
           <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-            Height curve — {selectedStation?.name ?? ''}
+            Height curve — {selectedEntry?.station.name ?? ''}
           </div>
           <svg
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -385,7 +489,7 @@ export default function TidePage() {
         </div>
       )}
 
-      {!loadingEvents && events.length === 0 && selectedId && (
+      {!loadingEvents && events.length === 0 && selectedKey && (
         <div className="text-sm text-slate-500">No events available for this station.</div>
       )}
 
