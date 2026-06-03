@@ -94,6 +94,7 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
       activeSource = nextSource;
       active = null;
       activeEvents = [];
+      stations = [];
       lastFetchDay = -1;
       await ensureStations(nextSource);
     }
