@@ -49,7 +49,7 @@ export function parseChsEvents(json: unknown): TidalEvent[] {
   });
 }
 
-async function chsGet(path: string): Promise<unknown> {
+export async function chsGet(path: string): Promise<unknown> {
   const res = await fetch(`${CHS_BASE}${path}`);
   if (!res.ok) throw new TideApiError(`CHS ${path} → ${res.status}`, res.status);
   return res.json();

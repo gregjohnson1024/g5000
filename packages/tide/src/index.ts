@@ -6,3 +6,6 @@ export { tideSnapshot, type TideSnapshot } from './snapshot.js';
 export { listStations, getTidalEvents, parseStations, parseTidalEvents, TideApiError } from './admiralty-client.js';
 export { chsListStations, chsGetTidalEvents, parseChsStations, parseChsEvents } from './chs-client.js';
 export { createTideSources, getTideSource, selectSource, type TideSource, type TideSourceId } from './sources.js';
+export type { CurrentPrediction, CurrentEvent, CurrentEventKind } from './current-prediction.js';
+export { currentNow, nextCurrentEvent } from './current-prediction.js';
+export { chsListCurrentStations, chsGetCurrentPredictions, chsGetCurrentEvents, parseChsCurrentStations, parseChsCurrentSeries, parseChsCurrentEvents } from './chs-currents.js';
