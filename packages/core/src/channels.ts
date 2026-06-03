@@ -118,6 +118,8 @@ export const Channels = {
   Tide: {
     /** Active tide station name. */
     Station: 'tide.station',
+    /** Active tide source: 'admiralty' | 'chs'. */
+    Source: 'tide.source',
     /** Interpolated height now, metres above Chart Datum (suppressed when no bracketing pair). */
     HeightNow: 'tide.heightNow',
     /** Tide state: 'rising' | 'falling' | 'stand' (height concept, not current slack). */
