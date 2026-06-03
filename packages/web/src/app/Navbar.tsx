@@ -22,6 +22,8 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/ais', label: 'AIS' },
   { href: '/polars', label: 'Polars' },
   { href: '/forecast', label: 'Forecast' },
+  { href: '/tide', label: 'Tide' },
+  { href: '/currents', label: 'Currents' },
   { href: '/waypoints', label: 'Waypoints' },
   { href: '/routes', label: 'Routes' },
   { href: '/tracks', label: 'Tracks' },
