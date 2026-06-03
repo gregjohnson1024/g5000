@@ -5,20 +5,18 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const store = getSharedConfigStore();
   let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: 'invalid JSON' }, { status: 400 });
+  try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'invalid JSON' }, { status: 400 }); }
+  const b = body as { stationId?: unknown; sourceId?: unknown };
+  const store = getSharedConfigStore();
+  const cfg = store.getTideConfig();
+  if (b.stationId === null) {
+    await store.setTideConfig({ ...cfg, pinnedStation: null });
+    return NextResponse.json({ ok: true });
   }
-  const stationId = (body as { stationId?: unknown }).stationId;
-  if (stationId !== null && typeof stationId !== 'string') {
-    return NextResponse.json(
-      { ok: false, error: 'stationId must be string or null' },
-      { status: 400 },
-    );
+  if (typeof b.stationId !== 'string' || (b.sourceId !== 'admiralty' && b.sourceId !== 'chs')) {
+    return NextResponse.json({ ok: false, error: 'stationId (string) + sourceId (admiralty|chs), or stationId:null' }, { status: 400 });
   }
-  await store.setTideConfig({ ...store.getTideConfig(), pinnedStationId: stationId });
+  await store.setTideConfig({ ...cfg, pinnedStation: { sourceId: b.sourceId, stationId: b.stationId } });
   return NextResponse.json({ ok: true });
 }

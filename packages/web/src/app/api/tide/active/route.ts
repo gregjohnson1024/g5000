@@ -5,11 +5,18 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(): Promise<NextResponse> {
-  const store = getSharedConfigStore();
-  const cfg = store.getTideConfig();
-  const pinned = cfg.pinnedStationId != null;
-  const st = pinned
-    ? (cfg.stationsCache?.stations.find((s) => s.id === cfg.pinnedStationId) ?? null)
-    : null;
-  return NextResponse.json({ ok: true, pinned, stationId: cfg.pinnedStationId, name: st?.name ?? null });
+  const cfg = getSharedConfigStore().getTideConfig();
+  const pin = cfg.pinnedStation;
+  let name: string | null = null;
+  if (pin) {
+    name = cfg.stationsCacheBySource[pin.sourceId]?.stations.find((s) => s.id === pin.stationId)?.name ?? null;
+  }
+  return NextResponse.json({
+    ok: true,
+    tideSource: cfg.tideSource,
+    pinned: pin !== null,
+    pinnedStationId: pin?.stationId ?? null,
+    pinnedSourceId: pin?.sourceId ?? null,
+    pinnedName: name,
+  });
 }
