@@ -64,6 +64,13 @@ describe('formatTile', () => {
     expect(r.color).toBe('default');
     expect(r.stale).toBe(false);
   });
+  it('renders tide.source enum (chs) as text', () => {
+    const t = tile({ field: 'tide.source', units: 'raw', decimals: 0 });
+    const r = formatTile(t, enumSample('chs', 1000), 1000);
+    expect(r.text).toBe('chs');
+    expect(r.color).toBe('default');
+    expect(r.stale).toBe(false);
+  });
   it('renders tide.heightNow scalar with units m to one decimal', () => {
     const t = tile({ field: 'tide.heightNow', units: 'm', decimals: 1 });
     const r = formatTile(t, scalar(3.2, 1000), 1000);

@@ -20,6 +20,7 @@ export function NavigatingGroup({
   const tideHeightNow = scalar(channels.get('tide.heightNow'));
   const tideState = enumVal(channels.get('tide.state'));
   const tideStation = enumVal(channels.get('tide.station'));
+  const tideSource = enumVal(channels.get('tide.source'));
   const tideNextType = enumVal(channels.get('tide.nextEventType'));
   const tideNextInSec = scalar(channels.get('tide.nextEventInSec'));
   const tideNextHeight = scalar(channels.get('tide.nextEventHeight'));
@@ -88,7 +89,11 @@ export function NavigatingGroup({
         label="Tide"
         value={tideHeightNow === null ? '—' : tideHeightNow.toFixed(1)}
         unit={tideHeightNow === null ? '' : 'm'}
-        sub={tideStation ?? tideState ?? undefined}
+        sub={
+          tideStation && tideSource
+            ? `${tideStation} · ${tideSource}`
+            : tideStation ?? tideSource ?? tideState ?? undefined
+        }
         small
       />
       <HelmTile
