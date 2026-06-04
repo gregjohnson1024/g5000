@@ -121,7 +121,10 @@ export default function CurrentsPage() {
           a.name.localeCompare(b.name),
         );
         setStations(sorted);
-        setSelectedId(sorted[0]?.id ?? null);
+        const qid = new URLSearchParams(window.location.search).get('station');
+        const initialId =
+          qid && sorted.some((s) => s.id === qid) ? qid : (sorted[0]?.id ?? null);
+        setSelectedId(initialId);
         setStationsLoaded(true);
       } catch {
         if (ignored) return;

@@ -134,16 +134,17 @@ export default function TidePage() {
     }
   }, []);
 
-  // Mount: fetch stations + active.
+  // Mount: fetch stations + active, then choose the selected entry ONCE
+  // with precedence query-param > pinned > first. Computing it in one place
+  // avoids a late /api/tide/active callback overwriting a deep-link selection.
   useEffect(() => {
     void (async () => {
       const r = await fetch('/api/tide/stations');
-      const j = await r.json().catch(() => ({ ok: false, sources: {} })) as {
+      const j = (await r.json().catch(() => ({ ok: false, sources: {} }))) as {
         ok: boolean;
         sources: Record<string, Station[]>;
       };
 
-      // Flatten all source arrays into picker entries; sort by name.
       const entries: PickerEntry[] = [];
       if (r.ok && j.ok) {
         for (const [srcId, stationArr] of Object.entries(j.sources)) {
@@ -156,7 +157,20 @@ export default function TidePage() {
       setPickerList(entries);
       setStationsLoaded(true);
 
-      // Fetch active to determine default selection.
+      // (1) Query-param selection (highest precedence).
+      const params = new URLSearchParams(window.location.search);
+      const qStation = params.get('station');
+      const qSource = params.get('source');
+      let queryKey: string | null = null;
+      if (qStation) {
+        const match = entries.find(
+          (e) => e.station.id === qStation && (!qSource || e.sourceId === qSource),
+        );
+        if (match) queryKey = entryKey(match);
+      }
+
+      // (2) Pinned default — also drives the source label. Fetch regardless.
+      let pinnedKey: string | null = null;
       const ar = await fetch('/api/tide/active');
       if (ar.ok) {
         const aj = (await ar.json()) as {
@@ -171,20 +185,16 @@ export default function TidePage() {
           const pSrc = aj.pinnedSourceId ?? null;
           setPinnedStationId(psId);
           setPinnedSourceId(pSrc);
-          // Use pinned entry as default only if it exists in the list.
           if (psId && pSrc) {
-            const pinnedKey = `${pSrc}:${psId}`;
-            const inList = entries.some((e) => entryKey(e) === pinnedKey);
-            setSelectedKey(inList ? pinnedKey : (entries[0] ? entryKey(entries[0]) : null));
-          } else {
-            setSelectedKey(entries[0] ? entryKey(entries[0]) : null);
+            const pk = `${pSrc}:${psId}`;
+            if (entries.some((e) => entryKey(e) === pk)) pinnedKey = pk;
           }
-        } else {
-          setSelectedKey(entries[0] ? entryKey(entries[0]) : null);
         }
-      } else {
-        setSelectedKey(entries[0] ? entryKey(entries[0]) : null);
       }
+
+      // (3) First entry as the final fallback. Select once.
+      const firstKey = entries[0] ? entryKey(entries[0]) : null;
+      setSelectedKey(queryKey ?? pinnedKey ?? firstKey);
     })();
   }, []);
 
