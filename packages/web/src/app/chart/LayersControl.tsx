@@ -16,6 +16,10 @@ export interface LayersState {
   ais: boolean;
   /** COG-projection extension lines on AIS targets. Defaults true. */
   aisCog: boolean;
+  /** Tide-station markers overlay. Defaults false. */
+  tideStations: boolean;
+  /** Tidal-current-station markers overlay. Defaults false. */
+  currentStations: boolean;
   /** Mutually-exclusive forecast/current overlay. 'none' = no model overlay. */
   model: ChartModel;
 }
@@ -35,7 +39,18 @@ export function LayersControl({
   onSelectModel,
 }: {
   state: LayersState;
-  onToggle: (key: 'osm' | 'enc' | 'satellite' | 'buoys' | 'bathy' | 'ais' | 'aisCog') => void;
+  onToggle: (
+    key:
+      | 'osm'
+      | 'enc'
+      | 'satellite'
+      | 'buoys'
+      | 'bathy'
+      | 'ais'
+      | 'aisCog'
+      | 'tideStations'
+      | 'currentStations',
+  ) => void;
   onSelectModel: (model: ChartModel) => void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
@@ -135,6 +150,16 @@ export function LayersControl({
                 onClick={() => onToggle('aisCog')}
               />
             ) : null}
+            <Row
+              label="Tide stations"
+              pressed={state.tideStations}
+              onClick={() => onToggle('tideStations')}
+            />
+            <Row
+              label="Current stations"
+              pressed={state.currentStations}
+              onClick={() => onToggle('currentStations')}
+            />
           </div>
         </div>
       ) : null}

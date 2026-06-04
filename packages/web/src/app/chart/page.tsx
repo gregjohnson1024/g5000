@@ -8,6 +8,7 @@ import { attachRoute, detachRoute, type RouteColorMode } from '../../components/
 import { attachRouteConnector } from '../../components/RouteConnector';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
 import { AisTargets } from '../../components/AisTargets';
+import { StationsOverlay } from '../../components/StationsOverlay';
 import { ForecastRoi } from '../../components/ForecastRoi';
 import { WaypointsLayer } from '../../components/WaypointsLayer';
 import { TrackOverlay, type TrackColorMode } from '../../components/TrackOverlay';
@@ -155,6 +156,8 @@ function ChartPageInner() {
     bathy: false,
     ais: true,
     aisCog: true,
+    tideStations: false,
+    currentStations: false,
     model: 'none' as ChartModel,
   });
   const [layersHydrated, setLayersHydrated] = useState(false);
@@ -172,6 +175,8 @@ function ChartPageInner() {
           bathy: parsed.bathy ?? false,
           ais: parsed.ais ?? true,
           aisCog: parsed.aisCog ?? true,
+          tideStations: parsed.tideStations ?? false,
+          currentStations: parsed.currentStations ?? false,
           model: validModels.includes(parsed.model as ChartModel)
             ? (parsed.model as ChartModel)
             : 'none',
@@ -918,6 +923,8 @@ function ChartPageInner() {
             own={livePos}
           />
         )}
+        {layers.tideStations && <StationsOverlay map={mapInstance} kind="tide" />}
+        {layers.currentStations && <StationsOverlay map={mapInstance} kind="current" />}
         <ForecastRoi
           map={mapInstance}
           defaultBbox={
