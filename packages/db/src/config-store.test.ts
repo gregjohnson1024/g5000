@@ -474,7 +474,7 @@ describe('ConfigStore', () => {
 
   it('seeds display config with defaults and persists a set across reopen', async () => {
     expect(store.getDisplayConfig()).toEqual(DEFAULT_DISPLAY_CONFIG);
-    const next = { ...DEFAULT_DISPLAY_CONFIG, brightnessPct: 35 };
+    const next = { ...DEFAULT_DISPLAY_CONFIG, brightnessPct: 35, nightMode: true };
     await store.setDisplayConfig(next);
     await store.close();
     store = await ConfigStore.open(dbPath);

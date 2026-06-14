@@ -390,10 +390,13 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = {
 export interface DisplayConfig {
   /** Panel backlight brightness, 0–100 % (UI-friendly; the unit maps to hardware). */
   brightnessPct: number;
+  /** Force the mast display's red-on-black night theme on/off (manual). */
+  nightMode: boolean;
 }
 
 export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   brightnessPct: 80,
+  nightMode: false,
 };
 
 export const DEFAULT_WARDROBE: SailWardrobe = {
