@@ -246,7 +246,7 @@ export default function MastConfigPage() {
         <label className="flex items-center gap-3 text-sm">
           <input
             type="range"
-            min={0}
+            min={5}
             max={100}
             step={1}
             value={brightnessPct}
