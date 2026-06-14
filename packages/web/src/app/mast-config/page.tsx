@@ -55,6 +55,7 @@ export default function MastConfigPage() {
   const [layout, setLayout] = useState<MastLayout | null>(null);
   const [channels, setChannels] = useState<string[]>([]);
   const [brightnessPct, setBrightnessPct] = useState<number>(80);
+  const [nightMode, setNightMode] = useState<boolean>(false);
   const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -85,6 +86,15 @@ export default function MastConfigPage() {
         }
       } catch {
         // non-fatal — brightness just stays at the default
+      }
+      try {
+        const nmRes = await fetch('/api/mast/night-mode', { cache: 'no-store' });
+        if (nmRes.ok) {
+          const nmBody = (await nmRes.json()) as { ok: boolean; nightMode: boolean };
+          if (nmBody.ok) setNightMode(nmBody.nightMode);
+        }
+      } catch {
+        // non-fatal — night mode just stays at the default
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -135,6 +145,15 @@ export default function MastConfigPage() {
         body: JSON.stringify({ brightnessPct: pct }),
       });
     }, 250);
+  };
+
+  const onNightModeChange = (on: boolean): void => {
+    setNightMode(on);
+    void fetch('/api/mast/night-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nightMode: on }),
+    });
   };
 
   // ── immutable helpers ───────────────────────────────────────────────────────
@@ -239,6 +258,22 @@ export default function MastConfigPage() {
         </label>
         <p className="text-xs text-slate-400">
           Applied to the mast-display panel live. The setting persists and dims the boot screen too.
+        </p>
+      </section>
+
+      <section className="border border-slate-700 rounded-md p-4 space-y-2">
+        <div className="text-sm font-medium">Night mode</div>
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={nightMode}
+            onChange={(e) => onNightModeChange(e.target.checked)}
+            aria-label="Night mode"
+          />
+          <span className="text-slate-300">{nightMode ? 'On — red on black' : 'Off — day theme'}</span>
+        </label>
+        <p className="text-xs text-slate-400">
+          Forces the mast display's red-on-black night theme on/off. Persists across reboots.
         </p>
       </section>
 
