@@ -95,6 +95,14 @@ export class MastService implements MastRuntime {
     return this.configStore.getDisplayConfig().brightnessPct;
   }
 
+  get nightMode$(): Observable<boolean> {
+    return this.configStore.displayConfig$.pipe(map((c) => c.nightMode));
+  }
+
+  getNightMode(): boolean {
+    return this.configStore.getDisplayConfig().nightMode;
+  }
+
   async stop(): Promise<void> {
     this.overrideSubject.complete();
     // ConfigStore's subjects are owned by ConfigStore; we do not complete them here.

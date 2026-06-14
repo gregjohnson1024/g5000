@@ -66,4 +66,6 @@ export interface MastRuntime {
   setOverride(pageId: string | null): void;
   readonly brightness$: Observable<number>;
   getBrightness(): number;
+  readonly nightMode$: Observable<boolean>;
+  getNightMode(): boolean;
 }
