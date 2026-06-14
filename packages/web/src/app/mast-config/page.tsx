@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GRID_CAPACITY } from '@g5000/mast';
 import type { DisplayUnit, GridKind, MastLayout, MastPage, MastThreshold, MastTile } from '@g5000/mast';
 
@@ -54,6 +54,8 @@ function makeDefaultTile(field: string): MastTile {
 export default function MastConfigPage() {
   const [layout, setLayout] = useState<MastLayout | null>(null);
   const [channels, setChannels] = useState<string[]>([]);
+  const [brightnessPct, setBrightnessPct] = useState<number>(80);
+  const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
@@ -74,6 +76,16 @@ export default function MastConfigPage() {
       setLayout(layoutBody.layout);
       setChannels(chBody.channels);
       setErr(null);
+      // Load brightness separately so a failure doesn't break the layout load.
+      try {
+        const brRes = await fetch('/api/mast/brightness', { cache: 'no-store' });
+        if (brRes.ok) {
+          const brBody = (await brRes.json()) as { ok: boolean; brightnessPct: number };
+          if (brBody.ok) setBrightnessPct(brBody.brightnessPct);
+        }
+      } catch {
+        // non-fatal — brightness just stays at the default
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -109,6 +121,20 @@ export default function MastConfigPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  // ── brightness ──────────────────────────────────────────────────────────────
+
+  const onBrightnessChange = (pct: number): void => {
+    setBrightnessPct(pct);
+    if (brightnessTimer.current) clearTimeout(brightnessTimer.current);
+    brightnessTimer.current = setTimeout(() => {
+      void fetch('/api/mast/brightness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brightnessPct: pct }),
+      });
+    }, 250);
   };
 
   // ── immutable helpers ───────────────────────────────────────────────────────
@@ -195,6 +221,26 @@ export default function MastConfigPage() {
       >
         {busy ? 'Saving…' : 'Save'}
       </button>
+
+      <section className="border border-slate-700 rounded-md p-4 space-y-2">
+        <div className="text-sm font-medium">Panel brightness</div>
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={brightnessPct}
+            onChange={(e) => onBrightnessChange(Number(e.target.value))}
+            className="flex-1"
+            aria-label="Panel brightness"
+          />
+          <span className="w-12 text-right font-mono">{brightnessPct}%</span>
+        </label>
+        <p className="text-xs text-slate-400">
+          Applied to the mast-display panel live. The setting persists and dims the boot screen too.
+        </p>
+      </section>
 
       {layout === null && !err && <p className="text-slate-400">Loading…</p>}
 
