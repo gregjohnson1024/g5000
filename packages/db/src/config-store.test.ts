@@ -9,6 +9,7 @@ import {
   DEFAULT_BOAT_CONFIG,
   DEFAULT_AWS_AWA_CAL,
   DEFAULT_DAMPING_CONFIG,
+  DEFAULT_DISPLAY_CONFIG,
   DEFAULT_GROOVE_SETTINGS,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
@@ -469,5 +470,14 @@ describe('ConfigStore', () => {
     await store.close();
     store = await ConfigStore.open(dbPath);
     expect(store.getTideConfig()).toEqual(next);
+  });
+
+  it('seeds display config with defaults and persists a set across reopen', async () => {
+    expect(store.getDisplayConfig()).toEqual(DEFAULT_DISPLAY_CONFIG);
+    const next = { ...DEFAULT_DISPLAY_CONFIG, brightnessPct: 35 };
+    await store.setDisplayConfig(next);
+    await store.close();
+    store = await ConfigStore.open(dbPath);
+    expect(store.getDisplayConfig()).toEqual(next);
   });
 });

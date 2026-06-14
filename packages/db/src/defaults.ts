@@ -386,6 +386,16 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = {
   stationsCacheBySource: {},
 };
 
+/** Per-boat mast-display panel settings. Applied by the appliance brightness agent. */
+export interface DisplayConfig {
+  /** Panel backlight brightness, 0–100 % (UI-friendly; the unit maps to hardware). */
+  brightnessPct: number;
+}
+
+export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
+  brightnessPct: 80,
+};
+
 export const DEFAULT_WARDROBE: SailWardrobe = {
   schemaVersion: 3,
   boatId: 'sula',

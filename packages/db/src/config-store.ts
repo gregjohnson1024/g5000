@@ -10,6 +10,7 @@ import {
   DEFAULT_COMPASS_DEVIATION,
   DEFAULT_CROSSOVER_SETTINGS,
   DEFAULT_DAMPING_CONFIG,
+  DEFAULT_DISPLAY_CONFIG,
   DEFAULT_GROOVE_SETTINGS,
   DEFAULT_POLARS,
   DEFAULT_SOURCE_PRIORITY,
@@ -24,6 +25,7 @@ import {
   type CompassDeviation,
   type CrossoverSettings,
   type DampingConfig,
+  type DisplayConfig,
   type GrooveSettings,
   type PassageLog,
   type PolarMode,
@@ -43,6 +45,7 @@ import {
   dampingConfig as dampingConfigTable,
   grooveSettings as grooveSettingsTable,
   tideConfig as tideConfigTable,
+  displayConfig as displayConfigTable,
   passageLog as passageLogTable,
   sailWardrobe,
   sourcePriorityConfig as sourcePriorityConfigTable,
@@ -86,6 +89,7 @@ type SubjectValues = {
   crossoverSettings: CrossoverSettings;
   grooveSettings: GrooveSettings;
   tideConfig: TideConfig;
+  displayConfig: DisplayConfig;
   waypoints: Waypoint[];
   routes: Route[];
   boatState: BoatState;
@@ -239,6 +243,10 @@ export class ConfigStore {
         value TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS tide_config (
+        boat_id TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS display_config (
         boat_id TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
@@ -415,6 +423,20 @@ export class ConfigStore {
         }
       : DEFAULT_TIDE_CONFIG;
 
+    // Load the display_config row for the active boat. Merged over
+    // DEFAULT_DISPLAY_CONFIG so new fields get sensible fallbacks.
+    const dcRows = db
+      .select()
+      .from(displayConfigTable)
+      .where(eq(displayConfigTable.boatId, activeBoatId))
+      .all() as Array<{ boatId: string; value: string }>;
+    const displayConfigValue: DisplayConfig = dcRows[0]
+      ? {
+          ...DEFAULT_DISPLAY_CONFIG,
+          ...(JSON.parse(dcRows[0].value) as Partial<DisplayConfig>),
+        }
+      : DEFAULT_DISPLAY_CONFIG;
+
     const initial = {
       boatConfig: loadOrInsert<BoatConfig>(boatConfigTable, DEFAULT_BOAT_CONFIG),
       awsAwaCal: loadOrInsert<AwsAwaCalTable>(awsAwaCal, DEFAULT_AWS_AWA_CAL),
@@ -432,6 +454,7 @@ export class ConfigStore {
       crossoverSettings: crossoverSettingsValue,
       grooveSettings: grooveSettingsValue,
       tideConfig: tideConfigValue,
+      displayConfig: displayConfigValue,
       waypoints: loadOrInsert<Waypoint[]>(waypointsTable, []),
       routes: loadOrInsert<Route[]>(routesTable, []),
       boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
@@ -592,6 +615,30 @@ export class ConfigStore {
       )
       .run(this.__activeBoatId, JSON.stringify(value));
     this.subjects.tideConfig.next(value);
+  }
+
+  /**
+   * Display configuration (panel backlight brightness) for the active boat.
+   * Seeded at open() from the display_config row for `activeBoatId`, merged
+   * over DEFAULT_DISPLAY_CONFIG so new fields get sensible fallbacks.
+   * Single-row table keyed on `boatId`.
+   */
+  get displayConfig$(): Observable<DisplayConfig> {
+    return this.subjects.displayConfig.asObservable();
+  }
+
+  /** Synchronous read of the current display config (BehaviorSubject.value). */
+  getDisplayConfig(): DisplayConfig {
+    return this.subjects.displayConfig.value;
+  }
+
+  async setDisplayConfig(value: DisplayConfig): Promise<void> {
+    this.raw
+      .prepare(
+        'INSERT INTO display_config (boat_id, value) VALUES (?, ?) ON CONFLICT (boat_id) DO UPDATE SET value = excluded.value',
+      )
+      .run(this.__activeBoatId, JSON.stringify(value));
+    this.subjects.displayConfig.next(value);
   }
 
   get waypoints$(): Observable<Waypoint[]> {
