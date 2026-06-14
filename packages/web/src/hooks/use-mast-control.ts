@@ -7,6 +7,7 @@ export interface UseMastControlResult {
   layout: MastLayout | null;
   override: string | null;
   connected: boolean;
+  nightMode: boolean;
 }
 
 /**
@@ -18,6 +19,7 @@ export function useMastControl(): UseMastControlResult {
   const [layout, setLayout] = useState<MastLayout | null>(null);
   const [override, setOverride] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [nightMode, setNightMode] = useState(false);
 
   useEffect(() => {
     const es = new EventSource('/api/mast/stream');
@@ -39,10 +41,17 @@ export function useMastControl(): UseMastControlResult {
         /* ignore malformed payloads */
       }
     });
+    es.addEventListener('nightmode', (ev) => {
+      try {
+        setNightMode(JSON.parse((ev as MessageEvent).data) as boolean);
+      } catch {
+        /* ignore malformed payloads */
+      }
+    });
     return () => {
       es.close();
     };
   }, []);
 
-  return { layout, override, connected };
+  return { layout, override, connected, nightMode };
 }

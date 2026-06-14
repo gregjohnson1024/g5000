@@ -4,7 +4,7 @@ import type { JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
 import { useMastControl } from '../../hooks/use-mast-control';
 import { useEngineState } from '../../hooks/use-engine-state';
-import { evaluateMode, selectActivePage, isNight } from '@g5000/mast';
+import { evaluateMode, selectActivePage } from '@g5000/mast';
 import { formatTile } from './format';
 import { Grid } from './Grid';
 import { Tile } from './Tile';
@@ -14,14 +14,9 @@ function scalar(s: JsonSafeSample | undefined): number | null {
   return s.value.value;
 }
 
-function geo(s: JsonSafeSample | undefined): { lat: number; lon: number } | null {
-  if (!s || s.value.kind !== 'geo') return null;
-  return s.value.value;
-}
-
 export default function MastPage() {
   const { channels, connected: dataConnected } = useSse();
-  const { layout, override } = useMastControl();
+  const { layout, override, nightMode } = useMastControl();
   const engineRunning = useEngineState();
 
   if (!layout) {
@@ -36,11 +31,10 @@ export default function MastPage() {
 
   const twaRad = scalar(channels.get('wind.true.angle'));
   const sogMs = scalar(channels.get('nav.gps.sog'));
-  const pos = geo(channels.get('nav.gps.position'));
   const mode = evaluateMode({ twaRad, sogMs, engineRunning });
   const activeId = selectActivePage(layout, mode, override);
   const page = layout.pages.find((p) => p.id === activeId) ?? layout.pages[0]!;
-  const night = pos ? isNight(pos.lat, pos.lon, new Date()) : false;
+  const night = nightMode;
   const now = Date.now();
 
   return (
