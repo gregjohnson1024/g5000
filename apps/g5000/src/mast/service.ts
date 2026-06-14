@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { BehaviorSubject, filter, type Observable } from 'rxjs';
+import { BehaviorSubject, filter, map, type Observable } from 'rxjs';
 import {
   DEFAULT_MAST_LAYOUT,
   knownChannelSet,
@@ -85,6 +85,14 @@ export class MastService implements MastRuntime {
 
   setOverride(pageId: string | null): void {
     this.overrideSubject.next(pageId);
+  }
+
+  get brightness$(): Observable<number> {
+    return this.configStore.displayConfig$.pipe(map((c) => c.brightnessPct));
+  }
+
+  getBrightness(): number {
+    return this.configStore.getDisplayConfig().brightnessPct;
   }
 
   async stop(): Promise<void> {

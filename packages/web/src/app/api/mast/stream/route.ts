@@ -19,14 +19,17 @@ export async function GET(req: Request): Promise<Response> {
       // Initial state on connect.
       send('layout', mastRuntime.getLayout());
       send('override', mastRuntime.getOverride());
+      send('brightness', mastRuntime.getBrightness());
 
       const layoutSub = mastRuntime.layout$.subscribe((l) => send('layout', l));
       const overrideSub = mastRuntime.override$.subscribe((o) => send('override', o));
+      const brightnessSub = mastRuntime.brightness$.subscribe((b) => send('brightness', b));
       const heartbeat = setInterval(() => controller.enqueue(encoder.encode(': ping\n\n')), 15_000);
 
       req.signal.addEventListener('abort', () => {
         layoutSub.unsubscribe();
         overrideSub.unsubscribe();
+        brightnessSub.unsubscribe();
         clearInterval(heartbeat);
         try {
           controller.close();

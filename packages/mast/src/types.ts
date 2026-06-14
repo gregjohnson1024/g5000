@@ -64,4 +64,6 @@ export interface MastRuntime {
   getLayout(): MastLayout;
   getOverride(): string | null;
   setOverride(pageId: string | null): void;
+  readonly brightness$: Observable<number>;
+  getBrightness(): number;
 }
