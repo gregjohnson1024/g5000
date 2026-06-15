@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GRID_CAPACITY } from '@g5000/mast';
-import type { DisplayUnit, GridKind, MastLayout, MastPage, MastThreshold, MastTile } from '@g5000/mast';
+import { GRID_CAPACITY, DAY_BASE_COLORS } from '@g5000/mast';
+import type { DisplayUnit, DayBaseColor, GridKind, MastLayout, MastPage, MastThreshold, MastTile } from '@g5000/mast';
+import { MAST_BASE_COLOR_HEX } from '../mast/colors';
 
 // ── constants ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ export default function MastConfigPage() {
   const [channels, setChannels] = useState<string[]>([]);
   const [brightnessPct, setBrightnessPct] = useState<number>(80);
   const [nightMode, setNightMode] = useState<boolean>(false);
+  const [dayBaseColor, setDayBaseColor] = useState<DayBaseColor>('white');
   const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -95,6 +97,15 @@ export default function MastConfigPage() {
         }
       } catch {
         // non-fatal — night mode just stays at the default
+      }
+      try {
+        const dcRes = await fetch('/api/mast/day-base-color', { cache: 'no-store' });
+        if (dcRes.ok) {
+          const dcBody = (await dcRes.json()) as { ok: boolean; dayBaseColor: DayBaseColor };
+          if (dcBody.ok) setDayBaseColor(dcBody.dayBaseColor);
+        }
+      } catch {
+        // non-fatal — day base colour stays at the default
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -153,6 +164,15 @@ export default function MastConfigPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nightMode: on }),
+    });
+  };
+
+  const onDayBaseColorChange = (color: DayBaseColor): void => {
+    setDayBaseColor(color);
+    void fetch('/api/mast/day-base-color', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dayBaseColor: color }),
     });
   };
 
@@ -274,6 +294,30 @@ export default function MastConfigPage() {
         </label>
         <p className="text-xs text-slate-400">
           Forces the mast display's red-on-black night theme on/off. Persists across reboots.
+        </p>
+      </section>
+
+      <section className="border border-slate-700 rounded-md p-4 space-y-2">
+        <div className="text-sm font-medium">Day base colour</div>
+        <div className="flex flex-wrap gap-2">
+          {DAY_BASE_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onDayBaseColorChange(c)}
+              aria-label={c}
+              aria-pressed={dayBaseColor === c}
+              title={c}
+              className={`w-8 h-8 rounded-full border-2 ${
+                dayBaseColor === c ? 'border-slate-100' : 'border-slate-600'
+              }`}
+              style={{ backgroundColor: MAST_BASE_COLOR_HEX[c] }}
+            />
+          ))}
+        </div>
+        <p className="text-xs text-slate-400">
+          Day-mode colour for cell values (black background). Alarm thresholds still override;
+          night mode shows everything in red.
         </p>
       </section>
 
