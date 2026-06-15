@@ -1,10 +1,10 @@
 .mast-root {
-  --mast-bg: #ffffff;
-  --mast-fg: #0b0e14;
-  --mast-muted: #6b7280;
-  --mast-green: #15803d;
-  --mast-amber: #b45309;
-  --mast-red: #b91c1c;
+  --mast-bg: #000000;
+  --mast-fg: #ffffff;
+  --mast-muted: #9ca3af;
+  --mast-green: #4ade80;
+  --mast-amber: #f59e0b;
+  --mast-red: #ef4444;
   position: fixed;
   inset: 0;
   z-index: 51;

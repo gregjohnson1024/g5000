@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { MastLayout } from '@g5000/mast';
+import type { DayBaseColor, MastLayout } from '@g5000/mast';
 
 export interface UseMastControlResult {
   layout: MastLayout | null;
   override: string | null;
   connected: boolean;
   nightMode: boolean;
+  dayBaseColor: DayBaseColor;
 }
 
 /**
@@ -20,6 +21,7 @@ export function useMastControl(): UseMastControlResult {
   const [override, setOverride] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [nightMode, setNightMode] = useState(false);
+  const [dayBaseColor, setDayBaseColor] = useState<DayBaseColor>('white');
 
   useEffect(() => {
     const es = new EventSource('/api/mast/stream');
@@ -48,10 +50,17 @@ export function useMastControl(): UseMastControlResult {
         /* ignore malformed payloads */
       }
     });
+    es.addEventListener('daybasecolor', (ev) => {
+      try {
+        setDayBaseColor(JSON.parse((ev as MessageEvent).data) as DayBaseColor);
+      } catch {
+        /* ignore malformed payloads */
+      }
+    });
     return () => {
       es.close();
     };
   }, []);
 
-  return { layout, override, connected, nightMode };
+  return { layout, override, connected, nightMode, dayBaseColor };
 }

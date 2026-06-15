@@ -8,6 +8,7 @@ import { evaluateMode, selectActivePage } from '@g5000/mast';
 import { formatTile } from './format';
 import { Grid } from './Grid';
 import { Tile } from './Tile';
+import { MAST_BASE_COLOR_HEX } from './colors';
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
@@ -16,7 +17,7 @@ function scalar(s: JsonSafeSample | undefined): number | null {
 
 export default function MastPage() {
   const { channels, connected: dataConnected } = useSse();
-  const { layout, override, nightMode } = useMastControl();
+  const { layout, override, nightMode, dayBaseColor } = useMastControl();
   const engineRunning = useEngineState();
 
   if (!layout) {
@@ -38,7 +39,10 @@ export default function MastPage() {
   const now = Date.now();
 
   return (
-    <div className={`mast-root${night ? ' mast-night' : ''}`}>
+    <div
+      className={`mast-root${night ? ' mast-night' : ''}`}
+      style={night ? undefined : ({ ['--mast-fg']: MAST_BASE_COLOR_HEX[dayBaseColor] } as React.CSSProperties)}
+    >
       {!dataConnected && (
         <div
           className="absolute top-0 inset-x-0 text-center text-[3vh] py-[1vh] font-bold"
