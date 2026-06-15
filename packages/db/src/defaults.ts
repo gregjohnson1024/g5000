@@ -11,6 +11,7 @@
 import type { SourcePriorityRule, SourcePriorityConfig } from '@g5000/core';
 export type { SourcePriorityRule, SourcePriorityConfig };
 import type { Station } from '@g5000/tide';
+import type { DayBaseColor } from '@g5000/mast';
 
 export interface BoatConfig {
   /** Mast height above the masthead unit's measurement reference, meters. */
@@ -392,11 +393,14 @@ export interface DisplayConfig {
   brightnessPct: number;
   /** Force the mast display's red-on-black night theme on/off (manual). */
   nightMode: boolean;
+  /** Day-mode base colour for cell values (one of @g5000/mast DAY_BASE_COLORS). */
+  dayBaseColor: DayBaseColor;
 }
 
 export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   brightnessPct: 80,
   nightMode: false,
+  dayBaseColor: 'white',
 };
 
 export const DEFAULT_WARDROBE: SailWardrobe = {
