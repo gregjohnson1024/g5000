@@ -4,6 +4,7 @@ import {
   DEFAULT_MAST_LAYOUT,
   knownChannelSet,
   validateMastLayout,
+  type DayBaseColor,
   type MastLayout,
   type MastRuntime,
 } from '@g5000/mast';
@@ -101,6 +102,14 @@ export class MastService implements MastRuntime {
 
   getNightMode(): boolean {
     return this.configStore.getDisplayConfig().nightMode;
+  }
+
+  get dayBaseColor$(): Observable<DayBaseColor> {
+    return this.configStore.displayConfig$.pipe(map((c) => c.dayBaseColor));
+  }
+
+  getDayBaseColor(): DayBaseColor {
+    return this.configStore.getDisplayConfig().dayBaseColor;
   }
 
   async stop(): Promise<void> {

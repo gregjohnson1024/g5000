@@ -1,4 +1,5 @@
 import type { Observable } from 'rxjs';
+import type { DayBaseColor } from './colors.js';
 
 /** Number-tile grids for v1. 'fields+graph' is intentionally deferred. */
 export type GridKind = '1' | '2' | '3' | '4' | '6';
@@ -68,4 +69,6 @@ export interface MastRuntime {
   getBrightness(): number;
   readonly nightMode$: Observable<boolean>;
   getNightMode(): boolean;
+  readonly dayBaseColor$: Observable<DayBaseColor>;
+  getDayBaseColor(): DayBaseColor;
 }
