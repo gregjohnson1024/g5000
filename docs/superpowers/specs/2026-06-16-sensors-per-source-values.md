@@ -57,9 +57,9 @@ Rules (first match wins):
 1. `parseN2kSource(source)` is non-null **and** `devices.get(src)` exists with `manufacturerName` and/or `modelId` →
    `"<manufacturerName> <modelId> (0x<srcHex>)"`, omitting whichever of manufacturer/model is absent
    (e.g. `"Garmin gWind (0x11)"`, or `"Garmin (0x11)"` if only manufacturer, or `"gWind (0x11)"` if only model).
-2. `parseN2kSource(source)` non-null and a device row exists but has no product info →
-   `"<deviceFunctionName ?? 'Device'> (0x<srcHex>)"` (e.g. `"Wind (0x15)"`).
-3. Otherwise (no device row, or `parseN2kSource` returns null, or a `computed:` tag) → `friendlySourceLabel(source)`.
+2. `parseN2kSource(source)` non-null and a device row exists with a `deviceFunctionName` (but no manufacturer/model) →
+   `"<deviceFunctionName> (0x<srcHex>)"` (e.g. `"Wind (0x15)"`).
+3. Otherwise (no device row; a device row carrying no manufacturer/model/function; `parseN2kSource` returns null; or a `computed:` tag) → `friendlySourceLabel(source)` (e.g. `"Wind · 0x15"`, `"computed: true wind"`). The PGN-derived `friendlySourceLabel` is more informative than a generic placeholder, so an empty device row falls here rather than printing `"Device (…)"`.
 
 Pure and decoupled: takes a minimal `DeviceLabelInfo` map, no `@g5000/bridge` import. (`page.tsx` maps the `/api/devices` JSON into this map.)
 
