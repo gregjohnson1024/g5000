@@ -1,20 +1,18 @@
 'use client';
+import type { SourcePriorityRule } from '@g5000/core';
 import { formatChannelValue } from '../../lib/friendly-source';
 import { deviceLabel, type DeviceLabelInfo } from '../../lib/device-label';
+import { pinnedSourceForChannel, setPinnedSource } from '../../lib/source-pin';
 import { groupSourcesByChannel } from './group-sources';
 import { freshnessOf, type Freshness } from './freshness';
 import type { SensorDef } from './sensor-definitions';
-import {
-  SourcePriorityEditor,
-  type ObservedEntry,
-  type SourcePriorityRule,
-} from './SourcePriorityEditor';
+import type { ObservedEntry } from './sensors-types';
 
 interface SensorCardProps {
   def: SensorDef;
   /** Observed entries for any channel (the card filters to its own). */
   observed: ObservedEntry[];
-  /** Full priority-rules config (the editor filters to its own channels). */
+  /** Full source-priority config (the card reads/writes its own channels). */
   rules: SourcePriorityRule[];
   /** N2K device registry keyed by source address, for friendly source names. */
   devices: Map<number, DeviceLabelInfo>;
@@ -29,25 +27,29 @@ const DOT_COLOR: Record<Freshness, string> = {
 };
 
 /**
- * One sensor's card on /sensors. Shows, per channel, the freshest value as a
- * headline plus a per-source breakdown (each source's own value + age), so
- * competing/disagreeing broadcasters are visible. The freshness dot tracks the
- * most-recent sample across this sensor's channels.
+ * One sensor's card on /sensors. Per channel: a headline value plus a radio
+ * group — `Auto` (most recent) or a single pinned source. Pinning writes a
+ * one-entry source-priority rule so the whole app uses only that source (no
+ * failover); `Auto` removes the rule. A pinned source that has gone stale
+ * stays listed (with `—`) so it remains selectable.
  */
 export function SensorCard({ def, observed, rules, devices, saving, onSaveRules }: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
 
-  // Freshest entry per channel for the headline value.
+  // Freshest entry per channel for the Auto headline.
   const latestByChannel = new Map<string, ObservedEntry>();
   for (const e of own) {
     const prev = latestByChannel.get(e.channel);
     if (!prev || e.ageMs < prev.ageMs) latestByChannel.set(e.channel, e);
   }
 
-  // All sources per channel for the breakdown.
   const bySource = groupSourcesByChannel(own);
+
+  const setPin = (channel: string, source: string | null): void => {
+    void onSaveRules(setPinnedSource(rules, channel, source));
+  };
 
   return (
     <section className="border border-slate-800 rounded bg-slate-900/40 p-4 space-y-3">
@@ -61,13 +63,32 @@ export function SensorCard({ def, observed, rules, devices, saving, onSaveRules 
         </h2>
       </header>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {def.channels.map((ch, i) => {
-          const headline = latestByChannel.get(ch);
-          const value = headline ? formatChannelValue(headline.lastValue) : '—';
-          const sources = bySource.get(ch) ?? [];
+          const pinned = pinnedSourceForChannel(rules, ch);
+          const observedForCh = bySource.get(ch) ?? [];
+
+          // Rows: every observed source, plus the pinned source if it isn't
+          // currently observed (kept visible so it stays selectable).
+          const rows: { source: string; entry: ObservedEntry | null }[] = observedForCh.map(
+            (e) => ({ source: e.source, entry: e }),
+          );
+          if (pinned && !observedForCh.some((e) => e.source === pinned)) {
+            rows.push({ source: pinned, entry: null });
+          }
+
+          // Headline reflects the choice.
+          let headlineValue: string;
+          if (pinned) {
+            const pe = observedForCh.find((e) => e.source === pinned);
+            headlineValue = pe ? formatChannelValue(pe.lastValue) : '—';
+          } else {
+            const fresh = latestByChannel.get(ch);
+            headlineValue = fresh ? formatChannelValue(fresh.lastValue) : '—';
+          }
+
           return (
-            <div key={ch} className="space-y-0.5">
+            <div key={ch} className="space-y-1">
               <div
                 className={
                   'flex items-baseline justify-between gap-3 ' +
@@ -75,23 +96,47 @@ export function SensorCard({ def, observed, rules, devices, saving, onSaveRules 
                 }
               >
                 <span className="font-mono text-xs text-slate-500">{ch}</span>
-                <span className="tabular-nums">{value}</span>
+                <span className="tabular-nums">{headlineValue}</span>
               </div>
-              {sources.length === 0 ? (
-                <div className="text-xs text-slate-500 pl-3">No source observed.</div>
-              ) : (
-                <ul className="text-xs text-slate-400 pl-3 space-y-0.5">
-                  {sources.map((e) => (
-                    <li key={e.source} className="flex items-baseline justify-between gap-3">
-                      <span className="truncate">{deviceLabel(e.source, devices)}</span>
-                      <span className="tabular-nums whitespace-nowrap">
-                        <span className="text-slate-300">{formatChannelValue(e.lastValue)}</span>
-                        <span className="text-slate-600"> · {(e.ageMs / 1000).toFixed(1)}s</span>
+
+              <div className="pl-3 space-y-0.5 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-400">
+                  <input
+                    type="radio"
+                    name={`pin-${ch}`}
+                    checked={pinned === null}
+                    onChange={() => setPin(ch, null)}
+                    disabled={saving}
+                  />
+                  <span>Auto — most recent</span>
+                </label>
+                {rows.length === 0 ? (
+                  <div className="text-slate-500 pl-6">No source observed.</div>
+                ) : (
+                  rows.map(({ source, entry }) => (
+                    <label key={source} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`pin-${ch}`}
+                        checked={pinned === source}
+                        onChange={() => setPin(ch, source)}
+                        disabled={saving}
+                      />
+                      <span className="truncate flex-1 text-slate-300">
+                        {deviceLabel(source, devices)}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      <span className="tabular-nums whitespace-nowrap">
+                        <span className="text-slate-300">
+                          {entry ? formatChannelValue(entry.lastValue) : '—'}
+                        </span>
+                        {entry && (
+                          <span className="text-slate-600"> · {(entry.ageMs / 1000).toFixed(1)}s</span>
+                        )}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
           );
         })}
@@ -118,22 +163,6 @@ export function SensorCard({ def, observed, rules, devices, saving, onSaveRules 
           </a>
         </div>
       )}
-
-      <details className="text-sm">
-        <summary className="cursor-pointer text-slate-400 hover:text-slate-200 select-none">
-          Source priorities ({def.channels.length} channel{def.channels.length === 1 ? '' : 's'})
-        </summary>
-        <div className="mt-2">
-          <SourcePriorityEditor
-            channels={def.channels}
-            rules={rules}
-            observed={observed}
-            devices={devices}
-            saving={saving}
-            onSave={onSaveRules}
-          />
-        </div>
-      </details>
     </section>
   );
 }
