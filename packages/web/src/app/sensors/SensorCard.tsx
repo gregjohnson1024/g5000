@@ -1,5 +1,7 @@
 'use client';
-import { friendlySourceLabel, formatChannelValue } from '../../lib/friendly-source';
+import { formatChannelValue } from '../../lib/friendly-source';
+import { deviceLabel, type DeviceLabelInfo } from '../../lib/device-label';
+import { groupSourcesByChannel } from './group-sources';
 import { freshnessOf, type Freshness } from './freshness';
 import type { SensorDef } from './sensor-definitions';
 import {
@@ -14,6 +16,8 @@ interface SensorCardProps {
   observed: ObservedEntry[];
   /** Full priority-rules config (the editor filters to its own channels). */
   rules: SourcePriorityRule[];
+  /** N2K device registry keyed by source address, for friendly source names. */
+  devices: Map<number, DeviceLabelInfo>;
   saving: boolean;
   onSaveRules: (next: SourcePriorityRule[]) => Promise<void>;
 }
@@ -25,24 +29,25 @@ const DOT_COLOR: Record<Freshness, string> = {
 };
 
 /**
- * One sensor's card on /sensors. Reads observed entries + rules from props
- * and slices to its own channels. The freshness dot tracks the most-recent
- * sample across this sensor's channels.
+ * One sensor's card on /sensors. Shows, per channel, the freshest value as a
+ * headline plus a per-source breakdown (each source's own value + age), so
+ * competing/disagreeing broadcasters are visible. The freshness dot tracks the
+ * most-recent sample across this sensor's channels.
  */
-export function SensorCard({ def, observed, rules, saving, onSaveRules }: SensorCardProps) {
+export function SensorCard({ def, observed, rules, devices, saving, onSaveRules }: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
 
-  // Pick the freshest entry per channel for the live-value display.
+  // Freshest entry per channel for the headline value.
   const latestByChannel = new Map<string, ObservedEntry>();
   for (const e of own) {
     const prev = latestByChannel.get(e.channel);
     if (!prev || e.ageMs < prev.ageMs) latestByChannel.set(e.channel, e);
   }
 
-  // Group source labels for the source line (one per unique source).
-  const sources = Array.from(new Set(own.map((e) => e.source))).sort();
+  // All sources per channel for the breakdown.
+  const bySource = groupSourcesByChannel(own);
 
   return (
     <section className="border border-slate-800 rounded bg-slate-900/40 p-4 space-y-3">
@@ -56,40 +61,40 @@ export function SensorCard({ def, observed, rules, saving, onSaveRules }: Sensor
         </h2>
       </header>
 
-      <div className="space-y-1">
+      <div className="space-y-2">
         {def.channels.map((ch, i) => {
-          const e = latestByChannel.get(ch);
-          const value = e ? formatChannelValue(e.lastValue) : '—';
+          const headline = latestByChannel.get(ch);
+          const value = headline ? formatChannelValue(headline.lastValue) : '—';
+          const sources = bySource.get(ch) ?? [];
           return (
-            <div
-              key={ch}
-              className={
-                'flex items-baseline justify-between gap-3 ' +
-                (i === 0 ? 'text-lg font-semibold text-slate-100' : 'text-sm text-slate-300')
-              }
-            >
-              <span className="font-mono text-xs text-slate-500">{ch}</span>
-              <span className="tabular-nums">{value}</span>
+            <div key={ch} className="space-y-0.5">
+              <div
+                className={
+                  'flex items-baseline justify-between gap-3 ' +
+                  (i === 0 ? 'text-lg font-semibold text-slate-100' : 'text-sm text-slate-300')
+                }
+              >
+                <span className="font-mono text-xs text-slate-500">{ch}</span>
+                <span className="tabular-nums">{value}</span>
+              </div>
+              {sources.length === 0 ? (
+                <div className="text-xs text-slate-500 pl-3">No source observed.</div>
+              ) : (
+                <ul className="text-xs text-slate-400 pl-3 space-y-0.5">
+                  {sources.map((e) => (
+                    <li key={e.source} className="flex items-baseline justify-between gap-3">
+                      <span className="truncate">{deviceLabel(e.source, devices)}</span>
+                      <span className="tabular-nums whitespace-nowrap">
+                        <span className="text-slate-300">{formatChannelValue(e.lastValue)}</span>
+                        <span className="text-slate-600"> · {(e.ageMs / 1000).toFixed(1)}s</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           );
         })}
-      </div>
-
-      <div className="text-xs text-slate-400">
-        {sources.length === 0 ? (
-          <span>No source observed.</span>
-        ) : (
-          <>
-            <span className="text-slate-500">Source: </span>
-            {sources.map((s) => friendlySourceLabel(s)).join(', ')}
-            {own.length > 0 && (
-              <>
-                <span className="text-slate-500"> · last update </span>
-                {(Math.min(...own.map((e) => e.ageMs)) / 1000).toFixed(1)} s ago
-              </>
-            )}
-          </>
-        )}
       </div>
 
       {def.usedBy.length > 0 && (
