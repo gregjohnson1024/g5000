@@ -128,6 +128,7 @@ export function SensorCard({ def, observed, rules, devices, saving, onSaveRules 
             channels={def.channels}
             rules={rules}
             observed={observed}
+            devices={devices}
             saving={saving}
             onSave={onSaveRules}
           />

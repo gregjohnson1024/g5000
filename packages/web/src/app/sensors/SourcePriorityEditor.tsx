@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { deviceLabel, type DeviceLabelInfo } from '../../lib/device-label';
 
 export interface SourcePriorityRule {
   channelPattern: string;
@@ -23,6 +24,8 @@ interface SourcePriorityEditorProps {
   channels: string[];
   rules: SourcePriorityRule[];
   observed: ObservedEntry[];
+  /** N2K device registry keyed by source address, for friendly source names. */
+  devices: Map<number, DeviceLabelInfo>;
   onSave: (next: SourcePriorityRule[]) => Promise<void>;
   saving: boolean;
 }
@@ -41,6 +44,7 @@ export function SourcePriorityEditor({
   channels,
   rules,
   observed,
+  devices,
   onSave,
   saving,
 }: SourcePriorityEditorProps) {
@@ -69,6 +73,7 @@ export function SourcePriorityEditor({
           ruleIdx={ownedRuleIdx(channel)}
           rule={ownedRuleIdx(channel) >= 0 ? (rules[ownedRuleIdx(channel)] ?? null) : null}
           knownSources={knownSourcesForChannel(channel)}
+          devices={devices}
           saving={saving}
           onCreate={() =>
             save((r) => [...r, { channelPattern: channel, sources: [], freshnessSeconds: 5 }])
@@ -94,6 +99,7 @@ interface ChannelRuleRowProps {
   ruleIdx: number;
   rule: SourcePriorityRule | null;
   knownSources: string[];
+  devices: Map<number, DeviceLabelInfo>;
   saving: boolean;
   onCreate: () => void;
   onUpdate: (next: SourcePriorityRule) => void;
@@ -104,6 +110,7 @@ function ChannelRuleRow({
   channel,
   rule,
   knownSources,
+  devices,
   saving,
   onCreate,
   onUpdate,
@@ -172,7 +179,9 @@ function ChannelRuleRow({
       {rule.sources.map((src, idx) => (
         <div key={src} className="flex items-center gap-1 text-sm">
           <span className="text-slate-500 text-xs w-4">{idx + 1}.</span>
-          <span className="font-mono text-slate-200 flex-1">{src}</span>
+          <span className="text-slate-200 flex-1 truncate" title={src}>
+            {deviceLabel(src, devices)}
+          </span>
           <button
             type="button"
             onClick={() => moveSource(idx, idx - 1)}
@@ -215,7 +224,7 @@ function ChannelRuleRow({
           </option>
           {availableForPicker.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {deviceLabel(s, devices)}
             </option>
           ))}
         </select>
