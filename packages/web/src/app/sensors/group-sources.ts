@@ -1,4 +1,4 @@
-import type { ObservedEntry } from './SourcePriorityEditor';
+import type { ObservedEntry } from './sensors-types';
 
 /**
  * Group observed entries by channel for the per-source breakdown on a sensor

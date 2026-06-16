@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { groupSourcesByChannel } from './group-sources';
-import type { ObservedEntry } from './SourcePriorityEditor';
+import type { ObservedEntry } from './sensors-types';
 
 const e = (channel: string, source: string): ObservedEntry => ({
   channel,
