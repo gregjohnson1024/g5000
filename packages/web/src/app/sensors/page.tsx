@@ -3,11 +3,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { SENSOR_DEFS } from './sensor-definitions';
 import { SensorCard } from './SensorCard';
 import type { ObservedEntry, SourcePriorityRule } from './SourcePriorityEditor';
+import type { DeviceLabelInfo } from '../../lib/device-label';
 
 interface ObservedResponse {
   entries: ObservedEntry[];
   windowMs: number;
 }
+
+interface DevicesResponse {
+  devices: Array<{
+    src: number;
+    manufacturerName?: string;
+    modelId?: string;
+    deviceFunctionName?: string;
+  }>;
+}
+
+const DEVICES_POLL_MS = 15000;
 
 const POLL_MS = 1000;
 
@@ -17,6 +29,7 @@ export default function SensorsPage() {
   const [rules, setRules] = useState<SourcePriorityRule[]>([]);
   const [rulesErr, setRulesErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [devices, setDevices] = useState<Map<number, DeviceLabelInfo>>(new Map());
 
   // Poll observed sources.
   useEffect(() => {
@@ -35,6 +48,38 @@ export default function SensorsPage() {
     };
     void tick();
     const id = window.setInterval(() => void tick(), POLL_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  // Load the N2K device registry (for friendly source names). Best-effort:
+  // on failure, source labels just fall back to PGN+address.
+  useEffect(() => {
+    let alive = true;
+    const load = async (): Promise<void> => {
+      try {
+        const res = await fetch('/api/devices', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`GET devices: ${res.status}`);
+        const body = (await res.json()) as DevicesResponse;
+        if (!alive) return;
+        const map = new Map<number, DeviceLabelInfo>();
+        for (const d of body.devices) {
+          map.set(d.src, {
+            src: d.src,
+            manufacturerName: d.manufacturerName,
+            modelId: d.modelId,
+            deviceFunctionName: d.deviceFunctionName,
+          });
+        }
+        setDevices(map);
+      } catch {
+        // Non-fatal — labels fall back to PGN+address.
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), DEVICES_POLL_MS);
     return () => {
       alive = false;
       window.clearInterval(id);
@@ -105,6 +150,7 @@ export default function SensorsPage() {
           def={def}
           observed={observed}
           rules={rules}
+          devices={devices}
           saving={saving}
           onSaveRules={onSaveRules}
         />
