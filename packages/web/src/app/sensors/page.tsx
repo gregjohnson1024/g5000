@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SENSOR_DEFS } from './sensor-definitions';
 import { SensorCard } from './SensorCard';
+import { AllChannels } from './AllChannels';
 import type { SourcePriorityRule } from '@g5000/core';
 import type { ObservedEntry } from './sensors-types';
 import type { DeviceLabelInfo } from '../../lib/device-label';
@@ -157,6 +158,14 @@ export default function SensorsPage() {
           onSaveRules={onSaveRules}
         />
       ))}
+
+      <AllChannels
+        observed={observed}
+        rules={rules}
+        devices={devices}
+        saving={saving}
+        onSaveRules={onSaveRules}
+      />
     </main>
   );
 }
