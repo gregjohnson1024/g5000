@@ -209,15 +209,25 @@ The `/mast` view and the `@g5000/mast` package are part of the normal build (add
 `packages/mast` to the `tsc -b` order above — same foot-gun class as the historical
 `grib` omission).
 
-**Layout edits do NOT require a rebuild or restart.** The git-tracked layout file
-`apps/g5000/mast-layout.json` is read from the working tree at runtime by a file
-watcher in MastService. To reconfigure: edit that JSON (e.g. with Claude Code),
-`git pull` on the Pi — the watcher validates and hot-loads it, pushing the new layout
-to the screen over SSE. An invalid edit is logged and the last good layout is kept.
-`tsc -b` / `next build` / `systemctl restart` are needed ONLY when the mast *code*
-(not the layout) changes. The layout path can be overridden with the `MAST_LAYOUT_PATH`
-environment variable (it defaults to `apps/g5000/mast-layout.json`, resolved relative to
-the app module, so it is independent of the process working directory).
+**Layout + display settings live in `ConfigStore`, not in a file.** `MastService`
+is a thin shell over `ConfigStore` (`apps/g5000/src/mast/service.ts`). The git-tracked
+`apps/g5000/mast-layout.json` is a **boot seed only**: `MastService.start()` writes it
+into `ConfigStore` *only if no layout is stored yet* (`getMastLayout() === null`). On
+every subsequent boot it logs `layout already in ConfigStore, skipping seed` and ignores
+the file. So once `config.db` has a layout, editing the JSON and `git pull`-ing on the Pi
+does **nothing** — the file watcher that used to hot-load it was removed in `d0ac078`.
+
+To reconfigure at runtime, use the **`/mast-config`** page (or `PUT /api/mast/layout`):
+it calls `ConfigStore.setMastLayout()`, which emits on `mastLayout$` and is pushed to the
+screen over the `/api/mast/stream` SSE — no rebuild or restart needed. The other display
+settings (brightness, night-mode, day-base-colour) live in the same store's
+`DisplayConfig` and are edited the same way (`/mast-config` → `POST /api/mast/{brightness,night-mode,day-base-color}`),
+also pushed over SSE. `tsc -b` / `next build` / `systemctl restart` are needed ONLY when
+the mast *code* changes.
+
+`MAST_LAYOUT_PATH` (default `apps/g5000/mast-layout.json`, resolved relative to the app
+module) overrides only the **seed** file path — it matters at first boot / against an empty
+`config.db`, not for live edits.
 
 ## When designing new features
 
