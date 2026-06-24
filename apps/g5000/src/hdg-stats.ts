@@ -1,6 +1,8 @@
 import {
   Channels,
   setSharedHdgStats,
+  subscribeSelected,
+  getSharedSourcePriority,
   type Bus,
   type Sample,
   type SharedHdgStats,
@@ -90,22 +92,37 @@ export function startHdgStats(
   };
 
   // Track magnetic variation so we can normalise Magnetic heading to True.
-  const unsubMagVar = bus.subscribe(Channels.Nav.MagVar, (s: Sample) => {
-    if (s.value.kind === 'scalar' && Number.isFinite(s.value.value)) {
-      lastMagVarRad = s.value.value;
-    }
-  });
+  const unsubMagVar = subscribeSelected(
+    bus,
+    Channels.Nav.MagVar,
+    getSharedSourcePriority,
+    (s: Sample) => {
+      if (s.value.kind === 'scalar' && Number.isFinite(s.value.value)) {
+        lastMagVarRad = s.value.value;
+      }
+    },
+  );
 
   // Prefer True heading if available. If only Magnetic comes in, fold in
   // the latest mag-var so the buffered values are still in True frame
   // (which matches the COG channel — so drift = COG_T − HDG_T is meaningful).
-  const unsubTrue = bus.subscribe(Channels.Boat.HeadingTrue, (s) => accept(s, false));
-  const unsubMag = bus.subscribe(Channels.Boat.HeadingMagnetic, (s) => {
-    // Only consume Magnetic if True hasn't arrived recently (in the last 5 s).
-    const now = Date.now();
-    const recentTrue = buf.some((e) => now - e.t < 5000);
-    if (!recentTrue) accept(s, true);
-  });
+  const unsubTrue = subscribeSelected(
+    bus,
+    Channels.Boat.HeadingTrue,
+    getSharedSourcePriority,
+    (s) => accept(s, false),
+  );
+  const unsubMag = subscribeSelected(
+    bus,
+    Channels.Boat.HeadingMagnetic,
+    getSharedSourcePriority,
+    (s) => {
+      // Only consume Magnetic if True hasn't arrived recently (in the last 5 s).
+      const now = Date.now();
+      const recentTrue = buf.some((e) => now - e.t < 5000);
+      if (!recentTrue) accept(s, true);
+    },
+  );
 
   return {
     stop(): void {

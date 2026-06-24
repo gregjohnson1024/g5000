@@ -1,3 +1,4 @@
+import { subscribeSelected, getSharedSourcePriority } from '@g5000/core';
 import type { Bus, AlarmsRegistry } from '@g5000/core';
 import type { AlarmsConfig } from '@g5000/db';
 
@@ -10,45 +11,50 @@ export function startLowBatteryPredicate(
 ): { dispose(): void } {
   let pendingFireTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const unsubscribe = bus.subscribe('electrical.battery.voltage', (sample) => {
-    const cfg = configRef.current;
-    if (!cfg.enabled[ID]) {
-      if (pendingFireTimer) {
-        clearTimeout(pendingFireTimer);
-        pendingFireTimer = null;
+  const unsubscribe = subscribeSelected(
+    bus,
+    'electrical.battery.voltage',
+    getSharedSourcePriority,
+    (sample) => {
+      const cfg = configRef.current;
+      if (!cfg.enabled[ID]) {
+        if (pendingFireTimer) {
+          clearTimeout(pendingFireTimer);
+          pendingFireTimer = null;
+        }
+        return;
       }
-      return;
-    }
-    if (sample.value.kind !== 'scalar') return;
-    const volts = sample.value.value;
-    if (!Number.isFinite(volts)) return;
+      if (sample.value.kind !== 'scalar') return;
+      const volts = sample.value.value;
+      if (!Number.isFinite(volts)) return;
 
-    const threshold = cfg.thresholds.lowBattery;
-    const holdMs = threshold.holdMs ?? 5000;
-    const thresholdV = threshold.thresholdV ?? 11.8;
+      const threshold = cfg.thresholds.lowBattery;
+      const holdMs = threshold.holdMs ?? 5000;
+      const thresholdV = threshold.thresholdV ?? 11.8;
 
-    if (volts < thresholdV) {
-      const current = registry.get(ID);
-      if (current && current.clearedAt === null) return;
-      if (pendingFireTimer) return;
-      pendingFireTimer = setTimeout(() => {
-        pendingFireTimer = null;
-        registry.fire({
-          id: ID,
-          severity: 'WARN',
-          label: 'Low Battery',
-          sticky: false,
-          context: { volts, thresholdV },
-        });
-      }, holdMs);
-    } else {
-      if (pendingFireTimer) {
-        clearTimeout(pendingFireTimer);
-        pendingFireTimer = null;
+      if (volts < thresholdV) {
+        const current = registry.get(ID);
+        if (current && current.clearedAt === null) return;
+        if (pendingFireTimer) return;
+        pendingFireTimer = setTimeout(() => {
+          pendingFireTimer = null;
+          registry.fire({
+            id: ID,
+            severity: 'WARN',
+            label: 'Low Battery',
+            sticky: false,
+            context: { volts, thresholdV },
+          });
+        }, holdMs);
+      } else {
+        if (pendingFireTimer) {
+          clearTimeout(pendingFireTimer);
+          pendingFireTimer = null;
+        }
+        registry.clear(ID);
       }
-      registry.clear(ID);
-    }
-  });
+    },
+  );
 
   return {
     dispose: () => {

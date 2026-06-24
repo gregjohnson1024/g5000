@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { Bus, Channels } from '@g5000/core';
+import { describe, it, expect, afterEach } from 'vitest';
+import {
+  Bus,
+  Channels,
+  setSharedSourcePriority,
+  _resetSharedSourcePriorityForTests,
+} from '@g5000/core';
 import type { PolarTable } from '@g5000/db';
 import { startPolarTargetsPredicate } from './polar-targets.js';
 
@@ -16,6 +21,10 @@ const POLAR: PolarTable = {
 };
 
 describe('startPolarTargetsPredicate', () => {
+  afterEach(() => {
+    _resetSharedSourcePriorityForTests();
+  });
+
   it('publishes targetSpeed / targetTwa / percentPolar when wind + bsp present', async () => {
     const bus = new Bus();
     const polarRef = { current: POLAR as PolarTable | null };
@@ -67,6 +76,55 @@ describe('startPolarTargetsPredicate', () => {
     });
     await new Promise((r) => setTimeout(r, 5));
     expect(published).toEqual([]);
+    dispose.dispose();
+  });
+
+  it('honours source priority on boat.speed.water (ignores non-winning source)', async () => {
+    // Rule: only `srcA` may feed boat.speed.water; srcB must be dropped.
+    setSharedSourcePriority([
+      { channelPattern: Channels.Boat.SpeedWater, sources: ['srcA'], freshnessSeconds: 60 },
+    ]);
+    const bus = new Bus();
+    const polarRef = { current: POLAR as PolarTable | null };
+    const dispose = startPolarTargetsPredicate(bus, polarRef);
+    const published: Record<string, number> = {};
+    bus.subscribe('race.**', (s) => {
+      if (s.value.kind === 'scalar') published[s.channel] = s.value.value;
+    });
+    const now = BigInt(Date.now()) * 1_000_000n;
+    bus.publish({
+      channel: Channels.Wind.TrueSpeed,
+      t_ns: now,
+      value: { kind: 'scalar', value: 8 },
+      source: 'test',
+    });
+    bus.publish({
+      channel: Channels.Wind.TrueAngle,
+      t_ns: now,
+      value: { kind: 'scalar', value: 0.7 },
+      source: 'test',
+    });
+    // Non-winning source: must NOT reach the predicate, so percentPolar stays unset.
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now,
+      value: { kind: 'scalar', value: 3 },
+      source: 'srcB',
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(published[Channels.Race.TargetSpeed]).toBeGreaterThan(0);
+    expect(published[Channels.Race.PercentPolar]).toBeUndefined();
+
+    // Winning source: now percentPolar is computed from srcA's bsp.
+    const targetSpeed = published[Channels.Race.TargetSpeed]!;
+    bus.publish({
+      channel: Channels.Boat.SpeedWater,
+      t_ns: now + 1n,
+      value: { kind: 'scalar', value: 3 },
+      source: 'srcA',
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(published[Channels.Race.PercentPolar]).toBeCloseTo((3 / targetSpeed) * 100, 5);
     dispose.dispose();
   });
 

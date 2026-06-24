@@ -1,6 +1,8 @@
 import {
   Channels,
   setSharedMotionStats,
+  subscribeSelected,
+  getSharedSourcePriority,
   type Bus,
   type Sample,
   type SharedMotionStats,
@@ -90,8 +92,12 @@ export function startMotionStats(
     if (drop > 0) buf.splice(0, drop);
   }
 
-  const unsubHeel = bus.subscribe(Channels.Motion.Heel, (s) => accept(heelBuf, s));
-  const unsubPitch = bus.subscribe(Channels.Motion.Pitch, (s) => accept(pitchBuf, s));
+  const unsubHeel = subscribeSelected(bus, Channels.Motion.Heel, getSharedSourcePriority, (s) =>
+    accept(heelBuf, s),
+  );
+  const unsubPitch = subscribeSelected(bus, Channels.Motion.Pitch, getSharedSourcePriority, (s) =>
+    accept(pitchBuf, s),
+  );
 
   return {
     stop(): void {

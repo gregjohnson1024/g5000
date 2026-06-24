@@ -1,4 +1,10 @@
-import { Bus, Channels, type RaceState } from '@g5000/core';
+import {
+  Bus,
+  Channels,
+  subscribeSelected,
+  getSharedSourcePriority,
+  type RaceState,
+} from '@g5000/core';
 import type { PolarTable } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { startPolarTargetsPredicate } from './polar-targets.js';
@@ -64,7 +70,7 @@ export function startRaceComputePipeline(
 
   // --- Input subscriptions (cache latest, recompute derived) ---
   unsubs.push(
-    bus.subscribe(Channels.Nav.Position, (s) => {
+    subscribeSelected(bus, Channels.Nav.Position, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'geo') {
         latest.pos = s.value.value;
         recomputeLineGeometry(s.t_ns);
@@ -74,7 +80,7 @@ export function startRaceComputePipeline(
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Nav.Cog, (s) => {
+    subscribeSelected(bus, Channels.Nav.Cog, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') {
         latest.cog = s.value.value;
         recomputeLineGeometry(s.t_ns);
@@ -84,7 +90,7 @@ export function startRaceComputePipeline(
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Nav.Sog, (s) => {
+    subscribeSelected(bus, Channels.Nav.Sog, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') {
         latest.sog = s.value.value;
         recomputeLineGeometry(s.t_ns);
@@ -132,7 +138,7 @@ export function startRaceComputePipeline(
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Boat.HeadingTrue, (s) => {
+    subscribeSelected(bus, Channels.Boat.HeadingTrue, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') latest.hdg = s.value.value;
     }),
   );

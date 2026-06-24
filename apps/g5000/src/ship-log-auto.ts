@@ -1,5 +1,5 @@
 import type { Bus } from '@g5000/core';
-import { Channels } from '@g5000/core';
+import { Channels, getSharedSourcePriority, subscribeSelected } from '@g5000/core';
 import { type ConfigStore, insertShipLogEntry, lastAutoEntryTsMs } from '@g5000/db';
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -50,24 +50,24 @@ export function startShipLogAuto(args: {
 
   const subs: Array<() => void> = [];
   subs.push(
-    bus.subscribe(Channels.Nav.Position, (s) => {
+    subscribeSelected(bus, Channels.Nav.Position, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'geo') {
         pos = { lat: s.value.value.lat, lon: s.value.value.lon, atMs: Date.now() };
       }
     }),
   );
   subs.push(
-    bus.subscribe(Channels.Nav.Cog, (s) => {
+    subscribeSelected(bus, Channels.Nav.Cog, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') cog = { value: s.value.value, atMs: Date.now() };
     }),
   );
   subs.push(
-    bus.subscribe(Channels.Nav.Sog, (s) => {
+    subscribeSelected(bus, Channels.Nav.Sog, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') sog = { value: s.value.value, atMs: Date.now() };
     }),
   );
   subs.push(
-    bus.subscribe(Channels.Boat.HeadingMagnetic, (s) => {
+    subscribeSelected(bus, Channels.Boat.HeadingMagnetic, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') hdg = { value: s.value.value, atMs: Date.now() };
     }),
   );

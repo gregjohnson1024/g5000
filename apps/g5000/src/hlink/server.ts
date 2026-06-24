@@ -1,7 +1,7 @@
 import net from 'node:net';
 import type { AddressInfo } from 'node:net';
 import type { Bus, Sample, ChannelValue } from '@g5000/core';
-import { createDamper } from '@g5000/core';
+import { createDamper, subscribeSelected, getSharedSourcePriority } from '@g5000/core';
 import { CHANNEL_TO_FUNCTIONS, FUNCTION_TABLE, hlinkFormat } from './function-table.js';
 import { formatP, formatV, parseHlinkLine } from './protocol.js';
 
@@ -94,7 +94,7 @@ export function startHlinkServer(opts: HlinkServerOptions): HlinkServerHandle {
   // One subscription, fan out to all clients on every sample. Cheaper
   // than N subscriptions when N grows; correct because each client filters
   // its own function set.
-  const unsubscribe = bus.subscribe('**', (sample: Sample) => {
+  const unsubscribe = subscribeSelected(bus, '**', getSharedSourcePriority, (sample: Sample) => {
     onSample(sample);
   });
 

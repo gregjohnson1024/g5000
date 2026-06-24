@@ -7,6 +7,7 @@ export * from './source-mode.js';
 export * from './log-stream.js';
 export * from './damping.js';
 export * from './selector.js';
+export * from './source-priority-shared.js';
 export * from './observed-sources.js';
 export * from './channel-history.js';
 export * from './ais-targets.js';

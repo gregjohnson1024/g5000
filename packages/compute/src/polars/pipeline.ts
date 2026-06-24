@@ -1,5 +1,5 @@
 import { firstValueFrom, type Subscription } from 'rxjs';
-import { Bus, type Sample } from '@g5000/core';
+import { Bus, getSharedSourcePriority, subscribeSelected, type Sample } from '@g5000/core';
 import type { ConfigStore, PolarTable } from '@g5000/db';
 import { interpolatePolarSpeed, optimalTwaForVmg, vmgFor } from './math.js';
 
@@ -54,18 +54,27 @@ export async function startPolarPipeline(opts: PolarPipelineOptions): Promise<()
     bus.publish(make('performance.target.twaDownwind', tDn, now_ns, 'rad'));
   }
 
-  const trackScalar = (channel: string, key: keyof LatestValues): void => {
+  // `selected` routes a SENSOR channel through the source-priority arbiter so
+  // only the current winner's samples drive the solve — boat.speed.water is
+  // multi-source on a real boat (multiple speed logs). Computed inputs
+  // (wind.true.*) stay on plain bus.subscribe; they have a single producer.
+  // No rule for the channel → subscribeSelected passes through (unchanged
+  // last-write-wins behaviour).
+  const trackScalar = (channel: string, key: keyof LatestValues, selected = false): void => {
+    const handler = (s: Sample): void => {
+      if (s.value.kind !== 'scalar') return;
+      latest[key] = { value: s.value.value, t_ns: s.t_ns };
+      recompute();
+    };
     subs.push(
-      bus.subscribe(channel, (s) => {
-        if (s.value.kind !== 'scalar') return;
-        latest[key] = { value: s.value.value, t_ns: s.t_ns };
-        recompute();
-      }),
+      selected
+        ? subscribeSelected(bus, channel, getSharedSourcePriority, handler)
+        : bus.subscribe(channel, handler),
     );
   };
   trackScalar('wind.true.speed', 'tws');
   trackScalar('wind.true.angle', 'twa');
-  trackScalar('boat.speed.water', 'bsp');
+  trackScalar('boat.speed.water', 'bsp', true);
 
   rxSubs.push(
     configStore.activePolar$.subscribe((next) => {

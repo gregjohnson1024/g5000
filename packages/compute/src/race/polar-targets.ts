@@ -1,4 +1,4 @@
-import { Bus, Channels } from '@g5000/core';
+import { Bus, Channels, subscribeSelected, getSharedSourcePriority } from '@g5000/core';
 import type { PolarTable } from '@g5000/db';
 import { interpolatePolarSpeed, optimalTwaForVmg } from '../polars/math.js';
 
@@ -62,7 +62,7 @@ export function startPolarTargetsPredicate(
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Boat.SpeedWater, (s) => {
+    subscribeSelected(bus, Channels.Boat.SpeedWater, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') {
         latest.bsp = s.value.value;
         tick(s.t_ns);

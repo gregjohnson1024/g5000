@@ -2,15 +2,20 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Bus, type Sample } from '@g5000/core';
+import {
+  Bus,
+  setSharedSourcePriority,
+  _resetSharedSourcePriorityForTests,
+  type Sample,
+} from '@g5000/core';
 import { ConfigStore, DEFAULT_POLARS } from '@g5000/db';
 import { startPolarPipeline } from './pipeline.js';
 
-const sample = (channel: string, value: number, t_ns = 1n): Sample => ({
+const sample = (channel: string, value: number, t_ns = 1n, source = 'test'): Sample => ({
   channel,
   t_ns,
   value: { kind: 'scalar', value },
-  source: 'test',
+  source,
 });
 
 describe('startPolarPipeline', () => {
@@ -37,6 +42,7 @@ describe('startPolarPipeline', () => {
     await stop();
     await store.close();
     rmSync(dir, { recursive: true, force: true });
+    _resetSharedSourcePriorityForTests();
   });
 
   it('publishes performance.target.{boatSpeed,vmg,twaUpwind,twaDownwind} when all inputs are present', async () => {
@@ -116,6 +122,37 @@ describe('startPolarPipeline', () => {
     bus.publish(sample('boat.speed.water', 5.01, now2));
     await new Promise((r) => setTimeout(r, 30));
     expect(received.length).toBeGreaterThan(initial);
+  });
+
+  it('honours source priority on boat.speed.water (the SENSOR input)', async () => {
+    // Pin boat.speed.water to srcA. boat.speed.water is multi-source on a real
+    // boat (multiple speed logs); samples from any other source must not drive
+    // the solve.
+    setSharedSourcePriority([
+      { channelPattern: 'boat.speed.water', sources: ['srcA'], freshnessSeconds: 60 },
+    ]);
+
+    const now = BigInt(Date.now()) * 1_000_000n;
+    bus.publish(sample('wind.true.speed', 8, now));
+    bus.publish(sample('wind.true.angle', Math.PI / 4, now));
+    // Winner establishes BSP and the pipeline fires.
+    bus.publish(sample('boat.speed.water', 5, now, 'srcA'));
+    await new Promise((r) => setTimeout(r, 30));
+
+    const afterWinner = received.length;
+    expect(afterWinner).toBeGreaterThan(0);
+
+    // A sample from a NON-winning source must not trigger a recompute.
+    const now2 = BigInt(Date.now()) * 1_000_000n;
+    bus.publish(sample('boat.speed.water', 9, now2, 'srcB'));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(received.length).toBe(afterWinner);
+
+    // ...but a fresh sample from the winning source does.
+    const now3 = BigInt(Date.now()) * 1_000_000n;
+    bus.publish(sample('boat.speed.water', 5.5, now3, 'srcA'));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(received.length).toBeGreaterThan(afterWinner);
   });
 });
 

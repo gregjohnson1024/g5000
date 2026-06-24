@@ -2,7 +2,12 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { mkdir } from 'node:fs/promises';
-import { getSharedBus, createAlarmsRegistry, setSharedAlarms } from '@g5000/core';
+import {
+  getSharedBus,
+  createAlarmsRegistry,
+  setSharedAlarms,
+  setSharedSourcePriority,
+} from '@g5000/core';
 import { ConfigStore, setSharedConfigStore, loadAlarmsConfig, type AlarmsConfig } from '@g5000/db';
 import { MastService } from './mast/service.js';
 import { setSharedMastRuntime } from '@g5000/mast';
@@ -63,6 +68,14 @@ async function main(): Promise<void> {
   const store = await ConfigStore.open(CONFIG_DB_PATH);
   setSharedConfigStore(store);
   teardown.push(() => store.close());
+  // Publish source-priority rules into the process-wide holder so every compute
+  // pipeline can arbitrate multi-source channels via subscribeSelected without
+  // holding a ConfigStore handle. Wired before any pipeline starts so the first
+  // samples are already arbitrated.
+  const sourcePrioritySub = store.sourcePriority$.subscribe((rules) => {
+    setSharedSourcePriority(rules);
+  });
+  teardown.push(async () => sourcePrioritySub.unsubscribe());
   const mastLayoutPath =
     process.env.MAST_LAYOUT_PATH ?? fileURLToPath(new URL('../mast-layout.json', import.meta.url));
   const mast = await MastService.start(store, mastLayoutPath);

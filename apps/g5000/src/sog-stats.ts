@@ -1,6 +1,8 @@
 import {
   Channels,
+  getSharedSourcePriority,
   setSharedSogStats,
+  subscribeSelected,
   type Bus,
   type Sample,
   type SharedSogStats,
@@ -63,7 +65,7 @@ export function startSogStats(
   };
   setSharedSogStats(shared);
 
-  const unsub = bus.subscribe(Channels.Nav.Sog, (s: Sample) => {
+  const unsub = subscribeSelected(bus, Channels.Nav.Sog, getSharedSourcePriority, (s: Sample) => {
     if (s.value.kind !== 'scalar') return;
     const v = s.value.value;
     if (!Number.isFinite(v)) return;

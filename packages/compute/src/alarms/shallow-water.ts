@@ -1,3 +1,4 @@
+import { subscribeSelected, getSharedSourcePriority } from '@g5000/core';
 import type { Bus, AlarmsRegistry } from '@g5000/core';
 import type { AlarmsConfig } from '@g5000/db';
 
@@ -10,7 +11,7 @@ export function startShallowWaterPredicate(
 ): { dispose(): void } {
   let pendingFireTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const unsubscribe = bus.subscribe('nav.depth', (sample) => {
+  const unsubscribe = subscribeSelected(bus, 'nav.depth', getSharedSourcePriority, (sample) => {
     const cfg = configRef.current;
     if (!cfg.enabled[ID]) {
       if (pendingFireTimer) {

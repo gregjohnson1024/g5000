@@ -1,4 +1,4 @@
-import { Bus, Channels } from '@g5000/core';
+import { Bus, Channels, subscribeSelected, getSharedSourcePriority } from '@g5000/core';
 import type { GrooveSettings } from '@g5000/db';
 import { classifyPointOfSail, type PointOfSail } from './point-of-sail.js';
 import { isInGroove, vmgEfficiencyPct, vmgMs, targetTwaErrorRad } from './metrics.js';
@@ -43,7 +43,10 @@ interface Latest {
   apModeT_ns?: bigint;
 }
 
-export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettingsRef): GroovePipelineHandle {
+export function startGrooveComputePipeline(
+  bus: Bus,
+  settingsRef: GrooveSettingsRef,
+): GroovePipelineHandle {
   const latest: Latest = {};
   const inGrooveBuf: FlagSample[] = [];
   const twaBuf: NumSample[] = [];
@@ -74,7 +77,11 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     pruneInPlace(rudderBuf, cutoff);
 
     let helmSource: 'human' | 'autopilot' = 'human';
-    if (latest.apMode !== undefined && latest.apModeT_ns !== undefined && isApEngaged(latest.apMode)) {
+    if (
+      latest.apMode !== undefined &&
+      latest.apModeT_ns !== undefined &&
+      isApEngaged(latest.apMode)
+    ) {
       const apAgeS = Number(t_ns - latest.apModeT_ns) / 1e9;
       if (apAgeS >= 0 && apAgeS <= s.helmSourceTtlSec) helmSource = 'autopilot';
     }
@@ -108,14 +115,20 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     });
     publishEnum(Channels.Groove.PointOfSail, pos, t_ns);
 
-    if (pos === 'not-sailing' || latest.targetSpeed === undefined || latest.targetTwa === undefined || latest.targetSpeed <= 0) {
+    if (
+      pos === 'not-sailing' ||
+      latest.targetSpeed === undefined ||
+      latest.targetTwa === undefined ||
+      latest.targetSpeed <= 0
+    ) {
       inGrooveBuf.length = 0;
       twaBuf.length = 0;
       bspBuf.length = 0;
       return;
     }
 
-    const tolerance = s.twaToleranceDeg * DEG * (pos === 'downwind' ? s.downwindToleranceFactor : 1);
+    const tolerance =
+      s.twaToleranceDeg * DEG * (pos === 'downwind' ? s.downwindToleranceFactor : 1);
 
     const flag = isInGroove({
       pointOfSail: pos,
@@ -143,7 +156,12 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     if (eff !== null) publishScalar(Channels.Groove.VmgEfficiency, eff, t_ns, '%');
 
     publishScalar(Channels.Groove.Vmg, vmgMs(latest.bsp, latest.twa), t_ns, 'm/s');
-    publishScalar(Channels.Groove.TargetTwaError, targetTwaErrorRad(twaAbs, latest.targetTwa), t_ns, 'rad');
+    publishScalar(
+      Channels.Groove.TargetTwaError,
+      targetTwaErrorRad(twaAbs, latest.targetTwa),
+      t_ns,
+      'rad',
+    );
 
     twaBuf.push({ t_ns, value: latest.twa });
     const sd = circularStdDev(twaBuf.map((x) => x.value));
@@ -171,7 +189,7 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Boat.SpeedWater, (s) => {
+    subscribeSelected(bus, Channels.Boat.SpeedWater, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') {
         latest.bsp = s.value.value;
         bspBuf.push({ t_ns: s.t_ns, value: s.value.value });
@@ -190,7 +208,7 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Boat.RudderAngle, (s) => {
+    subscribeSelected(bus, Channels.Boat.RudderAngle, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') {
         latest.rudder = s.value.value;
         rudderBuf.push({ t_ns: s.t_ns, value: s.value.value });
@@ -198,7 +216,7 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     }),
   );
   unsubs.push(
-    bus.subscribe(Channels.Motion.Heel, (s) => {
+    subscribeSelected(bus, Channels.Motion.Heel, getSharedSourcePriority, (s) => {
       if (s.value.kind === 'scalar') latest.heel = s.value.value;
     }),
   );

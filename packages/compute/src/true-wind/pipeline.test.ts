@@ -3,7 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { firstValueFrom } from 'rxjs';
-import { Bus, Channels, type Sample } from '@g5000/core';
+import {
+  Bus,
+  Channels,
+  setSharedSourcePriority,
+  _resetSharedSourcePriorityForTests,
+  type Sample,
+} from '@g5000/core';
 import { ConfigStore } from '@g5000/db';
 import { startTrueWindPipeline } from './pipeline.js';
 
@@ -39,6 +45,7 @@ describe('startTrueWindPipeline', () => {
     await stop();
     await store.close();
     rmSync(dir, { recursive: true, force: true });
+    _resetSharedSourcePriorityForTests();
   });
 
   it('publishes wind.true.{angle,speed,direction} when all inputs are present', async () => {
@@ -89,15 +96,13 @@ describe('startTrueWindPipeline', () => {
   it('honors source-priority: a non-winning heading source does not move computed TWD', async () => {
     // Pin heading to source A (Precision-9); a divergent source B (ZG100, ~65°
     // away) must be dropped by the solve instead of flipping the result.
-    await store.setSourcePriority([
+    setSharedSourcePriority([
       {
         channelPattern: Channels.Boat.HeadingMagnetic,
         sources: ['n2k:127250@0x11'],
         freshnessSeconds: 60,
       },
     ]);
-    // Let the pipeline's sourcePriority$ subscription pick up the new rule.
-    await new Promise((r) => setTimeout(r, 20));
 
     const now = BigInt(Date.now()) * 1_000_000n;
     const s = (channel: string, value: number, source: string): Sample => ({
