@@ -86,6 +86,44 @@ describe('startTrueWindPipeline', () => {
     expect(received.length).toBeGreaterThan(initialCount);
   });
 
+  it('honors source-priority: a non-winning heading source does not move computed TWD', async () => {
+    // Pin heading to source A (Precision-9); a divergent source B (ZG100, ~65°
+    // away) must be dropped by the solve instead of flipping the result.
+    await store.setSourcePriority([
+      {
+        channelPattern: Channels.Boat.HeadingMagnetic,
+        sources: ['n2k:127250@0x11'],
+        freshnessSeconds: 60,
+      },
+    ]);
+    // Let the pipeline's sourcePriority$ subscription pick up the new rule.
+    await new Promise((r) => setTimeout(r, 20));
+
+    const now = BigInt(Date.now()) * 1_000_000n;
+    const s = (channel: string, value: number, source: string): Sample => ({
+      channel,
+      t_ns: now,
+      value: { kind: 'scalar', value },
+      source,
+    });
+
+    // Steady apparent + speed (no rule for these → passthrough), plus heading
+    // from the PINNED source → a TWD is produced.
+    bus.publish(s(Channels.Wind.ApparentSpeed, 5, 'test'));
+    bus.publish(s(Channels.Wind.ApparentAngle, 0, 'test'));
+    bus.publish(s(Channels.Boat.SpeedWater, 3, 'test'));
+    bus.publish(s(Channels.Boat.HeadingMagnetic, 0, 'n2k:127250@0x11'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(received.some((x) => x.channel === 'wind.true.direction')).toBe(true);
+
+    // A divergent heading from the NON-winning source must be dropped → no new
+    // TWD recompute. (Pre-fix, raw bus.subscribe would have flipped TWD here.)
+    received.length = 0;
+    bus.publish(s(Channels.Boat.HeadingMagnetic, 1.13, 'n2k:127250@0x80'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(received.filter((x) => x.channel === 'wind.true.direction')).toHaveLength(0);
+  });
+
   it('drops a tick when an input is older than the staleness threshold', async () => {
     // Stop the pipeline started in beforeEach and start a new one with a
     // tight 100ms staleness window.

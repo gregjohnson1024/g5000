@@ -1,5 +1,11 @@
 import { combineLatest, firstValueFrom, type Subscription } from 'rxjs';
-import { Bus, Channels, type Sample } from '@g5000/core';
+import {
+  Bus,
+  Channels,
+  subscribeSelected,
+  type Sample,
+  type SourcePriorityConfig,
+} from '@g5000/core';
 import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@g5000/db';
 import { computeTrueWind } from './math.js';
 
@@ -42,6 +48,21 @@ export async function startTrueWindPipeline(
     compassDeviation: await firstValueFrom(configStore.compassDeviation$),
   };
 
+  // Source-priority arbitration for the input channels. Several inputs are
+  // multi-source on a real boat — two compasses on boat.heading.magnetic (which
+  // can sit ~65° apart), the raw masthead plus the H5000-corrected apparent,
+  // and multiple speed logs. Without arbitration the pipeline took last-write-
+  // wins across sources, so the computed wind (TWD especially) ping-ponged
+  // between them. Route every input through subscribeSelected so the same
+  // source-priority pins the helm/display path honours also govern the solve.
+  // No rule for a channel → passthrough (unchanged single-source behaviour).
+  let sourceRules: SourcePriorityConfig = await firstValueFrom(configStore.sourcePriority$);
+  rxSubs.push(
+    configStore.sourcePriority$.subscribe((r) => {
+      sourceRules = r;
+    }),
+  );
+
   function recompute(): void {
     if (!latest.aws || !latest.awa || !latest.bsp || !latest.hdg) return;
     const now_ns = BigInt(Date.now()) * 1_000_000n;
@@ -72,11 +93,16 @@ export async function startTrueWindPipeline(
 
   const trackScalar = (channel: string, key: keyof LatestValues): void => {
     subs.push(
-      bus.subscribe(channel, (s) => {
-        if (s.value.kind !== 'scalar') return;
-        latest[key] = { value: s.value.value, t_ns: s.t_ns };
-        recompute();
-      }),
+      subscribeSelected(
+        bus,
+        channel,
+        () => sourceRules,
+        (s) => {
+          if (s.value.kind !== 'scalar') return;
+          latest[key] = { value: s.value.value, t_ns: s.t_ns };
+          recompute();
+        },
+      ),
     );
   };
   trackScalar(Channels.Wind.ApparentSpeed, 'aws');
