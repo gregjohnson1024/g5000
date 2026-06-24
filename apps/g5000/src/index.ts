@@ -17,6 +17,7 @@ import { startShipLogAuto } from './ship-log-auto.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { installObservedSourcesTracker } from './observed-sources.js';
+import { installChannelHistoryTracker } from './channel-history.js';
 import { startWatchdog } from './sd-notify.js';
 import { wireAlarmsHistory } from './alarms-history.js';
 import { createLiveFactory, createDemoFactory, type BaseTeardownHolder } from './live-factory.js';
@@ -46,6 +47,13 @@ async function main(): Promise<void> {
   // publishers. Installed before any source so we don't miss early samples.
   const observed = installObservedSourcesTracker(bus);
   teardown.push(async () => observed.teardown());
+
+  // Channel-history tracker — keeps a rolling, per-(channel, source) ring of
+  // raw undamped scalars for the seven wind-diagnostic channels, so the UI can
+  // compare every source feeding each channel and spot a jumpy true-wind
+  // direction. Installed early, alongside observed-sources, to catch all samples.
+  const history = installChannelHistoryTracker(bus);
+  teardown.push(async () => history.teardown());
 
   // 0. Open ConfigStore so any code path (web routes, compute pipeline) can
   //    resolve it. This must precede driver setup — even if drivers fail,

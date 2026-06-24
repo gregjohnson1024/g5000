@@ -29,6 +29,7 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/tracks', label: 'Tracks' },
   { href: '/log', label: 'Log' },
   { href: '/autopilot', label: 'Autopilot' },
+  { href: '/wind-diag', label: 'Wind Dx' },
 ];
 
 const ALERTS_HREF = '/alerts';
