@@ -19,6 +19,8 @@ describe('buildColorLut', () => {
 
   it('defaults unmapped indices to opaque red', () => {
     const lut = buildColorLut({ pixels: [{ color: '#00000000', type: 'normal' }] });
-    expect([lut[255 * 4], lut[255 * 4 + 1], lut[255 * 4 + 2], lut[255 * 4 + 3]]).toEqual([255, 0, 0, 255]);
+    expect([lut[255 * 4], lut[255 * 4 + 1], lut[255 * 4 + 2], lut[255 * 4 + 3]]).toEqual([
+      255, 0, 0, 255,
+    ]);
   });
 });

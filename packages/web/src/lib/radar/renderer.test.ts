@@ -7,22 +7,31 @@ function fakeCtx(size: number) {
   return {
     canvas: { width: size, height: size },
     fillStyle: '' as string,
-    set _s(v: string) { /* noop */ },
+    set _s(v: string) {
+      /* noop */
+    },
     clearRect() {},
-    fillRect(x: number, y: number) { fills.push({ x, y, style: (this as any).fillStyle }); },
+    fillRect(x: number, y: number) {
+      fills.push({ x, y, style: (this as any).fillStyle });
+    },
     _fills: fills,
   } as unknown as CanvasRenderingContext2D & { _fills: typeof fills };
 }
 
 const caps: Capabilities = {
-  spokesPerRevolution: 2048, maxSpokeLength: 4, maxRange: 1000, minRange: 50,
+  spokesPerRevolution: 2048,
+  maxSpokeLength: 4,
+  maxRange: 1000,
+  minRange: 50,
   supportedRanges: [1000],
-  legend: { pixels: [
-    { color: '#00000000', type: 'normal' }, // 0 transparent
-    { color: '#0000ffff', type: 'normal' }, // 1 blue
-    { color: '#00ff00ff', type: 'normal' }, // 2 green
-    { color: '#ff0000ff', type: 'normal' }, // 3 red
-  ] },
+  legend: {
+    pixels: [
+      { color: '#00000000', type: 'normal' }, // 0 transparent
+      { color: '#0000ffff', type: 'normal' }, // 1 blue
+      { color: '#00ff00ff', type: 'normal' }, // 2 green
+      { color: '#ff0000ff', type: 'normal' }, // 3 red
+    ],
+  },
 };
 
 describe('RadarCanvas', () => {

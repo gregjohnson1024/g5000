@@ -27,7 +27,10 @@ describe('ConfigStore radarConfig', () => {
 
   it('round-trips radar config', async () => {
     store.setRadarConfig({ mayaraBaseUrl: 'http://pi:6502', defaultRangeM: 4000 });
-    expect(store.getRadarConfig()).toEqual({ mayaraBaseUrl: 'http://pi:6502', defaultRangeM: 4000 });
+    expect(store.getRadarConfig()).toEqual({
+      mayaraBaseUrl: 'http://pi:6502',
+      defaultRangeM: 4000,
+    });
   });
 
   it('emits the new value on radarConfig$ when setRadarConfig is called', async () => {
@@ -41,7 +44,10 @@ describe('ConfigStore radarConfig', () => {
     store.setRadarConfig({ mayaraBaseUrl: 'http://pi:6502', defaultRangeM: 2000 });
     await store.close();
     store = await ConfigStore.open(dbPath);
-    expect(store.getRadarConfig()).toEqual({ mayaraBaseUrl: 'http://pi:6502', defaultRangeM: 2000 });
+    expect(store.getRadarConfig()).toEqual({
+      mayaraBaseUrl: 'http://pi:6502',
+      defaultRangeM: 2000,
+    });
   });
 
   it('late subscribers get the current value from radarConfig$', async () => {

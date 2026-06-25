@@ -14,7 +14,7 @@
 - mayara default port **6502**; API base path `/signalk/v2/api/vessels/self/radars`; spoke WS field is **`spokeDataUrl`**; controls path is constructed as `${base}/${radarId}/controls/${controlId}` (there is **no** controlsUrl field).
 - Spoke `data[i]` is a **legend index** (0..255); colour = `legend.pixels[data[i]].color` as `#rrggbbaa`; **byte 0 is transparent**; unmapped indices default to opaque red `[255,0,0,255]`.
 - Cell `i` distance from radar = `i / data.length * spoke.range` metres; spoke direction = `spoke.bearing` (true, when present) else `spoke.angle` from bow + boat heading; both are in units of `[0..spokesPerRevolution)`.
-- The radar pixel stream must NOT go on the `Bus` or `/api/stream` (scalar/JSON/≤20 Hz). Only scalar radar *status* may.
+- The radar pixel stream must NOT go on the `Bus` or `/api/stream` (scalar/JSON/≤20 Hz). Only scalar radar _status_ may.
 - Reachability is **Tailscale-only**: browser → mayara at the Pi's tailnet address:6502. HTTPS-served pages require `wss://` (mixed-content); derive `ws`/`wss` from `location.protocol`.
 - All UI times UTC; lat/lon display is compact DMM (not relevant to most radar UI but applies to any coordinate readout).
 - New chart-layer components follow the `WindOverlay.tsx` pattern: props `{ map, ...data, hidden }`, idempotent `ensure()` guarding every `addSource`/`addLayer`, retry on `map.on('styledata', ensure)`, **do not** gate on `map.isStyleLoaded()`, push live visual changes via `map.setPaintProperty`.
@@ -23,26 +23,26 @@
 
 Created under `packages/web/src/lib/radar/` (pure logic, unit-tested), `packages/web/src/components/` + `packages/web/src/app/chart/` (UI), `apps/g5000/src/radar/` (server status), `packages/db` + `packages/core` (config + channels), `scripts/` (deploy).
 
-| Path | Responsibility |
-|------|----------------|
-| `packages/web/src/lib/radar/proto.ts` | inlined `RadarMessage.proto` source + protobufjs `decodeRadarMessage(buf)` |
-| `packages/web/src/lib/radar/types.ts` | TS types: `RadarInfo`, `Capabilities`, `Legend`, `DecodedSpoke`, `ControlValue` |
-| `packages/web/src/lib/radar/legend.ts` | `buildColorLut(legend) → Uint8ClampedArray(256*4)` |
-| `packages/web/src/lib/radar/geo.ts` | `rangeBboxCorners(centerLat, centerLon, rangeM)` for CanvasSource |
-| `packages/web/src/lib/radar/geometry.ts` | pure spoke→canvas pixel math |
-| `packages/web/src/lib/radar/renderer.ts` | `RadarCanvas`: paint spoke batches onto an offscreen canvas |
-| `packages/web/src/lib/radar/mayara-client.ts` | `MayaraClient`: discovery, capabilities, controls, spoke WS + reconnect |
-| `packages/web/src/components/RadarOverlay.tsx` | MapLibre layer (CanvasSource corner-pin), owns client+renderer lifecycle |
-| `packages/web/src/app/chart/RadarControls.tsx` | range/gain/sea/rain/opacity control panel |
-| `packages/web/src/app/chart/LayersControl.tsx` (modify) | add `radar` toggle |
-| `packages/web/src/app/chart/ChartToolbar.tsx` (modify) | add `radar` to the onToggle key union |
-| `packages/web/src/app/chart/page.tsx` (modify) | mount `RadarOverlay`, `chart:layers.radar` + `chart:radar` localStorage |
-| `packages/db/src/...` (modify) | `radar.mayaraBaseUrl` + defaults config |
-| `packages/core/src/channels.ts` (modify) | `radar.connected`, `radar.range.m` channels |
-| `apps/g5000/src/radar/status-poller.ts` | poll mayara state → publish status channels |
-| `apps/g5000/src/index.ts` (modify) | start the status poller |
-| `scripts/mayara.service` + `scripts/mayara.README.md` | systemd unit + install/run docs |
-| `packages/web/src/lib/radar/__fixtures__/*` | captured emulator `radars.json`, `capabilities.json`, `spoke-frame.bin` |
+| Path                                                    | Responsibility                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `packages/web/src/lib/radar/proto.ts`                   | inlined `RadarMessage.proto` source + protobufjs `decodeRadarMessage(buf)`      |
+| `packages/web/src/lib/radar/types.ts`                   | TS types: `RadarInfo`, `Capabilities`, `Legend`, `DecodedSpoke`, `ControlValue` |
+| `packages/web/src/lib/radar/legend.ts`                  | `buildColorLut(legend) → Uint8ClampedArray(256*4)`                              |
+| `packages/web/src/lib/radar/geo.ts`                     | `rangeBboxCorners(centerLat, centerLon, rangeM)` for CanvasSource               |
+| `packages/web/src/lib/radar/geometry.ts`                | pure spoke→canvas pixel math                                                    |
+| `packages/web/src/lib/radar/renderer.ts`                | `RadarCanvas`: paint spoke batches onto an offscreen canvas                     |
+| `packages/web/src/lib/radar/mayara-client.ts`           | `MayaraClient`: discovery, capabilities, controls, spoke WS + reconnect         |
+| `packages/web/src/components/RadarOverlay.tsx`          | MapLibre layer (CanvasSource corner-pin), owns client+renderer lifecycle        |
+| `packages/web/src/app/chart/RadarControls.tsx`          | range/gain/sea/rain/opacity control panel                                       |
+| `packages/web/src/app/chart/LayersControl.tsx` (modify) | add `radar` toggle                                                              |
+| `packages/web/src/app/chart/ChartToolbar.tsx` (modify)  | add `radar` to the onToggle key union                                           |
+| `packages/web/src/app/chart/page.tsx` (modify)          | mount `RadarOverlay`, `chart:layers.radar` + `chart:radar` localStorage         |
+| `packages/db/src/...` (modify)                          | `radar.mayaraBaseUrl` + defaults config                                         |
+| `packages/core/src/channels.ts` (modify)                | `radar.connected`, `radar.range.m` channels                                     |
+| `apps/g5000/src/radar/status-poller.ts`                 | poll mayara state → publish status channels                                     |
+| `apps/g5000/src/index.ts` (modify)                      | start the status poller                                                         |
+| `scripts/mayara.service` + `scripts/mayara.README.md`   | systemd unit + install/run docs                                                 |
+| `packages/web/src/lib/radar/__fixtures__/*`             | captured emulator `radars.json`, `capabilities.json`, `spoke-frame.bin`         |
 
 ---
 
@@ -51,11 +51,13 @@ Created under `packages/web/src/lib/radar/` (pure logic, unit-tested), `packages
 Stand up the emulator and capture real API/protobuf payloads so every later task tests against ground truth (no invented bytes).
 
 **Files:**
+
 - Create: `packages/web/src/lib/radar/__fixtures__/radars.json`, `capabilities.json`, `spoke-frame.bin`, `capture.md`
 - Create: `scripts/mayara-emulator.sh` (download + run helper)
 - Modify: `packages/web/package.json` (add `protobufjs` dependency)
 
 **Interfaces:**
+
 - Produces: fixture files consumed by Tasks 2–6; `protobufjs` available to `@g5000/web`.
 
 - [ ] **Step 1: Download the macOS emulator binary and run it**
@@ -68,6 +70,7 @@ tar xzf mayara-server-*-universal-apple-darwin.tar.gz
 ./mayara-server --emulator -p 6502 &   # serves REST + spoke WS on :6502
 sleep 2
 ```
+
 Expected: log lines showing an emulator radar registered and an HTTP server on `:6502`.
 
 - [ ] **Step 2: Capture the discovery + capabilities JSON fixtures**
@@ -78,6 +81,7 @@ curl -s http://127.0.0.1:6502/signalk/v2/api/vessels/self/radars | tee radars.js
 RID=$(curl -s http://127.0.0.1:6502/signalk/v2/api/vessels/self/radars | python3 -c 'import sys,json;print(list(json.load(sys.stdin))[0])')
 curl -s "http://127.0.0.1:6502/signalk/v2/api/vessels/self/radars/$RID/capabilities" | tee capabilities.json
 ```
+
 Expected: `radars.json` is a map with one radar carrying `spokeDataUrl`; `capabilities.json` carries `spokesPerRevolution`, `maxSpokeLength`, and `legend.pixels[]`.
 
 - [ ] **Step 3: Capture one binary spoke frame**
@@ -92,15 +96,18 @@ ws.on("message",d=>{ if(typeof d!=="string"){ fs.writeFileSync("spoke-frame.bin"
 setTimeout(()=>{console.error("no binary frame");process.exit(1)},5000);
 ' "$SPOKE_URL"
 ```
+
 Expected: `wrote <N> bytes` and a non-empty `spoke-frame.bin`.
 
 - [ ] **Step 4: Record how to reproduce + add the dependency**
 
 Write `__fixtures__/capture.md` documenting the four commands above. Then:
+
 ```bash
 cd /Users/gregjohnson/code/g5000
 npm install protobufjs@^7 --workspace @g5000/web
 ```
+
 Create `scripts/mayara-emulator.sh` wrapping Step 1 (download-if-missing + run `--emulator`) for repeatable local dev.
 
 - [ ] **Step 5: Commit**
@@ -115,11 +122,13 @@ git commit -m "feat(radar): mayara emulator fixtures + protobufjs dep"
 ### Task 2: Spoke types + protobuf decode
 
 **Files:**
+
 - Create: `packages/web/src/lib/radar/types.ts`
 - Create: `packages/web/src/lib/radar/proto.ts`
 - Test: `packages/web/src/lib/radar/proto.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `interface DecodedSpoke { angle: number; bearing?: number; range: number; time?: number; lat?: number; lon?: number; data: Uint8Array }`
   - `decodeRadarMessage(buf: Uint8Array): DecodedSpoke[]`
@@ -156,6 +165,7 @@ Expected: FAIL — `decodeRadarMessage` not found.
 - [ ] **Step 3: Implement `types.ts` and `proto.ts`**
 
 `types.ts`:
+
 ```ts
 export interface DecodedSpoke {
   angle: number;
@@ -167,7 +177,10 @@ export interface DecodedSpoke {
   data: Uint8Array;
 }
 
-export interface LegendPixel { color: string; type: string }
+export interface LegendPixel {
+  color: string;
+  type: string;
+}
 export interface Legend {
   pixels: LegendPixel[];
   lowReturn?: number;
@@ -194,10 +207,14 @@ export interface RadarInfo {
   radarIpAddress?: string;
   replay?: boolean;
 }
-export interface ControlValue { value: number | string; auto?: boolean }
+export interface ControlValue {
+  value: number | string;
+  auto?: boolean;
+}
 ```
 
 `proto.ts` (inline the proto so it works in both node tests and the browser — no fs / no codegen step):
+
 ```ts
 import protobuf from 'protobufjs';
 import type { DecodedSpoke } from './types.js';
@@ -224,8 +241,13 @@ const RadarMessage = protobuf.parse(PROTO_SRC).root.lookupType('RadarMessage');
 export function decodeRadarMessage(buf: Uint8Array): DecodedSpoke[] {
   const msg = RadarMessage.decode(buf) as unknown as {
     spokes?: Array<{
-      angle?: number; bearing?: number; range?: number;
-      time?: number | bigint; lat?: number; lon?: number; data?: Uint8Array;
+      angle?: number;
+      bearing?: number;
+      range?: number;
+      time?: number | bigint;
+      lat?: number;
+      lon?: number;
+      data?: Uint8Array;
     }>;
   };
   return (msg.spokes ?? []).map((s) => ({
@@ -257,10 +279,12 @@ git commit -m "feat(radar): protobuf spoke decode + types"
 ### Task 3: Legend → colour lookup table
 
 **Files:**
+
 - Create: `packages/web/src/lib/radar/legend.ts`
 - Test: `packages/web/src/lib/radar/legend.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Legend` (Task 2).
 - Produces: `buildColorLut(legend: Legend): Uint8ClampedArray` — length `256*4`, RGBA per byte value; byte 0 transparent; unmapped → `[255,0,0,255]`.
 
@@ -288,7 +312,9 @@ describe('buildColorLut', () => {
 
   it('defaults unmapped indices to opaque red', () => {
     const lut = buildColorLut({ pixels: [{ color: '#00000000', type: 'normal' }] });
-    expect([lut[255 * 4], lut[255 * 4 + 1], lut[255 * 4 + 2], lut[255 * 4 + 3]]).toEqual([255, 0, 0, 255]);
+    expect([lut[255 * 4], lut[255 * 4 + 1], lut[255 * 4 + 2], lut[255 * 4 + 3]]).toEqual([
+      255, 0, 0, 255,
+    ]);
   });
 });
 ```
@@ -306,7 +332,11 @@ import type { Legend } from './types.js';
 /** Parse "#rrggbbaa" | "#rrggbb" | "#rgb[a]" into [r,g,b,a] (0-255). */
 export function hexToRgba(hex: string): [number, number, number, number] {
   let h = hex.replace('#', '');
-  if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('');
+  if (h.length === 3 || h.length === 4)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   const bytes: number[] = [];
   for (let i = 0; i < h.length; i += 2) bytes.push(parseInt(h.slice(i, i + 2), 16));
   while (bytes.length < 3) bytes.push(0);
@@ -318,11 +348,17 @@ export function hexToRgba(hex: string): [number, number, number, number] {
 export function buildColorLut(legend: Legend): Uint8ClampedArray {
   const lut = new Uint8ClampedArray(256 * 4);
   for (let i = 0; i < 256; i++) {
-    lut[i * 4] = 255; lut[i * 4 + 1] = 0; lut[i * 4 + 2] = 0; lut[i * 4 + 3] = 255;
+    lut[i * 4] = 255;
+    lut[i * 4 + 1] = 0;
+    lut[i * 4 + 2] = 0;
+    lut[i * 4 + 3] = 255;
   }
   legend.pixels.slice(0, 256).forEach((p, i) => {
     const [r, g, b, a] = hexToRgba(p.color);
-    lut[i * 4] = r; lut[i * 4 + 1] = g; lut[i * 4 + 2] = b; lut[i * 4 + 3] = a;
+    lut[i * 4] = r;
+    lut[i * 4 + 1] = g;
+    lut[i * 4 + 2] = b;
+    lut[i * 4 + 3] = a;
   });
   return lut;
 }
@@ -345,10 +381,12 @@ git commit -m "feat(radar): legend byte->colour lookup"
 ### Task 4: Geo bbox + spoke render geometry (pure math)
 
 **Files:**
+
 - Create: `packages/web/src/lib/radar/geo.ts`, `packages/web/src/lib/radar/geometry.ts`
 - Test: `packages/web/src/lib/radar/geo.test.ts`, `packages/web/src/lib/radar/geometry.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `rangeBboxCorners(lat, lon, rangeM): [[lon,lat],[lon,lat],[lon,lat],[lon,lat]]` — TL, TR, BR, BL for MapLibre `CanvasSource.coordinates`.
   - `spokeToCanvas(angleOrBearing, spokesPerRev, cellIndex, cellCount, range, sizePx): { x, y }` — north-up canvas pixel (centre = `sizePx/2`, range edge = `sizePx/2`).
@@ -356,6 +394,7 @@ git commit -m "feat(radar): legend byte->colour lookup"
 - [ ] **Step 1: Write failing tests**
 
 `geo.test.ts`:
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { rangeBboxCorners } from './geo.js';
@@ -365,7 +404,7 @@ describe('rangeBboxCorners', () => {
     const [tl, tr, br, bl] = rangeBboxCorners(40, -70, 1852); // 1 nm
     expect(tl[1]).toBeGreaterThan(br[1]); // top lat > bottom lat
     expect(tr[0]).toBeGreaterThan(tl[0]); // right lon > left lon
-    expect(tl[0]).toBeCloseTo(bl[0], 6);  // left edge shares lon
+    expect(tl[0]).toBeCloseTo(bl[0], 6); // left edge shares lon
     // ~1nm half-extent in latitude ≈ 1852/111320 deg
     expect(tl[1] - 40).toBeCloseTo(1852 / 111320, 3);
   });
@@ -373,12 +412,14 @@ describe('rangeBboxCorners', () => {
 ```
 
 `geometry.test.ts`:
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { spokeToCanvas } from './geometry.js';
 
 describe('spokeToCanvas', () => {
-  const N = 2048, SIZE = 512;
+  const N = 2048,
+    SIZE = 512;
   it('angle 0 (north/up) at full range points straight up', () => {
     const { x, y } = spokeToCanvas(0, N, 1023, 1024, 1000, SIZE);
     expect(x).toBeCloseTo(SIZE / 2, 0);
@@ -405,6 +446,7 @@ Expected: FAIL — modules not found.
 - [ ] **Step 3: Implement `geo.ts` and `geometry.ts`**
 
 `geo.ts`:
+
 ```ts
 const M_PER_DEG_LAT = 111_320;
 
@@ -426,6 +468,7 @@ export function rangeBboxCorners(
 ```
 
 `geometry.ts`:
+
 ```ts
 /**
  * North-up canvas pixel for a spoke cell. `dir` is the spoke direction in
@@ -468,10 +511,12 @@ git commit -m "feat(radar): geo bbox + spoke->canvas geometry"
 Paint spoke batches onto an offscreen canvas using the legend LUT + geometry. Persistence = overwrite each spoke's angular slice as it arrives (mayara's ring-buffer model); no per-frame fade.
 
 **Files:**
+
 - Create: `packages/web/src/lib/radar/renderer.ts`
 - Test: `packages/web/src/lib/radar/renderer.test.ts`
 
 **Interfaces:**
+
 - Consumes: `buildColorLut` (T3), `spokeToCanvas` (T4), `DecodedSpoke`/`Capabilities` (T2).
 - Produces:
   - `class RadarCanvas { constructor(ctx: CanvasRenderingContext2D-like, caps: Capabilities, sizePx: number); drawSpokes(spokes: DecodedSpoke[]): void; clear(): void }`
@@ -489,22 +534,31 @@ function fakeCtx(size: number) {
   return {
     canvas: { width: size, height: size },
     fillStyle: '' as string,
-    set _s(v: string) { /* noop */ },
+    set _s(v: string) {
+      /* noop */
+    },
     clearRect() {},
-    fillRect(x: number, y: number) { fills.push({ x, y, style: (this as any).fillStyle }); },
+    fillRect(x: number, y: number) {
+      fills.push({ x, y, style: (this as any).fillStyle });
+    },
     _fills: fills,
   } as unknown as CanvasRenderingContext2D & { _fills: typeof fills };
 }
 
 const caps: Capabilities = {
-  spokesPerRevolution: 2048, maxSpokeLength: 4, maxRange: 1000, minRange: 50,
+  spokesPerRevolution: 2048,
+  maxSpokeLength: 4,
+  maxRange: 1000,
+  minRange: 50,
   supportedRanges: [1000],
-  legend: { pixels: [
-    { color: '#00000000', type: 'normal' }, // 0 transparent
-    { color: '#0000ffff', type: 'normal' }, // 1 blue
-    { color: '#00ff00ff', type: 'normal' }, // 2 green
-    { color: '#ff0000ff', type: 'normal' }, // 3 red
-  ] },
+  legend: {
+    pixels: [
+      { color: '#00000000', type: 'normal' }, // 0 transparent
+      { color: '#0000ffff', type: 'normal' }, // 1 blue
+      { color: '#00ff00ff', type: 'normal' }, // 2 green
+      { color: '#ff0000ff', type: 'normal' }, // 3 red
+    ],
+  },
 };
 
 describe('RadarCanvas', () => {
@@ -541,7 +595,11 @@ export class RadarCanvas {
   /** width in px of one painted cell, ~ so adjacent spokes don't gap at the rim. */
   private readonly cell: number;
 
-  constructor(private readonly ctx: Ctx, caps: Capabilities, private readonly size: number) {
+  constructor(
+    private readonly ctx: Ctx,
+    caps: Capabilities,
+    private readonly size: number,
+  ) {
     this.lut = buildColorLut(caps.legend);
     this.spokesPerRev = caps.spokesPerRevolution;
     this.cell = Math.max(2, Math.ceil((Math.PI * size) / caps.spokesPerRevolution));
@@ -585,10 +643,12 @@ git commit -m "feat(radar): offscreen canvas spoke renderer"
 ### Task 6: MayaraClient (discovery, capabilities, controls, spoke WS)
 
 **Files:**
+
 - Create: `packages/web/src/lib/radar/mayara-client.ts`
 - Test: `packages/web/src/lib/radar/mayara-client.test.ts`
 
 **Interfaces:**
+
 - Consumes: `decodeRadarMessage` (T2), types (T2).
 - Produces:
   - `class MayaraClient { constructor(opts: { baseUrl: string; fetchImpl?: typeof fetch; wsImpl?: WebSocketCtor }); discover(): Promise<{ id: string; info: RadarInfo }>; capabilities(id: string): Promise<Capabilities>; setControl(id: string, controlId: string, body: ControlValue): Promise<void>; connectSpokes(spokeDataUrl: string, onSpokes: (s: DecodedSpoke[]) => void, onState: (s: 'open'|'closed'|'error') => void): () => void }`
@@ -603,12 +663,18 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi } from 'vitest';
 import { MayaraClient, wsUrlFor } from './mayara-client.js';
 
-const radars = JSON.parse(readFileSync(fileURLToPath(new URL('./__fixtures__/radars.json', import.meta.url)), 'utf8'));
-const frame = new Uint8Array(readFileSync(fileURLToPath(new URL('./__fixtures__/spoke-frame.bin', import.meta.url))));
+const radars = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./__fixtures__/radars.json', import.meta.url)), 'utf8'),
+);
+const frame = new Uint8Array(
+  readFileSync(fileURLToPath(new URL('./__fixtures__/spoke-frame.bin', import.meta.url))),
+);
 
 describe('MayaraClient', () => {
   it('discovers the first radar id and its info', async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(radars))) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response(JSON.stringify(radars)),
+    ) as unknown as typeof fetch;
     const c = new MayaraClient({ baseUrl: 'http://pi:6502', fetchImpl });
     const { id, info } = await c.discover();
     expect(id).toBe(Object.keys(radars)[0]);
@@ -616,7 +682,9 @@ describe('MayaraClient', () => {
   });
 
   it('PUTs control body {value, auto}', async () => {
-    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response(null, { status: 200 }),
+    ) as unknown as typeof fetch;
     const c = new MayaraClient({ baseUrl: 'http://pi:6502', fetchImpl });
     await c.setControl('r1', 'gain', { value: 50, auto: false });
     const [url, init] = (fetchImpl as any).mock.calls[0];
@@ -627,20 +695,38 @@ describe('MayaraClient', () => {
 
   it('decodes spoke frames to the callback', async () => {
     const sockets: any[] = [];
-    class FakeWS { binaryType='blob'; onmessage:any; onopen:any; onclose:any; onerror:any;
-      constructor(public url: string){ sockets.push(this); }
-      close(){ this.onclose?.(); } }
+    class FakeWS {
+      binaryType = 'blob';
+      onmessage: any;
+      onopen: any;
+      onclose: any;
+      onerror: any;
+      constructor(public url: string) {
+        sockets.push(this);
+      }
+      close() {
+        this.onclose?.();
+      }
+    }
     const c = new MayaraClient({ baseUrl: 'http://pi:6502', wsImpl: FakeWS as any });
     const got: number[] = [];
-    c.connectSpokes('ws://radar/spokes', (s) => got.push(s.length), () => {});
+    c.connectSpokes(
+      'ws://radar/spokes',
+      (s) => got.push(s.length),
+      () => {},
+    );
     sockets[0].onopen?.();
     sockets[0].onmessage?.({ data: frame.buffer });
     expect(got[0]).toBeGreaterThan(0);
   });
 
   it('forces wss when base is https and rewrites host', () => {
-    expect(wsUrlFor('ws://10.0.0.5:6502/x/spokes', 'https://pi.ts.net:6502')).toBe('wss://pi.ts.net:6502/x/spokes');
-    expect(wsUrlFor('ws://10.0.0.5:6502/x/spokes', 'http://pi.lan:6502')).toBe('ws://pi.lan:6502/x/spokes');
+    expect(wsUrlFor('ws://10.0.0.5:6502/x/spokes', 'https://pi.ts.net:6502')).toBe(
+      'wss://pi.ts.net:6502/x/spokes',
+    );
+    expect(wsUrlFor('ws://10.0.0.5:6502/x/spokes', 'http://pi.lan:6502')).toBe(
+      'ws://pi.lan:6502/x/spokes',
+    );
   });
 });
 ```
@@ -724,11 +810,15 @@ export class MayaraClient {
     const open = (): void => {
       ws = new this.wsImpl(url);
       ws.binaryType = 'arraybuffer';
-      ws.onopen = () => { backoff = 500; onState('open'); };
+      ws.onopen = () => {
+        backoff = 500;
+        onState('open');
+      };
       ws.onmessage = (e) => {
         const d = e.data;
         if (typeof d === 'string') return;
-        const bytes = d instanceof ArrayBuffer ? new Uint8Array(d) : new Uint8Array(d as ArrayBufferLike);
+        const bytes =
+          d instanceof ArrayBuffer ? new Uint8Array(d) : new Uint8Array(d as ArrayBufferLike);
         onSpokes(decodeRadarMessage(bytes));
       };
       ws.onerror = () => onState('error');
@@ -769,16 +859,19 @@ git commit -m "feat(radar): mayara client (discover/capabilities/controls/spokes
 Store the mayara base URL + defaults server-side. Follow the existing `(id, value JSON)` table pattern; read the live ConfigStore code first to match the getter/setter/observable shape (e.g. how `sourcePriority` / `crossoverSettings` are defined and exposed as `store.*$`).
 
 **Files:**
+
 - Modify: `packages/db/src/` — the schema + `ConfigStore` (locate the file defining other config getters; mirror it).
 - Test: a `*.test.ts` beside the ConfigStore, mirroring an existing ConfigStore test.
 
 **Interfaces:**
+
 - Produces: `ConfigStore.getRadarConfig(): RadarConfig | null`, `ConfigStore.setRadarConfig(c: RadarConfig): void`, `store.radarConfig$` observable.
   - `interface RadarConfig { mayaraBaseUrl: string; defaultRangeM?: number }`
 
 - [ ] **Step 1: Read the pattern, write the failing test**
 
 Read an existing config accessor (e.g. `grep -n "sourcePriority" packages/db/src/*.ts`) and its test. Then write `radar-config.test.ts` mirroring it:
+
 ```ts
 // (mirror the existing ConfigStore test harness: open an in-memory/tmp store, set, read back, assert)
 it('round-trips radar config', () => {
@@ -813,12 +906,14 @@ git commit -m "feat(radar): ConfigStore radar.mayaraBaseUrl + defaults"
 The only server-side radar code: poll mayara's HTTP for liveness/range and publish two scalar channels. Async, non-blocking (watchdog-safe).
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts` (add `Radar.Connected = 'radar.connected'`, `Radar.RangeM = 'radar.range.m'`)
 - Create: `apps/g5000/src/radar/status-poller.ts`
 - Modify: `apps/g5000/src/index.ts` (start the poller after the web server)
 - Test: `apps/g5000/src/radar/status-poller.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Bus` (`@g5000/core`), `MayaraClient` (T6) or a minimal fetch.
 - Produces: `startRadarStatusPoller(bus: Bus, opts: { baseUrl: string; intervalMs?: number; fetchImpl?: typeof fetch }): () => void` — publishes `radar.connected` (enum/scalar 1|0) and `radar.range.m` (scalar) each tick; on fetch failure publishes connected=0.
 
@@ -860,6 +955,7 @@ describe('startRadarStatusPoller', () => {
 - [ ] **Step 3: Implement the channels + poller**
 
 In `packages/core/src/channels.ts` add a `Radar` group (`Connected: 'radar.connected'`, `RangeM: 'radar.range.m'`) mirroring the existing `Channels` object shape. Then `status-poller.ts`:
+
 ```ts
 import { Channels, type Bus } from '@g5000/core';
 
@@ -872,7 +968,12 @@ export function startRadarStatusPoller(
   const base = opts.baseUrl.replace(/\/$/, '');
   let stopped = false;
   const publish = (channel: string, value: number): void =>
-    bus.publish({ channel, t_ns: 0n, value: { kind: 'scalar', value, unit: '' }, source: 'radar:mayara' });
+    bus.publish({
+      channel,
+      t_ns: 0n,
+      value: { kind: 'scalar', value, unit: '' },
+      source: 'radar:mayara',
+    });
 
   const tick = async (): Promise<void> => {
     try {
@@ -883,11 +984,17 @@ export function startRadarStatusPoller(
       publish(Channels.Radar.Connected, 0);
     }
   };
-  const timer = setInterval(() => { if (!stopped) void tick(); }, intervalMs);
+  const timer = setInterval(() => {
+    if (!stopped) void tick();
+  }, intervalMs);
   void tick();
-  return () => { stopped = true; clearInterval(timer); };
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
 }
 ```
+
 (Confirm the exact `bus.publish` Sample shape against `packages/core/src/types.ts`; use a real `t_ns` via the same clock the other publishers use rather than `0n` if one is available.) Then in `apps/g5000/src/index.ts`, after `startWebServer(...)`, read `getRadarConfig()` and, if set, `startRadarStatusPoller(bus, { baseUrl: cfg.mayaraBaseUrl })`.
 
 - [ ] **Step 4: Run it, verify it passes** — `npx vitest run apps/g5000/src/radar/status-poller.test.ts`; Expected: PASS.
@@ -906,10 +1013,12 @@ git commit -m "feat(radar): status channels + server poller"
 Wire client → renderer → MapLibre `CanvasSource`. Mirror `WindOverlay.tsx`'s lifecycle exactly.
 
 **Files:**
+
 - Create: `packages/web/src/components/RadarOverlay.tsx`
 - Test: `packages/web/src/components/RadarOverlay.test.tsx` (light: mock map asserts source/layer creation)
 
 **Interfaces:**
+
 - Consumes: `MayaraClient` (T6), `RadarCanvas` (T5), `rangeBboxCorners` (T4), `RadarConfig` (T7), `LivePos` (from `LiveBoatMarker`).
 - Props: `{ map: maplibregl.Map | null; pos: LivePos | null; baseUrl: string; opacity: number; hidden: boolean }`.
 
@@ -922,18 +1031,35 @@ import { RadarOverlay } from './RadarOverlay.js';
 
 function fakeMap() {
   return {
-    getSource: vi.fn(() => undefined), addSource: vi.fn(), getLayer: vi.fn(() => undefined),
-    addLayer: vi.fn(), removeLayer: vi.fn(), removeSource: vi.fn(),
-    setPaintProperty: vi.fn(), on: vi.fn(), off: vi.fn(), isStyleLoaded: () => true,
+    getSource: vi.fn(() => undefined),
+    addSource: vi.fn(),
+    getLayer: vi.fn(() => undefined),
+    addLayer: vi.fn(),
+    removeLayer: vi.fn(),
+    removeSource: vi.fn(),
+    setPaintProperty: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    isStyleLoaded: () => true,
   } as any;
 }
 
 describe('RadarOverlay', () => {
   it('adds a canvas source + raster layer when mounted with a map', () => {
     const map = fakeMap();
-    render(<RadarOverlay map={map} pos={{ lat: 40, lon: -70, cog: 0, sog: 0, hdg: null, t: 0 }}
-      baseUrl="http://pi:6502" opacity={0.7} hidden={false} />);
-    expect(map.addSource).toHaveBeenCalledWith('radar', expect.objectContaining({ type: 'canvas' }));
+    render(
+      <RadarOverlay
+        map={map}
+        pos={{ lat: 40, lon: -70, cog: 0, sog: 0, hdg: null, t: 0 }}
+        baseUrl="http://pi:6502"
+        opacity={0.7}
+        hidden={false}
+      />,
+    );
+    expect(map.addSource).toHaveBeenCalledWith(
+      'radar',
+      expect.objectContaining({ type: 'canvas' }),
+    );
     expect(map.addLayer).toHaveBeenCalled();
   });
 });
@@ -944,6 +1070,7 @@ describe('RadarOverlay', () => {
 - [ ] **Step 3: Implement `RadarOverlay.tsx`**
 
 Mirror `WindOverlay.tsx`. Skeleton (fill bodies following that file):
+
 ```tsx
 'use client';
 import { useEffect, useRef } from 'react';
@@ -958,7 +1085,11 @@ const LAYER = 'radar-layer';
 const SIZE = 1024; // offscreen canvas px
 
 export function RadarOverlay(props: {
-  map: maplibregl.Map | null; pos: LivePos | null; baseUrl: string; opacity: number; hidden: boolean;
+  map: maplibregl.Map | null;
+  pos: LivePos | null;
+  baseUrl: string;
+  opacity: number;
+  hidden: boolean;
 }): null {
   const { map, pos, baseUrl, opacity, hidden } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -971,23 +1102,41 @@ export function RadarOverlay(props: {
   useEffect(() => {
     if (!map) return;
     const canvas = document.createElement('canvas');
-    canvas.width = SIZE; canvas.height = SIZE;
+    canvas.width = SIZE;
+    canvas.height = SIZE;
     canvasRef.current = canvas;
     const ensure = () => {
       try {
         if (!map.getSource(SRC) && posRef.current) {
-          const corners = rangeBboxCorners(posRef.current.lat, posRef.current.lon, rangeRef.current);
-          map.addSource(SRC, { type: 'canvas', canvas, coordinates: corners, animate: true } as any);
+          const corners = rangeBboxCorners(
+            posRef.current.lat,
+            posRef.current.lon,
+            rangeRef.current,
+          );
+          map.addSource(SRC, {
+            type: 'canvas',
+            canvas,
+            coordinates: corners,
+            animate: true,
+          } as any);
         }
         if (map.getSource(SRC) && !map.getLayer(LAYER)) {
-          map.addLayer({ id: LAYER, type: 'raster', source: SRC,
-            paint: { 'raster-opacity': opacity, 'raster-fade-duration': 0 } });
+          map.addLayer({
+            id: LAYER,
+            type: 'raster',
+            source: SRC,
+            paint: { 'raster-opacity': opacity, 'raster-fade-duration': 0 },
+          });
         }
-      } catch { /* retry on styledata */ }
+      } catch {
+        /* retry on styledata */
+      }
     };
     ensure();
     map.on('styledata', ensure);
-    return () => { map.off('styledata', ensure); };
+    return () => {
+      map.off('styledata', ensure);
+    };
   }, [map]);
 
   // 2) connect mayara → renderer (capabilities → RadarCanvas → drawSpokes)
@@ -1001,8 +1150,11 @@ export function RadarOverlay(props: {
       const caps = await client.capabilities((await client.discover()).id);
       rangeRef.current = caps.supportedRanges[0] ?? 2000;
       rcRef.current = new RadarCanvas(ctx, caps, SIZE);
-      dispose = client.connectSpokes(info.spokeDataUrl,
-        (spokes) => rcRef.current?.drawSpokes(spokes), () => {});
+      dispose = client.connectSpokes(
+        info.spokeDataUrl,
+        (spokes) => rcRef.current?.drawSpokes(spokes),
+        () => {},
+      );
     })().catch(() => {});
     return () => dispose();
   }, [map, baseUrl]);
@@ -1022,6 +1174,7 @@ export function RadarOverlay(props: {
   return null;
 }
 ```
+
 Notes: `raster-fade-duration: 0` avoids MapLibre cross-fading the live canvas; `animate: true` makes MapLibre re-sample the canvas each frame. Confirm `LivePos` import path against `LiveBoatMarker.tsx`.
 
 - [ ] **Step 4: Run it, verify it passes** — `npx vitest run packages/web/src/components/RadarOverlay.test.tsx`; Expected: PASS.
@@ -1038,11 +1191,13 @@ git commit -m "feat(radar): RadarOverlay MapLibre canvas layer"
 ### Task 10: Layers toggle wiring + mount
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx` (add `radar` to `LayersState` + a `Row`)
 - Modify: `packages/web/src/app/chart/ChartToolbar.tsx` (add `radar` to the `onToggle` key union)
 - Modify: `packages/web/src/app/chart/page.tsx` (default `radar: false` in `chart:layers`; new `chart:radar` object `{ opacity }`; mount `RadarOverlay`)
 
 **Interfaces:**
+
 - Consumes: `RadarOverlay` (T9), `RadarConfig.mayaraBaseUrl` (via a settings fetch or page prop), `livePos`.
 
 - [ ] **Step 1: Add `radar` to LayersState + a toggle Row**
@@ -1056,11 +1211,19 @@ Add `radar: false` to the `chart:layers` default object and merge. Add a `chart:
 - [ ] **Step 3: Mount the overlay**
 
 In the `<Map>` children, beside the other layers:
+
 ```tsx
-{layers.radar && mayaraBaseUrl && (
-  <RadarOverlay map={mapInstance} pos={livePos} baseUrl={mayaraBaseUrl}
-    opacity={radarUi.opacity} hidden={false} />
-)}
+{
+  layers.radar && mayaraBaseUrl && (
+    <RadarOverlay
+      map={mapInstance}
+      pos={livePos}
+      baseUrl={mayaraBaseUrl}
+      opacity={radarUi.opacity}
+      hidden={false}
+    />
+  );
+}
 ```
 
 - [ ] **Step 4: Verify build + lint**
@@ -1082,10 +1245,12 @@ git commit -m "feat(radar): chart layers toggle + mount RadarOverlay"
 Range/gain/sea/rain/opacity. Range/gain/sea/rain are PUT to mayara (radar is source of truth); opacity is local (`chart:radar`).
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/RadarControls.tsx`
 - Modify: `packages/web/src/app/chart/page.tsx` (render when `layers.radar`)
 
 **Interfaces:**
+
 - Consumes: `MayaraClient.setControl` (T6), capabilities `supportedRanges` (T6), control snapshot `GET …/controls`.
 - Props: `{ baseUrl: string; opacity: number; onOpacity: (v: number) => void }`.
 
@@ -1096,10 +1261,15 @@ A compact panel: a range stepper bound to `supportedRanges` (PUT `{ value: range
 - [ ] **Step 2: Wire into page.tsx**
 
 ```tsx
-{layers.radar && mayaraBaseUrl && (
-  <RadarControls baseUrl={mayaraBaseUrl} opacity={radarUi.opacity}
-    onOpacity={(v) => setRadarUi((s) => ({ ...s, opacity: v }))} />
-)}
+{
+  layers.radar && mayaraBaseUrl && (
+    <RadarControls
+      baseUrl={mayaraBaseUrl}
+      opacity={radarUi.opacity}
+      onOpacity={(v) => setRadarUi((s) => ({ ...s, opacity: v }))}
+    />
+  );
+}
 ```
 
 - [ ] **Step 3: Verify build + lint** — `npm run typecheck && npm run lint`; Expected: PASS.
@@ -1118,12 +1288,14 @@ git commit -m "feat(radar): range/gain/clutter/opacity control panel"
 Deployment artifact (verified on the Pi, not unit-tested).
 
 **Files:**
+
 - Create: `scripts/mayara.service`
 - Create: `scripts/mayara.README.md`
 
 - [ ] **Step 1: Write the unit**
 
 `scripts/mayara.service` (mirror `g5000-autopilot.service` conventions — `User=greg`, `Restart=on-failure`):
+
 ```ini
 [Unit]
 Description=mayara-server (radar bridge)
@@ -1141,6 +1313,7 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 ```
+
 And an `override.conf` example in the README setting the real interface or `--emulator`.
 
 - [ ] **Step 2: Write `mayara.README.md`**
@@ -1166,6 +1339,7 @@ End-to-end check against the emulator (the de-risk for the corner-pinned canvas)
 bash scripts/mayara-emulator.sh &        # mayara --emulator on :6502
 cd /Users/gregjohnson/code/g5000 && npm run dev --workspace @g5000/app
 ```
+
 Set `radar.mayaraBaseUrl=http://127.0.0.1:6502` in `/settings` (or seed ConfigStore).
 
 - [ ] **Step 2: Visual check**
@@ -1177,6 +1351,7 @@ Open `/chart`, toggle **Radar** on. Expected: a coloured radar disk centred on t
 ```bash
 npm test && npm run typecheck && npm run lint
 ```
+
 Expected: radar tests green; baseline pre-existing failures unchanged (per CLAUDE.md ~4 known-env failures only).
 
 - [ ] **Step 4: Commit any fixes**

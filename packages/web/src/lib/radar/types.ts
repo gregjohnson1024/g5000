@@ -8,7 +8,10 @@ export interface DecodedSpoke {
   data: Uint8Array;
 }
 
-export interface LegendPixel { color: string; type: string }
+export interface LegendPixel {
+  color: string;
+  type: string;
+}
 export interface Legend {
   pixels: LegendPixel[];
   lowReturn?: number;
@@ -35,4 +38,7 @@ export interface RadarInfo {
   radarIpAddress?: string;
   replay?: boolean;
 }
-export interface ControlValue { value: number | string; auto?: boolean }
+export interface ControlValue {
+  value: number | string;
+  auto?: boolean;
+}

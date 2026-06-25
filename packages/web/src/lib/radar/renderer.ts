@@ -12,7 +12,11 @@ export class RadarCanvas {
   /** width in px of one painted cell, ~ so adjacent spokes don't gap at the rim. */
   private readonly cell: number;
 
-  constructor(private readonly ctx: Ctx, caps: Capabilities, private readonly size: number) {
+  constructor(
+    private readonly ctx: Ctx,
+    caps: Capabilities,
+    private readonly size: number,
+  ) {
     this.lut = buildColorLut(caps.legend);
     this.spokesPerRev = caps.spokesPerRevolution;
     this.cell = Math.max(2, Math.ceil((Math.PI * size) / caps.spokesPerRevolution));

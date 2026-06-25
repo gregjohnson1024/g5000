@@ -103,15 +103,15 @@ stored in ConfigStore (`radar.mayaraBaseUrl`) and editable in `/settings`.
 
 ## Components
 
-| # | Component | Path | Responsibility |
-|---|-----------|------|----------------|
-| 1 | systemd unit | `scripts/mayara.service` (+ `override.conf`) | run mayara on the radar interface; restart on failure |
-| 2 | config | `packages/db` ConfigStore + `/settings` field | `radar.mayaraBaseUrl`, radar defaults — server-side, cross-client, persistent |
-| 3 | mayara client | `packages/web/src/lib/radar/mayara-client.ts` | discovery, capabilities (incl. legend), open spokes WS (`arraybuffer`), decode `RadarMessage` (protobufjs from a vendored `RadarMessage.proto`), control GET/PUT |
-| 4 | renderer | `packages/web/src/lib/radar/renderer.ts` | offscreen radar-centric canvas; spoke → coloured range line at its bearing using the legend; per-frame fade (persistence/trails); exposes canvas + geo extent |
-| 5 | overlay layer | `packages/web/src/components/RadarOverlay.tsx` | MapLibre layer mirroring `WindOverlay` (idempotent `ensure()`, `styledata` retry, `CanvasSource` corner-pinned to [centre ± range], throttled updates, opacity via `setPaintProperty`); owns WS lifecycle + reconnect/backoff |
-| 6 | controls + toggle | `chart/LayersControl.tsx`, `chart/ChartToolbar.tsx`, `chart/page.tsx` | `radar` toggle (three-file edit + `chart:layers` default); compact control panel (range; gain/sea/rain each with auto-toggle + manual slider; opacity) reflecting mayara control read-back; UI-only bits in `chart:radar` localStorage |
-| 7 | status poller | `apps/g5000` + `packages/core/src/channels.ts` | GET mayara state every few seconds → publish `radar.connected`, `radar.range.m` scalar channels; async, non-blocking |
+| #   | Component         | Path                                                                  | Responsibility                                                                                                                                                                                                                         |
+| --- | ----------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | systemd unit      | `scripts/mayara.service` (+ `override.conf`)                          | run mayara on the radar interface; restart on failure                                                                                                                                                                                  |
+| 2   | config            | `packages/db` ConfigStore + `/settings` field                         | `radar.mayaraBaseUrl`, radar defaults — server-side, cross-client, persistent                                                                                                                                                          |
+| 3   | mayara client     | `packages/web/src/lib/radar/mayara-client.ts`                         | discovery, capabilities (incl. legend), open spokes WS (`arraybuffer`), decode `RadarMessage` (protobufjs from a vendored `RadarMessage.proto`), control GET/PUT                                                                       |
+| 4   | renderer          | `packages/web/src/lib/radar/renderer.ts`                              | offscreen radar-centric canvas; spoke → coloured range line at its bearing using the legend; per-frame fade (persistence/trails); exposes canvas + geo extent                                                                          |
+| 5   | overlay layer     | `packages/web/src/components/RadarOverlay.tsx`                        | MapLibre layer mirroring `WindOverlay` (idempotent `ensure()`, `styledata` retry, `CanvasSource` corner-pinned to [centre ± range], throttled updates, opacity via `setPaintProperty`); owns WS lifecycle + reconnect/backoff          |
+| 6   | controls + toggle | `chart/LayersControl.tsx`, `chart/ChartToolbar.tsx`, `chart/page.tsx` | `radar` toggle (three-file edit + `chart:layers` default); compact control panel (range; gain/sea/rain each with auto-toggle + manual slider; opacity) reflecting mayara control read-back; UI-only bits in `chart:radar` localStorage |
+| 7   | status poller     | `apps/g5000` + `packages/core/src/channels.ts`                        | GET mayara state every few seconds → publish `radar.connected`, `radar.range.m` scalar channels; async, non-blocking                                                                                                                   |
 
 ## Data flow
 

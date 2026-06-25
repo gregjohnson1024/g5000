@@ -23,8 +23,13 @@ const RadarMessage = protobuf.parse(PROTO_SRC).root.lookupType('RadarMessage');
 export function decodeRadarMessage(buf: Uint8Array): DecodedSpoke[] {
   const msg = RadarMessage.decode(buf) as unknown as {
     spokes?: Array<{
-      angle?: number; bearing?: number; range?: number;
-      time?: number | bigint; lat?: number; lon?: number; data?: Uint8Array;
+      angle?: number;
+      bearing?: number;
+      range?: number;
+      time?: number | bigint;
+      lat?: number;
+      lon?: number;
+      data?: Uint8Array;
     }>;
   };
   return (msg.spokes ?? []).map((s) => ({

@@ -5,3 +5,6 @@ out/
 coverage/
 package-lock.json
 *.tsbuildinfo
+
+# SDD scratch (gitignored)
+.superpowers/

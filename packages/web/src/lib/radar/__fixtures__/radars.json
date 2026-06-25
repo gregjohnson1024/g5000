@@ -1,1 +1,11 @@
-{"emu0001":{"name":"Emulator HALO","brand":"Emulator","model":"Emulator HALO","spokeDataUrl":"ws://127.0.0.1:6502/signalk/v2/api/vessels/self/radars/emu0001/spokes","streamUrl":"ws://127.0.0.1:6502/signalk/v1/stream","radarIpAddress":"127.0.0.1","replay":false}}
+{
+  "emu0001": {
+    "name": "Emulator HALO",
+    "brand": "Emulator",
+    "model": "Emulator HALO",
+    "spokeDataUrl": "ws://127.0.0.1:6502/signalk/v2/api/vessels/self/radars/emu0001/spokes",
+    "streamUrl": "ws://127.0.0.1:6502/signalk/v1/stream",
+    "radarIpAddress": "127.0.0.1",
+    "replay": false
+  }
+}

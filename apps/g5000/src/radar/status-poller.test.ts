@@ -12,7 +12,11 @@ describe('startRadarStatusPoller', () => {
     const fetchImpl = vi.fn(
       async () => new Response(JSON.stringify({ r1: { spokeDataUrl: 'ws://x/spokes' } })),
     ) as unknown as typeof fetch;
-    const stop = startRadarStatusPoller(bus, { baseUrl: 'http://pi:6502', intervalMs: 10, fetchImpl });
+    const stop = startRadarStatusPoller(bus, {
+      baseUrl: 'http://pi:6502',
+      intervalMs: 10,
+      fetchImpl,
+    });
     await new Promise((r) => setTimeout(r, 30));
     stop();
     expect(seen['radar.connected']).toBe(1);
@@ -27,7 +31,11 @@ describe('startRadarStatusPoller', () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error('ECONNREFUSED');
     }) as unknown as typeof fetch;
-    const stop = startRadarStatusPoller(bus, { baseUrl: 'http://pi:6502', intervalMs: 10, fetchImpl });
+    const stop = startRadarStatusPoller(bus, {
+      baseUrl: 'http://pi:6502',
+      intervalMs: 10,
+      fetchImpl,
+    });
     await new Promise((r) => setTimeout(r, 30));
     stop();
     expect(v).toBe(0);

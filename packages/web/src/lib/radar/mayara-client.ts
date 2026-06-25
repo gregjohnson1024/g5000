@@ -76,7 +76,8 @@ export class MayaraClient {
       ws.onmessage = (e) => {
         const d = e.data;
         if (typeof d === 'string') return;
-        const bytes = d instanceof ArrayBuffer ? new Uint8Array(d) : new Uint8Array(d as ArrayBufferLike);
+        const bytes =
+          d instanceof ArrayBuffer ? new Uint8Array(d) : new Uint8Array(d as ArrayBufferLike);
         onSpokes(decodeRadarMessage(bytes));
       };
       ws.onerror = () => onState('error');

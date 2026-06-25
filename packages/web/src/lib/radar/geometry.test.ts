@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { spokeToCanvas } from './geometry.js';
 
 describe('spokeToCanvas', () => {
-  const N = 2048, SIZE = 512;
+  const N = 2048,
+    SIZE = 512;
   it('angle 0 (north/up) at full range points straight up', () => {
     const { x, y } = spokeToCanvas(0, N, 1023, 1024, 1000, SIZE);
     expect(x).toBeCloseTo(SIZE / 2, 0);
