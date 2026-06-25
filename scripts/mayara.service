@@ -1,0 +1,21 @@
+[Unit]
+Description=mayara-server (Navico/B&G radar bridge)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=greg
+# Default: emulator mode — safe for a fresh install without a radar connected.
+# Override via drop-in to switch to the real radar interface:
+#   /etc/systemd/system/mayara.service.d/override.conf
+# See mayara.README.md for the exact drop-in snippet.
+Environment=MAYARA_ARGS=--emulator -p 6502
+ExecStart=/home/greg/mayara/mayara-server $MAYARA_ARGS
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
