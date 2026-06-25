@@ -53,6 +53,7 @@ import {
   routes as routesTable,
   boatState as boatStateTable,
   mastLayout as mastLayoutTable,
+  radarConfig as radarConfigTable,
 } from './schema.js';
 import type { MastLayout } from '@g5000/mast';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
@@ -66,6 +67,12 @@ import {
 import { migrateWardrobeV2toV3, type V2Wardrobe } from './migrate-wardrobe-v3.js';
 
 const SINGLETON = 'singleton';
+
+/** Radar overlay configuration — mayara base URL and optional defaults. */
+export interface RadarConfig {
+  mayaraBaseUrl: string;
+  defaultRangeM?: number;
+}
 
 /**
  * The exact value-type carried by each subject/observable, keyed by subject
@@ -94,6 +101,7 @@ type SubjectValues = {
   routes: Route[];
   boatState: BoatState;
   mastLayout: MastLayout | null;
+  radarConfig: RadarConfig | null;
 };
 
 /** Subjects keyed exactly like {@link SubjectValues}, each a hot BehaviorSubject. */
@@ -114,7 +122,8 @@ type SimpleKey =
   | 'waypoints'
   | 'routes'
   | 'boatState'
-  | 'mastLayout';
+  | 'mastLayout'
+  | 'radarConfig';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
@@ -126,6 +135,7 @@ const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
   routes: routesTable,
   boatState: boatStateTable,
   mastLayout: mastLayoutTable,
+  radarConfig: radarConfigTable,
 };
 
 /**
@@ -254,6 +264,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS routes (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS boat_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mast_layout (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS radar_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -459,6 +470,7 @@ export class ConfigStore {
       routes: loadOrInsert<Route[]>(routesTable, []),
       boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
       mastLayout: loadOrInsert<MastLayout | null>(mastLayoutTable, null),
+      radarConfig: loadOrInsert<RadarConfig | null>(radarConfigTable, null),
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -679,6 +691,18 @@ export class ConfigStore {
   }
   async setMastLayout(value: MastLayout | null): Promise<void> {
     return this.setSimple('mastLayout', value);
+  }
+
+  get radarConfig$(): Observable<RadarConfig | null> {
+    return this.subjects.radarConfig.asObservable();
+  }
+  /** Synchronous read of the current radar config (BehaviorSubject.value). */
+  getRadarConfig(): RadarConfig | null {
+    return this.subjects.radarConfig.value;
+  }
+  setRadarConfig(value: RadarConfig): void {
+    this.upsert(radarConfigTable, value);
+    this.subjects.radarConfig.next(value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {

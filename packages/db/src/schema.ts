@@ -163,3 +163,8 @@ export const mastLayout = sqliteTable('mast_layout', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded MastLayout | null
 });
+
+export const radarConfig = sqliteTable('radar_config', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded RadarConfig | null
+});
