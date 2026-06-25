@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Bus, Channels, type Sample } from '@g5000/core';
-import { encodeN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
+import { encodeN2KActisense } from '@canboat/canboatjs/dist/n2k-actisense.js';
 import { runBridge } from './bridge.js';
 import { Ngt1Driver, type Ngt1Source } from './ngt-driver.js';
 import { SerialPort0183Driver, type Sentence0183Source } from './nmea0183/serial-driver.js';
@@ -47,13 +47,7 @@ describe('runBridge', () => {
     // PGN 130306 (Wind Data) binary layout: SID(8)+Speed(16)+Angle(16)+Reference(3)+...
     // byte[5] low 3 bits = Reference; 0x02 decodes to "Apparent".
     const windPayload = Buffer.from([0xa0, 0x16, 0x02, 0xfe, 0x7f, 0x02, 0xfa, 0xfa]);
-    const frame = encodeN2KActisense({
-      pgn: 130306,
-      data: windPayload,
-      prio: 2,
-      src: 17,
-      dst: 255,
-    });
+    const frame = encodeN2KActisense({ pgn: 130306, prio: 2, src: 17, dst: 255 }, windPayload);
     source.emit(frame);
 
     // Allow the RxJS chain to settle.

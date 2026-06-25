@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { firstValueFrom, take, toArray } from 'rxjs';
 import { Ngt1Driver, parseActisenseLine, type Ngt1Source } from './ngt-driver.js';
-import { encodeN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
+import { encodeN2KActisense } from '@canboat/canboatjs/dist/n2k-actisense.js';
 
 /**
  * Hand-crafted PGN 130306 wind payload (8 bytes). The exact bytes don't
@@ -13,27 +13,12 @@ const WIND_PAYLOAD = Buffer.from([0xa0, 0x16, 0x02, 0x02, 0x7f, 0xff, 0xfa, 0xfa
 const SPEED_PAYLOAD = Buffer.from([0xa0, 0x01, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff]);
 const HEADING_PAYLOAD = Buffer.from([0xa0, 0x01, 0xd0, 0x07, 0xff, 0xff, 0xfc, 0xff]);
 
-const windFrame = encodeN2KActisense({
-  pgn: 130306,
-  data: WIND_PAYLOAD,
-  prio: 2,
-  src: 17,
-  dst: 255,
-});
-const speedFrame = encodeN2KActisense({
-  pgn: 128259,
-  data: SPEED_PAYLOAD,
-  prio: 2,
-  src: 17,
-  dst: 255,
-});
-const headingFrame = encodeN2KActisense({
-  pgn: 127250,
-  data: HEADING_PAYLOAD,
-  prio: 3,
-  src: 17,
-  dst: 255,
-});
+const windFrame = encodeN2KActisense({ pgn: 130306, prio: 2, src: 17, dst: 255 }, WIND_PAYLOAD);
+const speedFrame = encodeN2KActisense({ pgn: 128259, prio: 2, src: 17, dst: 255 }, SPEED_PAYLOAD);
+const headingFrame = encodeN2KActisense(
+  { pgn: 127250, prio: 3, src: 17, dst: 255 },
+  HEADING_PAYLOAD,
+);
 
 class MemorySource implements Ngt1Source {
   private listener: ((chunk: Buffer) => void) | null = null;

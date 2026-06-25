@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { encodeN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
+import { encodeN2KActisense } from '@canboat/canboatjs/dist/n2k-actisense.js';
 import { Bus, Channels, type Sample } from '@g5000/core';
 import { Ngt1Driver, type Ngt1Source } from '../ngt-driver.js';
 import { runBridge } from '../bridge.js';
@@ -43,13 +43,7 @@ describe('session-record → replay round-trip with a real PGN 130306', () => {
       });
 
       const windPayload = Buffer.from([0xa0, 0x16, 0x02, 0xfe, 0x7f, 0x02, 0xfa, 0xfa]);
-      const frame = encodeN2KActisense({
-        pgn: 130306,
-        data: windPayload,
-        prio: 2,
-        src: 17,
-        dst: 255,
-      });
+      const frame = encodeN2KActisense({ pgn: 130306, prio: 2, src: 17, dst: 255 }, windPayload);
       source.emit(frame);
       await new Promise((r) => setTimeout(r, 30));
       await logger.close();

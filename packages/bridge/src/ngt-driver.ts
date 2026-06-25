@@ -1,6 +1,6 @@
 import { Subject, type Observable, EMPTY } from 'rxjs';
 import canboat from '@canboat/canboatjs';
-import { readN2KActisense } from '@canboat/canboatjs/lib/n2k-actisense.js';
+import { readN2KActisense } from '@canboat/canboatjs/dist/n2k-actisense.js';
 import type {
   RawCanFrame,
   Raw0183Sentence,

@@ -3,7 +3,7 @@ import canboat from '@canboat/canboatjs';
 import type { RawCanFrame } from './wire-driver.js';
 
 const { FromPgn } = canboat as unknown as {
-  FromPgn: new () => {
+  FromPgn: new (opts?: { useCamel?: boolean }) => {
     on(event: 'pgn', cb: (pgn: CanboatPgn) => void): void;
     parseString(line: string): void;
   };
@@ -39,7 +39,11 @@ export interface DecodedPgn {
  */
 export function decodeFrames(frames$: Observable<RawCanFrame>): Observable<DecodedPgn> {
   return new Observable<DecodedPgn>((subscriber) => {
-    const parser = new FromPgn();
+    // canboatjs 3.x defaults to camelCase field keys ('windSpeed'); the
+    // channel-mapper and all field consumers expect the canonical Title-Case
+    // names ('Wind Speed', 'Reference', …). useCamel:false restores them
+    // (and resolved string enums) — matching the 2.x behaviour exactly.
+    const parser = new FromPgn({ useCamel: false });
     const pendingTimestamps = new Map<number, bigint>(); // pgn → most-recent rxTimestamp
     parser.on('pgn', (pgn) => {
       const ts = pendingTimestamps.get(pgn.pgn) ?? 0n;

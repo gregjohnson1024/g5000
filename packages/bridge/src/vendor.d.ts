@@ -7,7 +7,7 @@ declare module '@canboat/canboatjs' {
   export default canboat;
 }
 
-declare module '@canboat/canboatjs/lib/n2k-actisense.js' {
+declare module '@canboat/canboatjs/dist/n2k-actisense.js' {
   /**
    * Parse Actisense binary frames from a Buffer.
    * - `data` is one or more complete framed packets starting with `0x10 0x02 0xd0`.
@@ -31,13 +31,12 @@ declare module '@canboat/canboatjs/lib/n2k-actisense.js' {
   /**
    * Encode a PGN payload as an Actisense binary frame (Buffer). Inverse of
    * readN2KActisense. Used in tests to generate fixtures.
+   *
+   * canboatjs 3.x takes the pgn metadata and the raw payload as two separate
+   * args (2.x took a single `{ pgn, data, … }` object).
    */
-  export function encodeN2KActisense(args: {
-    pgn: number;
-    data: Buffer;
-    prio?: number;
-    dst?: number;
-    src?: number;
-    timestamp?: number;
-  }): Buffer;
+  export function encodeN2KActisense(
+    pgn: { pgn: number; prio?: number; dst?: number; src?: number; timestamp?: number },
+    data: Buffer,
+  ): Buffer;
 }
