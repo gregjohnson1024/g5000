@@ -91,15 +91,15 @@ it clear of the `WatchdogSec=60` event-loop watchdog.
 **Browser.** Does the real radar work: opens the spoke WS, decodes, renders to a
 canvas, blits onto the chart, and issues control PUTs.
 
-**Reachability.** The canonical mayara endpoint is **the Pi's Tailscale
-address:6502** — direct/low-latency on the boat (browser and Pi co-located on the
-tailnet) and relayed when away, with no cloudflare round-trip. An optional
-`radar.sulabassana.net` cloudflared tunnel serves browsers not on the tailnet
-(mirrors the mast unit). **Constraint:** a g5000 page served over HTTPS may only
-open `wss://` (browser mixed-content rule), so the public path uses the TLS
-tunnel while the on-boat `http://` path may use plain `ws://`; the web app derives
-`ws`/`wss` from its own `location.protocol`. The mayara base URL is stored in
-ConfigStore (`radar.mayaraBaseUrl`) and editable in `/settings`.
+**Reachability (decided: Tailscale-only).** The browser reaches mayara at **the
+Pi's Tailscale address:6502** — direct/low-latency on the boat (browser and Pi
+co-located on the tailnet) and relayed when away. No cloudflared tunnel for radar
+(deferred; remote use is over Tailscale). **Mixed-content constraint:** a g5000
+page served over `http://` (e.g. the tailnet IP `:3000`) may open `ws://…:6502`
+directly; a page served over `https://` may open only `wss://`, so HTTPS access
+needs a TLS endpoint in front of mayara (e.g. Tailscale Serve). The web app
+derives `ws`/`wss` from its own `location.protocol`. The mayara base URL is
+stored in ConfigStore (`radar.mayaraBaseUrl`) and editable in `/settings`.
 
 ## Components
 
@@ -205,5 +205,6 @@ tap point).
   not yet Verified → confirm on install.
 - **mayara JSON shapes** (`GET /radars`, capabilities/legend, control ids) are
   read live → pin them against the running emulator while building the client.
-- **wss/TLS** for the public path depends on the cloudflared tunnel; the tailnet
-  path is primary.
+- **wss/TLS:** HTTPS access to g5000 needs a `wss` mayara endpoint (e.g.
+  Tailscale Serve); the `http` tailnet path needs none. A cloudflared radar
+  tunnel is deferred (Tailscale-only chosen).
