@@ -718,7 +718,7 @@ export class MayaraClient {
     const url = wsUrlFor(spokeDataUrl, this.baseUrl);
     let closed = false;
     let backoff = 500;
-    let ws: ReturnType<WebSocketCtor> | null = null;
+    let ws: InstanceType<WebSocketCtor> | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const open = (): void => {
