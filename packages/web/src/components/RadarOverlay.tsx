@@ -18,19 +18,24 @@ export function RadarOverlay(props: {
   hidden: boolean;
 }): null {
   const { map, pos, baseUrl, opacity, hidden } = props;
+  // Stable canvas for the component's lifetime — created once, shared by both effects.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  if (!canvasRef.current) {
+    const c = document.createElement('canvas');
+    c.width = SIZE;
+    c.height = SIZE;
+    canvasRef.current = c;
+  }
   const rcRef = useRef<RadarCanvas | null>(null);
   const rangeRef = useRef<number>(2000);
   const posRef = useRef<LivePos | null>(pos);
   posRef.current = pos;
 
-  // Effect A: offscreen canvas + CanvasSource/raster-layer (idempotent ensure, styledata retry)
+  // Effect A: attach the stable canvas to a CanvasSource/raster-layer on the current map
+  // (idempotent ensure, styledata retry).
   useEffect(() => {
     if (!map) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = SIZE;
-    canvas.height = SIZE;
-    canvasRef.current = canvas;
+    const canvas = canvasRef.current!;
     const ensure = (): void => {
       try {
         if (!map.getSource(SRC) && posRef.current) {
@@ -65,10 +70,10 @@ export function RadarOverlay(props: {
     };
   }, [map]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Effect B: connect MayaraClient → RadarCanvas → drawSpokes
+  // Effect B: connect MayaraClient → RadarCanvas → drawSpokes (uses the same stable canvas)
   useEffect(() => {
-    if (!map || !canvasRef.current) return;
-    const canvas = canvasRef.current;
+    if (!map) return;
+    const canvas = canvasRef.current!;
     const client = new MayaraClient({ baseUrl });
     let dispose = (): void => {};
     (async () => {
