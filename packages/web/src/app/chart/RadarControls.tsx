@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { MayaraClient } from '../../lib/radar/mayara-client';
 
 export interface RadarControlsProps {
+  /** g5000's same-origin REST proxy base (e.g. `/api/radar`). */
   baseUrl: string;
+  /** Direct mayara base for the spoke WebSocket (e.g. `http://host:6502`). */
+  wsBase: string;
   opacity: number;
   onOpacity: (v: number) => void;
   rangeM: number;
@@ -31,6 +34,7 @@ interface ReadyState {
  */
 export function RadarControls({
   baseUrl,
+  wsBase,
   opacity,
   onOpacity,
   rangeM,
@@ -47,7 +51,7 @@ export function RadarControls({
 
   // On mount: discover → capabilities → store id + supportedRanges.
   useEffect(() => {
-    const client = new MayaraClient({ baseUrl });
+    const client = new MayaraClient({ baseUrl, wsBase });
     clientRef.current = client;
     let alive = true;
     void (async () => {
@@ -63,7 +67,7 @@ export function RadarControls({
     return () => {
       alive = false;
     };
-  }, [baseUrl]);
+  }, [baseUrl, wsBase]);
 
   const showError = (msg: string): void => {
     setCtrlError(msg);

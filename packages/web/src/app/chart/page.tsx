@@ -332,10 +332,14 @@ function ChartPageInner() {
 
   // Mayara base URL — derived client-side from the page's own host on port 6502.
   // Computed in useEffect (SSR-safe: window/location are undefined during server render).
-  const [mayaraBaseUrl, setMayaraBaseUrl] = useState('');
+  // The spoke WebSocket connects to mayara directly (WS isn't CORS-bound), so we
+  // derive its base from the page host on :6502. The REST API instead goes
+  // through g5000's same-origin proxy at `/api/radar` (mayara sends no CORS
+  // headers, so the browser can't fetch it cross-origin). SSR-safe: client only.
+  const [mayaraWsBase, setMayaraWsBase] = useState('');
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setMayaraBaseUrl(`${window.location.protocol}//${window.location.hostname}:6502`);
+      setMayaraWsBase(`${window.location.protocol}//${window.location.hostname}:6502`);
     }
   }, []);
 
@@ -1066,11 +1070,12 @@ function ChartPageInner() {
         <SatelliteLayer map={mapInstance} visible={layers.satellite} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         <BathyLayer map={mapInstance} visible={layers.bathy} />
-        {layers.radar && mayaraBaseUrl && (
+        {layers.radar && mayaraWsBase && (
           <RadarOverlay
             map={mapInstance}
             pos={livePos}
-            baseUrl={mayaraBaseUrl}
+            baseUrl="/api/radar"
+            wsBase={mayaraWsBase}
             opacity={radarUi.opacity}
             rangeM={radarUi.rangeM}
           />
@@ -1139,9 +1144,10 @@ function ChartPageInner() {
           <TzToggle tz={tz} setTz={setTz} />
         </div>
         <LiveValues p={livePos} />
-        {layers.radar && mayaraBaseUrl && (
+        {layers.radar && mayaraWsBase && (
           <RadarControls
-            baseUrl={mayaraBaseUrl}
+            baseUrl="/api/radar"
+            wsBase={mayaraWsBase}
             opacity={radarUi.opacity}
             onOpacity={(v) => setRadarUi((s) => ({ ...s, opacity: v }))}
             rangeM={radarUi.rangeM}

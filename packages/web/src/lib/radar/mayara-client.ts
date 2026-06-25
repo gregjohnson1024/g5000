@@ -23,11 +23,20 @@ export function wsUrlFor(spokeDataUrl: string, baseUrl: string): string {
 
 export class MayaraClient {
   private readonly baseUrl: string;
+  /** Base for the spoke WebSocket — mayara directly (WS isn't CORS-bound),
+   * distinct from `baseUrl` which is g5000's same-origin REST proxy. */
+  private readonly wsBase: string;
   private readonly fetchImpl: typeof fetch;
   private readonly wsImpl: WebSocketCtor;
 
-  constructor(opts: { baseUrl: string; fetchImpl?: typeof fetch; wsImpl?: WebSocketCtor }) {
+  constructor(opts: {
+    baseUrl: string;
+    wsBase?: string;
+    fetchImpl?: typeof fetch;
+    wsImpl?: WebSocketCtor;
+  }) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
+    this.wsBase = (opts.wsBase ?? opts.baseUrl).replace(/\/$/, '');
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.wsImpl = opts.wsImpl ?? (globalThis.WebSocket as unknown as WebSocketCtor);
   }
@@ -60,7 +69,7 @@ export class MayaraClient {
     onSpokes: (s: DecodedSpoke[]) => void,
     onState: (s: 'open' | 'closed' | 'error') => void,
   ): () => void {
-    const url = wsUrlFor(spokeDataUrl, this.baseUrl);
+    const url = wsUrlFor(spokeDataUrl, this.wsBase);
     let closed = false;
     let backoff = 500;
     let ws: InstanceType<WebSocketCtor> | null = null;

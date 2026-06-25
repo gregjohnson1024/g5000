@@ -13,11 +13,14 @@ const SIZE = 1024; // offscreen canvas px
 export function RadarOverlay(props: {
   map: maplibregl.Map | null;
   pos: LivePos | null;
+  /** g5000's same-origin REST proxy base (e.g. `/api/radar`). */
   baseUrl: string;
+  /** Direct mayara base for the spoke WebSocket (e.g. `http://host:6502`). */
+  wsBase: string;
   opacity: number;
   rangeM: number;
 }): null {
-  const { map, pos, baseUrl, opacity, rangeM } = props;
+  const { map, pos, baseUrl, wsBase, opacity, rangeM } = props;
   // Stable canvas for the component's lifetime — created once, shared by both effects.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   if (!canvasRef.current) {
@@ -78,7 +81,7 @@ export function RadarOverlay(props: {
   useEffect(() => {
     if (!map) return;
     const canvas = canvasRef.current!;
-    const client = new MayaraClient({ baseUrl });
+    const client = new MayaraClient({ baseUrl, wsBase });
     let cancelled = false;
     let dispose = (): void => {};
     (async () => {
@@ -104,7 +107,7 @@ export function RadarOverlay(props: {
       cancelled = true;
       dispose();
     };
-  }, [map, baseUrl]);
+  }, [map, baseUrl, wsBase]);
 
   // Effect C: live opacity
   useEffect(() => {
