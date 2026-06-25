@@ -299,15 +299,22 @@ function ChartPageInner() {
     }
   }, [settingsHydrated, windHours, windLockNow]);
 
-  // Radar UI settings — opacity. Persisted to chart:radar (mirror of chart:settings pattern).
-  const [radarUi, setRadarUi] = useState<{ opacity: number }>({ opacity: 0.7 });
+  // Radar UI settings — opacity + rangeM. Persisted to chart:radar (mirror of chart:settings pattern).
+  // 3704 m ≈ 2 nm: first chart-visible range for most radar units.
+  const [radarUi, setRadarUi] = useState<{ opacity: number; rangeM: number }>({
+    opacity: 0.7,
+    rangeM: 3704,
+  });
   const [radarUiHydrated, setRadarUiHydrated] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem('chart:radar');
       if (raw) {
-        const j = JSON.parse(raw) as Partial<{ opacity: number }>;
-        if (typeof j.opacity === 'number') setRadarUi({ opacity: j.opacity });
+        const j = JSON.parse(raw) as Partial<{ opacity: number; rangeM: number }>;
+        setRadarUi({
+          opacity: typeof j.opacity === 'number' ? j.opacity : 0.7,
+          rangeM: typeof j.rangeM === 'number' ? j.rangeM : 3704,
+        });
       }
     } catch {
       /* corrupt blob; ignore */
@@ -1065,7 +1072,7 @@ function ChartPageInner() {
             pos={livePos}
             baseUrl={mayaraBaseUrl}
             opacity={radarUi.opacity}
-            hidden={false}
+            rangeM={radarUi.rangeM}
           />
         )}
         {(() => {
@@ -1137,6 +1144,8 @@ function ChartPageInner() {
             baseUrl={mayaraBaseUrl}
             opacity={radarUi.opacity}
             onOpacity={(v) => setRadarUi((s) => ({ ...s, opacity: v }))}
+            rangeM={radarUi.rangeM}
+            onRange={(m) => setRadarUi((s) => ({ ...s, rangeM: m }))}
           />
         )}
         <RoutePlanPanel

@@ -15,9 +15,9 @@ export function RadarOverlay(props: {
   pos: LivePos | null;
   baseUrl: string;
   opacity: number;
-  hidden: boolean;
+  rangeM: number;
 }): null {
-  const { map, pos, baseUrl, opacity, hidden } = props;
+  const { map, pos, baseUrl, opacity, rangeM } = props;
   // Stable canvas for the component's lifetime — created once, shared by both effects.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   if (!canvasRef.current) {
@@ -27,23 +27,19 @@ export function RadarOverlay(props: {
     canvasRef.current = c;
   }
   const rcRef = useRef<RadarCanvas | null>(null);
-  const rangeRef = useRef<number>(2000);
   const posRef = useRef<LivePos | null>(pos);
   posRef.current = pos;
 
   // Effect A: attach the stable canvas to a CanvasSource/raster-layer on the current map
-  // (idempotent ensure, styledata retry).
+  // (idempotent ensure, styledata retry). Cleanup removes the layer+source so toggling
+  // radar off fully tears down the echoes — no frozen overlay left on the map.
   useEffect(() => {
     if (!map) return;
     const canvas = canvasRef.current!;
     const ensure = (): void => {
       try {
         if (!map.getSource(SRC) && posRef.current) {
-          const corners = rangeBboxCorners(
-            posRef.current.lat,
-            posRef.current.lon,
-            rangeRef.current,
-          );
+          const corners = rangeBboxCorners(posRef.current.lat, posRef.current.lon, rangeM);
           map.addSource(SRC, {
             type: 'canvas',
             canvas,
@@ -67,43 +63,61 @@ export function RadarOverlay(props: {
     map.on('styledata', ensure);
     return () => {
       map.off('styledata', ensure);
+      try {
+        if (map.getLayer(LAYER)) map.removeLayer(LAYER);
+        if (map.getSource(SRC)) map.removeSource(SRC);
+      } catch {
+        /* map may already be torn down */
+      }
     };
   }, [map]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Effect B: connect MayaraClient → RadarCanvas → drawSpokes (uses the same stable canvas)
+  // Effect B: connect MayaraClient → RadarCanvas → drawSpokes (uses the same stable canvas).
+  // Guard with `cancelled` so that if cleanup fires before the async chain resolves, the
+  // later-opened WS + reconnect loop do not leak.
   useEffect(() => {
     if (!map) return;
     const canvas = canvasRef.current!;
     const client = new MayaraClient({ baseUrl });
+    let cancelled = false;
     let dispose = (): void => {};
     (async () => {
       const { id, info } = await client.discover();
+      if (cancelled) return;
       const caps = await client.capabilities(id);
-      rangeRef.current = caps.supportedRanges[0] ?? 2000;
+      if (cancelled) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       rcRef.current = new RadarCanvas(ctx, caps, SIZE);
-      dispose = client.connectSpokes(
+      const d = client.connectSpokes(
         info.spokeDataUrl,
         (spokes) => rcRef.current?.drawSpokes(spokes),
         () => {},
       );
+      if (cancelled) {
+        d();
+        return;
+      }
+      dispose = d;
     })().catch(() => {});
-    return () => dispose();
+    return () => {
+      cancelled = true;
+      dispose();
+    };
   }, [map, baseUrl]);
 
-  // Effect C: live opacity / visibility
+  // Effect C: live opacity
   useEffect(() => {
     if (!map?.getLayer(LAYER)) return;
-    map.setPaintProperty(LAYER, 'raster-opacity', hidden ? 0 : opacity);
-  }, [map, opacity, hidden]);
+    map.setPaintProperty(LAYER, 'raster-opacity', opacity);
+  }, [map, opacity]);
 
-  // Effect D: re-pin canvas source to boat position
+  // Effect D: re-pin canvas source to boat position and range
   useEffect(() => {
     if (!map || !pos) return;
     const src = map.getSource(SRC) as maplibregl.CanvasSource | undefined;
-    src?.setCoordinates(rangeBboxCorners(pos.lat, pos.lon, rangeRef.current));
-  }, [map, pos]);
+    src?.setCoordinates(rangeBboxCorners(pos.lat, pos.lon, rangeM));
+  }, [map, pos, rangeM]);
 
   return null;
 }

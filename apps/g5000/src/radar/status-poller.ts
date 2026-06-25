@@ -2,7 +2,7 @@ import { Channels, type Bus } from '@g5000/core';
 
 /**
  * Poll mayara's SignalK radar endpoint on a fixed interval and publish
- * `radar.connected` (1|0) and, when available, `radar.range.m` onto the bus.
+ * `radar.connected` (1|0) onto the bus.
  *
  * Non-blocking: the interval callback is fully async and never awaited by the
  * caller. Fetch errors are swallowed; connected=0 is published instead so
@@ -34,17 +34,6 @@ export function startRadarStatusPoller(
       const map = (await res.json()) as Record<string, unknown>;
       const radars = Object.values(map);
       publish(Channels.Radar.Connected, radars.length > 0 ? 1 : 0);
-      // Publish range if the first radar exposes it.
-      const first = radars[0];
-      if (
-        radars.length > 0 &&
-        first != null &&
-        typeof first === 'object' &&
-        'rangeM' in first &&
-        typeof (first as Record<string, unknown>)['rangeM'] === 'number'
-      ) {
-        publish(Channels.Radar.RangeM, (first as Record<string, unknown>)['rangeM'] as number);
-      }
     } catch {
       publish(Channels.Radar.Connected, 0);
     }

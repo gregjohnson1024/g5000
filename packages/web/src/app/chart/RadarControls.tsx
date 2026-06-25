@@ -6,6 +6,8 @@ export interface RadarControlsProps {
   baseUrl: string;
   opacity: number;
   onOpacity: (v: number) => void;
+  rangeM: number;
+  onRange: (m: number) => void;
 }
 
 interface ControlState {
@@ -31,10 +33,11 @@ export function RadarControls({
   baseUrl,
   opacity,
   onOpacity,
+  rangeM,
+  onRange,
 }: RadarControlsProps): React.ReactElement {
   const clientRef = useRef<MayaraClient | null>(null);
   const [ready, setReady] = useState<ReadyState | null>(null);
-  const [rangeIdx, setRangeIdx] = useState(0);
   const [gain, setGain] = useState<ControlState>({ value: 50, auto: true });
   const [sea, setSea] = useState<ControlState>({ value: 50, auto: true });
   const [rain, setRain] = useState<ControlState>({ value: 50, auto: true });
@@ -77,11 +80,29 @@ export function RadarControls({
     });
   };
 
+  // Derive the current range index as the nearest supported range to the shared rangeM prop.
+  const rangeIdx = (() => {
+    const ranges = ready?.supportedRanges;
+    if (!ranges || ranges.length === 0) return 0;
+    let best = 0;
+    let bestDelta = Infinity;
+    for (let i = 0; i < ranges.length; i++) {
+      const delta = Math.abs((ranges[i] ?? 0) - rangeM);
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        best = i;
+      }
+    }
+    return best;
+  })();
+
   const handleRange = (idx: number): void => {
-    setRangeIdx(idx);
     const ranges = ready?.supportedRanges;
     const m = ranges?.[idx];
-    if (m !== undefined) send('range', { value: m });
+    if (m !== undefined) {
+      onRange(m);
+      send('range', { value: m });
+    }
   };
 
   const handleGain = (next: ControlState): void => {

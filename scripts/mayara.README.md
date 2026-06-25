@@ -115,15 +115,15 @@ that is incompatible with the radar stream. Use Tailscale for encrypted remote a
 
 ---
 
-## 6. Server-side status channels (optional)
+## 6. Server-side status channel (optional)
 
-The g5000 app includes a background poller that reads `radar.connected` and
-`radar.range.m` channels via a server-side mayara connection. To activate it, set the
-mayara base URL in the ConfigStore:
+The g5000 app includes a background poller that publishes `radar.connected` (1 when at
+least one radar is reachable, 0 otherwise) onto the bus via a server-side mayara
+connection.
 
-- Open `/settings` in the g5000 UI.
-- Set **Radar › mayara base URL** to `http://localhost:6502` (or the appropriate host
-  if mayara runs on a different machine).
-
-If this is left blank the status channels stay dark, but the chart overlay still works
-via the browser-derived URL.
+**Phase-1 note:** there is no `/settings` UI for the mayara base URL. The browser-side
+chart overlay auto-derives the URL from the page's own host on port 6502 — no
+configuration needed there. The server-side poller reads `ConfigStore.getRadarConfig()
+.mayaraBaseUrl`, which currently has no UI and must be set by hand-editing `config.db`
+(a settings field is a deferred follow-up). If the URL is blank the poller is skipped,
+but the chart overlay continues to work via the browser-derived URL.
