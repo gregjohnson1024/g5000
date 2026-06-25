@@ -391,7 +391,8 @@ describe('spokeToCanvas', () => {
   });
   it('cell at half index sits at half radius', () => {
     const { y } = spokeToCanvas(0, N, 511, 1024, 1000, SIZE);
-    expect(y).toBeCloseTo(SIZE / 2 / 2 + SIZE / 4, 0); // r = 0.5 -> quarter from centre upward
+    // dir=0 → straight up; cell 511/1023 ≈ half radius → ~SIZE/4 above centre.
+    expect(y).toBeCloseTo(SIZE / 2 - SIZE / 4, 0);
   });
 });
 ```
