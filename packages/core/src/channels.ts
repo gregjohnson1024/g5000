@@ -131,4 +131,10 @@ export const Channels = {
     /** Height of the next tidal event, metres above Chart Datum. */
     NextEventHeight: 'tide.nextEventHeight',
   },
+  Radar: {
+    /** 1 when at least one radar is reachable via mayara; 0 otherwise. */
+    Connected: 'radar.connected',
+    /** Active radar range in metres (omitted when radar is disconnected). */
+    RangeM: 'radar.range.m',
+  },
 } as const;

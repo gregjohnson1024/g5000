@@ -30,6 +30,7 @@ import { startRaceSubsystem } from './race-subsystem.js';
 import { startGrooveSubsystem } from './groove-subsystem.js';
 import { startTideSubsystem } from './tide-subsystem.js';
 import { startHlink, startWebServer } from './server-setup.js';
+import { startRadarStatusPoller } from './radar/status-poller.js';
 
 const HTTP_PORT = Number(process.env.PORT ?? 3000);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
@@ -256,6 +257,17 @@ async function main(): Promise<void> {
   // 3. Start Next.js pointing at the @g5000/web package directory.
   const webDir = path.resolve(fileURLToPath(import.meta.url), '../../../../packages/web');
   const server = await startWebServer({ webDir, port: HTTP_PORT });
+
+  // Radar status poller — polls mayara's SignalK endpoint every 5s and
+  // publishes radar.connected (1|0) and radar.range.m onto the bus.
+  // Only started when a radar config with a base URL has been persisted.
+  const radarCfg = store.getRadarConfig();
+  if (radarCfg?.mayaraBaseUrl) {
+    const stopRadarPoller = startRadarStatusPoller(bus, { baseUrl: radarCfg.mayaraBaseUrl });
+    teardown.push(async () => stopRadarPoller());
+    // eslint-disable-next-line no-console
+    console.log(`[g5000] radar status poller online (${radarCfg.mayaraBaseUrl})`);
+  }
 
   // Watchdog heartbeat. Fires every WatchdogSec/2 if systemd asked us
   // to. If the event loop blocks long enough that we miss a ping,
