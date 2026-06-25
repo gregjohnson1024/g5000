@@ -48,3 +48,4 @@ packages/*/next-env.d.ts
 
 # Coastline data — downloaded by `npm run fetch --workspace @g5000/coastline`
 packages/coastline/data/
+.superpowers/
