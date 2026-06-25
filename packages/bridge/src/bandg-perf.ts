@@ -73,7 +73,7 @@ export function loadBandgKeyTable(): Map<number, BandgKeyEntry> {
 }
 
 /** Read `len` bytes little-endian from `buf` at `off` as an unsigned integer. */
-function readUIntLE(buf: Buffer, off: number, len: number): number {
+function readUIntLE(buf: Uint8Array, off: number, len: number): number {
   let v = 0;
   for (let b = 0; b < len; b++) v += buf[off + b]! * 2 ** (8 * b);
   return v;
@@ -89,18 +89,18 @@ function readUIntLE(buf: Buffer, off: number, len: number): number {
  * against the H5000's own display and refine `SIGNED_KEYS` below.
  */
 export function parseBandgKeyValues(
-  payload: Buffer,
+  payload: Uint8Array,
   table: Map<number, BandgKeyEntry>,
 ): BandgKeyValue[] {
   const out: BandgKeyValue[] = [];
   if (payload.length < 2) return out;
   // Header: manufacturer(11) + reserved(2) + industry(3). Only parse B&G frames
   // (PGN 130824 also has a Maretron variant, manufacturer 137).
-  if ((payload.readUInt16LE(0) & 0x7ff) !== BANDG_MANUFACTURER_CODE) return out;
+  if (((payload[0]! | (payload[1]! << 8)) & 0x7ff) !== BANDG_MANUFACTURER_CODE) return out;
   let i = 2;
 
   while (i + 2 <= payload.length) {
-    const word = payload.readUInt16LE(i);
+    const word = payload[i]! | (payload[i + 1]! << 8);
     const key = word & 0x0fff;
     const length = (word >> 12) & 0x0f;
     i += 2;
@@ -117,7 +117,8 @@ export function parseBandgKeyValues(
     if (raw === naSentinel) {
       value = null;
     } else if (entry) {
-      const signedRaw = SIGNED_KEYS.has(key) && raw >= 2 ** (8 * length - 1) ? raw - 2 ** (8 * length) : raw;
+      const signedRaw =
+        SIGNED_KEYS.has(key) && raw >= 2 ** (8 * length - 1) ? raw - 2 ** (8 * length) : raw;
       value = signedRaw * (entry.resolution ?? 1);
     } else {
       value = raw;
@@ -138,6 +139,68 @@ const SIGNED_KEYS = new Set<number>([
 ]);
 
 /** Convenience: full decode of a payload using the runtime catalog. */
-export function decodeBandgPerf(payload: Buffer): BandgKeyValue[] {
+export function decodeBandgPerf(payload: Uint8Array): BandgKeyValue[] {
   return parseBandgKeyValues(payload, loadBandgKeyTable());
 }
+
+/**
+ * Reassembles NMEA 2000 fast-packet frames (8 bytes each) into the full payload.
+ * 130824 spans many frames when the H5000 broadcasts a large key set.
+ *
+ * Frame 0 of a sequence: byte0 = (seqId<<5)|0, byte1 = total byte count,
+ * bytes 2..7 = first 6 payload bytes. Frames 1..n: byte0 = (seqId<<5)|counter,
+ * bytes 1..7 = next 7 bytes. Keyed by source; a fresh frame-0 or a sequence/
+ * counter mismatch resets that source (dropped/interleaved frames just yield a
+ * miss, never a corrupt payload).
+ */
+export class FastPacketReassembler {
+  private readonly inProgress = new Map<
+    number,
+    { seqId: number; expected: number; bytes: number[]; nextCounter: number }
+  >();
+
+  /** Feed one raw frame for `src`. Returns the complete payload, or null. */
+  feed(src: number, frame: Uint8Array): Uint8Array | null {
+    if (frame.length < 1) return null;
+    const seqId = (frame[0]! >> 5) & 0x07;
+    const counter = frame[0]! & 0x1f;
+
+    if (counter === 0) {
+      if (frame.length < 2) return null;
+      const expected = frame[1]!;
+      const bytes = Array.from(frame.subarray(2, 8));
+      this.inProgress.set(src, { seqId, expected, bytes, nextCounter: 1 });
+    } else {
+      const st = this.inProgress.get(src);
+      if (!st || st.seqId !== seqId || counter !== st.nextCounter) {
+        this.inProgress.delete(src);
+        return null;
+      }
+      for (let i = 1; i < frame.length && st.bytes.length < st.expected; i++)
+        st.bytes.push(frame[i]!);
+      st.nextCounter = counter + 1;
+    }
+
+    const st = this.inProgress.get(src)!;
+    if (st.bytes.length >= st.expected) {
+      this.inProgress.delete(src);
+      return Uint8Array.from(st.bytes.slice(0, st.expected));
+    }
+    return null;
+  }
+}
+
+/**
+ * Curated subset of B&G keys to publish as bus channels (key → channel name).
+ * Kept small so the bus stays clean during validation; expand once values are
+ * confirmed against the H5000's own display. Units come from the catalog
+ * (speeds m/s, angles rad, performance %).
+ */
+export const BANDG_PUBLISH_CHANNELS = new Map<number, string>([
+  [125, 'bandg.targetSpeed'],
+  [126, 'bandg.polarSpeed'],
+  [83, 'bandg.targetTwa'],
+  [124, 'bandg.polarPerformance'],
+  [285, 'bandg.vmgPerformance'],
+  [130, 'bandg.leeway'],
+]);

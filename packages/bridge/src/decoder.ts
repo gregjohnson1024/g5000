@@ -93,7 +93,7 @@ export const decode = (): OperatorFunction<RawCanFrame, DecodedPgn> => {
  * (dp_pgn = (id >> 8) & 0x3ffff). For PDU1 (PF < 240), the canonical PGN
  * has PS zeroed out; for PDU2 (PF >= 240), PS is part of the PGN.
  */
-function pgnFromCanId(id: number): number {
+export function pgnFromCanId(id: number): number {
   const pf = (id >> 16) & 0xff;
   // Extract 18-bit dp_pgn: includes DP bit (bit 24), PF (bits 23-16), PS (bits 15-8)
   const dp_pgn = (id >> 8) & 0x3ffff;

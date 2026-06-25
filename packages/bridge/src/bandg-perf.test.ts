@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { decodeBandgPerf, loadBandgKeyTable, parseBandgKeyValues } from './bandg-perf.js';
+import {
+  decodeBandgPerf,
+  FastPacketReassembler,
+  loadBandgKeyTable,
+  parseBandgKeyValues,
+} from './bandg-perf.js';
 
 /** Build one key-value entry: u16 LE = (length<<12)|key, then `length` LE value bytes. */
 function tlv(key: number, length: number, raw: number): Buffer {
@@ -44,7 +49,10 @@ describe('bandg-perf 130824 decoder', () => {
 
   it('handles signed keys (leeway can be negative)', () => {
     // key 130 = Leeway Angle, 0.0001 rad, signed; raw 0xFE0C = -500 → -0.05 rad
-    const out = parseBandgKeyValues(Buffer.concat([HEADER, tlv(130, 2, 0xfe0c)]), loadBandgKeyTable());
+    const out = parseBandgKeyValues(
+      Buffer.concat([HEADER, tlv(130, 2, 0xfe0c)]),
+      loadBandgKeyTable(),
+    );
     expect(out[0]!.name).toBe('Leeway Angle');
     expect(out[0]!.value).toBeCloseTo(-0.05, 4);
   });
@@ -52,5 +60,34 @@ describe('bandg-perf 130824 decoder', () => {
   it('stops cleanly on padding / short tail', () => {
     const out = decodeBandgPerf(Buffer.concat([HEADER, tlv(83, 2, 100), Buffer.from([0x00])]));
     expect(out).toHaveLength(1);
+  });
+});
+
+describe('FastPacketReassembler', () => {
+  it('returns a single-frame payload immediately', () => {
+    const r = new FastPacketReassembler();
+    // frame0: counter=0, total=6, then 6 payload bytes
+    const out = r.feed(16, Uint8Array.from([0x00, 6, 0x7d, 0x99, 0x53, 0x20, 0xae, 0x1e]));
+    expect(out).not.toBeNull();
+    expect(Array.from(out!)).toEqual([0x7d, 0x99, 0x53, 0x20, 0xae, 0x1e]);
+  });
+
+  it('reassembles a multi-frame payload and end-to-end decodes it', () => {
+    const r = new FastPacketReassembler();
+    // 10-byte payload: hdr(7d 99) + Target TWA(53 20, val ae 1e=7854) + VMG Perf(1d 21, val b6 03=950)
+    // frame0 carries 6 bytes, frame1 the remaining 4.
+    expect(r.feed(16, Uint8Array.from([0x00, 10, 0x7d, 0x99, 0x53, 0x20, 0xae, 0x1e]))).toBeNull();
+    const payload = r.feed(16, Uint8Array.from([0x01, 0x1d, 0x21, 0xb6, 0x03, 0xff, 0xff, 0xff]));
+    expect(payload).not.toBeNull();
+    const out = parseBandgKeyValues(payload!, loadBandgKeyTable());
+    expect(out.map((v) => v.name)).toEqual(['Target TWA', 'VMG Performance']);
+    expect(out[1]!.value).toBeCloseTo(95.0, 4);
+  });
+
+  it('drops a source on a counter/sequence mismatch (no corrupt payload)', () => {
+    const r = new FastPacketReassembler();
+    r.feed(16, Uint8Array.from([0x00, 10, 1, 2, 3, 4, 5, 6]));
+    // wrong next counter (2 instead of 1) → reset, returns null
+    expect(r.feed(16, Uint8Array.from([0x02, 7, 8, 9, 10, 11, 12, 13]))).toBeNull();
   });
 });

@@ -2,7 +2,13 @@ import type { Bus } from '@g5000/core';
 import { getPgnFirehose } from '@g5000/core';
 import { mergeMap, from, share, type Subscription } from 'rxjs';
 import type { WireDriver } from './wire-driver.js';
-import { decode } from './decoder.js';
+import { decode, pgnFromCanId } from './decoder.js';
+import {
+  FastPacketReassembler,
+  loadBandgKeyTable,
+  parseBandgKeyValues,
+  BANDG_PUBLISH_CHANNELS,
+} from './bandg-perf.js';
 import { mapPgnToSamples } from './channel-mapper.js';
 import { mapSentenceToSamples } from './nmea0183/channel-mapper.js';
 import { handleAisPgn, isAisPgn } from './ais/ais-handler.js';
@@ -58,6 +64,9 @@ function withErrorLog(message: string) {
     console.error(message, err);
   };
 }
+
+// B&G 130824 performance catalog (key → name/resolution/unit), loaded once.
+const bandgTable = loadBandgKeyTable();
 
 /**
  * Build a fresh DriverHub bound to `bus`. The hub uses the shared device
@@ -139,6 +148,33 @@ export function createDriverHub(bus: Bus): DriverHub {
       driver.rx0183.pipe(mergeMap((s) => from(mapSentenceToSamples(s)))).subscribe({
         next: (sample) => bus.publish(sample),
         error: withErrorLog('[driver-hub] 0183 pipeline error (subscription terminated)'),
+      }),
+    );
+
+    // 7) B&G 130824 performance — canboatjs decodes each key but drops the
+    // dynamic value, so reassemble the fast-packet ourselves and emit the
+    // catalogued keys (Target Speed / TWA, Polar Speed, VMG/Polar %, leeway).
+    // Taps the RAW frame stream (not decoded$) since we need the payload bytes.
+    const bandgReassembler = new FastPacketReassembler();
+    subs.push(
+      driver.rxCan.subscribe({
+        next: (frame) => {
+          if (pgnFromCanId(frame.id) !== 130824) return;
+          const src = frame.id & 0xff;
+          const payload = bandgReassembler.feed(src, frame.data);
+          if (!payload) return;
+          for (const kv of parseBandgKeyValues(payload, bandgTable)) {
+            const channel = BANDG_PUBLISH_CHANNELS.get(kv.key);
+            if (channel === undefined || kv.value === null) continue;
+            bus.publish({
+              channel,
+              t_ns: frame.rxTimestamp,
+              value: { kind: 'scalar', value: kv.value, unit: kv.unit },
+              source: `n2k:130824@0x${src.toString(16).padStart(2, '0')}`,
+            });
+          }
+        },
+        error: withErrorLog('[driver-hub] bandg-perf pipeline error'),
       }),
     );
 
