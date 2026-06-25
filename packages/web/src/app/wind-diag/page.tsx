@@ -42,11 +42,12 @@ const DEG_PER_RAD = 180 / Math.PI;
 type Convert = (v: number) => number;
 const toKn: Convert = (v) => v * KN_PER_MS;
 const toDeg: Convert = (v) => v * DEG_PER_RAD;
+const toPct: Convert = (v) => v; // catalog % values pass through
 
 interface RowDef {
   channel: string;
   title: string;
-  unit: 'kn' | 'deg';
+  unit: 'kn' | 'deg' | '%';
   convert: Convert;
 }
 
@@ -84,6 +85,22 @@ const ROWS: readonly RowDef[] = [
     unit: 'kn',
     convert: toKn,
   },
+  // ── H5000's own broadcast (PGN 130824), decoded from the B&G key-value PGN
+  //    canboatjs can't read. Compare these against g5000's computed rows above.
+  { channel: 'bandg.trueWindDirection', title: 'H5000 TWD', unit: 'deg', convert: toDeg },
+  { channel: 'bandg.avgTrueWindDirection', title: 'H5000 TWD (avg)', unit: 'deg', convert: toDeg },
+  { channel: 'bandg.trueWindSpeed', title: 'H5000 TWS', unit: 'kn', convert: toKn },
+  { channel: 'bandg.trueWindAngle', title: 'H5000 TWA', unit: 'deg', convert: toDeg },
+  { channel: 'bandg.targetTwa', title: 'H5000 Target TWA', unit: 'deg', convert: toDeg },
+  { channel: 'bandg.targetSpeed', title: 'H5000 Target Speed', unit: 'kn', convert: toKn },
+  {
+    channel: 'bandg.polarPerformance',
+    title: 'H5000 Polar Performance',
+    unit: '%',
+    convert: toPct,
+  },
+  { channel: 'bandg.vmgPerformance', title: 'H5000 VMG Performance', unit: '%', convert: toPct },
+  { channel: 'bandg.leeway', title: 'H5000 Leeway', unit: 'deg', convert: toDeg },
 ];
 
 const POLL_MS = 1000;

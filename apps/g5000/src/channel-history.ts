@@ -30,6 +30,17 @@ const DEFAULT_CHANNELS: string[] = [
   Channels.Wind.TrueDirection,
   Channels.Boat.HeadingMagnetic,
   Channels.Boat.SpeedWater,
+  // H5000's own performance/wind broadcast (PGN 130824), for side-by-side
+  // comparison against g5000's computed values on /wind-diag.
+  'bandg.trueWindDirection',
+  'bandg.avgTrueWindDirection',
+  'bandg.trueWindSpeed',
+  'bandg.trueWindAngle',
+  'bandg.targetTwa',
+  'bandg.targetSpeed',
+  'bandg.polarPerformance',
+  'bandg.vmgPerformance',
+  'bandg.leeway',
 ];
 
 const DEFAULT_WINDOW_MS = 300_000; // 5 min

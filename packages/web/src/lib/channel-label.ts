@@ -1,7 +1,21 @@
 /** Lower-case tokens to render upper-case in channel labels. */
 const ACRONYMS = new Set([
-  'gps', 'cog', 'sog', 'vmg', 'twa', 'tws', 'twd', 'awa', 'aws', 'ais', 'imu', 'eta', 'hdg',
-  'xte', 'rpm', 'utc',
+  'gps',
+  'cog',
+  'sog',
+  'vmg',
+  'twa',
+  'tws',
+  'twd',
+  'awa',
+  'aws',
+  'ais',
+  'imu',
+  'eta',
+  'hdg',
+  'xte',
+  'rpm',
+  'utc',
 ]);
 
 /** Channels whose path-derived label reads poorly. */
@@ -27,6 +41,11 @@ function splitWords(segment: string): string[] {
 export function channelLabel(channel: string): string {
   const override = CHANNEL_LABEL_OVERRIDES[channel];
   if (override) return override;
+  // B&G H5000 performance broadcast (PGN 130824) — mark the source explicitly
+  // so it's distinct from g5000's own computed channels.
+  if (channel.startsWith('bandg.')) {
+    return `H5000 ${channelLabel(channel.slice('bandg.'.length))}`;
+  }
   const words = channel
     .split('.')
     .flatMap(splitWords)

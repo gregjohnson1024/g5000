@@ -135,7 +135,8 @@ export function parseBandgKeyValues(
  * legitimately be negative.
  */
 const SIGNED_KEYS = new Set<number>([
-  130, // Leeway Angle
+  130, // Leeway Angle (lee positive / negative)
+  273, // Start Line Bias (port/stbd favoured)
 ]);
 
 /** Convenience: full decode of a payload using the runtime catalog. */
@@ -197,10 +198,35 @@ export class FastPacketReassembler {
  * (speeds m/s, angles rad, performance %).
  */
 export const BANDG_PUBLISH_CHANNELS = new Map<number, string>([
+  // The H5000's OWN wind solution — lets us compare directly against g5000's
+  // computed wind.true.* (the original "is the H5000's TWD different?" question).
+  [77, 'bandg.apparentWindSpeed'],
+  [79, 'bandg.trueWindSpeed'],
+  [80, 'bandg.avgTrueWindDirection'],
+  [81, 'bandg.trueWindAngle'],
+  [89, 'bandg.trueWindDirection'],
+  [109, 'bandg.windDirection'],
+  // Performance / targets.
   [125, 'bandg.targetSpeed'],
   [126, 'bandg.polarSpeed'],
   [83, 'bandg.targetTwa'],
   [124, 'bandg.polarPerformance'],
   [285, 'bandg.vmgPerformance'],
+  [127, 'bandg.vmgToWind'],
+  [50, 'bandg.tackingPerformance'],
+  [53, 'bandg.optimumWindAngle'],
+  // Leeway / current.
   [130, 'bandg.leeway'],
+  [73, 'bandg.currentSet'],
+  [131, 'bandg.currentDrift'],
+  // Tactical / race.
+  [154, 'bandg.oppositeTackHeading'],
+  [256, 'bandg.laylineTime'],
+  [258, 'bandg.laylineDistance'],
+  [117, 'bandg.raceTimer'],
+  [152, 'bandg.distanceToStartLine'],
+  [272, 'bandg.startLineBearing'],
+  [273, 'bandg.startLineBias'],
+  [111, 'bandg.nextLegAwa'],
+  [113, 'bandg.nextLegAws'],
 ]);
