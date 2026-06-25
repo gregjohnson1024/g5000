@@ -12,6 +12,7 @@
   "dependencies": {
     "@g5000/core": "*",
     "@canboat/canboatjs": "^3.20.0",
+    "@canboat/ts-pgns": "^1.11.18",
     "rxjs": "^7",
     "serialport": "^12"
   },
