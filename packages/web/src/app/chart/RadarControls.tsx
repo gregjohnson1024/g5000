@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { MayaraClient } from '../../lib/radar/mayara-client.js';
+import { MayaraClient } from '../../lib/radar/mayara-client';
 
 export interface RadarControlsProps {
   baseUrl: string;

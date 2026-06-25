@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { buildColorLut } from './legend.js';
-import type { Capabilities } from './types.js';
+import { buildColorLut } from './legend';
+import type { Capabilities } from './types';
 
 const caps: Capabilities = JSON.parse(
   readFileSync(fileURLToPath(new URL('./__fixtures__/capabilities.json', import.meta.url)), 'utf8'),

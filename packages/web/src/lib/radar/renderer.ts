@@ -1,6 +1,6 @@
-import { buildColorLut } from './legend.js';
-import { spokeToCanvas } from './geometry.js';
-import type { Capabilities, DecodedSpoke } from './types.js';
+import { buildColorLut } from './legend';
+import { spokeToCanvas } from './geometry';
+import type { Capabilities, DecodedSpoke } from './types';
 
 type Ctx = Pick<CanvasRenderingContext2D, 'clearRect' | 'fillRect' | 'canvas'> & {
   fillStyle: string | CanvasGradient | CanvasPattern;

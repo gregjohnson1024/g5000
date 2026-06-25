@@ -1,5 +1,5 @@
-import { decodeRadarMessage } from './proto.js';
-import type { Capabilities, ControlValue, DecodedSpoke, RadarInfo } from './types.js';
+import { decodeRadarMessage } from './proto';
+import type { Capabilities, ControlValue, DecodedSpoke, RadarInfo } from './types';
 
 const API = '/signalk/v2/api/vessels/self/radars';
 

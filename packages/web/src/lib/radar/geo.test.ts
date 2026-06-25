@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rangeBboxCorners } from './geo.js';
+import { rangeBboxCorners } from './geo';
 
 describe('rangeBboxCorners', () => {
   it('returns TL,TR,BR,BL square centred on the radar', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { spokeToCanvas } from './geometry.js';
+import { spokeToCanvas } from './geometry';
 
 describe('spokeToCanvas', () => {
   const N = 2048,

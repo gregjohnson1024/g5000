@@ -34,7 +34,7 @@ import { BathyLayer } from '../../components/BathyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
-import { RadarOverlay } from '../../components/RadarOverlay.js';
+import { RadarOverlay } from '../../components/RadarOverlay';
 import { RadarControls } from './RadarControls';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';

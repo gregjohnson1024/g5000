@@ -1,5 +1,5 @@
 import protobuf from 'protobufjs';
-import type { DecodedSpoke } from './types.js';
+import type { DecodedSpoke } from './types';
 
 // Mirrors mayara src/lib/protos/RadarMessage.proto (proto3).
 const PROTO_SRC = `

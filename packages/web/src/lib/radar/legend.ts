@@ -1,4 +1,4 @@
-import type { Legend } from './types.js';
+import type { Legend } from './types';
 
 /** Parse "#rrggbbaa" | "#rrggbb" | "#rgb[a]" into [r,g,b,a] (0-255). */
 export function hexToRgba(hex: string): [number, number, number, number] {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi } from 'vitest';
-import { MayaraClient, wsUrlFor } from './mayara-client.js';
+import { MayaraClient, wsUrlFor } from './mayara-client';
 
 const radars = JSON.parse(
   readFileSync(fileURLToPath(new URL('./__fixtures__/radars.json', import.meta.url)), 'utf8'),

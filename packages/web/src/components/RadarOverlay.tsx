@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import type maplibregl from 'maplibre-gl';
-import { MayaraClient } from '../lib/radar/mayara-client.js';
-import { RadarCanvas } from '../lib/radar/renderer.js';
-import { rangeBboxCorners } from '../lib/radar/geo.js';
-import type { LivePos } from './LiveBoatMarker.js';
+import { MayaraClient } from '../lib/radar/mayara-client';
+import { RadarCanvas } from '../lib/radar/renderer';
+import { rangeBboxCorners } from '../lib/radar/geo';
+import type { LivePos } from './LiveBoatMarker';
 
 const SRC = 'radar';
 const LAYER = 'radar-layer';

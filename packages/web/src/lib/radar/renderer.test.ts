@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { RadarCanvas } from './renderer.js';
-import type { Capabilities, DecodedSpoke } from './types.js';
+import { RadarCanvas } from './renderer';
+import type { Capabilities, DecodedSpoke } from './types';
 
 function fakeCtx(size: number) {
   const fills: Array<{ x: number; y: number; style: string }> = [];

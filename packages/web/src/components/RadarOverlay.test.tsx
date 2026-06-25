@@ -11,7 +11,7 @@
  * replace this with the render-based test from task-9-brief.md.
  */
 import { describe, it, expect } from 'vitest';
-import { RadarOverlay } from './RadarOverlay.js';
+import { RadarOverlay } from './RadarOverlay';
 
 describe('RadarOverlay', () => {
   it('exports a function component', () => {
