@@ -35,6 +35,7 @@ import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { RadarOverlay } from '../../components/RadarOverlay.js';
+import { RadarControls } from './RadarControls';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { WindTimeline } from './WindTimeline';
@@ -1131,6 +1132,13 @@ function ChartPageInner() {
           <TzToggle tz={tz} setTz={setTz} />
         </div>
         <LiveValues p={livePos} />
+        {layers.radar && mayaraBaseUrl && (
+          <RadarControls
+            baseUrl={mayaraBaseUrl}
+            opacity={radarUi.opacity}
+            onOpacity={(v) => setRadarUi((s) => ({ ...s, opacity: v }))}
+          />
+        )}
         <RoutePlanPanel
           waypoints={waypoints}
           tz={tz}
