@@ -135,6 +135,7 @@ export function parseBandgKeyValues(
  * legitimately be negative.
  */
 const SIGNED_KEYS = new Set<number>([
+  53, // Optimum Wind Angle (H5000 WS confirms signed: our unsigned 305° = -55°)
   130, // Leeway Angle (lee positive / negative)
   273, // Start Line Bias (port/stbd favoured)
 ]);
