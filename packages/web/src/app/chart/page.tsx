@@ -34,6 +34,7 @@ import { BathyLayer } from '../../components/BathyLayer';
 import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
+import { RadarOverlay } from '../../components/RadarOverlay.js';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { WindTimeline } from './WindTimeline';
@@ -158,6 +159,7 @@ function ChartPageInner() {
     aisCog: true,
     tideStations: false,
     currentStations: false,
+    radar: false,
     model: 'none' as ChartModel,
   });
   const [layersHydrated, setLayersHydrated] = useState(false);
@@ -177,6 +179,7 @@ function ChartPageInner() {
           aisCog: parsed.aisCog ?? true,
           tideStations: parsed.tideStations ?? false,
           currentStations: parsed.currentStations ?? false,
+          radar: parsed.radar ?? false,
           model: validModels.includes(parsed.model as ChartModel)
             ? (parsed.model as ChartModel)
             : 'none',
@@ -294,6 +297,39 @@ function ChartPageInner() {
       /* quota / private-mode; ignore */
     }
   }, [settingsHydrated, windHours, windLockNow]);
+
+  // Radar UI settings — opacity. Persisted to chart:radar (mirror of chart:settings pattern).
+  const [radarUi, setRadarUi] = useState<{ opacity: number }>({ opacity: 0.7 });
+  const [radarUiHydrated, setRadarUiHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('chart:radar');
+      if (raw) {
+        const j = JSON.parse(raw) as Partial<{ opacity: number }>;
+        if (typeof j.opacity === 'number') setRadarUi({ opacity: j.opacity });
+      }
+    } catch {
+      /* corrupt blob; ignore */
+    }
+    setRadarUiHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!radarUiHydrated) return;
+    try {
+      localStorage.setItem('chart:radar', JSON.stringify(radarUi));
+    } catch {
+      /* quota / private-mode; ignore */
+    }
+  }, [radarUiHydrated, radarUi]);
+
+  // Mayara base URL — derived client-side from the page's own host on port 6502.
+  // Computed in useEffect (SSR-safe: window/location are undefined during server render).
+  const [mayaraBaseUrl, setMayaraBaseUrl] = useState('');
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setMayaraBaseUrl(`${window.location.protocol}//${window.location.hostname}:6502`);
+    }
+  }, []);
 
   const [waypoints, setWaypoints] = useState<
     Array<{ id: string; name: string; lat: number; lon: number }>
@@ -1022,6 +1058,15 @@ function ChartPageInner() {
         <SatelliteLayer map={mapInstance} visible={layers.satellite} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
         <BathyLayer map={mapInstance} visible={layers.bathy} />
+        {layers.radar && mayaraBaseUrl && (
+          <RadarOverlay
+            map={mapInstance}
+            pos={livePos}
+            baseUrl={mayaraBaseUrl}
+            opacity={radarUi.opacity}
+            hidden={false}
+          />
+        )}
         {(() => {
           const sel = selectedWaypointId
             ? waypoints.find((w) => w.id === selectedWaypointId)

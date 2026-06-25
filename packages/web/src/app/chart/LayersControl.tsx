@@ -20,6 +20,8 @@ export interface LayersState {
   tideStations: boolean;
   /** Tidal-current-station markers overlay. Defaults false. */
   currentStations: boolean;
+  /** Radar overlay (Mayara). Defaults false. */
+  radar: boolean;
   /** Mutually-exclusive forecast/current overlay. 'none' = no model overlay. */
   model: ChartModel;
 }
@@ -49,7 +51,8 @@ export function LayersControl({
       | 'ais'
       | 'aisCog'
       | 'tideStations'
-      | 'currentStations',
+      | 'currentStations'
+      | 'radar',
   ) => void;
   onSelectModel: (model: ChartModel) => void;
 }): React.ReactElement {
@@ -160,6 +163,7 @@ export function LayersControl({
               pressed={state.currentStations}
               onClick={() => onToggle('currentStations')}
             />
+            <Row label="Radar" pressed={state.radar} onClick={() => onToggle('radar')} />
           </div>
         </div>
       ) : null}

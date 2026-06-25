@@ -15,7 +15,8 @@ export interface ChartToolbarProps {
       | 'ais'
       | 'aisCog'
       | 'tideStations'
-      | 'currentStations',
+      | 'currentStations'
+      | 'radar',
   ) => void;
   onSelectModel: (model: ChartModel) => void;
   waypointDropActive: boolean;
