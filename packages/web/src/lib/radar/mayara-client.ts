@@ -37,7 +37,9 @@ export class MayaraClient {
   }) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
     this.wsBase = (opts.wsBase ?? opts.baseUrl).replace(/\/$/, '');
-    this.fetchImpl = opts.fetchImpl ?? fetch;
+    // Bind to globalThis: the browser's `fetch` throws "Illegal invocation" if
+    // called as a method of another object (i.e. `this.fetchImpl(...)`).
+    this.fetchImpl = opts.fetchImpl ?? fetch.bind(globalThis);
     this.wsImpl = opts.wsImpl ?? (globalThis.WebSocket as unknown as WebSocketCtor);
   }
 
