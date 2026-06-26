@@ -32,6 +32,9 @@ export function RadarOverlay(props: {
   const rcRef = useRef<RadarCanvas | null>(null);
   const posRef = useRef<LivePos | null>(pos);
   posRef.current = pos;
+  // Lets effect D (which fires on position change) trigger effect A's `ensure`,
+  // so the source/layer get added once the live fix arrives after mount.
+  const ensureRef = useRef<() => void>(() => {});
 
   // Effect A: attach the stable canvas to a CanvasSource/raster-layer on the current map
   // (idempotent ensure, styledata retry). Cleanup removes the layer+source so toggling
@@ -62,10 +65,12 @@ export function RadarOverlay(props: {
         // retry on styledata
       }
     };
+    ensureRef.current = ensure;
     ensure();
     map.on('styledata', ensure);
     return () => {
       map.off('styledata', ensure);
+      ensureRef.current = () => {};
       try {
         if (map.getLayer(LAYER)) map.removeLayer(LAYER);
         if (map.getSource(SRC)) map.removeSource(SRC);
@@ -124,9 +129,12 @@ export function RadarOverlay(props: {
     map.setPaintProperty(LAYER, 'raster-opacity', opacity);
   }, [map, opacity]);
 
-  // Effect D: re-pin canvas source to boat position and range
+  // Effect D: re-pin canvas source to boat position and range. Also runs `ensure`
+  // first, so the source/layer are created when the live fix arrives after mount
+  // (the styledata retry in effect A does not fire on position updates).
   useEffect(() => {
     if (!map || !pos) return;
+    ensureRef.current();
     const src = map.getSource(SRC) as maplibregl.CanvasSource | undefined;
     src?.setCoordinates(rangeBboxCorners(pos.lat, pos.lon, rangeM));
   }, [map, pos, rangeM]);
