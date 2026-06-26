@@ -20,6 +20,23 @@ export interface Legend {
   pixelColors?: number;
   historyStart?: number;
 }
+/** One entry of a radar's `controls` map (keyed by control id, e.g. `range`, `gain`). */
+export interface RadarControlSpec {
+  id?: number;
+  name?: string;
+  dataType?: string;
+  minValue?: number;
+  maxValue?: number;
+  units?: string;
+  /**
+   * Values the control will accept. For `range` this is a SUBSET of the
+   * radar's `supportedRanges` (the nm-derived steps only) — sending a
+   * supportedRange that is not a validValue is rejected with HTTP 400.
+   */
+  validValues?: number[];
+  descriptions?: Record<string, string>;
+}
+
 export interface Capabilities {
   spokesPerRevolution: number;
   maxSpokeLength: number;
@@ -28,6 +45,7 @@ export interface Capabilities {
   supportedRanges: number[];
   legend: Legend;
   hasDoppler?: boolean;
+  controls?: Record<string, RadarControlSpec>;
 }
 export interface RadarInfo {
   name: string;

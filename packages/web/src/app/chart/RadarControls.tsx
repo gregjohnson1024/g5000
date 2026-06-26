@@ -20,7 +20,8 @@ interface ControlState {
 
 interface ReadyState {
   id: string;
-  supportedRanges: number[];
+  /** Range steps the radar's `range` control accepts (its validValues, NOT supportedRanges). */
+  ranges: number[];
 }
 
 /**
@@ -62,7 +63,11 @@ export function RadarControls({
         const { id } = await client.discover();
         const caps = await client.capabilities(id);
         if (!alive) return;
-        setReady({ id, supportedRanges: caps.supportedRanges });
+        // Use the range CONTROL's validValues — the values the radar will actually
+        // accept. supportedRanges is a superset (round-metric steps interleaved with
+        // nm-derived ones); sending a metric-only step (e.g. 36000) is rejected 400.
+        const ranges = caps.controls?.range?.validValues ?? caps.supportedRanges;
+        setReady({ id, ranges });
       } catch {
         if (alive) timer = setTimeout(() => void attempt(), 2000);
       }
@@ -89,9 +94,9 @@ export function RadarControls({
     });
   };
 
-  // Derive the current range index as the nearest supported range to the shared rangeM prop.
+  // Derive the current range index as the nearest accepted range to the shared rangeM prop.
   const rangeIdx = (() => {
-    const ranges = ready?.supportedRanges;
+    const ranges = ready?.ranges;
     if (!ranges || ranges.length === 0) return 0;
     let best = 0;
     let bestDelta = Infinity;
@@ -106,7 +111,7 @@ export function RadarControls({
   })();
 
   const handleRange = (idx: number): void => {
-    const ranges = ready?.supportedRanges;
+    const ranges = ready?.ranges;
     const m = ranges?.[idx];
     if (m !== undefined) {
       onRange(m);
@@ -153,13 +158,11 @@ export function RadarControls({
             −
           </button>
           <span className="text-slate-200 font-mono w-14 text-center">
-            {connecting || !ready.supportedRanges[rangeIdx]
-              ? '—'
-              : fmtRange(ready.supportedRanges[rangeIdx]!)}
+            {connecting || !ready.ranges[rangeIdx] ? '—' : fmtRange(ready.ranges[rangeIdx]!)}
           </span>
           <button
             type="button"
-            disabled={connecting || rangeIdx >= ready.supportedRanges.length - 1}
+            disabled={connecting || rangeIdx >= ready.ranges.length - 1}
             onClick={() => handleRange(rangeIdx + 1)}
             className="w-6 h-6 rounded border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:opacity-30 flex items-center justify-center"
           >
