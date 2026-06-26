@@ -50,22 +50,27 @@ export function RadarControls({
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // On mount: discover → capabilities → store id + supportedRanges.
+  // Retries on failure (mayara may be booting, or the proxy route still warming
+  // up on first hit), so the panel self-heals instead of sticking on "connecting".
   useEffect(() => {
     const client = new MayaraClient({ baseUrl, wsBase });
     clientRef.current = client;
     let alive = true;
-    void (async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = async (): Promise<void> => {
       try {
         const { id } = await client.discover();
         const caps = await client.capabilities(id);
         if (!alive) return;
         setReady({ id, supportedRanges: caps.supportedRanges });
       } catch {
-        // Silently stay in connecting state; radar emulator may be offline.
+        if (alive) timer = setTimeout(() => void attempt(), 2000);
       }
-    })();
+    };
+    void attempt();
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
     };
   }, [baseUrl, wsBase]);
 

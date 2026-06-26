@@ -84,27 +84,36 @@ export function RadarOverlay(props: {
     const client = new MayaraClient({ baseUrl, wsBase });
     let cancelled = false;
     let dispose = (): void => {};
-    (async () => {
-      const { id, info } = await client.discover();
-      if (cancelled) return;
-      const caps = await client.capabilities(id);
-      if (cancelled) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      rcRef.current = new RadarCanvas(ctx, caps, SIZE);
-      const d = client.connectSpokes(
-        info.spokeDataUrl,
-        (spokes) => rcRef.current?.drawSpokes(spokes),
-        () => {},
-      );
-      if (cancelled) {
-        d();
-        return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Retry discover/capabilities on failure (mayara booting, proxy route warming)
+    // so the overlay self-heals; once connected, the WS handles its own reconnect.
+    const attempt = async (): Promise<void> => {
+      try {
+        const { id, info } = await client.discover();
+        if (cancelled) return;
+        const caps = await client.capabilities(id);
+        if (cancelled) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        rcRef.current = new RadarCanvas(ctx, caps, SIZE);
+        const d = client.connectSpokes(
+          info.spokeDataUrl,
+          (spokes) => rcRef.current?.drawSpokes(spokes),
+          () => {},
+        );
+        if (cancelled) {
+          d();
+          return;
+        }
+        dispose = d;
+      } catch {
+        if (!cancelled) timer = setTimeout(() => void attempt(), 2000);
       }
-      dispose = d;
-    })().catch(() => {});
+    };
+    void attempt();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
       dispose();
     };
   }, [map, baseUrl, wsBase]);
