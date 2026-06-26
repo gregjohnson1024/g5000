@@ -9,6 +9,12 @@ import type { LivePos } from './LiveBoatMarker';
 const SRC = 'radar';
 const LAYER = 'radar-layer';
 const SIZE = 1024; // offscreen canvas px
+// Cadence at which the offscreen canvas is pushed into the MapLibre ImageSource.
+// ~3/s is smooth for a radar sweep (a full revolution is ~2.5 s) and keeps the
+// per-tick `toDataURL` encode cost modest on low-end chart clients.
+const REFRESH_MS = 300;
+
+type Corners = ReturnType<typeof rangeBboxCorners>;
 
 export function RadarOverlay(props: {
   map: maplibregl.Map | null;
@@ -32,26 +38,41 @@ export function RadarOverlay(props: {
   const rcRef = useRef<RadarCanvas | null>(null);
   const posRef = useRef<LivePos | null>(pos);
   posRef.current = pos;
+  // Latest range read by the refresh interval (which lives in effect A, deps [map]).
+  const rangeMRef = useRef(rangeM);
+  rangeMRef.current = rangeM;
   // Lets effect D (which fires on position change) trigger effect A's `ensure`,
   // so the source/layer get added once the live fix arrives after mount.
   const ensureRef = useRef<() => void>(() => {});
 
-  // Effect A: attach the stable canvas to a CanvasSource/raster-layer on the current map
-  // (idempotent ensure, styledata retry). Cleanup removes the layer+source so toggling
-  // radar off fully tears down the echoes — no frozen overlay left on the map.
+  // Effect A: drive the stable canvas onto an ImageSource/raster-layer on the current
+  // map (idempotent ensure, styledata retry), and push the canvas in on a cadence.
+  //
+  // We deliberately use an `image` source, NOT a `canvas` source. MapLibre only
+  // re-uploads a CanvasSource's GL texture during a source-update pass (`_sourcesDirty`),
+  // not on a plain `triggerRepaint`/render — so with nothing else continuously animating,
+  // the CanvasSource uploads its (initially blank) texture once and never refreshes.
+  // Echoes painted to the offscreen canvas were therefore invisible on the map (verified
+  // on real hardware GL: vector + raster-tile + ImageSource all render, CanvasSource does
+  // not). `ImageSource.updateImage` re-uploads the texture explicitly, so we re-encode the
+  // canvas and push it every REFRESH_MS. Cleanup removes the layer+source so toggling radar
+  // off fully tears down the echoes — no frozen overlay left on the map.
   useEffect(() => {
     if (!map) return;
     const canvas = canvasRef.current!;
+    const cornersNow = (): Corners | null => {
+      const p = posRef.current;
+      return p ? rangeBboxCorners(p.lat, p.lon, rangeMRef.current) : null;
+    };
     const ensure = (): void => {
       try {
-        if (!map.getSource(SRC) && posRef.current) {
-          const corners = rangeBboxCorners(posRef.current.lat, posRef.current.lon, rangeM);
+        const corners = cornersNow();
+        if (!map.getSource(SRC) && corners) {
           map.addSource(SRC, {
-            type: 'canvas',
-            canvas,
+            type: 'image',
+            url: canvas.toDataURL('image/png'),
             coordinates: corners,
-            animate: true,
-          } as Parameters<maplibregl.Map['addSource']>[1]);
+          });
         }
         if (map.getSource(SRC) && !map.getLayer(LAYER)) {
           map.addLayer({
@@ -68,7 +89,18 @@ export function RadarOverlay(props: {
     ensureRef.current = ensure;
     ensure();
     map.on('styledata', ensure);
+    const timer = setInterval(() => {
+      const src = map.getSource(SRC) as maplibregl.ImageSource | undefined;
+      const corners = cornersNow();
+      if (!src || !corners) return;
+      try {
+        src.updateImage({ url: canvas.toDataURL('image/png'), coordinates: corners });
+      } catch {
+        // source mid-teardown; the next tick retries
+      }
+    }, REFRESH_MS);
     return () => {
+      clearInterval(timer);
       map.off('styledata', ensure);
       ensureRef.current = () => {};
       try {
@@ -129,13 +161,14 @@ export function RadarOverlay(props: {
     map.setPaintProperty(LAYER, 'raster-opacity', opacity);
   }, [map, opacity]);
 
-  // Effect D: re-pin canvas source to boat position and range. Also runs `ensure`
-  // first, so the source/layer are created when the live fix arrives after mount
-  // (the styledata retry in effect A does not fire on position updates).
+  // Effect D: re-pin the image source to boat position and range for snappy response on
+  // a fix/range change (the REFRESH_MS tick also re-pins, but only every REFRESH_MS).
+  // Also runs `ensure` first, so the source/layer are created when the live fix arrives
+  // after mount (the styledata retry in effect A does not fire on position updates).
   useEffect(() => {
     if (!map || !pos) return;
     ensureRef.current();
-    const src = map.getSource(SRC) as maplibregl.CanvasSource | undefined;
+    const src = map.getSource(SRC) as maplibregl.ImageSource | undefined;
     src?.setCoordinates(rangeBboxCorners(pos.lat, pos.lon, rangeM));
   }, [map, pos, rangeM]);
 
