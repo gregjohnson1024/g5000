@@ -31,11 +31,18 @@ export class RadarCanvas {
       const dir = s.bearing ?? s.angle; // true-north when present, else from bow
       const n = s.data.length;
       for (let i = 0; i < n; i++) {
+        const { x, y } = spokeToCanvas(dir, this.spokesPerRev, i, n, s.range, this.size);
+        // Erase this cell's previous return FIRST. As the beam sweeps it overwrites
+        // each radial; a cell that is now empty (v === 0) must clear rather than keep
+        // last revolution's echo — otherwise the canvas accumulates every echo ever
+        // painted (a growing smear, worsened by the boat-centred bbox panning). Per-cell
+        // clear (vs wiping the whole canvas per revolution) keeps the ~1-rev afterglow
+        // that reads as radar, with no blink.
+        this.ctx.clearRect(x - this.cell / 2, y - this.cell / 2, this.cell, this.cell);
         const v = s.data[i]!;
-        if (v === 0) continue; // transparent
+        if (v === 0) continue; // empty water — leave the cell cleared
         const r = v * 4;
         this.ctx.fillStyle = `rgba(${this.lut[r]},${this.lut[r + 1]},${this.lut[r + 2]},${this.lut[r + 3]! / 255})`;
-        const { x, y } = spokeToCanvas(dir, this.spokesPerRev, i, n, s.range, this.size);
         this.ctx.fillRect(x - this.cell / 2, y - this.cell / 2, this.cell, this.cell);
       }
     }
