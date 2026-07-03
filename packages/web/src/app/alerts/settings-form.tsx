@@ -20,6 +20,7 @@ interface AlarmsConfig {
 const ALARM_LABELS: Record<string, string> = {
   mob: 'MOB',
   'anchor-watch': 'Anchor Watch',
+  'ais-cpa': 'AIS Collision (CPA)',
   'shallow-water': 'Shallow Water',
   'over-speed': 'Over Speed',
   'low-battery': 'Low Battery',

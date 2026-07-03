@@ -193,12 +193,14 @@ export function MobLayer({
 
   async function ack() {
     try {
-      await fetch('/api/alarms', {
+      const res = await fetch('/api/alarms', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id: 'mob', action: 'ack' }),
       });
-      setMob(null); // don't wait for the next poll to drop the marker
+      // Only clear locally when the ack actually landed — otherwise the marker
+      // vanishes for a poll cycle and pops back, reading as a glitch.
+      if (res.ok) setMob(null); // don't wait for the next poll to drop the marker
     } catch {
       // transient — the next click retries
     }

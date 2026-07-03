@@ -36,13 +36,17 @@ export function MobButton({ livePos, className }: { livePos: LivePos | null; cla
     const p = livePosRef.current;
     const context = p ? { lat: p.lat, lon: p.lon, t: p.t } : {};
     try {
-      await fetch('/api/alarms', {
+      const res = await fetch('/api/alarms', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id: 'mob', action: 'fire', context }),
       });
-      setFired(true);
-      setTimeout(() => setFired(false), 3000);
+      // Safety control: only show ✓ when the registry confirmed the fire — a
+      // 4xx/5xx must leave the button ready to retry, not fake success.
+      if (res.ok) {
+        setFired(true);
+        setTimeout(() => setFired(false), 3000);
+      }
     } catch {
       // transient — the user will see no banner and can hold again
     }

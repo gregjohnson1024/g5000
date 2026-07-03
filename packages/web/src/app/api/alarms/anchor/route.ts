@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import type { AlarmsConfig, AnchorThreshold } from '@g5000/db';
+import {
+  getSharedConfigStore,
+  saveAlarmsConfig,
+  type AlarmsConfig,
+  type AnchorThreshold,
+} from '@g5000/db';
 import { getSharedAlarms } from '@g5000/core';
 import { projectPoint } from '@g5000/compute';
 
@@ -14,6 +19,20 @@ function getRef(): ConfigRef | null {
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+/**
+ * Persist the mutated config so an armed anchor watch survives a process
+ * restart (a boat swinging at anchor must not lose its watch to a g5000
+ * restart). Best-effort: the live ref is already updated, so a DB failure
+ * must not fail the drop/weigh action itself.
+ */
+async function persistBestEffort(cfg: AlarmsConfig): Promise<void> {
+  try {
+    await saveAlarmsConfig(getSharedConfigStore(), cfg);
+  } catch {
+    /* live watch is armed via the ref; persistence is a durability bonus */
+  }
+}
 
 /**
  * GET /api/alarms/anchor
@@ -96,6 +115,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       ...ref.current,
       thresholds: { ...ref.current.thresholds, anchor },
     };
+    await persistBestEffort(ref.current);
     return NextResponse.json({ ok: true, anchor });
   }
 
@@ -112,6 +132,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const registry = getSharedAlarms();
     registry?.clear('anchor-watch');
     registry?.ack('anchor-watch');
+    await persistBestEffort(ref.current);
     return NextResponse.json({ ok: true });
   }
 
