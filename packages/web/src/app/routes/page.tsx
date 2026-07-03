@@ -243,6 +243,14 @@ export default function RoutesPage() {
                       >
                         {isBusy ? 'Planning…' : 'Plan'}
                       </button>
+                      <a
+                        href={`/api/routes/${route.id}/export-gpx`}
+                        download
+                        title="Download this route as a GPX file"
+                        className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded inline-block"
+                      >
+                        GPX
+                      </a>
                       <button
                         onClick={() => setBuilderMode(route.id)}
                         disabled={builderMode !== null}

@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseCoordinate, parseLatLon, formatCoordinate } from '../../lib/coords';
 import { greatCircleNm, bearingDeg } from '../../lib/geo';
 
@@ -41,6 +41,10 @@ export default function WaypointsPage() {
   // /api/stats/eta (which reads the active track's last point); shows "—"
   // if there's no active track yet.
   const [currentPos, setCurrentPos] = useState<CurrentPos | null>(null);
+
+  // GPX import state
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -134,6 +138,35 @@ export default function WaypointsPage() {
         return;
       }
       if (!j.ok) throw new Error(j.error?.message ?? 'delete failed');
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleImportFile = async (file: File): Promise<void> => {
+    setError(null);
+    setImportMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch('/api/waypoints/import-gpx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/gpx+xml' },
+        body: await file.text(),
+      });
+      const j = (await res.json()) as {
+        ok: boolean;
+        imported?: { waypoints: number; routes: number };
+        error?: { message?: string };
+      };
+      if (!j.ok) throw new Error(j.error?.message ?? 'import failed');
+      const { waypoints: nw = 0, routes: nr = 0 } = j.imported ?? {};
+      setImportMsg(
+        `Imported ${nw} waypoint${nw === 1 ? '' : 's'}` +
+          (nr > 0 ? ` and ${nr} route${nr === 1 ? '' : 's'}` : ''),
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -243,7 +276,35 @@ export default function WaypointsPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-base font-semibold">Saved waypoints</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold">Saved waypoints</h2>
+          <a
+            href="/api/waypoints/export-gpx"
+            download
+            className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
+          >
+            Export GPX
+          </a>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+            className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50"
+          >
+            Import GPX
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".gpx,application/gpx+xml"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void handleImportFile(file);
+            }}
+          />
+          {importMsg && <span className="text-xs text-emerald-400">{importMsg}</span>}
+        </div>
         {loading && <p className="text-slate-500 text-sm">Loading…</p>}
         {!loading && list.length === 0 && (
           <p className="text-slate-500 text-sm">No waypoints yet.</p>
