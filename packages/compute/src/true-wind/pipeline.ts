@@ -6,7 +6,14 @@ import {
   getSharedSourcePriority,
   type Sample,
 } from '@g5000/core';
-import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation, ConfigStore } from '@g5000/db';
+import type {
+  AwsAwaCalTable,
+  BoatConfig,
+  BspCal,
+  CompassDeviation,
+  ConfigStore,
+  WindMisalignmentCal,
+} from '@g5000/db';
 import { computeTrueWind } from './math.js';
 
 export interface TrueWindPipelineOptions {
@@ -22,6 +29,7 @@ interface LatestValues {
   bsp?: { value: number; t_ns: bigint };
   hdg?: { value: number; t_ns: bigint };
   yawRate?: { value: number; t_ns: bigint };
+  heel?: { value: number; t_ns: bigint };
 }
 
 export async function startTrueWindPipeline(
@@ -41,11 +49,13 @@ export async function startTrueWindPipeline(
     awsAwaCal: AwsAwaCalTable;
     bspCal: BspCal;
     compassDeviation: CompassDeviation;
+    windMisalignmentCal: WindMisalignmentCal | null;
   } = {
     boatConfig: await firstValueFrom(configStore.boatConfig$),
     awsAwaCal: await firstValueFrom(configStore.awsAwaCal$),
     bspCal: await firstValueFrom(configStore.bspCal$),
     compassDeviation: await firstValueFrom(configStore.compassDeviation$),
+    windMisalignmentCal: await firstValueFrom(configStore.windMisalignmentCal$),
   };
 
   function recompute(): void {
@@ -70,6 +80,8 @@ export async function startTrueWindPipeline(
       bspCal: configSnapshot.bspCal,
       compassDeviation: configSnapshot.compassDeviation,
       boatConfig: configSnapshot.boatConfig,
+      heel: latest.heel?.value ?? null,
+      misalignmentCal: configSnapshot.windMisalignmentCal,
     });
     bus.publish(make('wind.true.speed', out.tws, now_ns));
     bus.publish(make('wind.true.angle', out.twa, now_ns));
@@ -96,6 +108,7 @@ export async function startTrueWindPipeline(
   trackScalar(Channels.Boat.SpeedWater, 'bsp');
   trackScalar(Channels.Boat.HeadingMagnetic, 'hdg');
   trackScalar('motion.rateOfTurn', 'yawRate');
+  trackScalar(Channels.Motion.Heel, 'heel');
 
   rxSubs.push(
     combineLatest([
@@ -103,8 +116,9 @@ export async function startTrueWindPipeline(
       configStore.awsAwaCal$,
       configStore.bspCal$,
       configStore.compassDeviation$,
-    ]).subscribe(([boatConfig, awsAwaCal, bspCal, compassDeviation]) => {
-      configSnapshot = { boatConfig, awsAwaCal, bspCal, compassDeviation };
+      configStore.windMisalignmentCal$,
+    ]).subscribe(([boatConfig, awsAwaCal, bspCal, compassDeviation, windMisalignmentCal]) => {
+      configSnapshot = { boatConfig, awsAwaCal, bspCal, compassDeviation, windMisalignmentCal };
       recompute();
     }),
   );

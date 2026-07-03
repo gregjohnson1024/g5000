@@ -1,4 +1,10 @@
-import type { AwsAwaCalTable, BoatConfig, BspCal, CompassDeviation } from '@g5000/db';
+import type {
+  AwsAwaCalTable,
+  BoatConfig,
+  BspCal,
+  CompassDeviation,
+  WindMisalignmentCal,
+} from '@g5000/db';
 // `bilinearInterpolate2D` and `locate` live in the shared grid-interp module.
 // Re-exported here so existing importers of this module (and the package
 // barrel's `export *`) keep seeing `bilinearInterpolate2D` unchanged.
@@ -20,6 +26,11 @@ export interface TrueWindInputs {
   bspCal: BspCal;
   compassDeviation: CompassDeviation;
   boatConfig: BoatConfig;
+  /** Heel angle, radians (signed). Heel correction is skipped when absent
+   *  or when boatConfig.heelCorrectionEnabled is not set. */
+  heel?: number | null;
+  /** Per-AWS-bin sensor-misalignment cal. Skipped when absent. */
+  misalignmentCal?: WindMisalignmentCal | null;
 }
 
 export interface TrueWindOutputs {
@@ -45,6 +56,10 @@ const DEG_TO_RAD = Math.PI / 180;
  *   1. Masthead motion correction: subtract masthead linear velocity from
  *      the apparent wind vector. Velocity = yaw_rate × mast_height,
  *      perpendicular to the boat heading at the masthead.
+ *   1b. Heel correction (opt-in): project the mast-plane vane measurement
+ *      back to the horizontal plane.
+ *   1c. Sensor-misalignment offset (opt-in): signed AWA offset interpolated
+ *      on AWS, applied identically on both tacks.
  *   2. AWS/AWA calibration: 2D bilinear interpolation on the cal grid.
  *   3. BSP calibration: 1D linear interpolation on the BSP cal table.
  *   4. Compass deviation: lookup by heading bin.
@@ -63,8 +78,35 @@ export function computeTrueWind(inp: TrueWindInputs): TrueWindOutputs {
   // Subtract the masthead's lateral velocity from the apparent vector to get
   // the apparent wind that the masthead WOULD see if it were stationary.
   const awCorrectedY = awY - mastheadLatVel;
-  const awsCorr = Math.hypot(awX, awCorrectedY);
-  const awaCorr = Math.atan2(awCorrectedY, awX);
+  let awsCorr = Math.hypot(awX, awCorrectedY);
+  let awaCorr = Math.atan2(awCorrectedY, awX);
+
+  // --- Step 1b: heel correction (opt-in) ---
+  // The masthead vane measures the wind in the plane perpendicular to the
+  // mast. When the boat heels by φ, the horizontal wind's athwartships
+  // component is foreshortened by cos(φ) in that plane while the fore-aft
+  // component (along the heel axis) is unchanged. So the mast-plane
+  // measurement relates to the horizontal wind by
+  //   awa_h = atan2(sin(awa)·cos(φ), cos(awa))
+  //   aws_h = aws·sqrt(cos²(awa) + sin²(awa)·cos²(φ))
+  // atan2 of the scaled components preserves the sign/quadrant of awa.
+  // Skipped entirely (outputs bit-identical to before this stage existed)
+  // unless explicitly enabled AND a heel sample is present.
+  if (inp.boatConfig.heelCorrectionEnabled && inp.heel != null) {
+    const cosHeel = Math.cos(inp.heel);
+    const sinAwa = Math.sin(awaCorr);
+    const cosAwa = Math.cos(awaCorr);
+    awaCorr = Math.atan2(sinAwa * cosHeel, cosAwa);
+    awsCorr = awsCorr * Math.sqrt(cosAwa * cosAwa + sinAwa * sinAwa * cosHeel * cosHeel);
+  }
+
+  // --- Step 1c: sensor-misalignment offset (opt-in) ---
+  // Signed AWA offset (same sign on both tacks) interpolated on AWS — AWS is
+  // used as the key because TWS isn't known until after the vector
+  // subtraction. Skipped entirely when no cal is configured.
+  if (inp.misalignmentCal && inp.misalignmentCal.awsBins.length > 0) {
+    awaCorr = awaCorr + applyMisalignmentCal(awsCorr, inp.misalignmentCal);
+  }
 
   // --- Step 2: AWS/AWA cal table ---
   // Use |awa| for table lookup since the cal grid is symmetric across the
@@ -128,6 +170,23 @@ export function computeTrueWind(inp: TrueWindInputs): TrueWindOutputs {
   const twa = Math.atan2(twBoatY, twBoatX);
 
   return { tws, twa, twd, awsCal, awaCal, bspCal: bspCalValue };
+}
+
+/**
+ * Signed AWA offset (radians) for the given AWS: 1D linear interpolation on
+ * the cal's AWS bins, clamped at both ends. Returns 0 for an empty or
+ * shape-mismatched cal.
+ */
+export function applyMisalignmentCal(aws: number, cal: WindMisalignmentCal): number {
+  if (cal.awsBins.length === 0) return 0;
+  if (cal.awsBins.length !== cal.awaOffsetRad.length) return 0;
+  const idx = locate(cal.awsBins, aws);
+  const x0 = cal.awsBins[idx.lo]!;
+  const x1 = cal.awsBins[idx.hi]!;
+  const y0 = cal.awaOffsetRad[idx.lo]!;
+  const y1 = cal.awaOffsetRad[idx.hi]!;
+  const fx = x1 === x0 ? 0 : (aws - x0) / (x1 - x0);
+  return y0 * (1 - fx) + y1 * fx;
 }
 
 export function applyBspCal(bsp: number, cal: BspCal): number {

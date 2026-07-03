@@ -32,6 +32,7 @@ import { startGrooveSubsystem } from './groove-subsystem.js';
 import { startTideSubsystem } from './tide-subsystem.js';
 import { startHlink, startWebServer } from './server-setup.js';
 import { startRadarStatusPoller } from './radar/status-poller.js';
+import { installWindCalRun } from './wind-cal-run.js';
 
 const HTTP_PORT = Number(process.env.PORT ?? 3000);
 const SESSION_LOG_DIR = process.env.SESSION_LOG_DIR ?? null;
@@ -238,6 +239,14 @@ async function main(): Promise<void> {
 
   const stopTideSubsystem = await startTideSubsystem({ bus, store });
   teardown.push(stopTideSubsystem);
+
+  // Guided two-tack TWD calibration run — passive until started via the
+  // /api/calibration/twd-run route, which reaches it through the globalThis
+  // singleton installWindCalRun sets up.
+  const windCalRun = installWindCalRun(bus);
+  teardown.push(async () => {
+    windCalRun.abort();
+  });
 
   // 2b. H-LINK TCP server — B&G ASCII protocol over TCP, read-only.
   //     Exposes bus data to tactical-sailing software (Deckman, Expedition

@@ -4,6 +4,7 @@ import {
   bilinearInterpolate2D,
   applyBspCal,
   applyCompassDeviation,
+  applyMisalignmentCal,
   type TrueWindInputs,
 } from './math.js';
 import {
@@ -119,6 +120,185 @@ describe('applyBspCal', () => {
     };
     // At bsp = 5 (halfway), multiplier should be 1.0 → output = 5.
     expect(applyBspCal(5, cal)).toBeCloseTo(5, 6);
+  });
+});
+
+describe('computeTrueWind — zero-config regression (bit-identical)', () => {
+  // Outputs captured from the pre-heel/pre-misalignment implementation on
+  // these exact inputs. With no heel config and no misalignment cal, the new
+  // stages must be skipped entirely and every output must match bit-for-bit.
+  const fixtureInputs = [
+    { aws: 5, awa: Math.PI / 4, bsp: 3, headingMagRad: 0, yawRateRad: 0 },
+    { aws: 8.2, awa: -0.6, bsp: 3.6, headingMagRad: 1.2, yawRateRad: 0.03 },
+    { aws: 12.5, awa: 2.4, bsp: 4.1, headingMagRad: 5.9, yawRateRad: -0.05 },
+    { aws: 3.3, awa: -2.9, bsp: 2.2, headingMagRad: 3.1, yawRateRad: 0.01 },
+    { aws: 0.4, awa: 0.1, bsp: 0.5, headingMagRad: 0.2, yawRateRad: 0 },
+  ];
+  const fixtureOutputs = [
+    {
+      tws: 3.5758630516846663,
+      twa: 1.4204672165227834,
+      twd: 1.1726304627395887,
+      awsCal: 5,
+      awaCal: 0.7853981633974483,
+      bspCal: 3,
+    },
+    {
+      tws: 6.06335377824179,
+      twa: -1.021083687202089,
+      twd: 6.214264866194302,
+      awsCal: 8.516576409824925,
+      awaCal: -0.6523549464913543,
+      bspCal: 3.6,
+    },
+    {
+      tws: 16.26809077320933,
+      twa: 2.5298043953708684,
+      twd: 1.8987823344080879,
+      awsCal: 13.124706532429625,
+      awaCal: 2.3494131561238514,
+      bspCal: 4.1,
+    },
+    {
+      tws: 5.490440853071661,
+      twa: -2.9640780538937754,
+      twd: 6.171270499502616,
+      awsCal: 3.347630236914796,
+      awaCal: -2.8477684362256444,
+      bspCal: 2.2,
+    },
+    {
+      tws: 0.10953690651460672,
+      twa: 2.7684266088332197,
+      twd: 2.720589855050025,
+      awsCal: 0.4,
+      awaCal: 0.1,
+      bspCal: 0.5,
+    },
+  ];
+  const boatConfig = { ...DEFAULT_BOAT_CONFIG, magVarDeg: -14.2 };
+
+  it('matches the captured pre-change outputs exactly when the new config is unset', () => {
+    fixtureInputs.forEach((inp, i) => {
+      const out = computeTrueWind(baseInputs({ ...inp, boatConfig }));
+      expect(out).toEqual(fixtureOutputs[i]);
+      // toEqual would accept -0 vs 0 etc.; assert strict identity too.
+      expect(out.tws).toBe(fixtureOutputs[i]!.tws);
+      expect(out.twa).toBe(fixtureOutputs[i]!.twa);
+      expect(out.twd).toBe(fixtureOutputs[i]!.twd);
+      expect(out.awsCal).toBe(fixtureOutputs[i]!.awsCal);
+      expect(out.awaCal).toBe(fixtureOutputs[i]!.awaCal);
+      expect(out.bspCal).toBe(fixtureOutputs[i]!.bspCal);
+    });
+  });
+
+  it('explicit heel:null and misalignmentCal:null are identical to omitting them', () => {
+    fixtureInputs.forEach((inp) => {
+      const a = computeTrueWind(baseInputs({ ...inp, boatConfig }));
+      const b = computeTrueWind(
+        baseInputs({ ...inp, boatConfig, heel: null, misalignmentCal: null }),
+      );
+      expect(b).toEqual(a);
+    });
+  });
+
+  it('a heel sample without heelCorrectionEnabled changes nothing', () => {
+    fixtureInputs.forEach((inp, i) => {
+      const out = computeTrueWind(baseInputs({ ...inp, boatConfig, heel: 0.35 }));
+      expect(out).toEqual(fixtureOutputs[i]);
+    });
+  });
+});
+
+describe('computeTrueWind — heel correction', () => {
+  const heelConfig = { ...DEFAULT_BOAT_CONFIG, heelCorrectionEnabled: true };
+
+  it('heel = 0 is a numerical no-op', () => {
+    const off = computeTrueWind(baseInputs({ awa: 0.7, boatConfig: DEFAULT_BOAT_CONFIG }));
+    const on = computeTrueWind(baseInputs({ awa: 0.7, boatConfig: heelConfig, heel: 0 }));
+    expect(on.awaCal).toBeCloseTo(off.awaCal, 12);
+    expect(on.awsCal).toBeCloseTo(off.awsCal, 12);
+    expect(on.tws).toBeCloseTo(off.tws, 12);
+    expect(on.twa).toBeCloseTo(off.twa, 12);
+  });
+
+  it('wind dead ahead (awa = 0) is unaffected by heel', () => {
+    const out = computeTrueWind(baseInputs({ awa: 0, boatConfig: heelConfig, heel: 0.5 }));
+    expect(out.awaCal).toBeCloseTo(0, 12);
+    expect(out.awsCal).toBeCloseTo(5, 12);
+  });
+
+  it('wind on the beam (awa = π/2) at heel 60°: AWA unchanged, AWS halved', () => {
+    // sin(awa)=1, cos(awa)=0 → awa_h = atan2(cos φ, 0) = π/2;
+    // aws_h = aws·sqrt(0 + cos²φ) = aws·cos(60°) = aws/2.
+    const out = computeTrueWind(
+      baseInputs({ aws: 6, awa: Math.PI / 2, boatConfig: heelConfig, heel: Math.PI / 3 }),
+    );
+    expect(out.awaCal).toBeCloseTo(Math.PI / 2, 12);
+    expect(out.awsCal).toBeCloseTo(3, 12);
+  });
+
+  it('awa = 45° at heel 60° matches the closed-form projection', () => {
+    // awa_h = atan2(sin45°·cos60°, cos45°) = atan(0.5);
+    // aws_h = aws·sqrt(cos²45° + sin²45°·cos²60°) = aws·sqrt(0.625).
+    const out = computeTrueWind(
+      baseInputs({ aws: 5, awa: Math.PI / 4, boatConfig: heelConfig, heel: Math.PI / 3 }),
+    );
+    expect(out.awaCal).toBeCloseTo(Math.atan(0.5), 12);
+    expect(out.awsCal).toBeCloseTo(5 * Math.sqrt(0.625), 12);
+  });
+
+  it('preserves the sign of awa (port mirrors starboard)', () => {
+    const stbd = computeTrueWind(
+      baseInputs({ awa: Math.PI / 4, boatConfig: heelConfig, heel: 0.4 }),
+    );
+    const port = computeTrueWind(
+      baseInputs({ awa: -Math.PI / 4, boatConfig: heelConfig, heel: 0.4 }),
+    );
+    expect(port.awaCal).toBeCloseTo(-stbd.awaCal, 12);
+    expect(port.awsCal).toBeCloseTo(stbd.awsCal, 12);
+  });
+
+  it('preserves the quadrant for aft apparent wind', () => {
+    // awa = 135°: cos < 0, so the corrected angle must stay in the aft quadrant.
+    const out = computeTrueWind(
+      baseInputs({ awa: (3 * Math.PI) / 4, boatConfig: heelConfig, heel: 0.5 }),
+    );
+    expect(out.awaCal).toBeGreaterThan(Math.PI / 2);
+    expect(out.awaCal).toBeLessThan(Math.PI);
+  });
+});
+
+describe('applyMisalignmentCal', () => {
+  const cal = { awsBins: [3, 5, 8, 10], awaOffsetRad: [0.01, 0.02, 0.04, 0.05] };
+
+  it('returns the bin value at exact bin centers', () => {
+    expect(applyMisalignmentCal(3, cal)).toBe(0.01);
+    expect(applyMisalignmentCal(8, cal)).toBe(0.04);
+  });
+
+  it('interpolates linearly between bins', () => {
+    expect(applyMisalignmentCal(4, cal)).toBeCloseTo(0.015, 12);
+    expect(applyMisalignmentCal(9, cal)).toBeCloseTo(0.045, 12);
+  });
+
+  it('clamps below the first and above the last bin', () => {
+    expect(applyMisalignmentCal(0, cal)).toBe(0.01);
+    expect(applyMisalignmentCal(25, cal)).toBe(0.05);
+  });
+
+  it('returns 0 for an empty or shape-mismatched cal', () => {
+    expect(applyMisalignmentCal(5, { awsBins: [], awaOffsetRad: [] })).toBe(0);
+    expect(applyMisalignmentCal(5, { awsBins: [3, 5], awaOffsetRad: [0.1] })).toBe(0);
+  });
+
+  it('a constant offset cal shifts awaCal by exactly that offset (both tacks)', () => {
+    const constCal = { awsBins: [3, 10], awaOffsetRad: [0.05, 0.05] };
+    for (const awa of [Math.PI / 4, -Math.PI / 4]) {
+      const off = computeTrueWind(baseInputs({ awa }));
+      const on = computeTrueWind(baseInputs({ awa, misalignmentCal: constCal }));
+      expect(on.awaCal).toBeCloseTo(off.awaCal + 0.05, 12);
+    }
   });
 });
 

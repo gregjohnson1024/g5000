@@ -5,6 +5,7 @@ import type { AwsAwaCalTable } from '@g5000/db';
 import { CalHeatmap } from './CalHeatmap';
 import { CellEditor } from './CellEditor';
 import { TackTestWizard } from './TackTestWizard';
+import { TwdRunCard } from './TwdRunCard';
 
 export default function CalibrationWindPage() {
   const [cal, setCal] = useState<AwsAwaCalTable | null>(null);
@@ -66,6 +67,11 @@ export default function CalibrationWindPage() {
           </section>
         </>
       )}
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">TWD calibration run</h2>
+        <TwdRunCard />
+      </section>
 
       {!cal && !err && <p className="text-slate-400">Loading…</p>}
     </main>

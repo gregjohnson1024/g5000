@@ -34,6 +34,7 @@ import {
   type SailWardrobe,
   type SourcePriorityConfig,
   type TideConfig,
+  type WindMisalignmentCal,
 } from './defaults.js';
 import {
   aisAlarmConfig as aisAlarmConfigTable,
@@ -54,6 +55,7 @@ import {
   boatState as boatStateTable,
   mastLayout as mastLayoutTable,
   radarConfig as radarConfigTable,
+  windMisalignmentCal as windMisalignmentCalTable,
 } from './schema.js';
 import type { MastLayout } from '@g5000/mast';
 import type { Waypoint, Route } from './waypoints-routes-types.js';
@@ -102,6 +104,7 @@ type SubjectValues = {
   boatState: BoatState;
   mastLayout: MastLayout | null;
   radarConfig: RadarConfig | null;
+  windMisalignmentCal: WindMisalignmentCal | null;
 };
 
 /** Subjects keyed exactly like {@link SubjectValues}, each a hot BehaviorSubject. */
@@ -123,7 +126,8 @@ type SimpleKey =
   | 'routes'
   | 'boatState'
   | 'mastLayout'
-  | 'radarConfig';
+  | 'radarConfig'
+  | 'windMisalignmentCal';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
@@ -136,6 +140,7 @@ const SIMPLE_SETTER_TABLES: Record<SimpleKey, any> = {
   boatState: boatStateTable,
   mastLayout: mastLayoutTable,
   radarConfig: radarConfigTable,
+  windMisalignmentCal: windMisalignmentCalTable,
 };
 
 /**
@@ -265,6 +270,7 @@ export class ConfigStore {
       CREATE TABLE IF NOT EXISTS boat_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mast_layout (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS radar_config (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS wind_misalignment_cal (id TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
 
     const activeBoatId: string = process.env.G5000_BOAT_ID ?? 'sula';
@@ -471,6 +477,7 @@ export class ConfigStore {
       boatState: loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE),
       mastLayout: loadOrInsert<MastLayout | null>(mastLayoutTable, null),
       radarConfig: loadOrInsert<RadarConfig | null>(radarConfigTable, null),
+      windMisalignmentCal: loadOrInsert<WindMisalignmentCal | null>(windMisalignmentCalTable, null),
     };
 
     return new ConfigStore(raw, db, initial, activeBoatId);
@@ -703,6 +710,17 @@ export class ConfigStore {
   setRadarConfig(value: RadarConfig): void {
     this.upsert(radarConfigTable, value);
     this.subjects.radarConfig.next(value);
+  }
+
+  get windMisalignmentCal$(): Observable<WindMisalignmentCal | null> {
+    return this.subjects.windMisalignmentCal.asObservable();
+  }
+  /** Synchronous read of the current wind-misalignment cal (BehaviorSubject.value). */
+  getWindMisalignmentCal(): WindMisalignmentCal | null {
+    return this.subjects.windMisalignmentCal.value;
+  }
+  async setWindMisalignmentCal(value: WindMisalignmentCal | null): Promise<void> {
+    return this.setSimple('windMisalignmentCal', value);
   }
 
   async setBoatConfig(value: BoatConfig): Promise<void> {

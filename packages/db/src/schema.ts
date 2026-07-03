@@ -168,3 +168,8 @@ export const radarConfig = sqliteTable('radar_config', {
   id: text('id').primaryKey(),
   value: text('value').notNull(), // JSON-encoded RadarConfig | null
 });
+
+export const windMisalignmentCal = sqliteTable('wind_misalignment_cal', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(), // JSON-encoded WindMisalignmentCal | null
+});

@@ -25,6 +25,8 @@ export interface BoatConfig {
   /** This vessel's MMSI. When set, AIS targets matching it are filtered out
    *  of the chart view so we don't see ourselves on the radar. */
   selfMmsi?: number;
+  /** Apply masthead heel correction in the true-wind pipeline. Default false. */
+  heelCorrectionEnabled?: boolean;
 }
 
 /**
@@ -54,6 +56,21 @@ export interface BspCal {
 export interface CompassDeviation {
   /** 36 entries, one per 10° heading bin. Index 0 = heading 0–10°. Radians, additive. */
   deviation: number[];
+}
+
+/**
+ * Per-wind-speed sensor-misalignment calibration: a single signed AWA offset
+ * (radians) applied identically on both tacks. This is exactly what a
+ * two-tack TWD-spread run measures — offset = signed half of
+ * (TWD_port − TWD_stbd), angle-wrapped. Keyed by AWS (not TWS) because AWS
+ * is known before the true-wind vector subtraction and is stable to
+ * interpolate on. 1D linear interpolation between bins, clamped at the ends.
+ */
+export interface WindMisalignmentCal {
+  /** AWS bin centers, m/s. Strictly increasing. */
+  awsBins: number[];
+  /** Signed AWA offset per bin, radians (added to AWA on both tacks). */
+  awaOffsetRad: number[];
 }
 
 // Unit conversions — declared up front so the default tables below can write
@@ -378,7 +395,9 @@ export interface TideConfig {
   /** Pinned station (carries its source); honored only when it matches the active source. */
   pinnedStation: { sourceId: 'admiralty' | 'chs'; stationId: string } | null;
   /** Per-source static station-list cache (refreshed ~weekly). */
-  stationsCacheBySource: Partial<Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>>;
+  stationsCacheBySource: Partial<
+    Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>
+  >;
 }
 
 export const DEFAULT_TIDE_CONFIG: TideConfig = {
