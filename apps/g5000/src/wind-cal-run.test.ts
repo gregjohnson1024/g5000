@@ -136,6 +136,45 @@ describe('installWindCalRun (bus-facing controller)', () => {
     expect(c.status().counts.port[binIdx]).toBe(MIN_SAMPLES_PER_BUCKET + 5);
   });
 
+  it('classifies port tack from unsigned live-bus AWA (0..2π, per PGN 130306 / 0183 MWV)', () => {
+    const bus = new Bus();
+    const c = installWindCalRun(bus);
+    c.start();
+
+    // Live N2K/0183 publish AWA unsigned: a port-tack AWA arrives as 2π − 0.5,
+    // not −0.5. Without wrapping, every sample would bucket as starboard.
+    for (let i = 0; i < MIN_SAMPLES_PER_BUCKET + 5; i++) {
+      bus.publish(sample(Channels.Wind.ApparentAngle, 2 * Math.PI - 0.5));
+      bus.publish(sample(Channels.Wind.ApparentSpeed, 5));
+      bus.publish(sample(Channels.Wind.TrueDirection, 3.5));
+      publishTack(bus, 'starboard', 5, 3.4);
+    }
+
+    const binIdx = DEFAULT_RUN_AWS_BINS.indexOf(5);
+    expect(c.status().counts.port[binIdx]).toBe(MIN_SAMPLES_PER_BUCKET + 5);
+    expect(c.status().counts.starboard[binIdx]).toBe(MIN_SAMPLES_PER_BUCKET + 5);
+
+    const stopped = c.stop();
+    expect(stopped.result).not.toBeNull();
+    expect(stopped.result!.awsBins).toEqual([5]);
+    expect(stopped.result!.awaOffsetRad[0]).toBeCloseTo(0.05, 10);
+  });
+
+  it('clearResult discards the last result so a repeat apply is rejected', () => {
+    const bus = new Bus();
+    const c = installWindCalRun(bus);
+    c.start();
+    for (let i = 0; i < 40; i++) {
+      publishTack(bus, 'port', 5, 3.5);
+      publishTack(bus, 'starboard', 5, 3.4);
+    }
+    c.stop();
+    expect(c.result()).not.toBeNull();
+    c.clearResult();
+    expect(c.result()).toBeNull();
+    expect(c.status().result).toBeNull();
+  });
+
   it('does not bucket a TWD sample without a fresh apparent angle/speed', () => {
     const bus = new Bus();
     const c = installWindCalRun(bus);

@@ -126,6 +126,11 @@ export class WindCalRunCollector {
   /**
    * Per-bin offset (rad) using circular means, or null where either tack has
    * fewer than `minSamples`.
+   *
+   * Sign convention follows the spec (port − starboard, halved, added to AWA).
+   * A pure vane offset moves TWD largely common-mode across tacks, so the
+   * correction loop's sign deserves an on-water sanity check; if iterative
+   * applies diverge, flip the sign here.
    */
   previewOffsets(minSamples: number): (number | null)[] {
     return this.awsBins.map((_, i) => {
@@ -167,6 +172,8 @@ export interface WindCalRunController {
   status(): WindCalRunStatus;
   /** WindMisalignmentCal-shaped view of the last stop()'s result, or null. */
   result(): WindMisalignmentCal | null;
+  /** Clears the last result (called after apply so a repeat apply is rejected). */
+  clearResult(): void;
 }
 
 export function installWindCalRun(bus: Bus): WindCalRunController {
@@ -226,7 +233,9 @@ export function installWindCalRun(bus: Bus): WindCalRunController {
           if (!latestAwa || now - latestAwa.atMs > PAIRING_MAX_AGE_MS) return;
           if (!latestAws || now - latestAws.atMs > PAIRING_MAX_AGE_MS) return;
           // AWA sign convention: positive = wind from starboard = starboard tack.
-          const tack: Tack = latestAwa.value < 0 ? 'port' : 'starboard';
+          // Live N2K (PGN 130306) and 0183 MWV publish AWA unsigned (0..2π), so
+          // wrap to (−π, π] first — a port-tack AWA arrives as e.g. ~5.8 rad.
+          const tack: Tack = wrapToPi(latestAwa.value) < 0 ? 'port' : 'starboard';
           collector.add(tack, latestAws.value, s.value.value);
         }),
       );
@@ -254,6 +263,10 @@ export function installWindCalRun(bus: Bus): WindCalRunController {
     result(): WindMisalignmentCal | null {
       if (!result) return null;
       return { awsBins: result.awsBins, awaOffsetRad: result.awaOffsetRad };
+    },
+
+    clearResult(): void {
+      result = null;
     },
   };
 

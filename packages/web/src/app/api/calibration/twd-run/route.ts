@@ -32,6 +32,7 @@ interface WindCalRunController {
   abort(): WindCalRunStatus;
   status(): WindCalRunStatus;
   result(): WindMisalignmentCal | null;
+  clearResult(): void;
 }
 
 function getController(): WindCalRunController | null {
@@ -88,6 +89,9 @@ export async function POST(req: Request): Promise<Response> {
         const store = getSharedConfigStore();
         const merged = mergeMisalignmentCal(store.getWindMisalignmentCal(), measured);
         await store.setWindMisalignmentCal(merged);
+        // Clear the run result so a repeat apply (retry, second client) is
+        // rejected instead of re-adding the same residuals on top of the merge.
+        c.clearResult();
         return Response.json({ ok: true, cal: merged, status: c.status() });
       } catch (err) {
         return Response.json(
