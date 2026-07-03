@@ -30,6 +30,11 @@ export function PlaybackScrubber(props: {
   tz: TzMode;
   onStates: (states: Partial<Record<Model, PlaybackState>>) => void;
   onWindHour: (t: number) => void;
+  /** Optional controlled playback time. When provided (with onTChange) the
+   *  parent owns t; when absent the scrubber keeps its own internal state,
+   *  exactly as before. */
+  t?: number;
+  onTChange?: (t: number) => void;
 }) {
   const entries = MODELS.filter((m) => props.routes[m]).map(
     (m) => [m, toPlayback(props.routes[m]!)] as const,
@@ -37,7 +42,16 @@ export function PlaybackScrubber(props: {
   const tMin = entries.length ? Math.min(...entries.map(([, r]) => r.start)) : 0;
   const tMax = entries.length ? Math.max(...entries.map(([, r]) => r.end)) : 0;
 
-  const [t, setT] = useState(tMin);
+  const [tInternal, setTInternal] = useState(tMin);
+  const t = props.t ?? tInternal;
+  // Ref mirror so the rAF loop can advance from the latest value without a
+  // functional setState (which can't see a controlled parent's state).
+  const tRef = useRef(t);
+  tRef.current = t;
+  const setT = (next: number): void => {
+    if (props.t === undefined) setTInternal(next);
+    props.onTChange?.(next);
+  };
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(4);
   const markers = useRef<Partial<Record<Model, maplibregl.Marker>>>({});
@@ -54,6 +68,7 @@ export function PlaybackScrubber(props: {
   useEffect(() => {
     setT(tMin);
     setPlaying(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tMin, tMax]);
 
   useEffect(() => {
@@ -62,20 +77,23 @@ export function PlaybackScrubber(props: {
     const tick = (now: number): void => {
       const dt = (now - last.current) / 1000;
       last.current = now;
-      setT((prev) => {
-        const next = prev + dt * speed * 60;
-        if (next >= tMax) {
-          setPlaying(false);
-          return tMax;
-        }
-        return next;
-      });
+      const next = tRef.current + dt * speed * 60;
+      if (next >= tMax) {
+        setPlaying(false);
+        setT(tMax);
+        return;
+      }
+      // Advance the ref eagerly so the loop stays monotonic even if a
+      // render hasn't flushed the new t back yet.
+      tRef.current = next;
+      setT(next);
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
     return () => {
       if (raf.current) cancelAnimationFrame(raf.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, speed, tMax]);
 
   useEffect(() => {

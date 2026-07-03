@@ -52,6 +52,7 @@ import { startOf, endOf } from '../../lib/route-plan';
 import { ChartContextMenu } from './ChartContextMenu';
 import { resolveTarget, type ContextTarget, type HitWaypoint } from '../../lib/route-hit-test';
 import { PlaybackScrubber } from './PlaybackScrubber';
+import { RouteWeatherPanel } from '../../components/RouteWeatherPanel';
 import { RouteDetailsBox } from './RouteDetailsBox';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
@@ -357,6 +358,9 @@ function ChartPageInner() {
   const [playbackStates, setPlaybackStates] = useState<
     Partial<Record<'GFS' | 'ECMWF', PlaybackState>>
   >({});
+  // Shared playback clock (unix s), lifted so the scrubber and the
+  // route-weather panel stay in sync. Null until the scrubber initialises.
+  const [playT, setPlayT] = useState<number | null>(null);
   const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
   const ROUTE_LAYER: Record<'GFS' | 'ECMWF', string> = { GFS: 'route-gfs', ECMWF: 'route-ecmwf' };
   // Route line-colour mode (display only). Persisted; hydrated after mount.
@@ -854,6 +858,7 @@ function ChartPageInner() {
 
   const handleClearRoute = (): void => {
     setRoutes({});
+    setPlayT(null);
     if (mapInstance)
       (['GFS', 'ECMWF'] as const).forEach((m) => detachRoute(mapInstance, ROUTE_LAYER[m]));
   };
@@ -1187,7 +1192,10 @@ function ChartPageInner() {
               tz={tz}
               onStates={setPlaybackStates}
               onWindHour={onWindHour}
+              t={playT ?? undefined}
+              onTChange={setPlayT}
             />
+            <RouteWeatherPanel routes={routes} t={playT} onTChange={setPlayT} />
             {(['GFS', 'ECMWF'] as const)
               .filter((m) => routes[m])
               .map((m) => (
