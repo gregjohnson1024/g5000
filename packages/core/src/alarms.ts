@@ -12,7 +12,7 @@
 export type AlarmSeverity = 'CRITICAL' | 'WARN' | 'INFO';
 
 export interface AlarmSnapshot {
-  /** Stable identifier: 'mob' | 'anchor-watch' | 'shallow-water' | 'over-speed' | 'low-battery'. */
+  /** Stable identifier: 'mob' | 'anchor-watch' | 'shallow-water' | 'over-speed' | 'low-battery' | 'ais-cpa'. */
   id: string;
   severity: AlarmSeverity;
   /** Human-readable label for UI. */

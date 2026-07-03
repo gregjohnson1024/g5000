@@ -33,6 +33,9 @@ export const DEFAULT_ALARMS_CONFIG: AlarmsConfig = {
     'shallow-water': true,
     'over-speed': true,
     'low-battery': true,
+    // CPA/TCPA collision monitor. Thresholds live in AisAlarmConfig (single
+    // source of truth shared with the /ais page) — only the gate lives here.
+    'ais-cpa': true,
   },
   thresholds: {
     anchor: { armed: false, radiusM: 50 },
@@ -86,7 +89,11 @@ export async function loadAlarmsConfig(store: ConfigStore): Promise<AlarmsConfig
   const row = await db.select().from(alarmsConfig).where(eq(alarmsConfig.id, ID)).get();
   if (!row) return DEFAULT_ALARMS_CONFIG;
   try {
-    return JSON.parse(row.value) as AlarmsConfig;
+    const stored = JSON.parse(row.value) as AlarmsConfig;
+    // Backfill enabled flags for alarm ids added after this config was saved
+    // (e.g. 'ais-cpa') — otherwise a pre-existing row reads undefined => falsy
+    // and the new alarm is silently disabled. Stored values still win.
+    return { ...stored, enabled: { ...DEFAULT_ALARMS_CONFIG.enabled, ...stored.enabled } };
   } catch {
     return DEFAULT_ALARMS_CONFIG;
   }

@@ -4,12 +4,14 @@ import { startAnchorWatchPredicate } from './anchor-watch.js';
 import { startShallowWaterPredicate } from './shallow-water.js';
 import { startOverSpeedPredicate } from './over-speed.js';
 import { startLowBatteryPredicate } from './low-battery.js';
+import { startCpaMonitor } from './cpa-monitor.js';
 
 export {
   startAnchorWatchPredicate,
   startShallowWaterPredicate,
   startOverSpeedPredicate,
   startLowBatteryPredicate,
+  startCpaMonitor,
 };
 
 export function startAlarmsPipeline(
@@ -22,6 +24,7 @@ export function startAlarmsPipeline(
     startShallowWaterPredicate(bus, registry, configRef),
     startOverSpeedPredicate(bus, registry, configRef),
     startLowBatteryPredicate(bus, registry, configRef),
+    startCpaMonitor(bus, registry, configRef),
   ];
   return {
     dispose: () => {
