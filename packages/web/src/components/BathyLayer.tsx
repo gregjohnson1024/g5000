@@ -12,6 +12,60 @@ const SOURCE_LAYER = 'depth_contours';
 // (>=200 m) are more solid than the shallow set so they read at a glance.
 const VISIBLE_OPACITY: ExpressionSpecification = ['case', ['>=', ['get', 'depth'], 200], 0.9, 0.6];
 
+// Depth gradient, smoothly interpolated in HCL (perceptually uniform —
+// MapLibre's closest analogue to HSL; naive HSL/HSV would band unevenly in
+// luminance). Shallow cyan → royal blue → navy → near-black at the deepest
+// abyssal (~10,000 m).
+const HCL_RAMP: ExpressionSpecification = [
+  'interpolate-hcl',
+  ['linear'],
+  ['get', 'depth'],
+  0,
+  '#7dd3fc',
+  200,
+  '#38bdf8',
+  1000,
+  '#2563eb',
+  5000,
+  '#1e3a8a',
+  10000,
+  '#050a1a',
+];
+
+// Major isobaths (>=200 m) thicker than the shallow set.
+const BASE_WIDTH: ExpressionSpecification = ['case', ['>=', ['get', 'depth'], 200], 1.6, 0.8];
+
+/** Paint set for a given safety depth. 0/off reproduces the classic ramp
+ *  byte-for-byte; >0 flags contours at or shallower than the safety depth in
+ *  red-orange, slightly wider and fully opaque, leaving deeper contours on
+ *  the HCL ramp. */
+function paintFor(safetyDepthM: number, visible: boolean) {
+  const shallow: ExpressionSpecification = ['<=', ['get', 'depth'], safetyDepthM];
+  return safetyDepthM > 0
+    ? {
+        color: ['case', shallow, '#f87171', HCL_RAMP] as ExpressionSpecification,
+        width: [
+          'case',
+          shallow,
+          2.4,
+          ['>=', ['get', 'depth'], 200],
+          1.6,
+          0.8,
+        ] as ExpressionSpecification,
+        opacity: visible
+          ? ([
+              'case',
+              shallow,
+              1,
+              ['>=', ['get', 'depth'], 200],
+              0.9,
+              0.6,
+            ] as ExpressionSpecification)
+          : 0,
+      }
+    : { color: HCL_RAMP, width: BASE_WIDTH, opacity: visible ? VISIBLE_OPACITY : 0 };
+}
+
 /**
  * Depth-contour overlay backed by a precomputed global PMTiles archive
  * (tools/gebco-contour-maker → ~/.g5000-router/bathy-pmtiles/world.pmtiles),
@@ -29,12 +83,22 @@ const VISIBLE_OPACITY: ExpressionSpecification = ['case', ['>=', ['get', 'depth'
  * NOT for navigation — GEBCO is an interpolated ~450 m grid that smooths out
  * shoals and isolated dangers. Situational awareness only.
  */
-export function BathyLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
+export function BathyLayer({
+  map,
+  visible,
+  safetyDepthM = 0,
+}: {
+  map: maplibregl.Map | null;
+  visible: boolean;
+  /** Highlight contours at/shallower than this (m) in red-orange. 0 = off. */
+  safetyDepthM?: number;
+}) {
   useEffect(() => {
     if (!map) return;
 
     const ensure = (): void => {
       try {
+        const paint = paintFor(safetyDepthM, visible);
         if (!map.getSource(SOURCE_ID)) {
           map.addSource(SOURCE_ID, {
             type: 'vector',
@@ -49,37 +113,21 @@ export function BathyLayer({ map, visible }: { map: maplibregl.Map | null; visib
             'source-layer': SOURCE_LAYER,
             layout: { 'line-join': 'round' },
             paint: {
-              // Depth gradient, smoothly interpolated in HCL (perceptually
-              // uniform — MapLibre's closest analogue to HSL; naive HSL/HSV
-              // would band unevenly in luminance). Shallow cyan → royal blue →
-              // navy → near-black at the deepest abyssal (~10,000 m).
-              'line-color': [
-                'interpolate-hcl',
-                ['linear'],
-                ['get', 'depth'],
-                0,
-                '#7dd3fc',
-                200,
-                '#38bdf8',
-                1000,
-                '#2563eb',
-                5000,
-                '#1e3a8a',
-                10000,
-                '#050a1a',
-              ],
-              // Major isobaths (>=200 m) thicker than the shallow set.
-              'line-width': ['case', ['>=', ['get', 'depth'], 200], 1.6, 0.8],
-              'line-opacity': visible ? VISIBLE_OPACITY : 0,
+              'line-color': paint.color,
+              'line-width': paint.width,
+              'line-opacity': paint.opacity,
             },
           });
         }
         // Idempotent: force visibility back to 'visible' (in case a prior
-        // mount left it 'none') and update opacity for the current toggle.
-        // Keeping the layer rendered with line-opacity 0 when "off" is what
-        // lets the cursor depth readout work without the user seeing lines.
+        // mount left it 'none') and update paint for the current toggle +
+        // safety depth. Keeping the layer rendered with line-opacity 0 when
+        // "off" is what lets the cursor depth readout work without the user
+        // seeing lines.
         map.setLayoutProperty(LINE_LAYER_ID, 'visibility', 'visible');
-        map.setPaintProperty(LINE_LAYER_ID, 'line-opacity', visible ? VISIBLE_OPACITY : 0);
+        map.setPaintProperty(LINE_LAYER_ID, 'line-color', paint.color);
+        map.setPaintProperty(LINE_LAYER_ID, 'line-width', paint.width);
+        map.setPaintProperty(LINE_LAYER_ID, 'line-opacity', paint.opacity);
       } catch {
         /* style not ready — styledata retry covers it */
       }
@@ -97,7 +145,7 @@ export function BathyLayer({ map, visible }: { map: maplibregl.Map | null; visib
         /* map torn down */
       }
     };
-  }, [map, visible]);
+  }, [map, visible, safetyDepthM]);
 
   return null;
 }

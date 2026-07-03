@@ -39,6 +39,8 @@ export function LayersControl({
   state,
   onToggle,
   onSelectModel,
+  safetyDepthM,
+  onSafetyDepthM,
 }: {
   state: LayersState;
   onToggle: (
@@ -55,6 +57,9 @@ export function LayersControl({
       | 'radar',
   ) => void;
   onSelectModel: (model: ChartModel) => void;
+  /** Shallow-contour highlight threshold (m) for the bathy layer. 0 = off. */
+  safetyDepthM: number;
+  onSafetyDepthM: (m: number) => void;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -112,6 +117,23 @@ export function LayersControl({
           <Row label="Satellite" pressed={state.satellite} onClick={() => onToggle('satellite')} />
           <Row label="Buoys" pressed={state.buoys} onClick={() => onToggle('buoys')} />
           <Row label="Depth (GEBCO)" pressed={state.bathy} onClick={() => onToggle('bathy')} />
+          {state.bathy ? (
+            <label className="flex items-center justify-between px-2 py-1 pl-5 text-sm text-zinc-300">
+              Safety depth
+              <span className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={safetyDepthM}
+                  onChange={(e) => onSafetyDepthM(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-14 bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 text-right"
+                  aria-label="Safety depth in metres (0 = off)"
+                />
+                <span className="text-zinc-400">m</span>
+              </span>
+            </label>
+          ) : null}
           <div className="mt-1 pt-1 border-t border-zinc-700">
             <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-zinc-400">
               Model overlay

@@ -19,6 +19,9 @@ export interface ChartToolbarProps {
       | 'radar',
   ) => void;
   onSelectModel: (model: ChartModel) => void;
+  /** Shallow-contour highlight threshold (m) for the bathy layer. 0 = off. */
+  safetyDepthM: number;
+  onSafetyDepthM: (m: number) => void;
   waypointDropActive: boolean;
   onToggleWaypointDrop: () => void;
 }
@@ -27,12 +30,20 @@ export function ChartToolbar({
   layers,
   onToggleLayer,
   onSelectModel,
+  safetyDepthM,
+  onSafetyDepthM,
   waypointDropActive,
   onToggleWaypointDrop,
 }: ChartToolbarProps): React.ReactElement {
   return (
     <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end">
-      <LayersControl state={layers} onToggle={onToggleLayer} onSelectModel={onSelectModel} />
+      <LayersControl
+        state={layers}
+        onToggle={onToggleLayer}
+        onSelectModel={onSelectModel}
+        safetyDepthM={safetyDepthM}
+        onSafetyDepthM={onSafetyDepthM}
+      />
       <AnnotationDropper variant="icon" />
       <button
         type="button"

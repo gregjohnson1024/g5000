@@ -1,4 +1,5 @@
 export type { LatLon, RouteLeg, Route, PlanOptions, PlanInput } from './types.js';
+export type { DepthField } from './depth.js';
 export {
   greatCircleBearing,
   greatCircleDistance,

@@ -27,7 +27,17 @@ const DEFAULTS: Required<PlanOptions> = {
   motor: false,
   motorSpeed: 2.572, // 5 kn in m/s
   autoMotor: undefined as unknown as { minSail: number; motor: number },
+  minDepthM: undefined as unknown as number,
 };
+
+/** True when the draft constraint is active AND the sampled depth at
+ *  (lat, lon) is known and shallower than the minimum. Unknown depth (null,
+ *  i.e. no coverage/nodata) passes — the planner never fabricates a depth. */
+function tooShallow(input: PlanInput, o: Required<PlanOptions>, lat: number, lon: number): boolean {
+  if (o.minDepthM === undefined || !input.depth) return false;
+  const d = input.depth.depthAt(lat, lon);
+  return d !== null && d < o.minDepthM;
+}
 
 export function plan(input: PlanInput): Route {
   const o: Required<PlanOptions> = { ...DEFAULTS, ...(input.options ?? {}) };
@@ -70,6 +80,7 @@ export function plan(input: PlanInput): Route {
         ) {
           continue;
         }
+        if (tooShallow(input, o, child.pos.lat, child.pos.lon)) continue;
         next.push(child);
       }
     }
@@ -103,7 +114,10 @@ export function plan(input: PlanInput): Route {
     }
 
     // Termination: any node within one step's reach of destination → close.
+    // The synthesized final leg gets the same depth guard as regular legs —
+    // don't close into a destination shallower than the draft constraint.
     for (const n of frontier) {
+      if (tooShallow(input, o, input.end.lat, input.end.lon)) break;
       const dGround = greatCircleDistance(n.pos, input.end);
       if (dGround <= n.sogGround * stepSec || (n.sogGround === 0 && dGround === 0)) {
         // Synthesize final leg pointing directly at destination.

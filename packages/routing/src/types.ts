@@ -1,6 +1,7 @@
 import type { LatLon, WindField, CurrentField } from '@g5000/grib';
 import type { Coastline } from '@g5000/coastline';
 import type { PolarTable } from '@g5000/db';
+import type { DepthField } from './depth.js';
 
 export type { LatLon };
 
@@ -82,6 +83,11 @@ export interface PlanOptions {
    *  wind varies along the route. Independent of `motor` (which ignores the
    *  polar entirely). */
   autoMotor?: { minSail: number; motor: number };
+  /** Minimum acceptable water depth (m, positive down). Candidate positions
+   *  whose sampled depth is known and shallower than this are rejected, same
+   *  as land. Requires `input.depth`; ignored (no constraint) without it.
+   *  Unknown depth (null) always passes — the planner never fabricates. */
+  minDepthM?: number;
 }
 
 export interface PlanInput {
@@ -94,5 +100,8 @@ export interface PlanInput {
   polarId: string;
   coastline: Coastline;
   currents?: CurrentField;
+  /** Depth sampler for the draft constraint. Only consulted when
+   *  `options.minDepthM` is also set. */
+  depth?: DepthField;
   options?: PlanOptions;
 }

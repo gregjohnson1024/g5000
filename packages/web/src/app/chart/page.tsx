@@ -98,6 +98,8 @@ function ChartPageInner() {
   // When true, the slider stays pinned to the forecast hour nearest now and
   // advances with the clock; dragging the slider / using ←→ turns it off.
   const [windLockNow, setWindLockNow] = useState(true);
+  // Shallow-contour highlight threshold for the bathy layer (m). 0 = off.
+  const [safetyDepthM, setSafetyDepthM] = useState(0);
   // Bumped automatically whenever the user moves the timeline / model so the
   // chart re-reads from the cache. Fetching itself happens on /forecast.
   const [windRefreshKey, setWindRefreshKey] = useState(1);
@@ -286,9 +288,11 @@ function ChartPageInner() {
         const j = JSON.parse(raw) as Partial<{
           windHours: number;
           windLockNow: boolean;
+          safetyDepthM: number;
         }>;
         if (typeof j.windHours === 'number') setWindHours(j.windHours);
         if (typeof j.windLockNow === 'boolean') setWindLockNow(j.windLockNow);
+        if (typeof j.safetyDepthM === 'number') setSafetyDepthM(j.safetyDepthM);
       }
     } catch {
       /* corrupt blob; ignore */
@@ -298,11 +302,14 @@ function ChartPageInner() {
   useEffect(() => {
     if (!settingsHydrated) return;
     try {
-      localStorage.setItem('chart:settings', JSON.stringify({ windHours, windLockNow }));
+      localStorage.setItem(
+        'chart:settings',
+        JSON.stringify({ windHours, windLockNow, safetyDepthM }),
+      );
     } catch {
       /* quota / private-mode; ignore */
     }
-  }, [settingsHydrated, windHours, windLockNow]);
+  }, [settingsHydrated, windHours, windLockNow, safetyDepthM]);
 
   // Radar UI settings — opacity + rangeM. Persisted to chart:radar (mirror of chart:settings pattern).
   // 3704 m ≈ 2 nm: first chart-visible range for most radar units.
@@ -1078,7 +1085,7 @@ function ChartPageInner() {
         <EncLayer map={mapInstance} visible={layers.enc} />
         <SatelliteLayer map={mapInstance} visible={layers.satellite} />
         <EncBuoyLayer map={mapInstance} visible={layers.buoys} />
-        <BathyLayer map={mapInstance} visible={layers.bathy} />
+        <BathyLayer map={mapInstance} visible={layers.bathy} safetyDepthM={safetyDepthM} />
         {layers.radar && mayaraWsBase && (
           <RadarOverlay
             map={mapInstance}
@@ -1121,6 +1128,8 @@ function ChartPageInner() {
           layers={layers}
           onToggleLayer={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
           onSelectModel={(model) => setLayers((prev) => ({ ...prev, model }))}
+          safetyDepthM={safetyDepthM}
+          onSafetyDepthM={setSafetyDepthM}
           waypointDropActive={waypointDropActive}
           onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
         />

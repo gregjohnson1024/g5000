@@ -16,6 +16,9 @@ export interface PlanParams {
   departure: number;
   models: Array<'GFS' | 'ECMWF'>;
   useCurrents: boolean;
+  /** Draft constraint (m); undefined = off. Skipped server-side (with a
+   *  warning) when no depth grid covers the route. */
+  minDepthM?: number;
   options: {
     avoidLand?: boolean;
     pruneBucketDeg?: number;
@@ -84,6 +87,8 @@ export function PlanControls(props: {
   // Auto-motor: motor when the polar speed drops below minSail, capping the
   // engine contribution at motorKt. Seeded from saved Settings/Planning prefs.
   const [auto, setAuto] = useState({ minSailKt: 0, motorKt: 5 });
+  // Draft constraint in metres; 0 = off (the planner's default behaviour).
+  const [minDepthM, setMinDepthM] = useState(0);
   // Advanced isochrone-router knobs, also seeded from settings.
   const [adv, setAdv] = useState({
     avoidLand: true,
@@ -127,6 +132,7 @@ export function PlanControls(props: {
       departure: Math.floor(departureAnchor),
       models: selected,
       useCurrents,
+      minDepthM: minDepthM > 0 ? minDepthM : undefined,
       options: {
         avoidLand: adv.avoidLand,
         pruneBucketDeg: adv.pruneBucketDeg,
@@ -180,6 +186,11 @@ export function PlanControls(props: {
         />
         Use surface currents (CMEMS)
       </label>
+      <div className="flex flex-wrap items-center gap-1 text-sm">
+        <span className="text-slate-400">Min depth (m)</span>
+        <NumberInput min={0} step={0.5} value={minDepthM} onChange={setMinDepthM} width="inline" />
+        <span className="text-xs text-slate-500">0 = off</span>
+      </div>
       <div className="space-y-1 text-sm">
         <span className="text-slate-400">Auto-motor</span>
         <div className="flex flex-wrap items-center gap-1 pl-2 text-xs text-slate-400">

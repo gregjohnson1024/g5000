@@ -4,6 +4,7 @@ import { getSharedConfigStore } from '@g5000/db';
 import type { CurrentField } from '@g5000/grib';
 import { loadWindFor, loadCurrentFor } from '../../../../lib/grib-context';
 import { loadDefaultCoastline } from '../../../../lib/coastline';
+import { loadDepthField } from '../../../../lib/depth-grid';
 import { readJson } from '../../../../lib/persistence';
 import { SETTINGS } from '../../../../lib/paths';
 import { resolvePlanOptions, type PlanningSettings } from '../../../../lib/planning-settings';
@@ -19,6 +20,8 @@ interface Body {
   departure: number;
   model: 'GFS' | 'ECMWF';
   useCurrents?: boolean;
+  /** Draft constraint: reject legs into water shallower than this (m). */
+  minDepthM?: number;
   via?: { lat: number; lon: number }[];
   options?: Record<string, unknown> & {
     autoMotor?: { minSail: number; motor: number };
@@ -31,6 +34,7 @@ function validate(b: unknown): b is Body {
   const o = b as Record<string, unknown>;
   if (!o.start || !o.end || typeof o.departure !== 'number') return false;
   if (typeof o.model !== 'string' || !['GFS', 'ECMWF'].includes(o.model)) return false;
+  if (o.minDepthM !== undefined && typeof o.minDepthM !== 'number') return false;
   if (o.via !== undefined) {
     if (
       !Array.isArray(o.via) ||
@@ -74,6 +78,17 @@ export async function POST(req: Request): Promise<Response> {
     const polar = await firstValueFrom(store.activePolar$);
     const settings = ((await readJson(SETTINGS)) ?? {}) as { planning?: PlanningSettings };
     const resolved = resolvePlanOptions(settings.planning, b.options as never);
+    // Draft constraint: only bind it when depth tiles actually cover the
+    // route's neighbourhood — otherwise plan without it and say so.
+    const warnings: string[] = [];
+    let depth;
+    let minDepthM: number | undefined;
+    if (typeof b.minDepthM === 'number' && b.minDepthM > 0) {
+      const depthBbox = boundingBoxFor([b.start, ...(b.via ?? []), b.end], 1);
+      depth = (await loadDepthField(depthBbox)) ?? undefined;
+      if (depth) minDepthM = b.minDepthM;
+      else warnings.push('depth data not available — depth constraint skipped');
+    }
     const planInput = {
       start: b.start,
       end: b.end,
@@ -83,14 +98,16 @@ export async function POST(req: Request): Promise<Response> {
       polarId: 'active',
       coastline,
       currents,
+      depth,
       options: {
         ...resolved,
         useCurrents: !!b.useCurrents,
         captureIsochrones: !!b.options?.captureIsochrones,
+        minDepthM,
       },
     };
     const route = b.via && b.via.length > 0 ? planVia(planInput, b.via) : plan(planInput);
-    return Response.json({ ok: true, route });
+    return Response.json({ ok: true, route, ...(warnings.length > 0 ? { warnings } : {}) });
   } catch (err) {
     const e = err as { kind?: string; status?: number; retryable?: boolean; message?: string };
     return Response.json(

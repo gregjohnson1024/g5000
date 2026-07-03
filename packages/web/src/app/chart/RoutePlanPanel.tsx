@@ -89,6 +89,7 @@ export function RoutePlanPanel(props: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [mode, setMode] = useState<'waypoints' | 'route'>('waypoints');
   const [routes, setRoutes] = useState<SavedRouteLite[]>([]);
   const [routeId, setRouteId] = useState<string>('');
@@ -124,11 +125,13 @@ export function RoutePlanPanel(props: {
     setLoading(true);
     setError(null);
     setSummary(null);
+    setWarning(null);
     // Drop the previous route the moment planning starts — otherwise a stale
     // line lingers on the chart for the seconds the plan takes to compute.
     props.onClear();
     const results: Partial<Record<'GFS' | 'ECMWF', Route>> = {};
     const errs: string[] = [];
+    const warns = new Set<string>();
     await Promise.all(
       params.models.map(async (model) => {
         try {
@@ -142,6 +145,7 @@ export function RoutePlanPanel(props: {
               via: params.via,
               model,
               useCurrents: params.useCurrents,
+              minDepthM: params.minDepthM,
               options: params.options,
             }),
             signal: ctrl.signal,
@@ -149,10 +153,14 @@ export function RoutePlanPanel(props: {
           const j = (await res.json()) as {
             ok: boolean;
             route?: Route;
+            warnings?: string[];
             error?: { message?: string };
           };
           if (!j.ok || !j.route) errs.push(`${model}: ${j.error?.message ?? 'plan failed'}`);
-          else results[model] = j.route;
+          else {
+            results[model] = j.route;
+            for (const w of j.warnings ?? []) warns.add(w);
+          }
         } catch (e) {
           if (e instanceof Error && e.name === 'AbortError') return;
           errs.push(`${model}: ${e instanceof Error ? e.message : String(e)}`);
@@ -171,6 +179,7 @@ export function RoutePlanPanel(props: {
           `${m}: ${(r.distance / 1852).toFixed(0)} NM / ${fmtRouteDuration(r.end - r.start)}${r.incomplete ? ` (incomplete — ${INCOMPLETE_REASON[r.reason ?? ''] ?? 'unknown reason'})` : ''}`,
       );
       setSummary(parts.join(' · '));
+      if (warns.size > 0) setWarning([...warns].join(' · '));
       props.onRouted(results);
     }
   };
@@ -180,6 +189,7 @@ export function RoutePlanPanel(props: {
     abortRef.current = null;
     setLoading(false);
     setError(null);
+    setWarning(null);
   };
 
   return (
@@ -314,12 +324,14 @@ export function RoutePlanPanel(props: {
             </button>
           )}
           {summary && <p className="text-xs text-emerald-400">{summary}</p>}
+          {warning && <p className="text-xs text-amber-400">⚠ {warning}</p>}
           {error && <p className="text-xs text-rose-400">Error: {error}</p>}
           {props.hasRoute && (
             <button
               onClick={() => {
                 setError(null);
                 setSummary(null);
+                setWarning(null);
                 props.onClear();
               }}
               className="w-full px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 rounded"
