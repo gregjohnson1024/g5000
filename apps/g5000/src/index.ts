@@ -25,6 +25,7 @@ import { installObservedSourcesTracker } from './observed-sources.js';
 import { installChannelHistoryTracker } from './channel-history.js';
 import { startWatchdog } from './sd-notify.js';
 import { wireAlarmsHistory } from './alarms-history.js';
+import { wireAlarmPush } from './alarm-push.js';
 import { createLiveFactory, createDemoFactory, type BaseTeardownHolder } from './live-factory.js';
 import { startRaceSubsystem } from './race-subsystem.js';
 import { startGrooveSubsystem } from './groove-subsystem.js';
@@ -100,6 +101,10 @@ async function main(): Promise<void> {
   // Wrap registry mutators so each fire/clear/ack transition also appends to
   // the alarms_history table (best-effort; a DB hiccup never fails an alarm).
   wireAlarmsHistory({ store, registry: alarmsRegistry });
+
+  // Forward WARN/CRITICAL fires to an ntfy topic (phones off the boat wifi).
+  // No-op unless G5000_NTFY_TOPIC is set; fire-and-forget, never throws.
+  wireAlarmPush(alarmsRegistry);
 
   const initialAlarmsConfig = await loadAlarmsConfig(store);
   const alarmsConfigRef: { current: AlarmsConfig } = { current: initialAlarmsConfig };

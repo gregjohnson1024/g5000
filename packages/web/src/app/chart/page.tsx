@@ -38,6 +38,8 @@ import { RadarOverlay } from '../../components/RadarOverlay';
 import { RadarControls } from './RadarControls';
 import { MobButton } from '../../components/MobButton';
 import { MobLayer } from '../../components/MobLayer';
+import { AnchorWatchLayer } from '../../components/AnchorWatchLayer';
+import { AnchorCard } from './AnchorCard';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { WindTimeline } from './WindTimeline';
@@ -1118,6 +1120,7 @@ function ChartPageInner() {
           onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
         />
         <MobLayer map={mapInstance} livePos={livePos} />
+        <AnchorWatchLayer map={mapInstance} livePos={livePos} />
         <MapLoadingIndicator map={mapInstance} />
         <ChartFollowControl
           follow={camera.follow}
@@ -1159,6 +1162,7 @@ function ChartPageInner() {
             onRange={(m) => setRadarUi((s) => ({ ...s, rangeM: m }))}
           />
         )}
+        <AnchorCard livePos={livePos} />
         <RoutePlanPanel
           waypoints={waypoints}
           tz={tz}

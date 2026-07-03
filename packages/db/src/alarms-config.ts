@@ -4,9 +4,26 @@ import { alarmsConfig } from './schema.js';
 
 export interface AnchorThreshold {
   armed: boolean;
+  /** Boat position when the drop command was issued. */
   point?: { lat: number; lon: number };
   droppedAt?: string; // ISO
   radiusM: number;
+  /**
+   * Resolved actual anchor position — the drop position projected by
+   * offsetM/offsetBearingDeg when an offset was given, else the drop position
+   * itself. Consumers fall back to `point` when absent (pre-v2 configs).
+   */
+  anchorPoint?: { lat: number; lon: number };
+  /** Distance from the drop position to the actual anchor, metres. */
+  offsetM?: number;
+  /** Bearing from the drop position to the actual anchor, degrees true. */
+  offsetBearingDeg?: number;
+  /** Watch sector width in degrees (default 360 = full circle). */
+  coneDeg?: number;
+  /** Sector centre bearing as seen from the anchor, degrees true. */
+  coneCenterDeg?: number;
+  /** Seconds an unacked WARN breach persists before escalating to sticky CRITICAL (default 30). */
+  escalateAfterS?: number;
 }
 
 export interface ScalarThreshold {

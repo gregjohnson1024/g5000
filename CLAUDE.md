@@ -37,6 +37,8 @@ Common runtime knobs (set on the g5000 app process):
 - `SKIP_BRIDGE=1` — start without the N2K bridge (web-only smoke testing).
 - `G5000_ENABLE_AP_TX=1` — opt-in three-layer gate that allows the autopilot N2K TX path (fast-packet split via NGT-1 only). Off by default for safety; H5000 currently rejects spoofed `src=254` so this is research-only.
 - `G5000_HIDE_AIS=1` — suppress AIS targets on the chart (used on Pi when running near AIS-equipped boats in port).
+- `G5000_NTFY_TOPIC=<topic>` — enable ntfy push for WARN/CRITICAL alarm fires to this topic (unset = push disabled entirely).
+- `G5000_NTFY_URL=https://ntfy.sh` (default) — ntfy server base URL for alarm push; override for a self-hosted server.
 - `YDWG_HOST=192.168.1.100` (default) — set to `none` to disable the YDWG-02 TCP driver; override for a different boat.
 - `HLINK_ENABLED=0` / `HLINK_PORT=5050` — toggle / move the H-LINK TCP server.
 - `NGT1_PATH=/dev/ttyUSB0` / `NGT1_BAUD=115200` — NGT-1 serial.
@@ -213,7 +215,7 @@ The `/mast` view and the `@g5000/mast` package are part of the normal build (add
 **Layout + display settings live in `ConfigStore`, not in a file.** `MastService`
 is a thin shell over `ConfigStore` (`apps/g5000/src/mast/service.ts`). The git-tracked
 `apps/g5000/mast-layout.json` is a **boot seed only**: `MastService.start()` writes it
-into `ConfigStore` *only if no layout is stored yet* (`getMastLayout() === null`). On
+into `ConfigStore` _only if no layout is stored yet_ (`getMastLayout() === null`). On
 every subsequent boot it logs `layout already in ConfigStore, skipping seed` and ignores
 the file. So once `config.db` has a layout, editing the JSON and `git pull`-ing on the Pi
 does **nothing** — the file watcher that used to hot-load it was removed in `d0ac078`.
@@ -224,7 +226,7 @@ screen over the `/api/mast/stream` SSE — no rebuild or restart needed. The oth
 settings (brightness, night-mode, day-base-colour) live in the same store's
 `DisplayConfig` and are edited the same way (`/mast-config` → `POST /api/mast/{brightness,night-mode,day-base-color}`),
 also pushed over SSE. `tsc -b` / `next build` / `systemctl restart` are needed ONLY when
-the mast *code* changes.
+the mast _code_ changes.
 
 `MAST_LAYOUT_PATH` (default `apps/g5000/mast-layout.json`, resolved relative to the app
 module) overrides only the **seed** file path — it matters at first boot / against an empty

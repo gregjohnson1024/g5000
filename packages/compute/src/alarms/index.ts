@@ -13,6 +13,8 @@ export {
   startLowBatteryPredicate,
   startCpaMonitor,
 };
+// Pure anchor geometry — also consumed by the /api/alarms/anchor route.
+export * from './anchor-geometry.js';
 
 export function startAlarmsPipeline(
   bus: Bus,

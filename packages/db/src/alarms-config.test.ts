@@ -71,6 +71,40 @@ describe('isAlarmsConfig guard', () => {
     expect(isAlarmsConfig(DEFAULT_ALARMS_CONFIG)).toBe(true);
   });
 
+  it('accepts a pre-v2 anchor threshold missing the sector/offset/escalation fields', () => {
+    // Stored configs from before anchor watch v2 carry only
+    // { armed, point?, droppedAt?, radiusM } — they must still validate.
+    const cfg = {
+      ...DEFAULT_ALARMS_CONFIG,
+      thresholds: {
+        ...DEFAULT_ALARMS_CONFIG.thresholds,
+        anchor: { armed: true, point: { lat: 32.3, lon: -64.8 }, radiusM: 50 },
+      },
+    };
+    expect(isAlarmsConfig(cfg)).toBe(true);
+  });
+
+  it('accepts a v2 anchor threshold with sector geometry and escalation', () => {
+    const cfg = {
+      ...DEFAULT_ALARMS_CONFIG,
+      thresholds: {
+        ...DEFAULT_ALARMS_CONFIG.thresholds,
+        anchor: {
+          armed: true,
+          point: { lat: 32.3, lon: -64.8 },
+          anchorPoint: { lat: 32.3005, lon: -64.8 },
+          radiusM: 50,
+          offsetM: 55,
+          offsetBearingDeg: 0,
+          coneDeg: 120,
+          coneCenterDeg: 180,
+          escalateAfterS: 45,
+        },
+      },
+    };
+    expect(isAlarmsConfig(cfg)).toBe(true);
+  });
+
   it('accepts a structurally complete config with extra enabled ids', () => {
     const cfg = {
       ...DEFAULT_ALARMS_CONFIG,
