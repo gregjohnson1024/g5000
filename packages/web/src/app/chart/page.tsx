@@ -36,6 +36,8 @@ import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { RadarOverlay } from '../../components/RadarOverlay';
 import { RadarControls } from './RadarControls';
+import { MobButton } from '../../components/MobButton';
+import { MobLayer } from '../../components/MobLayer';
 import { type LayersState } from './LayersControl';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { WindTimeline } from './WindTimeline';
@@ -1115,6 +1117,7 @@ function ChartPageInner() {
           waypointDropActive={waypointDropActive}
           onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
         />
+        <MobLayer map={mapInstance} livePos={livePos} />
         <MapLoadingIndicator map={mapInstance} />
         <ChartFollowControl
           follow={camera.follow}
@@ -1123,6 +1126,8 @@ function ChartPageInner() {
           onToggleFollow={camera.toggleFollow}
           onCycleOrientation={camera.cycleOrientation}
         />
+        {/* MOB sits directly under the follow/orientation stack (top-3 + 2×~34px buttons + gaps). */}
+        <MobButton livePos={livePos} className="absolute left-3 top-[100px] z-10" />
         <OffscreenVesselIndicator
           map={mapInstance}
           livePos={livePos}
