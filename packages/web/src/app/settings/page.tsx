@@ -210,6 +210,182 @@ function TideCurrentsSection() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Anchor dashboard settings
+// ---------------------------------------------------------------------------
+
+interface AnchorDashboardConfig {
+  bowHeightM?: number;
+  droopDeductM?: number;
+  depthOffsets?: {
+    keelBelowTransducerM?: number;
+    transducerToWaterlineM?: number;
+  };
+  weatherPin?: { lat: number; lon: number } | null;
+}
+
+function AnchorDashboardSection() {
+  const [cfg, setCfg] = useState<AnchorDashboardConfig>({});
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [pinLat, setPinLat] = useState('');
+  const [pinLon, setPinLon] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetch('/api/settings')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok && j.settings?.anchorDashboard) {
+          const a = j.settings.anchorDashboard as AnchorDashboardConfig;
+          setCfg(a);
+          if (a.weatherPin) {
+            setPinEnabled(true);
+            setPinLat(String(a.weatherPin.lat));
+            setPinLon(String(a.weatherPin.lon));
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setStatus('Saving…');
+    const weatherPin: AnchorDashboardConfig['weatherPin'] = pinEnabled
+      ? { lat: parseFloat(pinLat) || 0, lon: parseFloat(pinLon) || 0 }
+      : null;
+    const next: AnchorDashboardConfig = { ...cfg, weatherPin };
+    const cur = await fetch('/api/settings')
+      .then((r) => r.json())
+      .catch(() => ({ settings: {} }));
+    const merged = { ...(cur.settings ?? {}), anchorDashboard: next };
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    setStatus(res.ok ? 'Saved' : 'Save failed');
+    setTimeout(() => setStatus(null), 2500);
+  };
+
+  const numInput = (
+    label: string,
+    hint: string,
+    value: number | undefined,
+    onChange: (v: number | undefined) => void,
+  ) => (
+    <label className="block text-sm">
+      {label}
+      <input
+        type="number"
+        min={0}
+        step={0.1}
+        value={value ?? ''}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          onChange(e.target.value === '' || Number.isNaN(v) ? undefined : v);
+        }}
+        placeholder="—"
+        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-28 ml-2"
+      />
+      <span className="block text-[11px] text-slate-500">{hint}</span>
+    </label>
+  );
+
+  return (
+    <section className="space-y-3 border border-slate-800 rounded p-3">
+      <h2 className="text-lg font-semibold">Anchor dashboard</h2>
+
+      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
+        <legend className="text-sm px-1">Rode &amp; scope</legend>
+        {numInput(
+          'Bow height (m)',
+          'Height of bow chock above the waterline.',
+          cfg.bowHeightM,
+          (v) => setCfg((s) => ({ ...s, bowHeightM: v })),
+        )}
+        {numInput(
+          'Droop deduct (m)',
+          'Catenary sag to subtract from the counter reading.',
+          cfg.droopDeductM,
+          (v) => setCfg((s) => ({ ...s, droopDeductM: v })),
+        )}
+      </fieldset>
+
+      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
+        <legend className="text-sm px-1">Depth offsets</legend>
+        {numInput(
+          'Keel below transducer (m)',
+          'Depth under keel = sounder − this value.',
+          cfg.depthOffsets?.keelBelowTransducerM,
+          (v) =>
+            setCfg((s) => ({
+              ...s,
+              depthOffsets: { ...s.depthOffsets, keelBelowTransducerM: v },
+            })),
+        )}
+        {numInput(
+          'Transducer to waterline (m)',
+          'Total water depth = sounder + this value.',
+          cfg.depthOffsets?.transducerToWaterlineM,
+          (v) =>
+            setCfg((s) => ({
+              ...s,
+              depthOffsets: { ...s.depthOffsets, transducerToWaterlineM: v },
+            })),
+        )}
+      </fieldset>
+
+      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
+        <legend className="text-sm px-1">Weather pin</legend>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={pinEnabled}
+            onChange={(e) => setPinEnabled(e.target.checked)}
+          />
+          Pin weather to a fixed position (instead of following the live GPS fix)
+        </label>
+        {pinEnabled && (
+          <div className="flex flex-wrap gap-3 text-sm">
+            <label className="block">
+              Lat
+              <input
+                type="number"
+                step="0.0001"
+                value={pinLat}
+                onChange={(e) => setPinLat(e.target.value)}
+                placeholder="e.g. 41.63"
+                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-32 ml-2"
+              />
+            </label>
+            <label className="block">
+              Lon
+              <input
+                type="number"
+                step="0.0001"
+                value={pinLon}
+                onChange={(e) => setPinLon(e.target.value)}
+                placeholder="e.g. -71.26"
+                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-32 ml-2"
+              />
+            </label>
+          </div>
+        )}
+        <p className="text-[11px] text-slate-500">
+          When unchecked, the anchor page weather and forecast follow the live GPS position.
+        </p>
+      </fieldset>
+
+      <div className="flex items-center gap-3">
+        <button onClick={() => void save()} className="bg-emerald-700 px-3 py-1 rounded text-sm">
+          Save anchor settings
+        </button>
+        {status && <span className="text-sm text-slate-400">{status}</span>}
+      </div>
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   // Source-mode state — separate from the persisted settings above because
   // it's a runtime-only switch (lives in the SourceModeController, not
@@ -482,6 +658,8 @@ export default function SettingsPage() {
       <PlanningSection />
 
       <TideCurrentsSection />
+
+      <AnchorDashboardSection />
     </main>
   );
 }

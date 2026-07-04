@@ -23,12 +23,18 @@ interface ActiveTide {
 
 export function TodayNowPanel({
   channels,
+  weatherLat,
+  weatherLon,
 }: {
   channels: ReadonlyMap<string, JsonSafeSample>;
+  /** Optional override lat for weather/forecast (from settings weatherPin or anchor position). */
+  weatherLat?: number;
+  /** Optional override lon for weather/forecast (from settings weatherPin or anchor position). */
+  weatherLon?: number;
 }): React.ReactElement {
   const position = geo(channels.get('nav.gps.position'));
-  const lat = position?.lat ?? DEFAULT_LAT;
-  const lon = position?.lon ?? DEFAULT_LON;
+  const lat = weatherLat ?? position?.lat ?? DEFAULT_LAT;
+  const lon = weatherLon ?? position?.lon ?? DEFAULT_LON;
 
   // ── Weather ─────────────────────────────────────────────────────────────────
   const [weather, setWeather] = useState<WeatherCurrent | null>(null);

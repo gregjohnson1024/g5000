@@ -50,9 +50,15 @@ const DEFAULT_LON = -64.7;
 export function AnchorDrawer({
   lat,
   lon,
+  weatherLat,
+  weatherLon,
 }: {
   lat: number | null;
   lon: number | null;
+  /** Optional override lat for weather tabs (from settings weatherPin). Falls back to lat. */
+  weatherLat?: number;
+  /** Optional override lon for weather tabs (from settings weatherPin). Falls back to lon. */
+  weatherLon?: number;
 }): React.ReactElement {
   // Start null (collapsed) for SSR safety; hydrate from localStorage in effect.
   const [activeTab, setActiveTab] = useState<DrawerTab | null>(null);
@@ -71,21 +77,26 @@ export function AnchorDrawer({
 
   const isOpen = hydrated && activeTab !== null;
 
+  // GPS fallback for non-weather tabs (radar uses live position)
   const effectiveLat = lat ?? DEFAULT_LAT;
   const effectiveLon = lon ?? DEFAULT_LON;
+
+  // Weather pin overrides lat/lon for weather and forecast tabs; falls back to GPS/default.
+  const wxLat = weatherLat ?? effectiveLat;
+  const wxLon = weatherLon ?? effectiveLon;
 
   function renderTabContent(): React.ReactElement {
     switch (activeTab) {
       case 'forecast':
-        return <ForecastGraphTab lat={effectiveLat} lon={effectiveLon} />;
+        return <ForecastGraphTab lat={wxLat} lon={wxLon} />;
       case 'table':
-        return <ForecastTableTab lat={effectiveLat} lon={effectiveLon} />;
+        return <ForecastTableTab lat={wxLat} lon={wxLon} />;
       case 'solar':
         return <SolarTab />;
       case 'tides':
-        return <TidesTab lat={effectiveLat} lon={effectiveLon} />;
+        return <TidesTab lat={wxLat} lon={wxLon} />;
       case 'sky':
-        return <SkyTab lat={effectiveLat} lon={effectiveLon} />;
+        return <SkyTab lat={wxLat} lon={wxLon} />;
       case 'radar':
         return <RadarTab lat={effectiveLat} lon={effectiveLon} />;
       default:
