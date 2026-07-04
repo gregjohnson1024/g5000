@@ -9,29 +9,8 @@ import { NearbyVesselsPanel } from './panels/NearbyVesselsPanel';
 import { WindDial } from './panels/WindDial';
 import { AnchorWatchPanel } from './panels/AnchorWatchPanel';
 import { TodayNowPanel } from './panels/TodayNowPanel';
+import { SystemsPanel } from './panels/SystemsPanel';
 import type { DepthOffsets } from '../../lib/depth-offset';
-
-const PLACEHOLDER_PANELS = ['Systems'] as const;
-
-type PlaceholderName = (typeof PLACEHOLDER_PANELS)[number];
-
-/** Placeholder panel card — later tasks swap the children for real content. */
-function PanelCard({
-  title,
-  channels: _channels,
-}: {
-  title: PlaceholderName;
-  channels: ReadonlyMap<string, JsonSafeSample>;
-}): React.ReactElement {
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1 min-h-[100px]">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">{title}</span>
-      <div className="flex-1 flex items-center justify-center">
-        <span className="text-slate-700 text-xs italic">—</span>
-      </div>
-    </div>
-  );
-}
 
 // Task 21 will wire the real offsets from ConfigStore; pass empty for now.
 const DEPTH_OFFSETS: DepthOffsets = {};
@@ -67,9 +46,7 @@ export default function AnchorPage(): React.ReactElement {
         <NearbyVesselsPanel channels={channels} />
         <AnchorWatchPanel channels={channels} />
         <TodayNowPanel channels={channels} />
-        {PLACEHOLDER_PANELS.map((name) => (
-          <PanelCard key={name} title={name} channels={channels} />
-        ))}
+        <SystemsPanel />
       </div>
 
       {/* Fixed slide-up drawer at bottom — pass position for weather/forecast tabs */}
