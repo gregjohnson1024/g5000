@@ -2,8 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GRID_CAPACITY, DAY_BASE_COLORS } from '@g5000/mast';
-import type { DisplayUnit, DayBaseColor, GridKind, MastLayout, MastPage, MastThreshold, MastTile } from '@g5000/mast';
+import type {
+  DisplayUnit,
+  DayBaseColor,
+  GridKind,
+  MastLayout,
+  MastPage,
+  MastThreshold,
+  MastTile,
+} from '@g5000/mast';
 import { MAST_BASE_COLOR_HEX } from '../mast/colors';
+import { MastPreview } from './MastPreview';
 
 // ── constants ──────────────────────────────────────────────────────────────────
 
@@ -23,14 +32,15 @@ interface ThresholdRow {
 function thresholdToRow(t: MastThreshold): ThresholdRow {
   // Pick the first bound present; v1 collapse is acceptable.
   const op: ThresholdOp =
-    t.gte !== undefined ? 'gte' :
-    t.gt  !== undefined ? 'gt'  :
-    t.lte !== undefined ? 'lte' : 'lt';
+    t.gte !== undefined ? 'gte' : t.gt !== undefined ? 'gt' : t.lte !== undefined ? 'lte' : 'lt';
   const value =
-    t.gte !== undefined ? t.gte :
-    t.gt  !== undefined ? t.gt  :
-    t.lte !== undefined ? t.lte :
-    (t.lt ?? 0);
+    t.gte !== undefined
+      ? t.gte
+      : t.gt !== undefined
+        ? t.gt
+        : t.lte !== undefined
+          ? t.lte
+          : (t.lt ?? 0);
   return { op, value, color: t.color };
 }
 
@@ -230,9 +240,11 @@ export default function MastConfigPage() {
     <main className="p-6 space-y-6 max-w-4xl">
       <h1 className="text-2xl font-semibold">Mast Display</h1>
       <p className="text-sm text-slate-400">
-        Configure which data each page of the mast display shows. Changes take effect live — no restart
-        required.
+        Configure which data each page of the mast display shows. Changes take effect live — no
+        restart required.
       </p>
+
+      <MastPreview />
 
       {err && <div className="text-red-400 text-sm">Error: {err}</div>}
 
@@ -247,11 +259,7 @@ export default function MastConfigPage() {
         </div>
       )}
 
-      {ok && (
-        <div className="text-green-400 text-sm">
-          Saved — the mast display updates live.
-        </div>
-      )}
+      {ok && <div className="text-green-400 text-sm">Saved — the mast display updates live.</div>}
 
       <button
         onClick={() => void handleSave()}
@@ -290,7 +298,9 @@ export default function MastConfigPage() {
             onChange={(e) => onNightModeChange(e.target.checked)}
             aria-label="Night mode"
           />
-          <span className="text-slate-300">{nightMode ? 'On — red on black' : 'Off — day theme'}</span>
+          <span className="text-slate-300">
+            {nightMode ? 'On — red on black' : 'Off — day theme'}
+          </span>
         </label>
         <p className="text-xs text-slate-400">
           Forces the mast display's red-on-black night theme on/off. Persists across reboots.
@@ -316,8 +326,8 @@ export default function MastConfigPage() {
           ))}
         </div>
         <p className="text-xs text-slate-400">
-          Day-mode colour for cell values (black background). Alarm thresholds still override;
-          night mode shows everything in red.
+          Day-mode colour for cell values (black background). Alarm thresholds still override; night
+          mode shows everything in red.
         </p>
       </section>
 
@@ -350,7 +360,14 @@ interface PageEditorProps {
   onThresholdsChange: (ti: number, rows: ThresholdRow[]) => void;
 }
 
-function PageEditor({ page, pageIndex, channels, onGridChange, onTileChange, onThresholdsChange }: PageEditorProps) {
+function PageEditor({
+  page,
+  pageIndex,
+  channels,
+  onGridChange,
+  onTileChange,
+  onThresholdsChange,
+}: PageEditorProps) {
   return (
     <section className="border border-slate-700 rounded-md p-4 space-y-4">
       <div className="flex items-center gap-4 flex-wrap">
@@ -374,12 +391,13 @@ function PageEditor({ page, pageIndex, channels, onGridChange, onTileChange, onT
         </label>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(Number(page.grid), 3)}, minmax(0, 1fr))` }}>
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: `repeat(${Math.min(Number(page.grid), 3)}, minmax(0, 1fr))` }}
+      >
         {page.tiles.map((tile, ti) => {
           // Union current field with channel list so an offline field stays selectable.
-          const fieldOptions = channels.includes(tile.field)
-            ? channels
-            : [tile.field, ...channels];
+          const fieldOptions = channels.includes(tile.field) ? channels : [tile.field, ...channels];
           const thresholdRows = (tile.thresholds ?? []).map(thresholdToRow);
           return (
             <TileEditor
@@ -409,7 +427,14 @@ interface TileEditorProps {
   onThresholdsChange: (rows: ThresholdRow[]) => void;
 }
 
-function TileEditor({ tile, tileIndex, fieldOptions, thresholdRows, onChange, onThresholdsChange }: TileEditorProps) {
+function TileEditor({
+  tile,
+  tileIndex,
+  fieldOptions,
+  thresholdRows,
+  onChange,
+  onThresholdsChange,
+}: TileEditorProps) {
   const addThreshold = (): void => {
     onThresholdsChange([...thresholdRows, { op: 'gte', value: 0, color: 'green' }]);
   };
@@ -424,7 +449,9 @@ function TileEditor({ tile, tileIndex, fieldOptions, thresholdRows, onChange, on
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded p-3 space-y-2 text-sm">
-      <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">Cell {tileIndex + 1}</div>
+      <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">
+        Cell {tileIndex + 1}
+      </div>
 
       {/* field */}
       <label className="flex flex-col gap-1">
@@ -511,7 +538,9 @@ function TileEditor({ tile, tileIndex, fieldOptions, thresholdRows, onChange, on
             />
             <select
               value={row.color}
-              onChange={(e) => updateThresholdRow(ri, { color: e.target.value as MastThreshold['color'] })}
+              onChange={(e) =>
+                updateThresholdRow(ri, { color: e.target.value as MastThreshold['color'] })
+              }
               className="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs"
             >
               {THRESHOLD_COLORS.map((c) => (
