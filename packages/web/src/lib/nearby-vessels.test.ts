@@ -13,7 +13,7 @@ describe('rankVessels', () => {
       now,
     );
     expect(ranked[0]?.name).toBe('NEAR');
-    expect(ranked[0]?.rangeM).toBeLessThan(ranked[1]!.rangeM);
+    expect(ranked[0]?.rangeM).toBeLessThan(ranked[1]!.rangeM!);
     expect(ranked[0]?.ageMs).toBe(1000);
   });
   it('returns range null when own fix missing', () => {

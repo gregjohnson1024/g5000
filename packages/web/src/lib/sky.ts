@@ -1,15 +1,17 @@
 import * as SunCalc from 'suncalc';
 
 export interface SkyInfo {
-  sunrise: Date;
-  sunset: Date;
-  civilDawn: Date;
-  civilDusk: Date;
-  nauticalDawn: Date;
-  nauticalDusk: Date;
-  astroDawn: Date;
-  astroDusk: Date;
-  dayLengthMs: number;
+  /** null at extreme latitudes (polar day / polar night) */
+  sunrise: Date | null;
+  sunset: Date | null;
+  civilDawn: Date | null;
+  civilDusk: Date | null;
+  nauticalDawn: Date | null;
+  nauticalDusk: Date | null;
+  astroDawn: Date | null;
+  astroDusk: Date | null;
+  /** null when sunrise or sunset is null (polar conditions) */
+  dayLengthMs: number | null;
   moon: { phase: number; illumination: number; rise: Date | null; set: Date | null };
 }
 
@@ -17,6 +19,7 @@ export function computeSky(lat: number, lon: number, date: Date): SkyInfo {
   const t = SunCalc.getTimes(date, lat, lon);
   const illum = SunCalc.getMoonIllumination(date);
   const moonT = SunCalc.getMoonTimes(date, lat, lon);
+  const dayLengthMs = t.sunset && t.sunrise ? t.sunset.getTime() - t.sunrise.getTime() : null;
   return {
     sunrise: t.sunrise,
     sunset: t.sunset,
@@ -26,7 +29,7 @@ export function computeSky(lat: number, lon: number, date: Date): SkyInfo {
     nauticalDusk: t.nauticalDusk,
     astroDawn: t.nightEnd,
     astroDusk: t.night,
-    dayLengthMs: t.sunset.getTime() - t.sunrise.getTime(),
+    dayLengthMs,
     moon: {
       phase: illum.phase,
       illumination: illum.fraction,
