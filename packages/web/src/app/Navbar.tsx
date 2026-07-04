@@ -17,6 +17,7 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/helm', label: 'Helm' },
   { href: '/race', label: 'Race' },
   { href: '/chart', label: 'Chart' },
+  { href: '/anchor', label: 'Anchor' },
   { href: '/passage', label: 'Passage' },
   { href: '/tracker', label: 'Tracker' },
   { href: '/ais', label: 'AIS' },
