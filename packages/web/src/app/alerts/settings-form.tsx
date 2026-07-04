@@ -116,7 +116,11 @@ export function SettingsForm() {
               ...cfg,
               thresholds: {
                 ...cfg.thresholds,
-                highWind: { holdMs: 60000, ...cfg.thresholds.highWind, thresholdKn: v },
+                highWind: {
+                  ...cfg.thresholds.highWind,
+                  holdMs: cfg.thresholds.highWind?.holdMs ?? 60000,
+                  thresholdKn: v,
+                },
               },
             })
           }
