@@ -6,9 +6,10 @@ import { AnchorDrawer } from './drawer';
 import { DepthPanel } from './panels/DepthPanel';
 import { PositionPanel } from './panels/PositionPanel';
 import { NearbyVesselsPanel } from './panels/NearbyVesselsPanel';
+import { WindDial } from './panels/WindDial';
 import type { DepthOffsets } from '../../lib/depth-offset';
 
-const PLACEHOLDER_PANELS = ['Apparent Wind', 'Anchor Watch', 'Today & Now', 'Systems'] as const;
+const PLACEHOLDER_PANELS = ['Anchor Watch', 'Today & Now', 'Systems'] as const;
 
 type PlaceholderName = (typeof PLACEHOLDER_PANELS)[number];
 
@@ -46,6 +47,10 @@ export default function AnchorPage(): React.ReactElement {
 
       {/* Top-zone panel grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {/* WindDial spans 2 cols so the circular dial has room */}
+        <div className="col-span-2">
+          <WindDial channels={channels} />
+        </div>
         <DepthPanel channels={channels} offsets={DEPTH_OFFSETS} />
         <PositionPanel channels={channels} />
         <NearbyVesselsPanel channels={channels} />
