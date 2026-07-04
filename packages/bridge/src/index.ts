@@ -29,6 +29,8 @@ export * from './ais/targets-registry.js';
 export * from './alerts/registry.js';
 export { readCaptureCodes } from './capture-codes.js';
 export type { CaptureCodes, CaptureEntry } from './autopilot-commands.js';
+export { createVictronRegistry } from './victron/registry.js';
+export { publishVictronToBus } from './victron/publisher.js';
 
 import { DeviceRegistry } from './devices/device-registry.js';
 

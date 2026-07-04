@@ -54,6 +54,20 @@ export const Channels = {
     /** Battery bank DC voltage in volts. Currently mapped from PGN 127508,
      *  lowest-instance battery. Future: instance-disambiguation. */
     BatteryVoltage: 'electrical.battery.voltage',
+    /** Battery state-of-charge, percent (0–100). */
+    BatterySoc: 'electrical.battery.soc',
+    /** Battery current, amperes (signed: + charge, − discharge). */
+    BatteryCurrent: 'electrical.battery.current',
+    /** Battery power, watts. */
+    BatteryPower: 'electrical.battery.power',
+    /** Net DC system power, watts. */
+    DcPower: 'electrical.dc.power',
+    /** AC grid/generator input power, watts. */
+    AcInputPower: 'electrical.ac.input.power',
+    /** AC inverter output power, watts. */
+    AcOutputPower: 'electrical.ac.output.power',
+    /** Total solar charger output power, watts. */
+    SolarPower: 'electrical.solar.power',
   },
   Race: {
     /** Signed perpendicular distance from boat to start line, meters.
