@@ -5,15 +5,10 @@ import { useSse } from '../../hooks/use-sse';
 import { AnchorDrawer } from './drawer';
 import { DepthPanel } from './panels/DepthPanel';
 import { PositionPanel } from './panels/PositionPanel';
+import { NearbyVesselsPanel } from './panels/NearbyVesselsPanel';
 import type { DepthOffsets } from '../../lib/depth-offset';
 
-const PLACEHOLDER_PANELS = [
-  'Nearby Vessels',
-  'Apparent Wind',
-  'Anchor Watch',
-  'Today & Now',
-  'Systems',
-] as const;
+const PLACEHOLDER_PANELS = ['Apparent Wind', 'Anchor Watch', 'Today & Now', 'Systems'] as const;
 
 type PlaceholderName = (typeof PLACEHOLDER_PANELS)[number];
 
@@ -53,6 +48,7 @@ export default function AnchorPage(): React.ReactElement {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <DepthPanel channels={channels} offsets={DEPTH_OFFSETS} />
         <PositionPanel channels={channels} />
+        <NearbyVesselsPanel channels={channels} />
         {PLACEHOLDER_PANELS.map((name) => (
           <PanelCard key={name} title={name} channels={channels} />
         ))}
