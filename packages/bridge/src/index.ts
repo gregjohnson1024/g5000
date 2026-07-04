@@ -31,6 +31,12 @@ export { readCaptureCodes } from './capture-codes.js';
 export type { CaptureCodes, CaptureEntry } from './autopilot-commands.js';
 export { createVictronRegistry } from './victron/registry.js';
 export { publishVictronToBus } from './victron/publisher.js';
+export {
+  startVictronMqttDriver,
+  type MqttLike,
+  type MqttConnectFn,
+  type VictronDriverOpts,
+} from './victron/mqtt-driver.js';
 
 import { DeviceRegistry } from './devices/device-registry.js';
 
