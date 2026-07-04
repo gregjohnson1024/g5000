@@ -3,10 +3,11 @@
 import type { JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
 import { AnchorDrawer } from './drawer';
+import { DepthPanel } from './panels/DepthPanel';
+import { PositionPanel } from './panels/PositionPanel';
+import type { DepthOffsets } from '../../lib/depth-offset';
 
-const PANELS = [
-  'Depth',
-  'Position',
+const PLACEHOLDER_PANELS = [
   'Nearby Vessels',
   'Apparent Wind',
   'Anchor Watch',
@@ -14,14 +15,14 @@ const PANELS = [
   'Systems',
 ] as const;
 
-type PanelName = (typeof PANELS)[number];
+type PlaceholderName = (typeof PLACEHOLDER_PANELS)[number];
 
 /** Placeholder panel card — later tasks swap the children for real content. */
 function PanelCard({
   title,
   channels: _channels,
 }: {
-  title: PanelName;
+  title: PlaceholderName;
   channels: ReadonlyMap<string, JsonSafeSample>;
 }): React.ReactElement {
   return (
@@ -33,6 +34,9 @@ function PanelCard({
     </div>
   );
 }
+
+// Task 21 will wire the real offsets from ConfigStore; pass empty for now.
+const DEPTH_OFFSETS: DepthOffsets = {};
 
 export default function AnchorPage(): React.ReactElement {
   const { channels, connected } = useSse();
@@ -47,7 +51,9 @@ export default function AnchorPage(): React.ReactElement {
 
       {/* Top-zone panel grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {PANELS.map((name) => (
+        <DepthPanel channels={channels} offsets={DEPTH_OFFSETS} />
+        <PositionPanel channels={channels} />
+        {PLACEHOLDER_PANELS.map((name) => (
           <PanelCard key={name} title={name} channels={channels} />
         ))}
       </div>
