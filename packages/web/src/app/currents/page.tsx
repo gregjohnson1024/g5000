@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState, useMemo, Fragment } from 'react';
 import { currentNow, nextCurrentEvent } from '@g5000/tide';
 import type { CurrentPrediction, CurrentEvent } from '@g5000/tide';
+import { fetchBoatFix } from '../../lib/boat-fix';
+import { fmtDistanceNm, sortByDistanceNm, type LatLon } from '../../lib/station-distance';
 
 // ── Local types ───────────────────────────────────────────────────────────────
 
@@ -59,21 +61,21 @@ function eventToY(speedKn: number, yMax: number): number {
 }
 
 const EVENT_COLOURS: Record<string, string> = {
-  slack: '#94a3b8',  // slate-400
-  flood: '#38bdf8',  // sky-400
-  ebb:   '#f97316',  // orange-500
+  slack: '#94a3b8', // slate-400
+  flood: '#38bdf8', // sky-400
+  ebb: '#f97316', // orange-500
 };
 
 const EVENT_LETTERS: Record<string, string> = {
   slack: 'S',
   flood: 'F',
-  ebb:   'E',
+  ebb: 'E',
 };
 
 const EVENT_LABELS: Record<string, string> = {
   slack: 'Slack',
   flood: 'Max flood',
-  ebb:   'Max ebb',
+  ebb: 'Max ebb',
 };
 
 // Format direction as 3-digit degrees true, e.g. "054°".
@@ -94,6 +96,29 @@ export default function CurrentsPage() {
   const [events, setEvents] = useState<CurrentEvent[]>([]);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // Feature gate: settings.canadianTideCurrents (default false). null = loading.
+  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  // One-shot boat fix for station distances; null = no fix (render undistanced).
+  const [boatFix, setBoatFix] = useState<LatLon | null>(null);
+
+  // Mount: read the feature gate and grab a one-shot fix for distances.
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setFeatureEnabled(j?.settings?.canadianTideCurrents === true);
+      })
+      .catch(() => {
+        if (!cancelled) setFeatureEnabled(false);
+      });
+    void fetchBoatFix().then((f) => {
+      if (!cancelled) setBoatFix(f);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Tick "now" every minute so the line + readout stay live.
   useEffect(() => {
@@ -107,7 +132,7 @@ export default function CurrentsPage() {
     void (async () => {
       try {
         const r = await fetch('/api/currents/stations');
-        const j = await r.json().catch(() => ({ ok: false, stations: [] })) as {
+        const j = (await r.json().catch(() => ({ ok: false, stations: [] }))) as {
           ok: boolean;
           stations: CurrentStation[];
         };
@@ -117,13 +142,10 @@ export default function CurrentsPage() {
           setStationsLoaded(true);
           return;
         }
-        const sorted = [...j.stations].sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
+        const sorted = [...j.stations].sort((a, b) => a.name.localeCompare(b.name));
         setStations(sorted);
         const qid = new URLSearchParams(window.location.search).get('station');
-        const initialId =
-          qid && sorted.some((s) => s.id === qid) ? qid : (sorted[0]?.id ?? null);
+        const initialId = qid && sorted.some((s) => s.id === qid) ? qid : (sorted[0]?.id ?? null);
         setSelectedId(initialId);
         setStationsLoaded(true);
       } catch {
@@ -132,7 +154,9 @@ export default function CurrentsPage() {
         setStationsLoaded(true);
       }
     })();
-    return () => { ignored = true; };
+    return () => {
+      ignored = true;
+    };
   }, []);
 
   // Fetch predictions + events when selected station changes.
@@ -152,7 +176,7 @@ export default function CurrentsPage() {
           setLoadingPredictions(false);
           return;
         }
-        const j = await r.json().catch(() => ({ ok: false, predictions: [], events: [] })) as {
+        const j = (await r.json().catch(() => ({ ok: false, predictions: [], events: [] }))) as {
           ok: boolean;
           predictions: CurrentPrediction[];
           events: CurrentEvent[];
@@ -175,16 +199,23 @@ export default function CurrentsPage() {
         setLoadingPredictions(false);
       }
     })();
-    return () => { ignored = true; };
+    return () => {
+      ignored = true;
+    };
   }, [selectedId]);
 
   // ── Derived values ────────────────────────────────────────────────────────
 
+  // Distance-annotated list, closest-first when a fix is available; otherwise
+  // the original (name-sorted) order with null distances.
+  const annotated = useMemo(
+    () => sortByDistanceNm(stations, boatFix, (s) => s),
+    [stations, boatFix],
+  );
+
   // Filter preserving selected station in list.
-  const filtered = stations.filter(
-    (s) =>
-      s.name.toLowerCase().includes(filter.toLowerCase()) ||
-      s.id === selectedId,
+  const filtered = annotated.filter(
+    ({ item: s }) => s.name.toLowerCase().includes(filter.toLowerCase()) || s.id === selectedId,
   );
 
   // Shared x-scale (derived from predictions window).
@@ -194,18 +225,11 @@ export default function CurrentsPage() {
   // y-scale ceiling — fold in event peak speeds so markers never clip.
   const yMax = Math.max(
     SPEED_FLOOR_KN,
-    ...predictions
-      .map((p) => p.speedKn)
-      .filter((v) => Number.isFinite(v)),
-    ...events
-      .map((e) => e.speedKn)
-      .filter((v) => Number.isFinite(v)),
+    ...predictions.map((p) => p.speedKn).filter((v) => Number.isFinite(v)),
+    ...events.map((e) => e.speedKn).filter((v) => Number.isFinite(v)),
   );
 
-  const curvePts =
-    predictions.length >= 2
-      ? buildSpeedPolyline(predictions, tMin, tMax, yMax)
-      : [];
+  const curvePts = predictions.length >= 2 ? buildSpeedPolyline(predictions, tMin, tMax, yMax) : [];
   const polyline = ptsToPolyline(curvePts);
 
   // Now-line x position, gated to x-range.
@@ -233,6 +257,24 @@ export default function CurrentsPage() {
   })();
 
   // ── Early exit states ─────────────────────────────────────────────────────
+
+  // Feature gate: hidden by default until settings.canadianTideCurrents is on.
+  if (featureEnabled !== true) {
+    return (
+      <main className="p-6 max-w-3xl mx-auto text-slate-100">
+        <h1 className="text-2xl font-semibold mb-4">Current Planning</h1>
+        {featureEnabled === false && (
+          <p className="text-sm text-slate-400">
+            Canadian Tide/Currents is disabled — enable it in{' '}
+            <a href="/settings" className="text-sky-400 underline">
+              Settings
+            </a>
+            .
+          </p>
+        )}
+      </main>
+    );
+  }
 
   if (stationsError) {
     return (
@@ -270,9 +312,10 @@ export default function CurrentsPage() {
           disabled={!stationsLoaded || stations.length === 0}
         >
           {!stationsLoaded && <option value="">Loading stations…</option>}
-          {filtered.map((s) => (
+          {filtered.map(({ item: s, distanceNm }) => (
             <option key={s.id} value={s.id}>
               {s.name}
+              {distanceNm !== null ? ` — ${fmtDistanceNm(distanceNm)}` : ''}
             </option>
           ))}
         </select>
@@ -289,8 +332,7 @@ export default function CurrentsPage() {
       {!loadingPredictions && curvePts.length > 0 && (
         <div className="mb-4 bg-slate-900 border border-slate-700 rounded p-3">
           <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-            Drift curve —{' '}
-            {stations.find((s) => s.id === selectedId)?.name ?? ''}
+            Drift curve — {stations.find((s) => s.id === selectedId)?.name ?? ''}
           </div>
           <svg
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -307,12 +349,7 @@ export default function CurrentsPage() {
               strokeDasharray="2 2"
             />
             {/* Speed polyline */}
-            <polyline
-              points={polyline}
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="1.5"
-            />
+            <polyline points={polyline} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
             {/* Event markers — clamp x to plot area so out-of-span events stay at the edge */}
             {events.map((ev) => {
               const rawX = eventToX(ev.timeMs, tMin, tMax);
@@ -384,9 +421,7 @@ export default function CurrentsPage() {
       )}
 
       {loadingPredictions && (
-        <div className="mb-4 text-sm text-slate-500">
-          Loading current predictions…
-        </div>
+        <div className="mb-4 text-sm text-slate-500">Loading current predictions…</div>
       )}
 
       {/* Events table */}
@@ -420,7 +455,12 @@ export default function CurrentsPage() {
                     className="border-b border-slate-800 hover:bg-slate-900/40"
                   >
                     <td className="py-1.5 pr-4 text-slate-300">
-                      {new Date(ev.timeMs).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(ev.timeMs).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </td>
                     <td className={`py-1.5 pr-4 font-semibold ${colour}`}>
                       {EVENT_LABELS[ev.kind] ?? ev.kind}
@@ -435,17 +475,15 @@ export default function CurrentsPage() {
       )}
 
       {!loadingPredictions && events.length === 0 && selectedId && stationsLoaded && (
-        <div className="text-sm text-slate-500">
-          No current events available for this station.
-        </div>
+        <div className="text-sm text-slate-500">No current events available for this station.</div>
       )}
 
       {/* Footer labels */}
       <div className="mt-6 space-y-0.5 text-[11px] text-slate-500">
         <p>Drift in knots · Set in °true</p>
         <p>
-          Tidal-stream predictions at a CHS current station — distinct from the
-          chart&apos;s ocean-current overlay.
+          Tidal-stream predictions at a CHS current station — distinct from the chart&apos;s
+          ocean-current overlay.
         </p>
       </div>
     </main>

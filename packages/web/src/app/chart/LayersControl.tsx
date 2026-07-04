@@ -41,6 +41,7 @@ export function LayersControl({
   onSelectModel,
   safetyDepthM,
   onSafetyDepthM,
+  showTideCurrents,
 }: {
   state: LayersState;
   onToggle: (
@@ -60,6 +61,8 @@ export function LayersControl({
   /** Shallow-contour highlight threshold (m) for the bathy layer. 0 = off. */
   safetyDepthM: number;
   onSafetyDepthM: (m: number) => void;
+  /** settings.canadianTideCurrents gate — hides the CHS station toggles when off. */
+  showTideCurrents: boolean;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -175,16 +178,20 @@ export function LayersControl({
                 onClick={() => onToggle('aisCog')}
               />
             ) : null}
-            <Row
-              label="Tide stations"
-              pressed={state.tideStations}
-              onClick={() => onToggle('tideStations')}
-            />
-            <Row
-              label="Current stations"
-              pressed={state.currentStations}
-              onClick={() => onToggle('currentStations')}
-            />
+            {showTideCurrents ? (
+              <>
+                <Row
+                  label="Tide stations"
+                  pressed={state.tideStations}
+                  onClick={() => onToggle('tideStations')}
+                />
+                <Row
+                  label="Current stations"
+                  pressed={state.currentStations}
+                  onClick={() => onToggle('currentStations')}
+                />
+              </>
+            ) : null}
             <Row label="Radar" pressed={state.radar} onClick={() => onToggle('radar')} />
           </div>
         </div>
