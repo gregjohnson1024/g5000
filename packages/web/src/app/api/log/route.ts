@@ -16,6 +16,7 @@ const VALID_KINDS: ReadonlySet<ShipLogKind> = new Set([
   'equipment',
   'incident',
   'crew',
+  'trip',
 ]);
 
 const activeBoatId = (): string => process.env.G5000_BOAT_ID ?? 'sula';

@@ -5,6 +5,7 @@ export { validatePolarTable } from './polar-revisions.js';
 export * from './alarms-config.js';
 export * from './alarms-history.js';
 export * from './ship-log.js';
+export * from './trips.js';
 export * from './race-state.js';
 export type { Waypoint, Route } from './waypoints-routes-types.js';
 export type { BoatState } from './boat-state.js';

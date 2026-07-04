@@ -242,6 +242,29 @@ export class ConfigStore {
       );
       CREATE INDEX IF NOT EXISTS idx_ship_log_entries_ts
         ON ship_log_entries (boat_id, ts_ms DESC);
+      CREATE TABLE IF NOT EXISTS trips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        boat_id TEXT NOT NULL,
+        start_ms INTEGER NOT NULL,
+        end_ms INTEGER NOT NULL,
+        start_lat REAL NOT NULL,
+        start_lon REAL NOT NULL,
+        end_lat REAL NOT NULL,
+        end_lon REAL NOT NULL,
+        distance_m REAL NOT NULL,
+        duration_s INTEGER NOT NULL,
+        max_sog_kn REAL NOT NULL,
+        avg_sog_kn REAL NOT NULL,
+        mode TEXT NOT NULL,
+        point_of_sail_json TEXT,
+        stay_kind TEXT NOT NULL,
+        moorage_start_name TEXT,
+        moorage_end_name TEXT,
+        notes TEXT,
+        created_ms INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_trips_boat_start
+        ON trips (boat_id, start_ms DESC);
       CREATE TABLE IF NOT EXISTS race_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS crossover_map (
         boat_id TEXT NOT NULL,

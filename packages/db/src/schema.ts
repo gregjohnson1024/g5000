@@ -105,7 +105,7 @@ export const shipLogEntries = sqliteTable('ship_log_entries', {
   tsMs: integer('ts_ms').notNull(),
   /** 'manual' | 'auto' */
   source: text('source').notNull(),
-  /** 'note' | 'position' | 'weather' | 'equipment' | 'incident' | 'crew' */
+  /** 'note' | 'position' | 'weather' | 'equipment' | 'incident' | 'crew' | 'trip' */
   kind: text('kind').notNull(),
   text: text('text'),
   lat: real('lat'),
@@ -117,6 +117,39 @@ export const shipLogEntries = sqliteTable('ship_log_entries', {
   twdDeg: real('twd_deg'),
   author: text('author'),
   boatId: text('boat_id').notNull(),
+});
+
+/**
+ * Trips — auto-detected passages (dock-to-dock / anchor-to-anchor), written
+ * by the g5000 app's trip engine when the trip detector closes a trip.
+ * Columnar like ship_log_entries; soft enums (`mode`, `stay_kind`) carry no
+ * DB constraint so new categories don't need a migration.
+ */
+export const trips = sqliteTable('trips', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  boatId: text('boat_id').notNull(),
+  /** Epoch ms, backdated to when the boat actually started moving. */
+  startMs: integer('start_ms').notNull(),
+  /** Epoch ms, backdated to when the boat actually stopped. */
+  endMs: integer('end_ms').notNull(),
+  startLat: real('start_lat').notNull(),
+  startLon: real('start_lon').notNull(),
+  endLat: real('end_lat').notNull(),
+  endLon: real('end_lon').notNull(),
+  distanceM: real('distance_m').notNull(),
+  durationS: integer('duration_s').notNull(),
+  maxSogKn: real('max_sog_kn').notNull(),
+  avgSogKn: real('avg_sog_kn').notNull(),
+  /** 'sail' | 'motor' | 'mixed' | 'unknown' (heuristic; user-overridable). */
+  mode: text('mode').notNull(),
+  /** JSON Record<string, number>: seconds per point-of-sail state, or null. */
+  pointOfSailJson: text('point_of_sail_json'),
+  /** Classification of the stay BEGUN at trip end: 'anchor' | 'unknown'. */
+  stayKind: text('stay_kind').notNull(),
+  moorageStartName: text('moorage_start_name'),
+  moorageEndName: text('moorage_end_name'),
+  notes: text('notes'),
+  createdMs: integer('created_ms').notNull(),
 });
 
 export const raceState = sqliteTable('race_state', {

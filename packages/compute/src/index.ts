@@ -15,3 +15,4 @@ export * from './alarms/index.js';
 // that chain into client components breaks `next build --webpack`. Server
 // consumers (g5000 app, /api/race/* routes) import via the subpath.
 export * from './sail-crossover/index.js';
+export * from './trip/detector.js';

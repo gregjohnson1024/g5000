@@ -4,7 +4,14 @@ import { shipLogEntries } from './schema.js';
 
 export type ShipLogSource = 'manual' | 'auto';
 
-export type ShipLogKind = 'note' | 'position' | 'weather' | 'equipment' | 'incident' | 'crew';
+export type ShipLogKind =
+  | 'note'
+  | 'position'
+  | 'weather'
+  | 'equipment'
+  | 'incident'
+  | 'crew'
+  | 'trip';
 
 export interface ShipLogEntry {
   id: number;

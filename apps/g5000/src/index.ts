@@ -19,6 +19,7 @@ import {
 import { ReplayDriver, runBridge, createAisTargetsRegistry } from '@g5000/bridge';
 import { migrateWaypointsJson } from './migrate-waypoints.js';
 import { startShipLogAuto } from './ship-log-auto.js';
+import { startTripEngine } from './trip-engine.js';
 import { createSourceModeController } from './source-mode-controller.js';
 import { installLogStream } from './log-stream-impl.js';
 import { installObservedSourcesTracker } from './observed-sources.js';
@@ -141,6 +142,19 @@ async function main(): Promise<void> {
   const sessionsDir = SESSION_LOG_DIR ?? path.join(dataDir, 'sessions');
   await mkdir(sessionsDir, { recursive: true });
   const sourceModeController = createSourceModeController({ bus, sessionsDir });
+
+  // Trip engine — feeds live position/SOG into the trip detector and writes
+  // trips rows (+ a kind='trip' ship's-log entry) when a trip closes. Gated
+  // on live mode, same as the track recorder.
+  const tripEngine = startTripEngine({
+    bus,
+    store,
+    boatId: activeBoatId,
+    getMode: () => sourceModeController.getStatus().mode,
+  });
+  teardown.push(async () => tripEngine.dispose());
+  // eslint-disable-next-line no-console
+  console.log('[autopilot] trip engine online');
 
   // Track the most-recently-built base-source teardown for graceful
   // shutdown. The controller owns the handle internally; we shadow its
