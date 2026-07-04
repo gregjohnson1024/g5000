@@ -37,6 +37,7 @@ export {
   type MqttConnectFn,
   type VictronDriverOpts,
 } from './victron/mqtt-driver.js';
+export { startVictronSim, simSnapshotAt, type VictronSimOpts } from './victron/sim.js';
 
 import { DeviceRegistry } from './devices/device-registry.js';
 
