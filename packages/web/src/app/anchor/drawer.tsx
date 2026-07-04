@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { ForecastGraphTab } from './tabs/ForecastGraphTab';
 import { ForecastTableTab } from './tabs/ForecastTableTab';
 import { SolarTab } from './tabs/SolarTab';
+import { TidesTab } from './tabs/TidesTab';
+import { SkyTab } from './tabs/SkyTab';
+import { RadarTab } from './tabs/RadarTab';
 
 type DrawerTab = 'forecast' | 'table' | 'tides' | 'radar' | 'sky' | 'solar';
 
@@ -79,6 +82,12 @@ export function AnchorDrawer({
         return <ForecastTableTab lat={effectiveLat} lon={effectiveLon} />;
       case 'solar':
         return <SolarTab />;
+      case 'tides':
+        return <TidesTab lat={effectiveLat} lon={effectiveLon} />;
+      case 'sky':
+        return <SkyTab lat={effectiveLat} lon={effectiveLon} />;
+      case 'radar':
+        return <RadarTab lat={effectiveLat} lon={effectiveLon} />;
       default:
         return (
           <p className="text-slate-500 text-sm italic">
