@@ -9,6 +9,7 @@
 **Tech Stack:** NOMADS `filter_hrrr_2d.pl`, `wgrib2` (already a runtime dep for GFS/ECMWF parsing), MapLibre, the existing `wind-fetch.ts` machinery.
 
 **Key constraints / gotchas (read first):**
+
 - **CONUS only.** HRRR covers the continental US + coastal waters. Outside that domain the fetch/regrid yields empty data — the UI must message "HRRR has no data here" rather than show a blank overlay. Gate by a rough CONUS bbox (lat 21–53, lon -135 to -60).
 - **Short horizon.** HRRR is hourly f00–f18 every run, extending to f00–f48 only on the 00/06/12/18z runs. Far shorter than GFS/ECMWF's 168 h — the timeline/slider must cope with a model whose max forecast hour is ~18–48.
 - **Hourly runs.** HRRR runs every hour (00–23z), posted ~50–90 min after the hour. `pickHrrrRun` should lag ~2 h to be safe.
@@ -180,7 +181,7 @@ export function inHrrrDomain(b: Bbox): boolean {
 
 **Files:** `model-layer.ts`, `LayersControl.tsx`, `WindOverlay.tsx`, `chart/page.tsx`.
 
-- [ ] **Step 1:** `model-layer.ts` — `ChartModel` gains `'hrrr'`; `isWindModel = model==='gfs'||model==='ecmwf'||model==='hrrr'`; `windModel` returns the model when it's any of the three. Update `model-layer.test.ts` with an `hrrr` case (wind shown, currentHidden true). 
+- [ ] **Step 1:** `model-layer.ts` — `ChartModel` gains `'hrrr'`; `isWindModel = model==='gfs'||model==='ecmwf'||model==='hrrr'`; `windModel` returns the model when it's any of the three. Update `model-layer.test.ts` with an `hrrr` case (wind shown, currentHidden true).
 - [ ] **Step 2:** `LayersControl.tsx` — add `<ModelRow label="HRRR (3 km)" active={state.model==='hrrr'} onClick={()=>onSelectModel('hrrr')} />`. The `ChartModel` validation array in `chart/page.tsx` hydration (`['none','gfs','ecmwf','cmems']`) must add `'hrrr'`.
 - [ ] **Step 3:** `WindOverlay.tsx` — widen `export type WindModel = 'gfs' | 'ecmwf' | 'hrrr';` (rendering unchanged — same `WindGrid`).
 - [ ] **Step 4:** `chart/page.tsx` —
@@ -210,4 +211,7 @@ export function inHrrrDomain(b: Bbox): boolean {
 **Type consistency:** `WindModel` widened in BOTH `wind-fetch.ts` and `WindOverlay.tsx`; `ChartModel` widened in `model-layer.ts` and the hydration validation array; per-model records (`availableHours`, `latestRunAt`, `POOL_CONCURRENCY`, `expectedRun`) all gain `hrrr`. `fetchHrrrGrid`/`buildHrrrUrl`/`pickHrrrRun`/`hrrrHorizonHours`/`inHrrrDomain` names are consistent across tasks.
 
 **Open investigation points (resolve while implementing, by reading the named files):** exact `wgrib2` json-parse path in `wind-fetch.ts`; exact shape of the `/api/wind` route's model branch and `availableHours`/manifest loop in `chart/page.tsx`; whether `/api/forecast/manifest` needs a per-model tweak for hrrr.
+
+```
+
 ```

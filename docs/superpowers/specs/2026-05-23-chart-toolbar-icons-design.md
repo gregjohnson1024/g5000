@@ -56,12 +56,14 @@ The toolbar owns no domain state itself — it lays out and forwards to the thre
 controls.
 
 ### 1. Layers
+
 `LayersControl` keeps all its logic. Change: its outer wrapper drops the
 `absolute top-2 right-2` self-positioning (the toolbar positions it), and its
 popover changes from `mt-2` (in-flow, below) to `absolute right-full mr-2 top-0`
 (overlay, left) so it doesn't push the Annotation/Waypoint icons down.
 
 ### 2. Annotation
+
 The existing `AnnotationDropper` panel logic (presets, custom label, period
 start/stop, 5s poll, `/api/tracks/active/annotation`) is unchanged. Change: its
 trigger becomes a `w-9 h-9` toolbar icon (a flag/marker glyph) instead of the
@@ -72,20 +74,23 @@ when a timing period is open (preserving the current "⏺ open period" affordanc
 e.g. a small dot badge).
 
 ### 3. Waypoint drop mode
+
 New `WaypointDropButton` (in `ChartToolbar.tsx` or a small sibling) toggles a
 `waypointDropMode: boolean` owned by `chart/page.tsx`:
+
 - **Enter:** button highlighted; set the map canvas cursor to `crosshair`; arm
   the `<Map onClick>` handler.
 - **Map click:** capture `{lat, lon}`; auto-name `"WP N"` (N chosen so the
   slugified id `wp-n` doesn't collide with an existing waypoint — compute from
   the current waypoint list, retry/increment on a 409); `POST /api/waypoints
-  {name, lat, lon}`; on success append the returned waypoint to the chart's
+{name, lat, lon}`; on success append the returned waypoint to the chart's
   `waypoints` state (so `WaypointsLayer` shows the pin immediately) — or re-fetch
   `/api/waypoints`; then exit drop-mode + reset the cursor.
 - **Cancel:** clicking the icon again, or pressing `Esc`, exits drop-mode
   without creating anything.
 
 ### Map wiring (`chart/page.tsx`)
+
 Pass `<Map onClick={waypointDropMode ? handleDropClick : undefined}>`. When not
 in drop-mode the handler is `undefined`, so normal map clicks stay inert (the
 chart is otherwise display-only). The cursor change uses
@@ -103,13 +108,13 @@ increment N and retry once. Keeps names short and rename-friendly.
   the waypoint button + shared icon-button style.
 - **Modify:** `packages/web/src/app/chart/LayersControl.tsx` — keep it a self-
   contained button+popover unit, but change its outer wrapper from `absolute
-  top-2 right-2 z-10` to `relative` (the `ChartToolbar` flex-col positions it),
+top-2 right-2 z-10` to `relative` (the `ChartToolbar` flex-col positions it),
   and change the popover from `mt-2` to `absolute right-full mr-2 top-0` (opens
   left). Same pattern applied to `AnnotationDropper`. This keeps each control
   self-contained — the toolbar only supplies the flex-col wrapper + uniform
   sizing — which is the smallest, lowest-risk diff.
 - **Modify:** `packages/web/src/components/AnnotationDropper.tsx` — icon trigger
-  + left-opening panel + open-period dot; keep all track logic.
+  - left-opening panel + open-period dot; keep all track logic.
 - **Modify:** `packages/web/src/app/chart/page.tsx` — mount `<ChartToolbar>` in
   place of the separate `LayersControl` + `AnnotationDropper` mounts; add
   `waypointDropMode` state + `handleDropClick` + cursor handling; pass

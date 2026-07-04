@@ -3,7 +3,11 @@ import { parseWaypointForm } from './waypoint-form.js';
 
 describe('parseWaypointForm', () => {
   it('parses a valid name + DMM position + notes', () => {
-    const r = parseWaypointForm({ name: 'Newport', positionRaw: '41 29.2n 71 19.5w', notes: 'fuel' });
+    const r = parseWaypointForm({
+      name: 'Newport',
+      positionRaw: '41 29.2n 71 19.5w',
+      notes: 'fuel',
+    });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.patch.name).toBe('Newport');

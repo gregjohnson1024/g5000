@@ -9,6 +9,7 @@
 **Tech Stack:** TypeScript (ESM, strict; relative imports use `.js` ONLY in the tsc-compiled packages like `@g5000/db` — NOT in `packages/web`, which uses bundler resolution / no extension), Next.js 16, React 19, better-sqlite3 via Drizzle, RxJS, vitest. Spec: `docs/superpowers/specs/2026-05-23-boat-state-annotations-design.md`.
 
 **Current refs:**
+
 - `@g5000/db` `defaults.ts`: `SailCategory='headsail'|'main'|'downwind'`, `SAIL_CATEGORIES`, `Sail={id,name,category,areaSqM?,notes?,region}`, `SailWardrobe={schemaVersion:3,boatId,sails:Sail[],active:{headsail?,main?,downwind?},activeMode}`. All exported from `@g5000/db`.
 - ConfigStore singleton-blob pattern (waypoints/routes added this way): `schema.ts` `sqliteTable('x',{id,value})`; `config-store.ts` `CREATE TABLE IF NOT EXISTS x (id TEXT PRIMARY KEY, value TEXT NOT NULL)`, `loadOrInsert<T>(table, default)` in `open()`, a `BehaviorSubject`, and `get x$()`/`getX()`/`async setX()` accessors (setter calls `this.upsert(table, value)` then `.next`).
 - `AnnotationDropper.tsx`: polls `GET /api/tracks/active/annotation` every 5 s + on visibility; `post(label, kind)` → `POST .../annotation`; `state.trackId` (null = no track); `open_`/`disabled`; hardcoded `QUICK_BUTTONS` (Tack/Gybe/Reef/Main/J1-3/Spinnaker); Custom field; Start/End period. `variant: 'pill'|'icon'`.
@@ -19,12 +20,14 @@
 ## File structure
 
 **Create:**
+
 - `packages/db/src/boat-state.ts` — `BoatState` type + `DEFAULT_BOAT_STATE`.
 - `packages/web/src/app/api/boat-state/route.ts` — GET + POST (merge).
 - `packages/web/src/components/sail-groups.ts` + `.test.ts` — `sailGroups(wardrobe)`.
 - `packages/web/src/components/daggerboard-label.ts` + `.test.ts` — `daggerboardLabel(side, pct)`.
 
 **Modify:**
+
 - `packages/db/src/schema.ts` — `boat_state` table.
 - `packages/db/src/config-store.ts` — CREATE TABLE + load + `boatState$`/`getBoatState`/`setBoatState`.
 - `packages/db/src/config-store.test.ts` — boat_state round-trip test.
@@ -36,6 +39,7 @@
 ## Task 1: `boat_state` ConfigStore table + accessors
 
 **Files:**
+
 - Create: `packages/db/src/boat-state.ts`
 - Modify: `packages/db/src/schema.ts`, `config-store.ts`, `index.ts`
 - Test: `packages/db/src/config-store.test.ts`
@@ -43,6 +47,7 @@
 - [ ] **Step 1: Create the type**
 
 `packages/db/src/boat-state.ts`:
+
 ```ts
 /** Persisted live boat state surfaced + controlled by the annotation box. */
 export interface BoatState {
@@ -61,6 +66,7 @@ export const DEFAULT_BOAT_STATE: BoatState = {
 - [ ] **Step 2: Write the failing test**
 
 Append to `packages/db/src/config-store.test.ts` (reuse the existing temp-dir harness — `dbPath`/`store` from `beforeEach`):
+
 ```ts
 import type { BoatState } from './boat-state.js';
 
@@ -91,11 +97,13 @@ describe('ConfigStore boat_state', () => {
   });
 });
 ```
+
 Run `npx vitest run packages/db/src/config-store.test.ts -t "boat_state"` → FAIL.
 
 - [ ] **Step 3: Schema table**
 
 In `packages/db/src/schema.ts`, alongside the other `(id, value)` tables:
+
 ```ts
 export const boatState = sqliteTable('boat_state', {
   id: text('id').primaryKey(),
@@ -106,10 +114,12 @@ export const boatState = sqliteTable('boat_state', {
 - [ ] **Step 4: CREATE TABLE + accessors (mirror the waypoints/routes wiring)**
 
 In `config-store.ts`:
+
 - Add to the `raw.exec(`...`)` block: `CREATE TABLE IF NOT EXISTS boat_state (id TEXT PRIMARY KEY, value TEXT NOT NULL);`
 - Import `boatState as boatStateTable` from `./schema.js` and `{ type BoatState, DEFAULT_BOAT_STATE }` from `./boat-state.js`.
 - In `open()`, load it: `const boatStateValue = loadOrInsert<BoatState>(boatStateTable, DEFAULT_BOAT_STATE);` and thread into the constructor (same way the `waypoints`/`routes` values are threaded).
 - Add a `BehaviorSubject<BoatState>` field initialised from the loaded value; and public accessors next to the waypoints/routes ones:
+
 ```ts
 get boatState$(): Observable<BoatState> {
   return this.boatState$$.asObservable();
@@ -122,11 +132,13 @@ async setBoatState(value: BoatState): Promise<void> {
   this.boatState$$.next(value);
 }
 ```
+
 Add `this.boatState$$.complete()` in `close()` alongside the others.
 
 - [ ] **Step 5: Export the type**
 
 In `packages/db/src/index.ts`:
+
 ```ts
 export type { BoatState } from './boat-state.js';
 export { DEFAULT_BOAT_STATE } from './boat-state.js';
@@ -136,6 +148,7 @@ export { DEFAULT_BOAT_STATE } from './boat-state.js';
 
 `npx vitest run packages/db/src/config-store.test.ts -t "boat_state"` → 3 PASS.
 `npm run typecheck --workspace @g5000/db` → passes.
+
 ```bash
 git add packages/db/src/boat-state.ts packages/db/src/schema.ts packages/db/src/config-store.ts packages/db/src/config-store.test.ts packages/db/src/index.ts
 git commit -m "feat(db): boat_state ConfigStore table (daggerboards + engines)"
@@ -146,11 +159,13 @@ git commit -m "feat(db): boat_state ConfigStore table (daggerboards + engines)"
 ## Task 2: `/api/boat-state` GET + POST (merge)
 
 **Files:**
+
 - Create: `packages/web/src/app/api/boat-state/route.ts`
 
 - [ ] **Step 1: Implement the route**
 
 `packages/web/src/app/api/boat-state/route.ts` (mirror the conventions of `api/sails/active/route.ts` — `getSharedConfigStore`, `NextResponse`/`Response.json`, `dynamic`/`runtime` exports if the siblings use them):
+
 ```ts
 import { getSharedConfigStore, type BoatState } from '@g5000/db';
 
@@ -214,6 +229,7 @@ export async function POST(req: Request): Promise<Response> {
 
 `npm run typecheck --workspace @g5000/web` → passes (run `npx tsc -b packages/db` first if a stale-dist export error for `BoatState`/`getBoatState` appears).
 Smoke (dev server :3000):
+
 ```
 curl -s localhost:3000/api/boat-state
 curl -s -X POST localhost:3000/api/boat-state -H 'content-type: application/json' -d '{"daggerboards":{"port":75},"engines":{"starboard":{"running":true}}}' -w "\nHTTP %{http_code}\n"
@@ -222,6 +238,7 @@ curl -s -X POST localhost:3000/api/boat-state -H 'content-type: application/json
 # reset:
 curl -s -X POST localhost:3000/api/boat-state -H 'content-type: application/json' -d '{"daggerboards":{"port":0},"engines":{"starboard":{"running":false}}}'
 ```
+
 ```bash
 git add packages/web/src/app/api/boat-state
 git commit -m "feat(web): /api/boat-state GET + partial-merge POST"
@@ -232,12 +249,14 @@ git commit -m "feat(web): /api/boat-state GET + partial-merge POST"
 ## Task 3: `sailGroups` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/components/sail-groups.ts`
 - Test: `packages/web/src/components/sail-groups.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 `packages/web/src/components/sail-groups.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { sailGroups } from './sail-groups';
@@ -277,11 +296,13 @@ describe('sailGroups', () => {
   });
 });
 ```
+
 Run → FAIL.
 
 - [ ] **Step 2: Implement**
 
 `packages/web/src/components/sail-groups.ts`:
+
 ```ts
 import { SAIL_CATEGORIES, type SailCategory, type SailWardrobe } from '@g5000/db';
 
@@ -313,6 +334,7 @@ export function sailGroups(wardrobe: SailWardrobe): SailGroup[] {
 - [ ] **Step 3: Verify + commit**
 
 Run the test → 3 PASS. `npm run typecheck --workspace @g5000/web` → passes (`npx tsc -b packages/db` first if stale).
+
 ```bash
 git add packages/web/src/components/sail-groups.ts packages/web/src/components/sail-groups.test.ts
 git commit -m "feat(web): sailGroups helper for the annotation box"
@@ -323,12 +345,14 @@ git commit -m "feat(web): sailGroups helper for the annotation box"
 ## Task 4: `daggerboardLabel` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/components/daggerboard-label.ts`
 - Test: `packages/web/src/components/daggerboard-label.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 `packages/web/src/components/daggerboard-label.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { daggerboardLabel } from './daggerboard-label';
@@ -344,11 +368,13 @@ describe('daggerboardLabel', () => {
   });
 });
 ```
+
 Run → FAIL.
 
 - [ ] **Step 2: Implement**
 
 `packages/web/src/components/daggerboard-label.ts`:
+
 ```ts
 export type BoardSide = 'port' | 'starboard';
 
@@ -366,6 +392,7 @@ export function daggerboardLabel(side: BoardSide, pct: number): string {
 - [ ] **Step 3: Verify + commit**
 
 Run the test → 2 PASS. `npm run typecheck --workspace @g5000/web` → passes.
+
 ```bash
 git add packages/web/src/components/daggerboard-label.ts packages/web/src/components/daggerboard-label.test.ts
 git commit -m "feat(web): daggerboardLabel helper"
@@ -376,11 +403,13 @@ git commit -m "feat(web): daggerboardLabel helper"
 ## Task 5: AnnotationDropper — dynamic sail groups
 
 **Files:**
+
 - Modify: `packages/web/src/components/AnnotationDropper.tsx`
 
 - [ ] **Step 1: Poll the wardrobe + hold it in state**
 
 READ the file. Add `wardrobe` state and fetch it on the same 5 s tick that fetches annotations. In the existing poll effect's `tick()`, after the annotation fetch, also:
+
 ```ts
 try {
   const wr = await fetch('/api/sails', { cache: 'no-store' });
@@ -389,11 +418,13 @@ try {
   /* keep last wardrobe */
 }
 ```
+
 Add `const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);` and `import { SAIL_CATEGORIES, type SailWardrobe, type SailCategory } from '@g5000/db';` plus `import { sailGroups } from './sail-groups';`.
 
 - [ ] **Step 2: A sail-set action (set active + log)**
 
 Add a callback:
+
 ```ts
 const setSail = useCallback(
   async (category: SailCategory, sailId: string | null, label: string): Promise<void> => {
@@ -426,54 +457,58 @@ const setSail = useCallback(
   [post, state.trackId],
 );
 ```
+
 (`post` already closes the panel + flashes on its own path; the `else` branch covers the no-track case so the user still gets feedback.)
 
 - [ ] **Step 3: Replace the hardcoded sail rows with dynamic groups**
 
 Remove the `Main up/down`, `J1/J2/J3`, `Spinnaker up/down`, and `Reef in/out` entries from `QUICK_BUTTONS` (KEEP `Tack` and `Gybe`). Then, in the panel, after the Tack/Gybe row and before the Start/End period button, render the sail groups (only when `wardrobe` is loaded):
+
 ```tsx
-{wardrobe &&
-  sailGroups(wardrobe).map((g) => (
-    <div key={g.category} className="space-y-1">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">
-        {g.label}
-        {g.activeId ? (
-          <span className="ml-1 text-slate-300">
-            — {g.sails.find((s) => s.id === g.activeId)?.name ?? g.activeId}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {g.sails.map((s) => (
+{
+  wardrobe &&
+    sailGroups(wardrobe).map((g) => (
+      <div key={g.category} className="space-y-1">
+        <div className="text-[11px] uppercase tracking-wide text-slate-400">
+          {g.label}
+          {g.activeId ? (
+            <span className="ml-1 text-slate-300">
+              — {g.sails.find((s) => s.id === g.activeId)?.name ?? g.activeId}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {g.sails.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => void setSail(g.category, s.id, s.name)}
+              className={
+                'px-2 py-1 text-xs rounded border ' +
+                (g.activeId === s.id
+                  ? 'bg-amber-500 text-slate-900 border-amber-600'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+              }
+            >
+              {s.name}
+            </button>
+          ))}
           <button
-            key={s.id}
             type="button"
-            onClick={() => void setSail(g.category, s.id, s.name)}
+            onClick={() => void setSail(g.category, null, `${g.label} down`)}
             className={
               'px-2 py-1 text-xs rounded border ' +
-              (g.activeId === s.id
-                ? 'bg-amber-500 text-slate-900 border-amber-600'
-                : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+              (g.activeId
+                ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-slate-700 text-slate-100 border-slate-600')
             }
           >
-            {s.name}
+            down
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => void setSail(g.category, null, `${g.label} down`)}
-          className={
-            'px-2 py-1 text-xs rounded border ' +
-            (g.activeId
-              ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-              : 'bg-slate-700 text-slate-100 border-slate-600')
-          }
-        >
-          down
-        </button>
+        </div>
       </div>
-    </div>
-  ))}
+    ));
+}
 ```
 
 - [ ] **Step 4: Split the disabled logic**
@@ -484,6 +519,7 @@ The Tack/Gybe/Custom/period controls keep `disabled={disabled}` (no active track
 
 `npm run typecheck --workspace @g5000/web` → passes.
 `curl -s -o /dev/null -w "/chart %{http_code}  /helm " localhost:3000/chart; curl -s -o /dev/null -w "%{http_code}\n" localhost:3000/helm` → 200 200.
+
 ```bash
 git add packages/web/src/components/AnnotationDropper.tsx
 git commit -m "feat(web): annotation box — dynamic sail groups from wardrobe"
@@ -494,11 +530,13 @@ git commit -m "feat(web): annotation box — dynamic sail groups from wardrobe"
 ## Task 6: AnnotationDropper — daggerboard + engine groups
 
 **Files:**
+
 - Modify: `packages/web/src/components/AnnotationDropper.tsx`
 
 - [ ] **Step 1: Poll boat-state + hold it**
 
 Add `const [boatState, setBoatState] = useState<BoatState | null>(null);` and `import { type BoatState } from '@g5000/db';`, `import { daggerboardLabel, type BoardSide } from './daggerboard-label';`. In the poll `tick()`, also fetch `/api/boat-state`:
+
 ```ts
 try {
   const bs = await fetch('/api/boat-state', { cache: 'no-store' });
@@ -547,90 +585,100 @@ const postBoatState = useCallback(
 - [ ] **Step 3: Render daggerboard + engine groups**
 
 After the sail groups, render (when `boatState` is loaded):
+
 ```tsx
-{boatState && (
-  <>
-    {(['port', 'starboard'] as const).map((side) => (
-      <div key={`dagger-${side}`} className="space-y-1">
-        <div className="text-[11px] uppercase tracking-wide text-slate-400">
-          {side === 'port' ? 'Port board' : 'Stbd board'}
-          <span className="ml-1 text-slate-300">— {boatState.daggerboards[side]}%</span>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {[0, 25, 50, 75, 100].map((pct) => (
-            <button
-              key={pct}
-              type="button"
-              onClick={() =>
-                void postBoatState(
-                  { daggerboards: { [side]: pct } as Partial<BoatState['daggerboards']> } as Partial<BoatState>,
-                  daggerboardLabel(side as BoardSide, pct),
-                )
-              }
-              className={
-                'px-2 py-1 text-xs rounded border ' +
-                (boatState.daggerboards[side] === pct
-                  ? 'bg-amber-500 text-slate-900 border-amber-600'
-                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
-              }
-            >
-              {pct === 0 ? 'Up' : pct === 100 ? 'Down' : `${pct}%`}
-            </button>
-          ))}
-        </div>
-      </div>
-    ))}
-    {(['port', 'starboard'] as const).map((side) => {
-      const running = boatState.engines[side].running;
-      const label = side === 'port' ? 'Port engine' : 'Stbd engine';
-      return (
-        <div key={`engine-${side}`} className="space-y-1">
+{
+  boatState && (
+    <>
+      {(['port', 'starboard'] as const).map((side) => (
+        <div key={`dagger-${side}`} className="space-y-1">
           <div className="text-[11px] uppercase tracking-wide text-slate-400">
-            {label}
-            <span className="ml-1 text-slate-300">— {running ? 'running' : 'stopped'}</span>
+            {side === 'port' ? 'Port board' : 'Stbd board'}
+            <span className="ml-1 text-slate-300">— {boatState.daggerboards[side]}%</span>
           </div>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() =>
-                void postBoatState(
-                  { engines: { [side]: { running: true } } as Partial<BoatState['engines']> } as Partial<BoatState>,
-                  `${label} on`,
-                )
-              }
-              className={
-                'px-2 py-1 text-xs rounded border ' +
-                (running
-                  ? 'bg-emerald-600 text-white border-emerald-700'
-                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
-              }
-            >
-              Run
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                void postBoatState(
-                  { engines: { [side]: { running: false } } as Partial<BoatState['engines']> } as Partial<BoatState>,
-                  `${label} off`,
-                )
-              }
-              className={
-                'px-2 py-1 text-xs rounded border ' +
-                (!running
-                  ? 'bg-slate-600 text-white border-slate-500'
-                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
-              }
-            >
-              Stop
-            </button>
+          <div className="flex flex-wrap gap-1">
+            {[0, 25, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                onClick={() =>
+                  void postBoatState(
+                    {
+                      daggerboards: { [side]: pct } as Partial<BoatState['daggerboards']>,
+                    } as Partial<BoatState>,
+                    daggerboardLabel(side as BoardSide, pct),
+                  )
+                }
+                className={
+                  'px-2 py-1 text-xs rounded border ' +
+                  (boatState.daggerboards[side] === pct
+                    ? 'bg-amber-500 text-slate-900 border-amber-600'
+                    : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                }
+              >
+                {pct === 0 ? 'Up' : pct === 100 ? 'Down' : `${pct}%`}
+              </button>
+            ))}
           </div>
         </div>
-      );
-    })}
-  </>
-)}
+      ))}
+      {(['port', 'starboard'] as const).map((side) => {
+        const running = boatState.engines[side].running;
+        const label = side === 'port' ? 'Port engine' : 'Stbd engine';
+        return (
+          <div key={`engine-${side}`} className="space-y-1">
+            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+              {label}
+              <span className="ml-1 text-slate-300">— {running ? 'running' : 'stopped'}</span>
+            </div>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() =>
+                  void postBoatState(
+                    {
+                      engines: { [side]: { running: true } } as Partial<BoatState['engines']>,
+                    } as Partial<BoatState>,
+                    `${label} on`,
+                  )
+                }
+                className={
+                  'px-2 py-1 text-xs rounded border ' +
+                  (running
+                    ? 'bg-emerald-600 text-white border-emerald-700'
+                    : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                }
+              >
+                Run
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void postBoatState(
+                    {
+                      engines: { [side]: { running: false } } as Partial<BoatState['engines']>,
+                    } as Partial<BoatState>,
+                    `${label} off`,
+                  )
+                }
+                className={
+                  'px-2 py-1 text-xs rounded border ' +
+                  (!running
+                    ? 'bg-slate-600 text-white border-slate-500'
+                    : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700')
+                }
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 ```
+
 > The `as Partial<...>` casts handle the computed `[side]` key under strict TS. If they're noisy, a tiny typed builder (`dbPatch(side, pct)`) is fine — keep it readable.
 
 - [ ] **Step 4: Make the panel scrollable**
@@ -641,6 +689,7 @@ The expanded panel `<div>` (the `w-[280px] … p-3 space-y-3` block) now holds m
 
 `npm run typecheck --workspace @g5000/web` → passes.
 `curl` `/chart` + `/helm` → 200.
+
 ```bash
 git add packages/web/src/components/AnnotationDropper.tsx
 git commit -m "feat(web): annotation box — daggerboard + engine state groups"

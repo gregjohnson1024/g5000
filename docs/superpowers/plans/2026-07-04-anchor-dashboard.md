@@ -17,7 +17,7 @@
 - **Never gate MapLibre `addSource`/`addLayer` on `map.isStyleLoaded()`** (only the anchor mini-map uses canvas/SVG, not MapLibre — so this mostly won't apply, but note it if any real map is added).
 - **Driver failure must never block boot** or trip the systemd watchdog — reconnect with backoff, degrade to "offline".
 - **Victron driver is READ-ONLY** for v1 (no `W/` writes).
-- **Test baseline:** the known-environmental failures in CLAUDE.md (coastline, ConfigStore-dependent web route tests, wgrib2) are the accepted red baseline; any *other* failing test is a regression.
+- **Test baseline:** the known-environmental failures in CLAUDE.md (coastline, ConfigStore-dependent web route tests, wgrib2) are the accepted red baseline; any _other_ failing test is a regression.
 - **`npm run typecheck` does NOT typecheck `packages/web` `.tsx`** — before considering web work done, run `npm run build --workspace @g5000/web`.
 - Spec: `docs/superpowers/specs/2026-07-04-anchor-dashboard-design.md`.
 
@@ -26,6 +26,7 @@
 ## File Structure
 
 **Part B — Victron driver**
+
 - `packages/core/src/victron-state.ts` — `VictronSnapshot`/`VictronRegistry` types + `get/setSharedVictron` (globalThis).
 - `packages/core/src/channels.ts` — add `Electrical.*` scalar channels.
 - `packages/bridge/src/victron/topics.ts` — pure `parseTopic`/`applyMessage`/`deriveSnapshot`.
@@ -39,6 +40,7 @@
 - `packages/web/src/app/api/victron/state/route.ts` — `GET` registry snapshot.
 
 **Part A — Dashboard UI**
+
 - `packages/web/src/app/anchor/page.tsx` — shell (top zone grid + drawer).
 - `packages/web/src/app/anchor/panels/{DepthPanel,PositionPanel,NearbyVesselsPanel,WindDial,AnchorWatchPanel,TodayNowPanel,SystemsPanel}.tsx`
 - `packages/web/src/app/anchor/tabs/{ForecastGraphTab,ForecastTableTab,TidesTab,RadarTab,SkyTab,SolarTab}.tsx`
@@ -54,10 +56,12 @@
 ### Task 1: Victron types + registry singleton (`@g5000/core`)
 
 **Files:**
+
 - Create: `packages/core/src/victron-state.ts`
 - Modify: `packages/core/src/index.ts` (add `export * from './victron-state.js';`)
 
 **Interfaces:**
+
 - Produces:
   - `interface VictronSnapshot` (below)
   - `interface VictronRegistry { update(topic: string, payloadJson: string): void; snapshot(): VictronSnapshot; markStale(): void; connected(): boolean; setConnected(v: boolean): void; clear(): void; }`
@@ -153,10 +157,12 @@ git commit -m "feat(victron): snapshot/registry types + shared-singleton accesso
 ### Task 2: Topic parser + snapshot deriver (`@g5000/bridge`, pure, TDD)
 
 **Files:**
+
 - Create: `packages/bridge/src/victron/topics.ts`
 - Test: `packages/bridge/src/victron/topics.test.ts`
 
 **Interfaces:**
+
 - Consumes: `VictronSnapshot` from `@g5000/core`.
 - Produces:
   - `interface RawVictronState { byKey: Map<string, number | string | null> }` — key = `"service/instance/path"`.
@@ -399,6 +405,7 @@ git commit -m "feat(victron): MQTT topic parser + snapshot deriver"
 ### Task 3: Registry impl + bus publisher (`@g5000/bridge`)
 
 **Files:**
+
 - Create: `packages/bridge/src/victron/registry.ts`
 - Create: `packages/bridge/src/victron/publisher.ts`
 - Test: `packages/bridge/src/victron/publisher.test.ts`
@@ -406,6 +413,7 @@ git commit -m "feat(victron): MQTT topic parser + snapshot deriver"
 - Modify: `packages/bridge/src/index.ts` (re-exports)
 
 **Interfaces:**
+
 - Consumes: `RawVictronState`, `applyMessage`, `deriveSnapshot`, `VictronRegistry`, `Bus`, `Channels`.
 - Produces:
   - `function createVictronRegistry(): VictronRegistry` (idempotent shared singleton; mirrors `createAisTargetsRegistry`).
@@ -482,7 +490,14 @@ describe('publishVictronToBus', () => {
     publishVictronToBus(bus, {
       connected: true,
       updatedAt: 1,
-      battery: { soc: 68, voltage: 26.7, current: 5, power: 133, temperatureC: null, timeToGoS: null },
+      battery: {
+        soc: 68,
+        voltage: 26.7,
+        current: 5,
+        power: 133,
+        temperatureC: null,
+        timeToGoS: null,
+      },
       solar: { totalPower: 1946, chargers: [] },
       dc: { power: null },
       ac: { inputPower: null, outputPower: 1000, consumptionPower: 1000 },
@@ -491,7 +506,9 @@ describe('publishVictronToBus', () => {
       generator: { state: null, runtimeH: null },
     });
     const val = (ch: string) =>
-      seen.get(ch)?.value.kind === 'scalar' ? (seen.get(ch)!.value as { value: number }).value : undefined;
+      seen.get(ch)?.value.kind === 'scalar'
+        ? (seen.get(ch)!.value as { value: number }).value
+        : undefined;
     expect(val(Channels.Electrical.BatterySoc)).toBe(68);
     expect(val(Channels.Electrical.SolarPower)).toBe(1946);
     expect(val(Channels.Electrical.AcOutputPower)).toBe(1000);
@@ -560,12 +577,14 @@ git commit -m "feat(victron): shared registry + bus publisher + electrical chann
 ### Task 4: MQTT driver (connect / discover / keepalive / subscribe / reconnect)
 
 **Files:**
+
 - Create: `packages/bridge/src/victron/mqtt-driver.ts`
 - Test: `packages/bridge/src/victron/mqtt-driver.test.ts`
 - Modify: `packages/bridge/package.json` (add `"mqtt": "^5"`), then `npm install`
 - Modify: `packages/bridge/src/index.ts` (export `startVictronMqttDriver`)
 
 **Interfaces:**
+
 - Consumes: `mqtt` package, `VictronRegistry`, `Bus`, `publishVictronToBus`.
 - Produces:
   - `interface VictronDriverOpts { host: string; port?: number; portalId?: string; registry: VictronRegistry; bus: Bus; publishIntervalMs?: number; keepaliveMs?: number; connect?: MqttConnectFn; }`
@@ -574,6 +593,7 @@ git commit -m "feat(victron): shared registry + bus publisher + electrical chann
   - `function startVictronMqttDriver(opts: VictronDriverOpts): () => void` (returns teardown).
 
 **Design notes (implement to these):**
+
 - On `connect`: `setConnected(true)`, subscribe `N/+/system/0/Serial` to learn the portal id if not provided, then subscribe `N/<portalId>/#`, publish `R/<portalId>/keepalive` (empty) once, and start a **30 s** keepalive timer publishing `R/<portalId>/keepalive` with `{"keepalive-options":["suppress-republish"]}`.
 - On `message(topic,payload)`: if portal id still unknown and topic matches `N/<id>/system/0/Serial`, capture `<id>` and do the subscribe+keepalive bootstrap. Otherwise `registry.update(topic, payload.toString())`.
 - A **publish timer** (default 1 s) calls `publishVictronToBus(bus, registry.snapshot())` so headline channels stay fresh without publishing on every message.
@@ -585,6 +605,7 @@ git commit -m "feat(victron): shared registry + bus publisher + electrical chann
 ```bash
 cd packages/bridge && npm install mqtt@^5 && cd ../..
 ```
+
 Expected: `mqtt` added to `packages/bridge/package.json` dependencies; root `package-lock.json` updated.
 
 - [ ] **Step 2: Write the failing test** (injected fake client — no network)
@@ -630,7 +651,11 @@ describe('startVictronMqttDriver', () => {
     });
     client.emit('connect');
     // Learns portal id from a Serial topic:
-    client.emit('message', 'N/abc123/system/0/Serial', Buffer.from(JSON.stringify({ value: 'abc123' })));
+    client.emit(
+      'message',
+      'N/abc123/system/0/Serial',
+      Buffer.from(JSON.stringify({ value: 'abc123' })),
+    );
     expect(subscribed).toContain('N/abc123/#');
     expect(published.some(([t]) => t === 'R/abc123/keepalive')).toBe(true);
     published.length = 0;
@@ -644,9 +669,19 @@ describe('startVictronMqttDriver', () => {
   it('feeds instrument messages into the registry snapshot', () => {
     const { client } = fakeClient();
     const registry = createVictronRegistry();
-    startVictronMqttDriver({ host: 'x', portalId: 'p', registry, bus: new Bus(), connect: () => client });
+    startVictronMqttDriver({
+      host: 'x',
+      portalId: 'p',
+      registry,
+      bus: new Bus(),
+      connect: () => client,
+    });
     client.emit('connect');
-    client.emit('message', 'N/p/system/0/Dc/Battery/Soc', Buffer.from(JSON.stringify({ value: 55 })));
+    client.emit(
+      'message',
+      'N/p/system/0/Dc/Battery/Soc',
+      Buffer.from(JSON.stringify({ value: 55 })),
+    );
     expect(registry.snapshot().battery.soc).toBe(55);
   });
 });
@@ -670,11 +705,13 @@ git commit -m "feat(victron): MQTT driver (portal discovery, keepalive, resilien
 ### Task 5: Deterministic simulator
 
 **Files:**
+
 - Create: `packages/bridge/src/victron/sim.ts`
 - Test: `packages/bridge/src/victron/sim.test.ts`
 - Modify: `packages/bridge/src/index.ts` (export `startVictronSim`)
 
 **Interfaces:**
+
 - Produces:
   - `interface VictronSimOpts { registry: VictronRegistry; bus: Bus; tickMs?: number; now?: () => number; }`
   - `function startVictronSim(opts: VictronSimOpts): () => void`
@@ -718,11 +755,13 @@ git commit -m "feat(victron): deterministic off-boat simulator"
 ### Task 6: Wire into app boot + `GET /api/victron/state`
 
 **Files:**
+
 - Create: `apps/g5000/src/victron.ts`
 - Modify: `apps/g5000/src/index.ts` (call `startVictron`)
 - Create: `packages/web/src/app/api/victron/state/route.ts`
 
 **Interfaces:**
+
 - Consumes: `createVictronRegistry`, `startVictronMqttDriver`, `startVictronSim`, `Bus`, env vars.
 - Produces: `function startVictron(bus: Bus): () => void` (teardown).
 
@@ -763,7 +802,9 @@ export function startVictron(bus: Bus): () => void {
     }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn(`[g5000] victron start failed: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(
+      `[g5000] victron start failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
   return () => {};
 }
@@ -774,10 +815,11 @@ export function startVictron(bus: Bus): () => void {
 ```ts
 import { startVictron } from './victron.js'; // top with the other imports
 ```
+
 ```ts
-  // Victron Venus OS (Cerbo) — battery/solar/tanks/temps via MQTT (or sim).
-  const stopVictron = startVictron(bus);
-  teardown.push(async () => stopVictron());
+// Victron Venus OS (Cerbo) — battery/solar/tanks/temps via MQTT (or sim).
+const stopVictron = startVictron(bus);
+teardown.push(async () => stopVictron());
 ```
 
 - [ ] **Step 3: Write the API route** `packages/web/src/app/api/victron/state/route.ts`
@@ -804,10 +846,13 @@ export async function GET(): Promise<Response> {
 npx tsc -b packages/core packages/bridge
 cd apps/g5000 && npm run build && cd ../..
 ```
+
 Then, in one terminal: `VICTRON_SIM=1 SKIP_BRIDGE=1 npm run dev --workspace @g5000/app` (or full dev), and:
+
 ```bash
 curl -s localhost:3000/api/victron/state | head
 ```
+
 Expected: JSON with `"connected":true`, non-null `battery.soc`, `solar.totalPower`, ≥1 charger.
 
 - [ ] **Step 5: Commit**
@@ -826,11 +871,13 @@ git commit -m "feat(victron): wire driver/sim into boot + GET /api/victron/state
 ### Task 7: `/anchor` page shell + drawer + navbar tab
 
 **Files:**
+
 - Create: `packages/web/src/app/anchor/page.tsx`
 - Create: `packages/web/src/app/anchor/drawer.tsx` (drawer container + tab bar)
 - Modify: `packages/web/src/app/Navbar.tsx` (add `{ href: '/anchor', label: 'Anchor' }` to `TOP_LEVEL`, after `/chart`)
 
 **Interfaces:**
+
 - Produces: default-exported `AnchorPage` client component. Drawer state (`open tab | null`) persisted in `localStorage['anchor:drawer']`.
 
 **Design notes:** g5000 dark theme (match existing pages' Tailwind classes — read `packages/web/src/app/helm/page.tsx` for the class vocabulary). Top zone = CSS grid (`grid grid-cols-…`) of placeholder panel cards. Drawer = fixed bottom bar with tab buttons (`Forecast · Table · Tides · Radar · Sky · Solar`); clicking a tab expands a panel above the bar; a chevron/again-click collapses. Use `useSse()` at the page level and thread the `channels` map to panels via props (avoid one EventSource per panel).
@@ -866,10 +913,13 @@ describe('computeScope', () => {
     expect(r.scope).toBeCloseTo(117 / 14.2, 4);
   });
   it('returns null scope when depth+bow is zero', () => {
-    expect(computeScope({ chainCounter: 30, droopDeduct: 0, depthM: 0, bowHeightM: 0 }).scope).toBeNull();
+    expect(
+      computeScope({ chainCounter: 30, droopDeduct: 0, depthM: 0, bowHeightM: 0 }).scope,
+    ).toBeNull();
   });
 });
 ```
+
 ```ts
 // rode-scope.ts
 export interface ScopeInput {
@@ -889,6 +939,7 @@ export function computeScope(i: ScopeInput): ScopeResult {
   return { rode, totalPlusBow, scope: totalPlusBow > 0 ? rode / totalPlusBow : null };
 }
 ```
+
 Commit: `feat(anchor): rode/scope calculator`.
 
 ### Task 9: `lib/depth-offset.ts`
@@ -910,6 +961,7 @@ describe('deriveDepths', () => {
   });
 });
 ```
+
 ```ts
 // depth-offset.ts
 export interface DepthOffsets {
@@ -929,6 +981,7 @@ export function deriveDepths(sounderM: number, o: DepthOffsets): Depths {
   };
 }
 ```
+
 Commit: `feat(anchor): depth-offset math`.
 
 ### Task 10: `lib/gust.ts`
@@ -941,11 +994,18 @@ import { describe, it, expect } from 'vitest';
 import { rollingMax } from './gust';
 describe('rollingMax', () => {
   it('returns the max value within the window', () => {
-    const s = [{ t: 0, v: 10 }, { t: 1000, v: 21 }, { t: 2000, v: 15 }];
+    const s = [
+      { t: 0, v: 10 },
+      { t: 1000, v: 21 },
+      { t: 2000, v: 15 },
+    ];
     expect(rollingMax(s, 5000, 2000)).toBe(21);
   });
   it('excludes samples older than the window', () => {
-    const s = [{ t: 0, v: 30 }, { t: 60_000, v: 12 }];
+    const s = [
+      { t: 0, v: 30 },
+      { t: 60_000, v: 12 },
+    ];
     expect(rollingMax(s, 10_000, 60_000)).toBe(12);
   });
   it('returns null for an empty window', () => {
@@ -953,11 +1013,15 @@ describe('rollingMax', () => {
   });
 });
 ```
+
 ```ts
 // gust.ts
 import { useChannelHistory } from '../hooks/use-channel-history';
 
-export interface TV { t: number; v: number; }
+export interface TV {
+  t: number;
+  v: number;
+}
 export function rollingMax(samples: TV[], windowMs: number, now: number): number | null {
   let max: number | null = null;
   for (const s of samples) {
@@ -973,6 +1037,7 @@ export function useGust(channel: string, windowMs: number): number | null {
   return rollingMax(samples, windowMs, Date.now());
 }
 ```
+
 > Confirm `useChannelHistory`'s actual return shape (`.history` element fields) against `packages/web/src/hooks/use-channel-history.ts` and adapt the `.map` — the `rollingMax` test is the contract that must pass regardless.
 
 Commit: `feat(anchor): rolling-max gust helper + hook`.
@@ -991,7 +1056,7 @@ describe('rankVessels', () => {
     const now = 100_000;
     const ranked = rankVessels(
       [
-        { mmsi: 1, name: 'FAR', lat: 25.50, lon: -76.63, lastSeenMs: now - 5000 },
+        { mmsi: 1, name: 'FAR', lat: 25.5, lon: -76.63, lastSeenMs: now - 5000 },
         { mmsi: 2, name: 'NEAR', lat: 25.486, lon: -76.637, lastSeenMs: now - 1000 },
       ] as never,
       own,
@@ -1002,11 +1067,16 @@ describe('rankVessels', () => {
     expect(ranked[0]?.ageMs).toBe(1000);
   });
   it('returns range null when own fix missing', () => {
-    const ranked = rankVessels([{ mmsi: 1, name: 'X', lat: 25.5, lon: -76.6, lastSeenMs: 0 }] as never, null, 0);
+    const ranked = rankVessels(
+      [{ mmsi: 1, name: 'X', lat: 25.5, lon: -76.6, lastSeenMs: 0 }] as never,
+      null,
+      0,
+    );
     expect(ranked[0]?.rangeM).toBeNull();
   });
 });
 ```
+
 ```ts
 // nearby-vessels.ts
 import type { AisTarget } from '@g5000/core';
@@ -1019,8 +1089,11 @@ export interface RankedVessel {
 const R = 6371008.8;
 const toRad = (d: number) => (d * Math.PI) / 180;
 function haversineM(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lon - a.lon);
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  const dLat = toRad(b.lat - a.lat),
+    dLon = toRad(b.lon - a.lon);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 export function rankVessels(
@@ -1032,12 +1105,14 @@ export function rankVessels(
     .map((t) => ({
       mmsi: t.mmsi,
       name: t.name ?? null,
-      rangeM: own && t.lat != null && t.lon != null ? haversineM(own, { lat: t.lat, lon: t.lon }) : null,
+      rangeM:
+        own && t.lat != null && t.lon != null ? haversineM(own, { lat: t.lat, lon: t.lon }) : null,
       ageMs: now - t.lastSeenMs,
     }))
     .sort((a, b) => (a.rangeM ?? Infinity) - (b.rangeM ?? Infinity));
 }
 ```
+
 Commit: `feat(anchor): nearby-vessels ranking`.
 
 ### Task 12: `lib/sky.ts` (suncalc)
@@ -1058,14 +1133,19 @@ describe('computeSky', () => {
   });
 });
 ```
+
 ```ts
 // sky.ts
 import SunCalc from 'suncalc';
 export interface SkyInfo {
-  sunrise: Date; sunset: Date;
-  civilDawn: Date; civilDusk: Date;
-  nauticalDawn: Date; nauticalDusk: Date;
-  astroDawn: Date; astroDusk: Date;
+  sunrise: Date;
+  sunset: Date;
+  civilDawn: Date;
+  civilDusk: Date;
+  nauticalDawn: Date;
+  nauticalDusk: Date;
+  astroDawn: Date;
+  astroDusk: Date;
   dayLengthMs: number;
   moon: { phase: number; illumination: number; rise: Date | null; set: Date | null };
 }
@@ -1074,15 +1154,25 @@ export function computeSky(lat: number, lon: number, date: Date): SkyInfo {
   const illum = SunCalc.getMoonIllumination(date);
   const moonT = SunCalc.getMoonTimes(date, lat, lon);
   return {
-    sunrise: t.sunrise, sunset: t.sunset,
-    civilDawn: t.dawn, civilDusk: t.dusk,
-    nauticalDawn: t.nauticalDawn, nauticalDusk: t.nauticalDusk,
-    astroDawn: t.nightEnd, astroDusk: t.night,
+    sunrise: t.sunrise,
+    sunset: t.sunset,
+    civilDawn: t.dawn,
+    civilDusk: t.dusk,
+    nauticalDawn: t.nauticalDawn,
+    nauticalDusk: t.nauticalDusk,
+    astroDawn: t.nightEnd,
+    astroDusk: t.night,
     dayLengthMs: t.sunset.getTime() - t.sunrise.getTime(),
-    moon: { phase: illum.phase, illumination: illum.fraction, rise: moonT.rise ?? null, set: moonT.set ?? null },
+    moon: {
+      phase: illum.phase,
+      illumination: illum.fraction,
+      rise: moonT.rise ?? null,
+      set: moonT.set ?? null,
+    },
   };
 }
 ```
+
 Commit: `feat(anchor): sky/astro (suncalc)`. Also add `suncalc` to `packages/web/next.config.ts` `serverExternalPackages`? **No** — it's a client-side pure lib; leave it bundled.
 
 ---
@@ -1094,9 +1184,10 @@ Commit: `feat(anchor): sky/astro (suncalc)`. Also add `suncalc` to `packages/web
 ### Task 13: DepthPanel + PositionPanel
 
 **Files:** Create `packages/web/src/app/anchor/panels/DepthPanel.tsx`, `PositionPanel.tsx`. Props: `{ channels: ReadonlyMap<string, JsonSafeSample>; offsets: DepthOffsets }`.
+
 - `DepthPanel`: read `nav.depth` scalar; `deriveDepths`; big number + "UNDER KEEL"/"total depth" sub-lines when offsets set, else single `DEPTH` label.
 - `PositionPanel`: read `nav.gps.position` (lat/lon) → DMM; heading from `boat.heading.magnetic`/`.true` (whichever present) as `NNN° <cardinal>`.
-Verify vs screenshots; commit `feat(anchor): depth + position panels`.
+  Verify vs screenshots; commit `feat(anchor): depth + position panels`.
 
 ### Task 14: NearbyVesselsPanel
 
@@ -1108,12 +1199,13 @@ Verify vs screenshots; commit `feat(anchor): depth + position panels`.
 
 ### Task 16: AnchorWatchPanel + RodeScopeCalc
 
-**Files:** Create `panels/AnchorWatchPanel.tsx`. 
+**Files:** Create `panels/AnchorWatchPanel.tsx`.
+
 - Poll `GET /api/alarms/anchor` every 2 s (mirror `AnchorWatchLayer.tsx`). Compute distance/bearing from `channels['nav.gps.position']` → `anchor.anchorPoint ?? anchor.point` (reuse the haversine + `destPoint` already in `AnchorWatchLayer.tsx`; extract shared geometry to `packages/web/src/lib/geo.ts` if cleaner).
 - Mini plan-view: a small `<svg>`/`<canvas>` (NOT MapLibre) drawing the drag circle, anchor marker, boat dot, rode line — north-up, scaled to `radiusM`.
 - Controls: **Drop here (use GPS)** → `POST /api/alarms/anchor {action:'drop'}`; **Clear** → `{action:'weigh'}`; radius field (existing). Match the anchor API request shape used elsewhere (verify against `packages/web/src/app/api/alarms/anchor/route.ts`).
 - Embed `RodeScopeCalc`: inputs chain-counter (localStorage `anchor:chainCounter`), droop-deduct + bow-height (from anchor-dashboard config, Task 24; default 0 until then), depth from `nav.depth`; show `computeScope` result (rode / total+bow / scope).
-Verify vs screenshots; commit `feat(anchor): anchor-watch panel + rode/scope calc`.
+  Verify vs screenshots; commit `feat(anchor): anchor-watch panel + rode/scope calc`.
 
 ---
 
@@ -1122,11 +1214,13 @@ Verify vs screenshots; commit `feat(anchor): anchor-watch panel + rode/scope cal
 ### Task 17: Weather DTO + fetch lib (TDD) + routes
 
 **Files:**
+
 - Create: `packages/web/src/lib/weather-dto.ts` + `weather-dto.test.ts` (pure parse: raw Open-Meteo JSON → `WeatherCurrent`/`WeatherForecast`).
 - Create: `packages/web/src/app/api/weather/current/route.ts`, `packages/web/src/app/api/weather/forecast/route.ts`.
 - Create: `packages/web/src/lib/weather-cache.ts` (memory + disk cache under `~/.g5000-router/weather-cache`, TTL + last-good fallback) — mirror the tile-proxy disk-cache pattern in `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.ts`.
 
 **Interfaces:**
+
 - `interface WeatherCurrent { tempC, apparentC, condition, precipProb, windKn, gustKn, humidity, uv, pressure, updatedAt }`
 - `interface WeatherForecast { hourly: HourPoint[]; daily: DayPoint[]; fetchedAt: number }`
 - `parseCurrent(raw): WeatherCurrent`, `parseForecast(raw): WeatherForecast`.
@@ -1139,10 +1233,11 @@ Verify vs screenshots; commit `feat(anchor): anchor-watch panel + rode/scope cal
 ### Task 18: TodayNowPanel + Forecast tabs
 
 **Files:** Create `panels/TodayNowPanel.tsx`, `tabs/ForecastGraphTab.tsx`, `tabs/ForecastTableTab.tsx`.
+
 - `TodayNowPanel`: `WeatherCurrent` (temp, condition, wind, precip) + tide-now. **Tide-now:** call the same tide data the `TidesTab` uses (Task 20) — reuse `@g5000/tide` `interpolateHeight(events, Date.now())` and next HW/LW from `/api/tide/events`. Show "—" when no station.
 - `ForecastGraphTab`: meteogram from `WeatherForecast.hourly` — temp line, precip bars, wind line, day/night bands from `computeSky`. Use a lightweight SVG or the charting approach already used in `packages/web` (grep for existing chart components, e.g. the tide curve, and match).
 - `ForecastTableTab`: hourly heatmap table (temp/wind/gust/dir/cloud/precip%/humidity/UV/pressure), color-scaled cells.
-Verify vs screenshots; `npm run build --workspace @g5000/web`; commit `feat(anchor): today-now + forecast graph/table`.
+  Verify vs screenshots; `npm run build --workspace @g5000/web`; commit `feat(anchor): today-now + forecast graph/table`.
 
 ---
 
@@ -1151,18 +1246,20 @@ Verify vs screenshots; `npm run build --workspace @g5000/web`; commit `feat(anch
 ### Task 19: SystemsPanel + Tanks + Temperatures + SolarTab
 
 **Files:** Create `panels/SystemsPanel.tsx` (+ Tanks/Temps as sibling cards or sub-components) and `tabs/SolarTab.tsx`.
+
 - Poll `GET /api/victron/state` every 2 s. When `connected === false`/`offline`, render "Cerbo offline" (not zeros).
 - `SystemsPanel`: SoC % + charge/discharge (A/W with sign→"CHARGING +28.8A +770W"), solar total W, AC out/in, DC power, time-to-go (from `battery.timeToGoS`). Tanks: bar gauges (level %, fluid type, colour by type). Temperatures: labelled °C list.
 - `SolarTab`: per-charger cards (`snapshot.solar.chargers`) with V/I/P, state, day-max, yield-today; a system-total figure. (Curves are optional; a bar/number layout is acceptable for v1 since we have no per-charger history channel yet — note this in a comment.)
-Verify against the sim (`VICTRON_SIM=1`); commit `feat(anchor): systems/tanks/temps panels + solar tab`.
+  Verify against the sim (`VICTRON_SIM=1`); commit `feat(anchor): systems/tanks/temps panels + solar tab`.
 
 ### Task 20: TidesTab + SkyTab + RadarTab
 
 **Files:** Create `tabs/TidesTab.tsx`, `tabs/SkyTab.tsx`, `tabs/RadarTab.tsx`.
+
 - `TidesTab`: reuse the `/tide` page's data hooks/lib — station picker (`/api/tide/stations`), events (`/api/tide/events`), current height (`interpolateHeight`), next HW/LW, and a curve (reuse or mirror the `/tide` page's chart). Respect the `canadianTideCurrents` gate + empty state, same as `/tide`.
 - `SkyTab`: render `computeSky(lat, lon, now)` — sun rise/set + civil/nautical/astro twilight, day length, moon phase + illumination + upcoming phases (compute phase dates by scanning `SunCalc.getMoonIllumination` forward day-by-day for the next new/first/full/last).
 - `RadarTab`: Windy embed `<iframe src="https://embed.windy.com/embed2.html?lat=…&lon=…&overlay=radar…">` centred on the fix; show a "no connection" placeholder when `navigator.onLine === false`.
-Verify; `npm run build --workspace @g5000/web`; commit `feat(anchor): tides, sky, radar tabs`.
+  Verify; `npm run build --workspace @g5000/web`; commit `feat(anchor): tides, sky, radar tabs`.
 
 ---
 
@@ -1171,6 +1268,7 @@ Verify; `npm run build --workspace @g5000/web`; commit `feat(anchor): tides, sky
 ### Task 21: Anchor-dashboard settings (bow height, droop, depth offsets, weather pin)
 
 **Files:**
+
 - Modify: `packages/web/src/app/settings/page.tsx` — add an "Anchor dashboard" section editing `settings.anchorDashboard` via the existing `GET/PUT /api/settings` file blob (see `packages/web/src/app/api/settings/route.ts`). Fields: `bowHeightM`, `droopDeductM`, `depthOffsets.{keelBelowTransducerM,transducerToWaterlineM}`, `weatherPin` (or "follow live fix").
 - Modify: `panels/DepthPanel.tsx`, `panels/AnchorWatchPanel.tsx` (RodeScopeCalc), weather routes/panel to read `anchorDashboard` config (fetch `/api/settings`, use `settings.anchorDashboard ?? {}`).
 
@@ -1186,12 +1284,14 @@ Verify; `npm run build --workspace @g5000/web`; commit `feat(anchor): tides, sky
   - `VICTRON_MQTT_HOST=none` (default off; set to the Cerbo host e.g. `192.168.1.129`)
   - `VICTRON_MQTT_PORT=1883`, `VICTRON_SIM=1`, `VICTRON_PORTAL_ID` (optional override).
 - [ ] Run the full gate:
+
 ```bash
 npm run typecheck
 npm run build            # includes next build (web) — the real web typecheck
 npm test                 # expect ~baseline failures only (CLAUDE.md); new tests green
 npm run lint
 ```
+
 - [ ] Manual wire-up review of `/anchor` against the eleven screenshots (with `VICTRON_SIM=1`): top-zone panels populated, drawer tabs all render, "Cerbo offline" path works when the sim is off.
 - [ ] Commit `docs(anchor): env gates + /anchor page docs; mark spec implemented`.
 
@@ -1200,13 +1300,14 @@ npm run lint
 ## Self-Review
 
 **1. Spec coverage:**
+
 - Dashboard shell + drawer → Task 7. ✅
 - Depth/Position/NearbyVessels/WindDial+gust/AnchorWatch+RodeScope → Tasks 8–16. ✅
 - Today&Now + Forecast Graph/Table (Open-Meteo) → Tasks 17–18. ✅
 - Systems/Tanks/Temps + Solar tab (Victron) → Task 19. ✅
 - Tides (reuse) / Sky (suncalc) / Radar (Windy) → Task 20. ✅
 - Victron driver: types+registry (T1,T3), parser (T2), driver (T4), sim (T5), boot+API (T6). ✅
-- Channels (electrical.*) → Task 3. ✅
+- Channels (electrical.\*) → Task 3. ✅
 - Config (anchorDashboard) + settings → Task 21. ✅
 - Env gates + docs → Task 22. ✅
 - Metric units / knots / DMM → Global Constraints + panels. ✅

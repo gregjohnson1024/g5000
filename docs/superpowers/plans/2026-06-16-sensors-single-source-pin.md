@@ -13,8 +13,9 @@
 **Branch:** all work on `feature/sensors-single-source-pin` (from `develop`).
 
 **Context — current state (verified):**
+
 - `@g5000/core` exports `interface SourcePriorityRule { channelPattern: string; sources: string[]; freshnessSeconds: number; blocked?: string[] }` (via `export * from './selector.js'`).
-- `packages/web/src/app/sensors/SourcePriorityEditor.tsx` currently *also* declares a duplicate local `SourcePriorityRule` and an `ObservedEntry` interface, and exports the `SourcePriorityEditor` component. It has **no test file**.
+- `packages/web/src/app/sensors/SourcePriorityEditor.tsx` currently _also_ declares a duplicate local `SourcePriorityRule` and an `ObservedEntry` interface, and exports the `SourcePriorityEditor` component. It has **no test file**.
 - Importers of `./SourcePriorityEditor`: `group-sources.ts` + `group-sources.test.ts` (type `ObservedEntry`), `page.tsx` (types `ObservedEntry`, `SourcePriorityRule`), `SensorCard.tsx` (the component + both types).
 - `SensorCard` already receives `rules`, `onSaveRules`, `observed`, `devices` props.
 - `deviceLabel(source, devices)`, `groupSourcesByChannel(own)`, `formatChannelValue(v)`, `freshnessOf(ageMs)` exist and are reused unchanged.
@@ -24,6 +25,7 @@
 ### Task 1: `source-pin.ts` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/lib/source-pin.ts`
 - Test: `packages/web/src/lib/source-pin.test.ts`
 
@@ -170,6 +172,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Relocate `ObservedEntry` to `sensors-types.ts`
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/sensors-types.ts`
 - Modify: `packages/web/src/app/sensors/group-sources.ts`
 - Modify: `packages/web/src/app/sensors/group-sources.test.ts`
@@ -197,10 +200,13 @@ export interface ObservedEntry {
 - [ ] **Step 2: Repoint `group-sources.ts`**
 
 Change its first line from:
+
 ```ts
 import type { ObservedEntry } from './SourcePriorityEditor';
 ```
+
 to:
+
 ```ts
 import type { ObservedEntry } from './sensors-types';
 ```
@@ -208,10 +214,13 @@ import type { ObservedEntry } from './sensors-types';
 - [ ] **Step 3: Repoint `group-sources.test.ts`**
 
 Change the line:
+
 ```ts
 import type { ObservedEntry } from './SourcePriorityEditor';
 ```
+
 to:
+
 ```ts
 import type { ObservedEntry } from './sensors-types';
 ```
@@ -236,6 +245,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Replace the editor with an inline radio group in `SensorCard`
 
 **Files:**
+
 - Modify: `packages/web/src/app/sensors/SensorCard.tsx` (full replacement below)
 
 Renders, per channel, a headline (reflecting the pin) and a radio group: `Auto` plus one row per source. Rows = observed sources for the channel, plus the pinned source if it isn't currently observed (so a pinned-but-stale source stays visible/selectable). Removes the `SourcePriorityEditor` `<details>`. Imports `ObservedEntry` from `./sensors-types`, `SourcePriorityRule` from `@g5000/core`, and the pin helpers.
@@ -280,7 +290,14 @@ const DOT_COLOR: Record<Freshness, string> = {
  * failover); `Auto` removes the rule. A pinned source that has gone stale
  * stays listed (with `—`) so it remains selectable.
  */
-export function SensorCard({ def, observed, rules, devices, saving, onSaveRules }: SensorCardProps) {
+export function SensorCard({
+  def,
+  observed,
+  rules,
+  devices,
+  saving,
+  onSaveRules,
+}: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
@@ -377,7 +394,10 @@ export function SensorCard({ def, observed, rules, devices, saving, onSaveRules 
                           {entry ? formatChannelValue(entry.lastValue) : '—'}
                         </span>
                         {entry && (
-                          <span className="text-slate-600"> · {(entry.ageMs / 1000).toFixed(1)}s</span>
+                          <span className="text-slate-600">
+                            {' '}
+                            · {(entry.ageMs / 1000).toFixed(1)}s
+                          </span>
                         )}
                       </span>
                     </label>
@@ -435,16 +455,20 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Repoint `page.tsx` and delete `SourcePriorityEditor`
 
 **Files:**
+
 - Modify: `packages/web/src/app/sensors/page.tsx`
 - Delete: `packages/web/src/app/sensors/SourcePriorityEditor.tsx`
 
 - [ ] **Step 1: Repoint page.tsx type imports**
 
 In `packages/web/src/app/sensors/page.tsx`, replace the line:
+
 ```ts
 import type { ObservedEntry, SourcePriorityRule } from './SourcePriorityEditor';
 ```
+
 with these two lines:
+
 ```ts
 import type { SourcePriorityRule } from '@g5000/core';
 import type { ObservedEntry } from './sensors-types';
@@ -462,6 +486,7 @@ cd /Users/gregjohnson/code/g5000 && npx tsc -b
 cd /Users/gregjohnson/code/g5000 && npx vitest run packages/web/src/lib/source-pin.test.ts packages/web/src/lib/device-label.test.ts packages/web/src/app/sensors/group-sources.test.ts
 cd /Users/gregjohnson/code/g5000/packages/web && npm run build
 ```
+
 Expected: `tsc -b` exit 0; tests pass (8 + 8 + 3 = 19); `npm run build` succeeds with `/sensors` in the route manifest.
 
 - [ ] **Step 4: Commit**

@@ -7,10 +7,10 @@
 ## Summary
 
 Add a performance-telemetry layer to g5000 that answers three nested questions
-about how *Sula* is being sailed:
+about how _Sula_ is being sailed:
 
 1. **What the boat achieved** — live speed/angle/VMG/VMC against a target.
-2. **What the boat was capable of** — an *achievable polar* learned from Sula's
+2. **What the boat was capable of** — an _achievable polar_ learned from Sula's
    own logged data (upper-percentile per wind bin), not a builder table.
 3. **How the deficit between them partitions across the crew** — separating
    helm error (angle-driven loss) from trim/setup loss (loss at perfect angle).
@@ -24,7 +24,7 @@ last, behind a calibration + data-accumulation gate.
 
 The implementation follows g5000's existing pattern: a compute pipeline
 **subscribes** to channels already on the RxJS bus and **publishes** derived
-channels. It *composes* the true-wind and polar-target math that already exists
+channels. It _composes_ the true-wind and polar-target math that already exists
 rather than re-deriving it. Because every metric is a bus channel, the same code
 path feeds live tiles (helm + mast), the H-LINK re-emit, session logging, and
 full-fidelity **replay** — so the retrospective scorecard is the live pipeline
@@ -67,6 +67,7 @@ rotation sensor, or leeway-angle output." That doc is **stale**: Sula has heel
 and pitch. Fix that doc as part of Phase 0.
 
 **Have** (populated and used by compute today):
+
 - Apparent wind: `wind.apparent.angle` (AWA), `wind.apparent.speed` (AWS).
 - `boat.speed.water` (STW); `boat.heading.magnetic` / `.true` (HDG).
 - `nav.gps.position` / `.cog` / `.sog` / `.depth`, `nav.magvar`.
@@ -80,20 +81,23 @@ and pitch. Fix that doc as part of Phase 0.
   (vector residual, currently **leeway-free**).
 
 **Needs wiring** (on the bus per the owner, not yet mapped):
+
 - **Rudder angle** → `boat.rudder.angle`. PGN 127245 today maps only the
-  *commanded* field to `autopilot.commandedRudder`; add the actual rudder
+  _commanded_ field to `autopilot.commandedRudder`; add the actual rudder
   **Position** field → `boat.rudder.angle`. The channel constant, damping entry,
   and H-LINK fn 11 already exist; this is one handler change + a mapper test.
 
 **Lack** (no sensor → dependent metrics blocked on hardware):
+
 - **Mast rotation** → no rotation-corrected AWA.
 - **Rig / sheet / forestay loads** (no load cells) → no trim load-tracking or
   anticipation-lag.
 
 **Data-state** (repo `config.db`; the Pi on the boat may differ — verify in
 Phase 0):
+
 - **No polar loaded** (`polars=0`, `polar_revisions=0`). Until a polar exists (a
-  loaded cat polar *or* the learned envelope), all target/%polar/groove math is
+  loaded cat polar _or_ the learned envelope), all target/%polar/groove math is
   inert.
 - **AWS/AWA and BSP cal are identity/zero** (uncalibrated). TWA-binned
   statistics — and therefore the envelope and attribution layers — are
@@ -157,13 +161,14 @@ subscribers; groove produces nothing until its inputs (incl. `targetTwa` /
 
 ## The three-layer model
 
-Performance telemetry decomposes into *achieved* (L1), *capable* (L6 envelope),
-and *the crew deficit between them, partitioned* (L6 attribution). The layers in
+Performance telemetry decomposes into _achieved_ (L1), _capable_ (L6 envelope),
+and _the crew deficit between them, partitioned_ (L6 attribution). The layers in
 between (L2 cat physics, L3 helm, L4 maneuver, L5 trim) are the observable
 quantities that feed the partition. Layers L1–L5 are computable now; L6 is gated
 behind calibration + accumulated data (see Phasing).
 
 ### Notation
+
 - `TWA` true wind angle, signed rad (+stbd / −port); `|TWA|` magnitude.
 - `TWS`, `STW`, `SOG`, `targetSpeed` in m/s; `targetTwa` magnitude in rad.
 - `φ` heel (rad), `θ` pitch (rad, bow-down sign per IMU convention), `δ_rudder`
@@ -187,7 +192,7 @@ behind calibration + accumulated data (see Phasing).
 ### Derived-signal foundations
 
 - **True wind** — unchanged: masthead-rotation correction + 2D AWS/AWA cal +
-  BSP cal + compass deviation. Heel-corrected AWA is now *feasible* (heel present)
+  BSP cal + compass deviation. Heel-corrected AWA is now _feasible_ (heel present)
   but **deferred**: on a cat heel is small and the cal table absorbs steady-state
   upwash empirically. Listed as an available refinement, not Phase 0 work.
 - **Leeway** (Phase 0, new) — `λ = k·φ / max(STW, STW_floor)²`, clamped to a
@@ -198,13 +203,13 @@ behind calibration + accumulated data (see Phasing).
 
 ### L2 — Cat physics
 
-- **Hot-downwind VMG** — handled entirely by loading a *cat* polar (so
+- **Hot-downwind VMG** — handled entirely by loading a _cat_ polar (so
   `targetTwa` downwind is ~135–150°). No groove code.
 - **Pitchpole / bow-down risk** (`safety.pitchRisk`, enum `normal`/`caution`/
   `warning`) — from bow-down pitch `θ` and pitch-rate `θ̇`, weighted by downwind
   point of sail and apparent wind. v1 is a transparent threshold function (not a
   learned model): caution/warning when `θ` exceeds configured bow-down angles
-  *or* `θ̇` exceeds a rate threshold, escalated downwind / at high AWS. Also
+  _or_ `θ̇` exceeds a rate threshold, escalated downwind / at high AWS. Also
   publish raw `motion.pitch` to a tile. Conservative defaults, fully configurable;
   this is the inverse-of-monohull instinct made into a live safety cue.
 
@@ -220,8 +225,8 @@ behind calibration + accumulated data (see Phasing).
   fine.
 - **`groove.steeringEffort`** — rudder work from `boat.rudder.angle` over `W`:
   `reversals/min = 60/W · count(sign-changes in Δδ_rudder, ignoring |Δδ_rudder|
-  < ε)`, with RMS of `δ̇_rudder` (°/s) computed alongside as a secondary readout.
-  Skilled helms steer *less*; high reversal rate is sawing → induced drag.
+< ε)`, with RMS of `δ̇_rudder` (°/s) computed alongside as a secondary readout.
+  Skilled helms steer _less_; high reversal rate is sawing → induced drag.
 - **`groove.helmNervousness`** ∈ [0,1] — fraction of heading-error variance above
   a cutoff frequency `f_c` (a transparent high-pass/low-pass energy split of
   `e(t) = HDG − HDG_mean(W)`; the correction-spectrum / autocorrelation idea
@@ -238,7 +243,8 @@ behind calibration + accumulated data (see Phasing).
 
 A `maneuver.ts` state machine detects tacks/gybes and emits one `perf.maneuver`
 event per maneuver:
-- **Detection** — onset when `|rateOfTurn|` exceeds a threshold *and* `TWA` is
+
+- **Detection** — onset when `|rateOfTurn|` exceeds a threshold _and_ `TWA` is
   transiting head-to-wind (tack: sign flip near `|TWA|→0`) or dead-downwind
   (gybe: sign flip near `|TWA|→π`); settle when `STW ≥ 0.95·targetSpeed` and
   heading is steady.
@@ -248,7 +254,7 @@ event per maneuver:
   is often more diagnostic than the speed-loss minimum (rebuilding apparent from
   a low-speed state is nonlinear) — τ is the headline.
 - **Exit ratio** = `STW_min / STW_entry`.
-Event payload: `{ type: 'tack'|'gybe', t_ns, lossMeters, lossBoatLengths,
+  Event payload: `{ type: 'tack'|'gybe', t_ns, lossMeters, lossBoatLengths,
 secondsLost, tauSec, exitRatio, entrySTW, minSTW }`. Aggregated in the scorecard.
 
 ### L5 — Trim competence
@@ -258,7 +264,7 @@ secondsLost, tauSec, exitRatio, entrySTW, minSTW }`. Aggregated in the scorecard
   sheeting to the pressure curve.
 - **Load tracking, anticipation-lag** — **blocked** (no load cells). Schema
   leaves room; not implemented.
-- **Trim-residual attribution** — the *intercept* of the L6 regression (deficit
+- **Trim-residual attribution** — the _intercept_ of the L6 regression (deficit
   at zero angle error) is the trim/setup contribution. See L6.
 
 ### L6 — Capability envelope & crew-deficit attribution
@@ -268,21 +274,23 @@ secondsLost, tauSec, exitRatio, entrySTW, minSTW }`. Aggregated in the scorecard
 samples, the achievable speed is the **92.5th percentile** of `STW` (configurable
 in the 90–95 range). Persist the surface as a `polar_revisions` entry tagged
 `envelope`, with a **coverage map** (filled bins / total, and per-bin sample
-count). Once coverage clears a threshold, the envelope can *be* the target source
+count). Once coverage clears a threshold, the envelope can _be_ the target source
 (`targetSpeed`/`targetTwa` served from it) — the one path that needs no
 trustworthy builder polar, which matters if no good cat polar exists for Sula.
 
 **Deficit must be VMG-referenced, not STW-referenced.** A speed-referenced
-deficit `1 − STW/achievable(TWS,TWA)` *prices out* the angle error it is trying to
+deficit `1 − STW/achievable(TWS,TWA)` _prices out_ the angle error it is trying to
 measure: a helm footing 8° low is faster through the water, and the envelope at
 that wider angle is also high, so the speed deficit reads ≈ 0 despite a large
 angle error — the regression slope then comes out backwards and a chronic
 pincher/footer scores as near-perfect. Instead use a **VMG-referenced** deficit:
+
 ```
 VMG_achievable(TWS)  = max over angle of [ achievable(TWS, angle)·cos(angle) ]   // envelope's own optimal-VMG point
 d_vmg                = 1 − (STW·cos TWA) / VMG_achievable(TWS)
 ```
-Now sailing the wrong angle *does* surface as deficit, so the partition recovers.
+
+Now sailing the wrong angle _does_ surface as deficit, so the partition recovers.
 
 **Aggregate crew deficit** over a segment/session = `mean(d_vmg)` on quality-
 passing steady samples.
@@ -321,27 +329,32 @@ noted but not built.
 
 **Instantaneous in-groove** (`groove.inGroove`, enum `in`/`out` — the atomic
 basis the windows aggregate):
+
 ```
 angleErr = | |TWA| − targetTwa |
 upwind / downwind:  inGroove = (angleErr ≤ δ) AND (STW ≥ k·targetSpeed)
 reaching:           inGroove = (STW ≥ k·targetSpeed)         // angle set by course-to-mark
 not-sailing:        inGroove = null (excluded from windows)
 ```
+
 `δ` default **5°** (×1.5 downwind, where the groove is genuinely broader);
 `k` default **0.95**.
 
 **`groove.timeInGroove` (%)** — time-weighted fraction of the rolling window `W`
-(default 60 s) spent in-groove, counting only *sailing* samples (not-sailing
+(default 60 s) spent in-groove, counting only _sailing_ samples (not-sailing
 intervals drop out of numerator and denominator):
+
 ```
 timeInGroove = 100 · Σ(Δtᵢ·inGrooveᵢ) / Σ(Δtᵢ over sailing samples)
 ```
 
 **`groove.vmgEfficiency` (%)** — one channel, point-of-sail-correct:
+
 ```
 upwind/downwind:  vmgEff = 100 · (STW·cos TWA) / (targetSpeed·cos targetTwa)
 reaching:         vmgEff = 100 · STW / targetSpeed
 ```
+
 Both cos terms share sign → valid up & downwind. Clamped `[0,120]`, published as a
 short EMA (τ ≈ 6 s) so it's readable. Captures speed **and** angle together — you
 can't game it by footing for speed at a bad angle.
@@ -368,26 +381,26 @@ refinement.
 
 ## Channels published
 
-| Channel | Kind / unit | Phase | Notes |
-|---|---|---|---|
-| `boat.rudder.angle` | scalar, rad | 0 | new producer mapping (PGN 127245 Position) |
-| `boat.leeway` | scalar, rad | 0 | heel-based leeway estimate |
-| `safety.pitchRisk` | enum | 1 | normal / caution / warning |
-| `groove.pointOfSail` | enum | 1 | upwind / reaching / downwind / not-sailing |
-| `groove.helmSource` | enum | 1 | human / autopilot |
-| `groove.inGroove` | enum | 1 | in / out (atomic basis) |
-| `groove.timeInGroove` | scalar, % | 1 | **hero number** |
-| `groove.vmgEfficiency` | scalar, % | 1 | point-of-sail-correct, EMA |
-| `groove.vmg` | scalar, m/s | 1 | VMG to/from wind |
-| `groove.targetTwaError` | scalar, rad | 1 | signed (footing + / pinching −) |
-| `groove.twaSteadiness` | scalar, rad | 1 | circular SD; UI shows ° |
-| `groove.speedCv` | scalar, ratio | 1 | σ/μ STW, steady segments |
-| `groove.steeringEffort` | scalar, 1/min | 1 | rudder reversals/min (+ RMS rate) |
-| `groove.buildRate` | scalar, m/s² | 1 | dSTW/dt on acceleration |
-| `groove.puffGain` | scalar | 1 | sign = bear-away(+)/pinch(−) |
-| `groove.puffLagSec` | scalar, s | 1 | reaction latency |
-| `groove.helmNervousness` | scalar, 0–1 | 3 | HF heading-error energy; retro/low-rate |
-| `perf.maneuver` | event | 1 | per-maneuver cost payload |
+| Channel                  | Kind / unit   | Phase | Notes                                      |
+| ------------------------ | ------------- | ----- | ------------------------------------------ |
+| `boat.rudder.angle`      | scalar, rad   | 0     | new producer mapping (PGN 127245 Position) |
+| `boat.leeway`            | scalar, rad   | 0     | heel-based leeway estimate                 |
+| `safety.pitchRisk`       | enum          | 1     | normal / caution / warning                 |
+| `groove.pointOfSail`     | enum          | 1     | upwind / reaching / downwind / not-sailing |
+| `groove.helmSource`      | enum          | 1     | human / autopilot                          |
+| `groove.inGroove`        | enum          | 1     | in / out (atomic basis)                    |
+| `groove.timeInGroove`    | scalar, %     | 1     | **hero number**                            |
+| `groove.vmgEfficiency`   | scalar, %     | 1     | point-of-sail-correct, EMA                 |
+| `groove.vmg`             | scalar, m/s   | 1     | VMG to/from wind                           |
+| `groove.targetTwaError`  | scalar, rad   | 1     | signed (footing + / pinching −)            |
+| `groove.twaSteadiness`   | scalar, rad   | 1     | circular SD; UI shows °                    |
+| `groove.speedCv`         | scalar, ratio | 1     | σ/μ STW, steady segments                   |
+| `groove.steeringEffort`  | scalar, 1/min | 1     | rudder reversals/min (+ RMS rate)          |
+| `groove.buildRate`       | scalar, m/s²  | 1     | dSTW/dt on acceleration                    |
+| `groove.puffGain`        | scalar        | 1     | sign = bear-away(+)/pinch(−)               |
+| `groove.puffLagSec`      | scalar, s     | 1     | reaction latency                           |
+| `groove.helmNervousness` | scalar, 0–1   | 3     | HF heading-error energy; retro/low-rate    |
+| `perf.maneuver`          | event         | 1     | per-maneuver cost payload                  |
 
 Add the new channel constants to `packages/core/src/channels.ts` and register
 them in `knownChannelSet()` so they appear automatically in the mast layout
@@ -397,6 +410,7 @@ editor's channel picker (`/api/mast/channels`).
 
 **Live (reuses existing transport** — `use-sse.ts` + `/api/stream` for helm,
 `/api/mast/stream` for mast):
+
 - **`/helm`** — a Groove tile cluster: hero **Time-in-groove %** (large, color-
   banded), **VMG-efficiency %**, **VMC**, and one **steering** readout that
   relabels by `helmSource`; a **point-of-sail badge**; a **pitch-risk** indicator
@@ -419,8 +433,9 @@ worst-wander stretch; maneuver tally (count, mean loss, mean τ); time split
 (sailing vs motoring, human vs pilot). Surfaced as a **Groove section on the
 existing `/sessions` view**, generated on demand by replaying the session through
 the groove pipeline. The **envelope** (Phase 2) adds an achievable-polar overlay
-+ coverage; **attribution** (Phase 3) adds the helm/trim split and the data-
-quality status.
+
+- coverage; **attribution** (Phase 3) adds the helm/trim split and the data-
+  quality status.
 
 ## Phasing — dependency-gated
 
@@ -429,7 +444,7 @@ quality status.
   into current; a **calibration / data-quality gate** that tags every sample
   (cal real vs identity; required sensors present & fresh; steady vs maneuver) so
   downstream layers can exclude garbage — operationalizing the "garbage-in"
-  warning. Load a cat polar *or* bootstrap an interim envelope (config.db
+  warning. Load a cat polar _or_ bootstrap an interim envelope (config.db
   currently has no polar + identity cal). Fix the stale hercules-feature-notes.
 - **Phase 1 — Live metrics** (approved v1 + sensor-free additions). Groove
   pipeline (inGroove, timeInGroove, vmgEfficiency, vmg, targetTwaError,
@@ -460,6 +475,7 @@ Exposed via a getter-based `grooveSettingsRef`; edited on a `/groove-config` pag
 ## Testing
 
 Matches the repo's Vitest + fast-check, pure-module style:
+
 - `point-of-sail.test.ts` — class boundaries, not-sailing floors, hysteresis.
 - `windows.test.ts` — **fast-check properties**: fraction ∈ [0,1]; circular SD ≥ 0
   & wrap-correct; reversal count honours dead-band; CV well-defined; empty window
@@ -503,7 +519,7 @@ Matches the repo's Vitest + fast-check, pure-module style:
 
 - **Sea state.** `twaSteadiness`, `speedCv`, `steeringEffort` are worse in waves
   regardless of skill. Not normalized; an optional heel/pitch-variance "sea-state"
-  context readout is a future nicety. (Heel + pitch are present, so this *could*
+  context readout is a future nicety. (Heel + pitch are present, so this _could_
   be added later as context.)
 - **Self-reference.** L6 measures consistency against Sula's own drifting
   envelope; replicated-leg / two-boat testing is the only external anchor.

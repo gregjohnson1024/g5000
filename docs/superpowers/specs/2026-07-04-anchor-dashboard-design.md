@@ -1,7 +1,7 @@
 # At-Anchor Dashboard (`/anchor`) + Victron Cerbo Integration — Design
 
 **Date:** 2026-07-04
-**Status:** Design — approved shape, pending spec review
+**Status:** Implemented (sim-verified; live Cerbo verification pending a powered boat)
 **Branch:** `anchor-dashboard` (off `develop`)
 
 ## Intent
@@ -25,21 +25,21 @@ deterministic **simulator** with live verification deferred to a boat-powered se
 
 ## Decisions (locked)
 
-| Decision | Choice |
-| --- | --- |
-| Home | New top-level **Anchor** navbar tab → dedicated `/anchor` page |
-| Theme | g5000 dark theme; Ingenuity-faithful *layout* (top zone + slide-up drawer) |
-| Units | Metric display (m, °C); wind in **knots**; lat/lon compact DMM; storage stays SI |
-| General weather | **Open-Meteo** (free, keyless) → Today & Now + Forecast Graph + Table |
-| Weather radar | **Windy** weather-radar embed as an optional, online-only sub-tab |
-| Systems | **Victron Cerbo included** — MQTT driver → battery, solar, DC/AC totals, tanks, temperatures, generator |
-| Victron transport | **MQTT over TCP 1883** to the Cerbo's local FlashMQ broker (Node connects directly; no websocket) |
+| Decision             | Choice                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Home                 | New top-level **Anchor** navbar tab → dedicated `/anchor` page                                                 |
+| Theme                | g5000 dark theme; Ingenuity-faithful _layout_ (top zone + slide-up drawer)                                     |
+| Units                | Metric display (m, °C); wind in **knots**; lat/lon compact DMM; storage stays SI                               |
+| General weather      | **Open-Meteo** (free, keyless) → Today & Now + Forecast Graph + Table                                          |
+| Weather radar        | **Windy** weather-radar embed as an optional, online-only sub-tab                                              |
+| Systems              | **Victron Cerbo included** — MQTT driver → battery, solar, DC/AC totals, tanks, temperatures, generator        |
+| Victron transport    | **MQTT over TCP 1883** to the Cerbo's local FlashMQ broker (Node connects directly; no websocket)              |
 | Off-boat development | **Deterministic Victron simulator** (env-gated), so the dashboard is fully buildable/demoable without the boat |
 
 ## Non-goals (this spec)
 
-- **Emporia Vue 2 per-circuit AC monitoring.** Sula has no Emporia. Ingenuity's *AC Loads* /
-  *AC History* sub-tabs (per-circuit L1/L2 breakdown + kWh history) are out of scope. The Cerbo
+- **Emporia Vue 2 per-circuit AC monitoring.** Sula has no Emporia. Ingenuity's _AC Loads_ /
+  _AC History_ sub-tabs (per-circuit L1/L2 breakdown + kWh history) are out of scope. The Cerbo
   **does** give AC in/out **totals** (via the vebus/system service), which the Systems panel shows;
   the per-circuit breakdown is what's excluded.
 - **Writing to the Cerbo** (generator start, hot-water control). The driver is **read-only** for
@@ -50,25 +50,25 @@ deterministic **simulator** with live verification deferred to a boat-powered se
 
 ## Data source map
 
-| Panel / sub-tab | Source | Status |
-| --- | --- | --- |
-| Depth | `nav.depth` (m below transducer) | Live. Under-keel/total only if optional offsets set |
-| Position | `nav.gps.position` + heading | Live |
-| Nearby Vessels | `GET /api/ais/targets` | Live; range + age computed client-side |
-| Apparent-Wind dial | `wind.apparent.angle` / `.speed` (+ heading for course-up) | Live |
-| Gust 10-min / 1-hr | rolling max over apparent-speed history | New (client rolling-max) |
-| Anchor Watch | `GET/POST /api/alarms/anchor` | Live (built in Orca work) |
-| Rode & Scope | user inputs + `nav.depth` + config | New (pure calc + config) |
-| Today & Now (weather) | Open-Meteo current | New (Open-Meteo) |
-| Today & Now (tide) | `@g5000/tide` lib | Live (reuse) |
-| **Battery & Power** | Victron MQTT (`system` + `battery` + `vebus`) | **New (Cerbo driver)** |
-| **Tanks** | Victron MQTT (`tank`) | **New (Cerbo driver)** |
-| **Temperatures** | Victron MQTT (`temperature`) | **New (Cerbo driver)** |
-| Forecast Graph / Table | Open-Meteo hourly + daily | New (Open-Meteo) |
-| Tides sub-tab | `/api/tide/*` + `@g5000/tide` | Live (reuse; inherits Admiralty/CHS coverage + `canadianTideCurrents` gate) |
-| **Solar sub-tab** | Victron MQTT (`solarcharger` per-MPPT) | **New (Cerbo driver)** |
-| Sky sub-tab | `suncalc` (offline) | New (offline, keyless) |
-| Radar sub-tab | Windy embed | New (external iframe, online-only) |
+| Panel / sub-tab        | Source                                                     | Status                                                                      |
+| ---------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Depth                  | `nav.depth` (m below transducer)                           | Live. Under-keel/total only if optional offsets set                         |
+| Position               | `nav.gps.position` + heading                               | Live                                                                        |
+| Nearby Vessels         | `GET /api/ais/targets`                                     | Live; range + age computed client-side                                      |
+| Apparent-Wind dial     | `wind.apparent.angle` / `.speed` (+ heading for course-up) | Live                                                                        |
+| Gust 10-min / 1-hr     | rolling max over apparent-speed history                    | New (client rolling-max)                                                    |
+| Anchor Watch           | `GET/POST /api/alarms/anchor`                              | Live (built in Orca work)                                                   |
+| Rode & Scope           | user inputs + `nav.depth` + config                         | New (pure calc + config)                                                    |
+| Today & Now (weather)  | Open-Meteo current                                         | New (Open-Meteo)                                                            |
+| Today & Now (tide)     | `@g5000/tide` lib                                          | Live (reuse)                                                                |
+| **Battery & Power**    | Victron MQTT (`system` + `battery` + `vebus`)              | **New (Cerbo driver)**                                                      |
+| **Tanks**              | Victron MQTT (`tank`)                                      | **New (Cerbo driver)**                                                      |
+| **Temperatures**       | Victron MQTT (`temperature`)                               | **New (Cerbo driver)**                                                      |
+| Forecast Graph / Table | Open-Meteo hourly + daily                                  | New (Open-Meteo)                                                            |
+| Tides sub-tab          | `/api/tide/*` + `@g5000/tide`                              | Live (reuse; inherits Admiralty/CHS coverage + `canadianTideCurrents` gate) |
+| **Solar sub-tab**      | Victron MQTT (`solarcharger` per-MPPT)                     | **New (Cerbo driver)**                                                      |
+| Sky sub-tab            | `suncalc` (offline)                                        | New (offline, keyless)                                                      |
+| Radar sub-tab          | Windy embed                                                | New (external iframe, online-only)                                          |
 
 ## Architecture — Part A: the dashboard UI
 
@@ -86,8 +86,8 @@ deterministic **simulator** with live verification deferred to a boat-powered se
 
 Each panel is a small, independently-understandable card:
 
-1. **`DepthPanel`** — `nav.depth`. With `depthOffsets` config set, also shows *total depth* =
-   sounder + transducer-below-waterline and *under keel* = sounder − keel-below-transducer.
+1. **`DepthPanel`** — `nav.depth`. With `depthOffsets` config set, also shows _total depth_ =
+   sounder + transducer-below-waterline and _under keel_ = sounder − keel-below-transducer.
    Unset → single raw number labeled `DEPTH`.
 2. **`PositionPanel`** — DMM lat/lon + heading.
 3. **`NearbyVesselsPanel`** — polls `/api/ais/targets`; haversine range from own fix, age from
@@ -169,8 +169,8 @@ NGT-1/YDWG (not N2K): it reads the Cerbo's MQTT broker and publishes to the same
   - `temperatures: [{ id, name, celsius }]`
   - `generator: { state, runtimeH }`
   - `updatedAt`
-  Preference: use `system/0/*` aggregates for headline battery/PV/consumption; per-device services
-  for detail (per-MPPT, per-tank, per-temperature).
+    Preference: use `system/0/*` aggregates for headline battery/PV/consumption; per-device services
+    for detail (per-MPPT, per-tank, per-temperature).
 
 ### `VictronRegistry` + channels
 
@@ -181,7 +181,7 @@ NGT-1/YDWG (not N2K): it reads the Cerbo's MQTT broker and publishes to the same
   - `electrical.battery.soc`, `electrical.battery.current`, `electrical.battery.power`
   - `electrical.dc.power`, `electrical.ac.input.power`, `electrical.ac.output.power`
   - `electrical.solar.power`
-  (Existing `electrical.battery.voltage` stays.) Added to `packages/core/src/channels.ts`.
+    (Existing `electrical.battery.voltage` stays.) Added to `packages/core/src/channels.ts`.
 
 ### `victron-sim.ts` — off-boat development
 

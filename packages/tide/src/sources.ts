@@ -1,5 +1,8 @@
 import type { Station, TidalEvent } from './types.js';
-import { listStations as admiraltyListStations, getTidalEvents as admiraltyGetTidalEvents } from './admiralty-client.js';
+import {
+  listStations as admiraltyListStations,
+  getTidalEvents as admiraltyGetTidalEvents,
+} from './admiralty-client.js';
 import { chsListStations, chsGetTidalEvents } from './chs-client.js';
 
 export type TideSourceId = 'admiralty' | 'chs';
@@ -13,14 +16,21 @@ export interface TideSource {
 }
 
 const inBbox = (
-  lat: number, lon: number, latMin: number, latMax: number, lonMin: number, lonMax: number,
+  lat: number,
+  lon: number,
+  latMin: number,
+  latMax: number,
+  lonMin: number,
+  lonMax: number,
 ): boolean => lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax;
 
 /** Build the tide sources. The ADMIRALTY key is injected (getter) so this
  *  package never reads process.env. Both the service and the API routes build
  *  sources through this one factory. Coverage bboxes are coarse rectangles
  *  (heuristic; UK and Canada do not overlap). */
-export function createTideSources(opts: { getAdmiraltyKey: () => string | undefined }): TideSource[] {
+export function createTideSources(opts: {
+  getAdmiraltyKey: () => string | undefined;
+}): TideSource[] {
   return [
     {
       id: 'admiralty',
@@ -39,7 +49,10 @@ export function createTideSources(opts: { getAdmiraltyKey: () => string | undefi
   ];
 }
 
-export function getTideSource(sources: ReadonlyArray<TideSource>, id: string): TideSource | undefined {
+export function getTideSource(
+  sources: ReadonlyArray<TideSource>,
+  id: string,
+): TideSource | undefined {
   return sources.find((s) => s.id === id);
 }
 

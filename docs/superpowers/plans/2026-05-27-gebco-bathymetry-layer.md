@@ -31,6 +31,7 @@
 ### Task 1: ESRI ASCII grid parser
 
 **Files:**
+
 - Create: `packages/web/src/lib/bathy/esriascii.ts`
 - Test: `packages/web/src/lib/bathy/esriascii.test.ts`
 
@@ -152,6 +153,7 @@ git commit -m "feat(web): ESRI ASCII grid parser for GMRT bathymetry"
 ### Task 2: Depth-contour generation
 
 **Files:**
+
 - Create: `packages/web/src/lib/bathy/contours.ts`
 - Test: `packages/web/src/lib/bathy/contours.test.ts`
 
@@ -187,7 +189,9 @@ describe('depthContours', () => {
       values,
     };
     const fc = depthContours(grid, [-10, -50, -100, -200]);
-    const depths = fc.features.map((f) => (f.properties as { depth: number }).depth).sort((a, b) => a - b);
+    const depths = fc.features
+      .map((f) => (f.properties as { depth: number }).depth)
+      .sort((a, b) => a - b);
     // -200 never reached (deepest is -120) → no feature for it.
     expect(depths).toEqual([10, 50, 100]);
     // Geometry is geographic: longitudes within the bbox, lats within [40,44].
@@ -270,6 +274,7 @@ git commit -m "feat(web): depth-contour generation from bathymetry grid"
 ### Task 3: bbox snapping, cache key, GMRT URL helpers
 
 **Files:**
+
 - Create: `packages/web/src/lib/bathy/bbox.ts`
 - Test: `packages/web/src/lib/bathy/bbox.test.ts`
 
@@ -384,6 +389,7 @@ git commit -m "feat(web): bbox snap + cache-key + GMRT URL helpers for bathymetr
 ### Task 4: `/api/bathy/contours` route with disk cache
 
 **Files:**
+
 - Create: `packages/web/src/app/api/bathy/contours/route.ts`
 
 This task is thin wiring over the three tested libs; the cache layout mirrors the existing sat-tiles cache (`packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.ts`). No new unit test — the parsing, contouring, and bbox logic are already covered. Verify by manual curl in Step 3.
@@ -396,7 +402,13 @@ import { join } from 'node:path';
 import { ROOT } from '../../../../lib/paths';
 import { parseEsriAscii } from '../../../../lib/bathy/esriascii';
 import { depthContours } from '../../../../lib/bathy/contours';
-import { snapBbox, cacheKey, gmrtUrl, type BathyResolution, type Bbox } from '../../../../lib/bathy/bbox';
+import {
+  snapBbox,
+  cacheKey,
+  gmrtUrl,
+  type BathyResolution,
+  type Bbox,
+} from '../../../../lib/bathy/bbox';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -443,10 +455,7 @@ export async function GET(req: Request): Promise<Response> {
   try {
     const r = await fetch(gmrtUrl(bbox, res), { headers: { 'user-agent': USER_AGENT } });
     if (!r.ok) {
-      return Response.json(
-        { ok: false, error: { message: `GMRT ${r.status}` } },
-        { status: 502 },
-      );
+      return Response.json({ ok: false, error: { message: `GMRT ${r.status}` } }, { status: 502 });
     }
     text = await r.text();
   } catch (e) {
@@ -475,10 +484,12 @@ Expected: PASS (no errors).
 - [ ] **Step 3: Manual smoke test against the running dev server**
 
 Run:
+
 ```bash
 curl -s "http://localhost:3000/api/bathy/contours?latMin=40&latMax=41&lonMin=-71&lonMax=-70&res=low" \
   -w "\nx-cache via headers above; feature count:\n" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d['features']), 'features'); print(sorted({f['properties']['depth'] for f in d['features']}))"
 ```
+
 Expected: a non-zero feature count and a sorted list of depths drawn from the threshold set (e.g. `[10, 20, 50, 100, ...]`). A second identical request should be served from disk (`x-cache: HIT`) — confirm with `curl -sD - ... -o /dev/null | grep -i x-cache`.
 
 - [ ] **Step 4: Commit**
@@ -493,6 +504,7 @@ git commit -m "feat(web): /api/bathy/contours GMRT fetch + contour + disk cache"
 ### Task 5: `BathyLayer` client component
 
 **Files:**
+
 - Create: `packages/web/src/components/BathyLayer.tsx`
 
 No unit test (MapLibre side-effects; verified in the browser in Task 7). Mirrors the effect-driven attach/detach + `styledata` retry pattern from `TrackOverlay.tsx` / `EncLayer.tsx`.
@@ -654,6 +666,7 @@ git commit -m "feat(web): BathyLayer depth-contour overlay component"
 ### Task 6: Wire the toggle into the layers popover + chart page
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 - Modify: `packages/web/src/app/chart/page.tsx`
 
@@ -662,9 +675,9 @@ git commit -m "feat(web): BathyLayer depth-contour overlay component"
 In `packages/web/src/app/chart/LayersControl.tsx`, add the field to the interface (after `buoys`):
 
 ```ts
-  buoys: boolean;
-  /** GEBCO/GMRT depth contours. Off by default. */
-  bathy: boolean;
+buoys: boolean;
+/** GEBCO/GMRT depth contours. Off by default. */
+bathy: boolean;
 ```
 
 Widen the `onToggle` prop type (currently `'osm' | 'enc' | 'satellite' | 'buoys' | 'ais' | 'aisCog'`) to include `'bathy'`:
@@ -683,12 +696,12 @@ Add a toggle row immediately after the Buoys row:
 Add `bathy` to the `onCount` tally:
 
 ```ts
-  const onCount =
-    (state.enc ? 1 : 0) +
-    (state.satellite ? 1 : 0) +
-    (state.buoys ? 1 : 0) +
-    (state.bathy ? 1 : 0) +
-    (state.model !== 'none' ? 1 : 0);
+const onCount =
+  (state.enc ? 1 : 0) +
+  (state.satellite ? 1 : 0) +
+  (state.buoys ? 1 : 0) +
+  (state.bathy ? 1 : 0) +
+  (state.model !== 'none' ? 1 : 0);
 ```
 
 - [ ] **Step 2: Default + hydrate `bathy` in chart page**

@@ -14,10 +14,14 @@ const base = {
 
 describe('classifyPointOfSail', () => {
   it('returns not-sailing below the wind floor', () => {
-    expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, twsMs: 2 * KN })).toBe<PointOfSail>('not-sailing');
+    expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, twsMs: 2 * KN })).toBe<PointOfSail>(
+      'not-sailing',
+    );
   });
   it('returns not-sailing below steerage', () => {
-    expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, bspMs: 0.5 * KN })).toBe<PointOfSail>('not-sailing');
+    expect(
+      classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, bspMs: 0.5 * KN }),
+    ).toBe<PointOfSail>('not-sailing');
   });
   it('classifies a beat as upwind', () => {
     expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG })).toBe<PointOfSail>('upwind');

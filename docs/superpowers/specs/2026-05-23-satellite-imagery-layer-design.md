@@ -14,17 +14,17 @@ plus a thin MapLibre raster layer plus a toggle in `LayersControl`. Unlike NOAA
 
 ## Decisions (locked during brainstorming)
 
-| Decision | Choice | Rationale |
-| --- | --- | --- |
-| Imagery source | **Esri World Imagery** (keyless ArcGIS tiles) | Global, sharp to ~z19, no API key, standard XYZ. Verified keyless `image/jpeg` 200 at z10 and z17 on 2026-05-23. |
-| Why a proxy (not direct upstream) | Same-origin disk-caching proxy | Offshore has no internet → tiles must be pre-warmed and served from disk. Also avoids leaking boat position to Esri on every pan. |
-| Layer model | Independent toggle; satellite wins z-order over NOAA when both on | User accepts the both-on overlap; satellite is opaque and sits just under the annotation sentinel. |
-| Primary use | Harbor/anchorage detail (z~18–19), cached for offline | Docks, moorings, breakwaters, shoals. |
-| Cache growth | Growable region list + global low-zoom base + disk-budget guard | Curated breadth at low zoom, targeted depth where it matters, never silently fill the SD card. |
-| Global base depth | z0–7 (~22k tiles, a few hundred MB) | Worldwide context everywhere; regions add depth on top. |
-| Disk cap | 8 GB, no auto-delete | Tailored to the Pi (29 GB card, 14 GB free, whole router cache is 457 MB today). Leaves the card ~76% full when full; eviction only on explicit prune. |
-| Prune interface | Admin UI on `/settings` **and** CLI, sharing one lib | UI for at-the-helm cache management; CLI for headless/ssh. Single prune implementation. |
-| "Unused" definition | Tiles not **viewed** in N days (LRU by mtime) | Proxy bumps tile mtime on each disk HIT, so mtime = last-served time; prune evicts least-recently-viewed. |
+| Decision                          | Choice                                                            | Rationale                                                                                                                                              |
+| --------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Imagery source                    | **Esri World Imagery** (keyless ArcGIS tiles)                     | Global, sharp to ~z19, no API key, standard XYZ. Verified keyless `image/jpeg` 200 at z10 and z17 on 2026-05-23.                                       |
+| Why a proxy (not direct upstream) | Same-origin disk-caching proxy                                    | Offshore has no internet → tiles must be pre-warmed and served from disk. Also avoids leaking boat position to Esri on every pan.                      |
+| Layer model                       | Independent toggle; satellite wins z-order over NOAA when both on | User accepts the both-on overlap; satellite is opaque and sits just under the annotation sentinel.                                                     |
+| Primary use                       | Harbor/anchorage detail (z~18–19), cached for offline             | Docks, moorings, breakwaters, shoals.                                                                                                                  |
+| Cache growth                      | Growable region list + global low-zoom base + disk-budget guard   | Curated breadth at low zoom, targeted depth where it matters, never silently fill the SD card.                                                         |
+| Global base depth                 | z0–7 (~22k tiles, a few hundred MB)                               | Worldwide context everywhere; regions add depth on top.                                                                                                |
+| Disk cap                          | 8 GB, no auto-delete                                              | Tailored to the Pi (29 GB card, 14 GB free, whole router cache is 457 MB today). Leaves the card ~76% full when full; eviction only on explicit prune. |
+| Prune interface                   | Admin UI on `/settings` **and** CLI, sharing one lib              | UI for at-the-helm cache management; CLI for headless/ssh. Single prune implementation.                                                                |
+| "Unused" definition               | Tiles not **viewed** in N days (LRU by mtime)                     | Proxy bumps tile mtime on each disk HIT, so mtime = last-served time; prune evicts least-recently-viewed.                                              |
 
 ## Licensing caveat (read before relying on the offline cache)
 
@@ -35,7 +35,7 @@ enforcement, but it is **not explicitly licensed**.
 
 Mitigation is architectural: the proxy is **source-agnostic**. The Esri URL lives in
 exactly one place (the `sat-tiles` route's upstream template, mirrored in the seed
-script). Swapping to **Sentinel-2 cloudless / EOX** — which *is* openly licensed for
+script). Swapping to **Sentinel-2 cloudless / EOX** — which _is_ openly licensed for
 caching and redistribution — is a one-line upstream-URL change, with no change to the
 layer component, the `LayersControl` row, the cache layout, or the seed scripts. EOX
 trades resolution (~10 m, cloud-free composite) for an unambiguous license; it is the
@@ -89,7 +89,7 @@ Near-clone of `enc-tiles/[z]/[x]/[y]/route.ts`. Differences:
   static and offshore can't refetch, so a long TTL avoids treating good cached tiles
   as stale.
 - **Bump mtime on disk HIT** (best-effort, fire-and-forget `utimes`): makes a tile's
-  mtime its *last-served* time, so the prune guard's "unused" = "not viewed recently"
+  mtime its _last-served_ time, so the prune guard's "unused" = "not viewed recently"
   (true LRU). A frequently-viewed tile never expires; an unviewed tile keeps its
   original fetch time and becomes a prune candidate. Do not block the response on the
   `utimes` write.
@@ -145,8 +145,8 @@ Subcommands:
 - **`regions`** — reads `~/.g5000-router/sat-seed-regions.json`:
   ```json
   [
-    { "name": "Bermuda",        "bbox": [-64.95, 32.20, -64.60, 32.45], "maxZoom": 17 },
-    { "name": "Narragansett-Bay","bbox": [-71.45, 41.45, -71.20, 41.75], "maxZoom": 18 }
+    { "name": "Bermuda", "bbox": [-64.95, 32.2, -64.6, 32.45], "maxZoom": 17 },
+    { "name": "Narragansett-Bay", "bbox": [-71.45, 41.45, -71.2, 41.75], "maxZoom": 18 }
   ]
   ```
   Seeds each region `MIN_Z..region.maxZoom`. If the file is absent on first run, write
@@ -202,8 +202,7 @@ SocketCAN sections:
 
 - **Usage readout**: total size vs the 8 GB cap as a small progress bar, plus the
   per-zoom breakdown (z, size, tile count) from `GET /api/sat-cache`.
-- **Prune unused tiles**: a number input "remove tiles not viewed in ___ days" (default
-  90) and a **Prune** button → `POST /api/sat-cache/prune { olderThanDays }`. On success,
+- **Prune unused tiles**: a number input "remove tiles not viewed in \_\_\_ days" (default 90) and a **Prune** button → `POST /api/sat-cache/prune { olderThanDays }`. On success,
   show "Freed N MB (M tiles)" and refresh the readout.
 - **Prune to cap**: a secondary button shown only when over budget →
   `POST /api/sat-cache/prune { maxGb: 8 }`.

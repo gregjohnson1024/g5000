@@ -13,6 +13,7 @@
 **Conventions:** one test file `npx vitest run <path>`; web typecheck `cd packages/web && npx tsc --noEmit`; full build `npx tsc -b`. Commit trailer `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 
 **Live-verified CHS shapes (probed 2026-06-03 — use as fixtures):**
+
 - `GET https://api-sine.dfo-mpo.gc.ca/api/v1/stations` → array; element `{ id:"5cebf1df…", code:"00490", officialName:"Halifax", alternativeName, latitude:44.65914, longitude:-63.583386, operating, type, timeSeries:[{code:"wlp"},{code:"wlp-hilo"},…] }`.
 - `GET /api/v1/stations/{id}/data?time-series-code=wlp-hilo&from={ISO}&to={ISO}` → array; element `{ eventDate:"2026-06-03T19:59:00Z", value:0.74, qcFlagCode, reviewed, timeSeriesId }`. **No HW/LW label — derive by alternation.** Halifax sample sequence: `0.74, 1.706, 0.425` → `LW, HW, LW`.
 
@@ -23,11 +24,13 @@
 ### Task 1: CHS IWLS client
 
 **Files:**
+
 - Create: `packages/tide/src/chs-client.ts`
 - Test: `packages/tide/src/chs-client.test.ts`
 - Modify: `packages/tide/src/index.ts` (export)
 
 - [ ] **Step 1: Write the failing test `packages/tide/src/chs-client.test.ts`** (fixtures = real probed shapes):
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { parseChsStations, parseChsEvents } from './chs-client.js';
@@ -35,9 +38,22 @@ import { parseChsStations, parseChsEvents } from './chs-client.js';
 describe('parseChsStations', () => {
   it('maps prediction-capable stations and skips others', () => {
     const json = [
-      { id: '5cebf1df3d0f4a073c4bbcbb', code: '00490', officialName: 'Halifax', latitude: 44.65914, longitude: -63.583386,
-        timeSeries: [{ code: 'wlp' }, { code: 'wlp-hilo' }] },
-      { id: 'x', code: '0', officialName: 'NoPredict', latitude: 50, longitude: -60, timeSeries: [{ code: 'wlo' }] }, // no wlp-hilo → skip
+      {
+        id: '5cebf1df3d0f4a073c4bbcbb',
+        code: '00490',
+        officialName: 'Halifax',
+        latitude: 44.65914,
+        longitude: -63.583386,
+        timeSeries: [{ code: 'wlp' }, { code: 'wlp-hilo' }],
+      },
+      {
+        id: 'x',
+        code: '0',
+        officialName: 'NoPredict',
+        latitude: 50,
+        longitude: -60,
+        timeSeries: [{ code: 'wlo' }],
+      }, // no wlp-hilo → skip
       { id: 'y', officialName: 'BadCoords', timeSeries: [{ code: 'wlp-hilo' }] }, // missing coords → skip
     ];
     expect(parseChsStations(json)).toEqual([
@@ -76,6 +92,7 @@ describe('parseChsEvents', () => {
 - [ ] **Step 2: Run, verify FAIL:** `npx vitest run packages/tide/src/chs-client.test.ts`.
 
 - [ ] **Step 3: Implement `packages/tide/src/chs-client.ts`:**
+
 ```ts
 import type { Station, TidalEvent } from './types.js';
 import { TideApiError } from './admiralty-client.js';
@@ -88,7 +105,10 @@ export function parseChsStations(json: unknown): Station[] {
   if (!Array.isArray(json)) return [];
   const out: Station[] = [];
   for (const s of json as Array<{
-    id?: unknown; officialName?: unknown; latitude?: unknown; longitude?: unknown;
+    id?: unknown;
+    officialName?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
     timeSeries?: Array<{ code?: unknown }>;
   }>) {
     const series = Array.isArray(s.timeSeries) ? s.timeSeries : [];
@@ -149,12 +169,20 @@ export async function chsGetTidalEvents(stationId: string, days: number): Promis
 - [ ] **Step 4: Run, verify PASS:** `npx vitest run packages/tide/src/chs-client.test.ts`.
 
 - [ ] **Step 5: Export** — append to `packages/tide/src/index.ts`:
+
 ```ts
-export { chsListStations, chsGetTidalEvents, parseChsStations, parseChsEvents } from './chs-client.js';
+export {
+  chsListStations,
+  chsGetTidalEvents,
+  parseChsStations,
+  parseChsEvents,
+} from './chs-client.js';
 ```
+
 Build: `npx tsc -b packages/tide` (clean).
 
 - [ ] **Step 6: Commit**
+
 ```bash
 git add packages/tide/src/chs-client.ts packages/tide/src/chs-client.test.ts packages/tide/src/index.ts
 git commit -m "feat(tide): CHS IWLS client + fixture-tested parsers (HW/LW by alternation)
@@ -167,11 +195,13 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: TideSource abstraction + selection
 
 **Files:**
+
 - Create: `packages/tide/src/sources.ts`
 - Test: `packages/tide/src/sources.test.ts`
 - Modify: `packages/tide/src/index.ts` (export)
 
 - [ ] **Step 1: Write the failing test `packages/tide/src/sources.test.ts`:**
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { createTideSources, getTideSource, selectSource } from './sources.js';
@@ -179,7 +209,7 @@ import { createTideSources, getTideSource, selectSource } from './sources.js';
 const withKey = createTideSources({ getAdmiraltyKey: () => 'KEY' });
 const noKey = createTideSources({ getAdmiraltyKey: () => undefined });
 
-const ukPos = { lat: 55, lon: -2 };       // North Sea
+const ukPos = { lat: 55, lon: -2 }; // North Sea
 const caPos = { lat: 44.659, lon: -63.58 }; // Halifax
 const midAtlantic = { lat: 40, lon: -30 };
 
@@ -224,9 +254,13 @@ describe('selectSource', () => {
 - [ ] **Step 2: Run, verify FAIL:** `npx vitest run packages/tide/src/sources.test.ts`.
 
 - [ ] **Step 3: Implement `packages/tide/src/sources.ts`:**
+
 ```ts
 import type { Station, TidalEvent } from './types.js';
-import { listStations as admiraltyListStations, getTidalEvents as admiraltyGetTidalEvents } from './admiralty-client.js';
+import {
+  listStations as admiraltyListStations,
+  getTidalEvents as admiraltyGetTidalEvents,
+} from './admiralty-client.js';
 import { chsListStations, chsGetTidalEvents } from './chs-client.js';
 
 export type TideSourceId = 'admiralty' | 'chs';
@@ -240,14 +274,21 @@ export interface TideSource {
 }
 
 const inBbox = (
-  lat: number, lon: number, latMin: number, latMax: number, lonMin: number, lonMax: number,
+  lat: number,
+  lon: number,
+  latMin: number,
+  latMax: number,
+  lonMin: number,
+  lonMax: number,
 ): boolean => lat >= latMin && lat <= latMax && lon >= lonMin && lon <= lonMax;
 
 /** Build the tide sources. The ADMIRALTY key is injected (getter) so this
  *  package never reads process.env. Both the service and the API routes
  *  build sources through this one factory. Coverage bboxes are coarse
  *  rectangles (heuristic; UK and Canada do not overlap). */
-export function createTideSources(opts: { getAdmiraltyKey: () => string | undefined }): TideSource[] {
+export function createTideSources(opts: {
+  getAdmiraltyKey: () => string | undefined;
+}): TideSource[] {
   return [
     {
       id: 'admiralty',
@@ -266,7 +307,10 @@ export function createTideSources(opts: { getAdmiraltyKey: () => string | undefi
   ];
 }
 
-export function getTideSource(sources: ReadonlyArray<TideSource>, id: string): TideSource | undefined {
+export function getTideSource(
+  sources: ReadonlyArray<TideSource>,
+  id: string,
+): TideSource | undefined {
   return sources.find((s) => s.id === id);
 }
 
@@ -292,12 +336,21 @@ export function selectSource(
 - [ ] **Step 4: Run, verify PASS:** `npx vitest run packages/tide/src/sources.test.ts`.
 
 - [ ] **Step 5: Export** — append to `packages/tide/src/index.ts`:
+
 ```ts
-export { createTideSources, getTideSource, selectSource, type TideSource, type TideSourceId } from './sources.js';
+export {
+  createTideSources,
+  getTideSource,
+  selectSource,
+  type TideSource,
+  type TideSourceId,
+} from './sources.js';
 ```
+
 Build: `npx tsc -b packages/tide` (clean). Run `npx vitest run packages/tide` (all pass).
 
 - [ ] **Step 6: Commit**
+
 ```bash
 git add packages/tide/src/sources.ts packages/tide/src/sources.test.ts packages/tide/src/index.ts
 git commit -m "feat(tide): TideSource abstraction + auto-by-region selection
@@ -312,12 +365,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 **Files:** Modify `packages/core/src/channels.ts`.
 
 - [ ] **Step 1:** In the `Tide` group, add (after `Station`):
+
 ```ts
     /** Active tide source: 'admiralty' | 'chs'. */
     Source: 'tide.source',
 ```
+
 - [ ] **Step 2:** `npx tsc -b packages/core` (clean).
 - [ ] **Step 3: Commit**
+
 ```bash
 git add packages/core/src/channels.ts
 git commit -m "feat(tide): tide.source channel constant
@@ -332,6 +388,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 **Files:** Modify `packages/db/src/defaults.ts` and `packages/db/src/config-store.test.ts`. (The `tide_config` Drizzle table and the `getTideConfig`/`setTideConfig` accessors are generic over the JSON value — unchanged.)
 
 - [ ] **Step 1: Replace the `TideConfig` interface + default** in `defaults.ts` with:
+
 ```ts
 import type { Station } from '@g5000/tide';
 
@@ -341,7 +398,9 @@ export interface TideConfig {
   /** Pinned station (carries its source); honored only when it matches the active source. */
   pinnedStation: { sourceId: 'admiralty' | 'chs'; stationId: string } | null;
   /** Per-source static station-list cache (refreshed ~weekly). */
-  stationsCacheBySource: Partial<Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>>;
+  stationsCacheBySource: Partial<
+    Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>
+  >;
 }
 
 export const DEFAULT_TIDE_CONFIG: TideConfig = {
@@ -350,24 +409,27 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = {
   stationsCacheBySource: {},
 };
 ```
+
 (Remove the old `pinnedStationId`/`defaultStationId`/`stationsCache` fields.)
 
 - [ ] **Step 2: Update the existing tide-config test** in `config-store.test.ts` to the new shape — find the `'tide config'` test and change the mutation to the new fields:
+
 ```ts
-  it('seeds tide config with defaults and persists a set across reopen', async () => {
-    expect(store.getTideConfig()).toEqual(DEFAULT_TIDE_CONFIG);
-    const next = { ...DEFAULT_TIDE_CONFIG, tideSource: 'chs' as const };
-    await store.setTideConfig(next);
-    await store.close();
-    store = await ConfigStore.open(dbPath);
-    expect(store.getTideConfig()).toEqual(next);
-  });
+it('seeds tide config with defaults and persists a set across reopen', async () => {
+  expect(store.getTideConfig()).toEqual(DEFAULT_TIDE_CONFIG);
+  const next = { ...DEFAULT_TIDE_CONFIG, tideSource: 'chs' as const };
+  await store.setTideConfig(next);
+  await store.close();
+  store = await ConfigStore.open(dbPath);
+  expect(store.getTideConfig()).toEqual(next);
+});
 ```
 
 - [ ] **Step 3: Build + test**
-Run `npx tsc -b packages/db` (clean) — if `config-store.ts` references any removed field it'll fail; it shouldn't (accessors are generic), but if it does, the only valid fix is updating that reference to the new shape (report it). Run `npx vitest run packages/db/src/config-store.test.ts` (all pass).
+      Run `npx tsc -b packages/db` (clean) — if `config-store.ts` references any removed field it'll fail; it shouldn't (accessors are generic), but if it does, the only valid fix is updating that reference to the new shape (report it). Run `npx vitest run packages/db/src/config-store.test.ts` (all pass).
 
 - [ ] **Step 4: Commit**
+
 ```bash
 git add packages/db/src/defaults.ts packages/db/src/config-store.test.ts
 git commit -m "feat(db): evolve TideConfig for multi-source (tideSource, pinnedStation, per-source cache)
@@ -384,12 +446,23 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Replace everything from `export interface TideSubsystemDeps` to the end of the file** with the multi-source service (keep the imports line updated and `publishTideSnapshot` above it intact):
 
 Update the import line at the top to:
+
 ```ts
-import { tideSnapshot, nearestStation, createTideSources, selectSource, type TideSource, type Station, type TidalEvent } from '@g5000/tide';
+import {
+  tideSnapshot,
+  nearestStation,
+  createTideSources,
+  selectSource,
+  type TideSource,
+  type Station,
+  type TidalEvent,
+} from '@g5000/tide';
 ```
+
 (`tideSnapshot` stays — it's used by `publishTideSnapshot`. Remove `listStations`/`getTidalEvents` from the import.)
 
 Then the service:
+
 ```ts
 export interface TideSubsystemDeps {
   bus: Bus;
@@ -427,7 +500,10 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
       const cfg = store.getTideConfig();
       await store.setTideConfig({
         ...cfg,
-        stationsCacheBySource: { ...cfg.stationsCacheBySource, [source.id]: { fetchedAtMs: Date.now(), stations } },
+        stationsCacheBySource: {
+          ...cfg.stationsCacheBySource,
+          [source.id]: { fetchedAtMs: Date.now(), stations },
+        },
       });
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -437,7 +513,8 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
 
   function resolveStation(source: TideSource): Station | null {
     const pin = store.getTideConfig().pinnedStation;
-    if (pin && pin.sourceId === source.id) return stations.find((s) => s.id === pin.stationId) ?? active;
+    if (pin && pin.sourceId === source.id)
+      return stations.find((s) => s.id === pin.stationId) ?? active;
     if (lastPos) return nearestStation(stations, lastPos, active);
     return active;
   }
@@ -466,7 +543,9 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
         const fresh = await nextSource.getTidalEvents(nextStation.id, 7);
         const now = Date.now();
         const pastKept = activeEvents.filter((e) => e.timeMs <= now).slice(-1);
-        const merged = stationChanged ? fresh : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
+        const merged = stationChanged
+          ? fresh
+          : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
         activeEvents = merged.filter((e, i, arr) => i === 0 || e.timeMs !== arr[i - 1]!.timeMs);
         active = nextStation;
         lastFetchDay = today;
@@ -519,6 +598,7 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
 - [ ] **Step 3: Build:** `npx tsc -b apps/g5000` (clean).
 
 - [ ] **Step 4: Commit**
+
 ```bash
 git add apps/g5000/src/tide-subsystem.ts
 git commit -m "feat(tide): multi-source TideService (auto-by-region, per-source cache, tide.source)
@@ -534,7 +614,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 All build sources via the shared factory: `const sources = createTideSources({ getAdmiraltyKey: () => process.env.ADMIRALTY_TIDAL_API_KEY })`. Read the current four routes first.
 
-- [ ] **Step 1: `stations/route.ts`** — return the active source's cached list. The service caches per source in `stationsCacheBySource`; the route reports the *config-active* source's cache (resolve via `selectSource` needs position, which the route doesn't have — so report the cache for the explicitly-set source if `tideSource !== 'auto'`, else return all cached lists keyed by source so the page can show whichever is active). Simplest contract: return `{ ok, sources: { admiralty?: Station[], chs?: Station[] } }` from `stationsCacheBySource`, plus `{ activeSourceId: cfg.tideSource }` (the page already learns the *resolved* active source from the `tide.source` channel / `/active`). Implement:
+- [ ] **Step 1: `stations/route.ts`** — return the active source's cached list. The service caches per source in `stationsCacheBySource`; the route reports the _config-active_ source's cache (resolve via `selectSource` needs position, which the route doesn't have — so report the cache for the explicitly-set source if `tideSource !== 'auto'`, else return all cached lists keyed by source so the page can show whichever is active). Simplest contract: return `{ ok, sources: { admiralty?: Station[], chs?: Station[] } }` from `stationsCacheBySource`, plus `{ activeSourceId: cfg.tideSource }` (the page already learns the _resolved_ active source from the `tide.source` channel / `/active`). Implement:
+
 ```ts
 import { NextResponse } from 'next/server';
 import { getSharedConfigStore } from '@g5000/db';
@@ -551,6 +632,7 @@ export async function GET(): Promise<NextResponse> {
 ```
 
 - [ ] **Step 2: `events/route.ts`** — `?stationId=&source=`; resolve the named source via the factory:
+
 ```ts
 import { NextResponse } from 'next/server';
 import { createTideSources, getTideSource } from '@g5000/tide';
@@ -563,7 +645,10 @@ export async function GET(req: Request): Promise<NextResponse> {
   const stationId = url.searchParams.get('stationId');
   const sourceId = url.searchParams.get('source');
   if (!stationId || !sourceId) {
-    return NextResponse.json({ ok: false, error: 'stationId and source required' }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: 'stationId and source required' },
+      { status: 400 },
+    );
   }
   const sources = createTideSources({ getAdmiraltyKey: () => process.env.ADMIRALTY_TIDAL_API_KEY });
   const source = getTideSource(sources, sourceId);
@@ -585,6 +670,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 ```
 
 - [ ] **Step 3: `active/route.ts`** — report config + pin:
+
 ```ts
 import { NextResponse } from 'next/server';
 import { getSharedConfigStore } from '@g5000/db';
@@ -596,7 +682,9 @@ export async function GET(): Promise<NextResponse> {
   const pin = cfg.pinnedStation;
   let name: string | null = null;
   if (pin) {
-    name = cfg.stationsCacheBySource[pin.sourceId]?.stations.find((s) => s.id === pin.stationId)?.name ?? null;
+    name =
+      cfg.stationsCacheBySource[pin.sourceId]?.stations.find((s) => s.id === pin.stationId)?.name ??
+      null;
   }
   return NextResponse.json({
     ok: true,
@@ -610,6 +698,7 @@ export async function GET(): Promise<NextResponse> {
 ```
 
 - [ ] **Step 4: `pin/route.ts`** — `POST { stationId, sourceId } | { stationId: null }`:
+
 ```ts
 import { NextResponse } from 'next/server';
 import { getSharedConfigStore } from '@g5000/db';
@@ -618,7 +707,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request): Promise<NextResponse> {
   let body: unknown;
-  try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'invalid JSON' }, { status: 400 }); }
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: 'invalid JSON' }, { status: 400 });
+  }
   const b = body as { stationId?: unknown; sourceId?: unknown };
   const store = getSharedConfigStore();
   const cfg = store.getTideConfig();
@@ -627,15 +720,22 @@ export async function POST(req: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: true });
   }
   if (typeof b.stationId !== 'string' || (b.sourceId !== 'admiralty' && b.sourceId !== 'chs')) {
-    return NextResponse.json({ ok: false, error: 'stationId (string) + sourceId (admiralty|chs), or stationId:null' }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: 'stationId (string) + sourceId (admiralty|chs), or stationId:null' },
+      { status: 400 },
+    );
   }
-  await store.setTideConfig({ ...cfg, pinnedStation: { sourceId: b.sourceId, stationId: b.stationId } });
+  await store.setTideConfig({
+    ...cfg,
+    pinnedStation: { sourceId: b.sourceId, stationId: b.stationId },
+  });
   return NextResponse.json({ ok: true });
 }
 ```
 
 - [ ] **Step 5: Typecheck + commit**
-Run `cd packages/web && npx tsc --noEmit` (clean).
+      Run `cd packages/web && npx tsc --noEmit` (clean).
+
 ```bash
 git add packages/web/src/app/api/tide
 git commit -m "feat(tide): source-aware /api/tide routes (source param, per-source cache, pin w/ source)
@@ -658,9 +758,10 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - Each station option must carry its `sourceId` so the events fetch + pin know the source. Model the picker list as `{ sourceId, station }[]`.
 
 - [ ] **Step 2: Build**
-Run `cd packages/web && npx tsc --noEmit` then `cd packages/web && npm run build` → `/tide` in manifest. (Do not run a dev server; note manual DEMO_MODE smoke recommended, not performed.)
+      Run `cd packages/web && npx tsc --noEmit` then `cd packages/web && npm run build` → `/tide` in manifest. (Do not run a dev server; note manual DEMO_MODE smoke recommended, not performed.)
 
 - [ ] **Step 3: Commit**
+
 ```bash
 git add packages/web/src/app/tide/page.tsx
 git commit -m "feat(web): source-aware /tide page (multi-source picker, source label, pin w/ source)
@@ -679,12 +780,13 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 2:** In `mast/format.test.ts`, add a case asserting a `tide.source` enum sample renders its value verbatim (`{kind:'enum',value:'chs'}` → `'chs'`) via the existing enum passthrough.
 
 - [ ] **Step 3: Full build + tests**
-Run:
+      Run:
 - `npx tsc -b` (whole workspace — exit 0).
 - `npx vitest run packages/tide packages/db/src/config-store.test.ts apps/g5000/src/tide-subsystem.test.ts packages/web/src/app/mast/format.test.ts` (all pass).
 - `cd packages/web && npm run build` (succeeds; `/tide` in manifest).
 
 - [ ] **Step 4: Commit**
+
 ```bash
 git add packages/web/src/app/helm/groups/NavigatingGroup.tsx packages/web/src/app/mast/format.test.ts
 git commit -m "feat(web): show tide.source on helm tide tile + mast formatter test

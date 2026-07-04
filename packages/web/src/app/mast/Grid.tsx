@@ -10,5 +10,7 @@ const GRID_CLASS: Record<GridKind, string> = {
 };
 
 export function Grid({ grid, children }: { grid: GridKind; children: ReactNode }) {
-  return <div className={`grid h-full w-full gap-[1vh] p-[2vh] ${GRID_CLASS[grid]}`}>{children}</div>;
+  return (
+    <div className={`grid h-full w-full gap-[1vh] p-[2vh] ${GRID_CLASS[grid]}`}>{children}</div>
+  );
 }

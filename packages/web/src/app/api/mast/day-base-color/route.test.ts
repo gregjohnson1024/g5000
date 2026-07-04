@@ -22,7 +22,9 @@ describe('/api/mast/day-base-color', () => {
   });
 
   it('POST round-trips a valid colour', async () => {
-    const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ dayBaseColor: 'cyan' }) }));
+    const res = await POST(
+      new Request('http://x', { method: 'POST', body: JSON.stringify({ dayBaseColor: 'cyan' }) }),
+    );
     expect(res.status).toBe(200);
     const back = (await (await GET()).json()) as { dayBaseColor: string };
     expect(back.dayBaseColor).toBe('cyan');
@@ -30,7 +32,9 @@ describe('/api/mast/day-base-color', () => {
 
   it('POST rejects an invalid colour', async () => {
     for (const v of ['mauve', 42, null]) {
-      const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ dayBaseColor: v }) }));
+      const res = await POST(
+        new Request('http://x', { method: 'POST', body: JSON.stringify({ dayBaseColor: v }) }),
+      );
       expect(res.status).toBe(400);
     }
   });

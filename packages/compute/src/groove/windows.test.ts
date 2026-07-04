@@ -26,9 +26,14 @@ describe('timeWeightedFraction', () => {
   it('is always within [0,1] (property)', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.record({ s: fc.integer({ min: 0, max: 1000 }), f: fc.boolean() }), { minLength: 2, maxLength: 50 }),
+        fc.array(fc.record({ s: fc.integer({ min: 0, max: 1000 }), f: fc.boolean() }), {
+          minLength: 2,
+          maxLength: 50,
+        }),
         (xs) => {
-          const sorted = xs.map((x, i) => ({ t_ns: ns(x.s + i * 0.001), flag: x.f })).sort((a, b) => Number(a.t_ns - b.t_ns));
+          const sorted = xs
+            .map((x, i) => ({ t_ns: ns(x.s + i * 0.001), flag: x.f }))
+            .sort((a, b) => Number(a.t_ns - b.t_ns));
           const r = timeWeightedFraction(sorted);
           return r === null || (r >= 0 && r <= 1);
         },
@@ -50,10 +55,16 @@ describe('circularStdDev', () => {
   });
   it('is non-negative (property)', () => {
     fc.assert(
-      fc.property(fc.array(fc.double({ min: -Math.PI, max: Math.PI, noNaN: true }), { minLength: 1, maxLength: 50 }), (xs) => {
-        const sd = circularStdDev(xs);
-        return sd !== null && sd >= 0;
-      }),
+      fc.property(
+        fc.array(fc.double({ min: -Math.PI, max: Math.PI, noNaN: true }), {
+          minLength: 1,
+          maxLength: 50,
+        }),
+        (xs) => {
+          const sd = circularStdDev(xs);
+          return sd !== null && sd >= 0;
+        },
+      ),
     );
   });
 });

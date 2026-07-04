@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-05-31-helm-sub-groups-design.md`
 
 **Conventions:**
+
 - Run one test file: `npx vitest run <path>` from the repo root.
 - Typecheck web: `cd packages/web && npx tsc --noEmit`. Prod build: `cd packages/web && npm run build`.
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
@@ -18,6 +19,7 @@
 - `channels` type throughout is `ReadonlyMap<string, JsonSafeSample>` (from `@g5000/core`), as returned by `useSse().channels`.
 
 **File structure:**
+
 - Create `helm/tile-helpers.ts` (+ test) — shared value extractors + formatters.
 - Create `helm/helm-group.ts` (+ test) — pure group type + `normalizeGroup`.
 - Create `helm/use-helm-group.ts` — localStorage-backed group state hook.
@@ -34,6 +36,7 @@
 ### Task 1: Shared tile helpers
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/tile-helpers.ts`
 - Test: `packages/web/src/app/helm/tile-helpers.test.ts`
 
@@ -47,7 +50,7 @@ import type { JsonSafeSample } from '@g5000/core';
 import { scalar, enumVal, geo, fmtSpeed, fmtAngleSigned, fmtHeadingRad } from './tile-helpers';
 
 const s = (v: JsonSafeSample['value']): JsonSafeSample =>
-  ({ channel: 'x', t_ns: '0', value: v, source: 'test' } as unknown as JsonSafeSample);
+  ({ channel: 'x', t_ns: '0', value: v, source: 'test' }) as unknown as JsonSafeSample;
 
 describe('value extractors', () => {
   it('scalar returns the number only for scalar samples', () => {
@@ -167,6 +170,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Group type + normalize (pure)
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/helm-group.ts`
 - Test: `packages/web/src/app/helm/helm-group.test.ts`
 
@@ -234,6 +238,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Group-state hook + rolling-stats hook
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/use-helm-group.ts`
 - Create: `packages/web/src/app/helm/use-rolling-stats.ts`
 
@@ -335,31 +340,61 @@ export function useRollingStats(): RollingStats {
             stats?: { avgMs: number | null; coveredMs: number; windowMs: number };
           };
           if (j.ok && j.stats && j.stats.avgMs !== null) {
-            setAvgSog({ ms: j.stats.avgMs, coveredMs: j.stats.coveredMs, windowMs: j.stats.windowMs });
+            setAvgSog({
+              ms: j.stats.avgMs,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
           }
         }
         if (cogR.ok) {
           const j = (await cogR.json()) as {
             ok: boolean;
-            stats?: { avgRad: number | null; concentration: number; coveredMs: number; windowMs: number };
+            stats?: {
+              avgRad: number | null;
+              concentration: number;
+              coveredMs: number;
+              windowMs: number;
+            };
           };
           if (j.ok && j.stats && j.stats.avgRad !== null) {
-            setAvgCog({ rad: j.stats.avgRad, concentration: j.stats.concentration, coveredMs: j.stats.coveredMs, windowMs: j.stats.windowMs });
+            setAvgCog({
+              rad: j.stats.avgRad,
+              concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
           }
         }
         if (hdgR.ok) {
           const j = (await hdgR.json()) as {
             ok: boolean;
-            stats?: { avgRad: number | null; concentration: number; coveredMs: number; windowMs: number };
+            stats?: {
+              avgRad: number | null;
+              concentration: number;
+              coveredMs: number;
+              windowMs: number;
+            };
           };
           if (j.ok && j.stats && j.stats.avgRad !== null) {
-            setAvgHdg({ rad: j.stats.avgRad, concentration: j.stats.concentration, coveredMs: j.stats.coveredMs, windowMs: j.stats.windowMs });
+            setAvgHdg({
+              rad: j.stats.avgRad,
+              concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
           }
         }
         if (motionR.ok) {
           const j = (await motionR.json()) as {
             ok: boolean;
-            stats?: { heelRmsRad: number | null; pitchRmsRad: number | null; combinedRmsRad: number | null; coveredMs: number; windowMs: number };
+            stats?: {
+              heelRmsRad: number | null;
+              pitchRmsRad: number | null;
+              combinedRmsRad: number | null;
+              coveredMs: number;
+              windowMs: number;
+            };
           };
           if (j.ok && j.stats) {
             setMotion({
@@ -406,6 +441,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: CoreStrip + HelmTabs
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/CoreStrip.tsx`
 - Create: `packages/web/src/app/helm/HelmTabs.tsx`
 
@@ -453,7 +489,13 @@ export function CoreStrip({
   return (
     <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-3">
       <HelmTile label="SOG" value={fmtSpeed(sog)} unit="kn" small />
-      <HelmTile label="HDG" value={fmtHeadingRad(hdgValueRad)} unit="°" sub={hdgRef ?? undefined} small />
+      <HelmTile
+        label="HDG"
+        value={fmtHeadingRad(hdgValueRad)}
+        unit="°"
+        sub={hdgRef ?? undefined}
+        small
+      />
       <HelmTile label="COG" value={fmtHeading(cog)} unit="°" sub={cogRef ?? undefined} small />
       <HelmTile label="Depth" value={fmtSpeedlessDepth(depth)} unit="m" small />
       <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" small />
@@ -532,6 +574,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 5: Extract PositionTile + AlertsPanel
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/PositionTile.tsx`
 - Create: `packages/web/src/app/helm/AlertsPanel.tsx`
 
@@ -560,6 +603,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 6: StartingGroup (absorbs RaceTiles)
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/groups/StartingGroup.tsx`
 
 Contains the start-line live readouts. Replaces `components/RaceTiles.tsx` (deleted in Task 9). `bias`/`windShift.bias` are radians; `DTL`/`TTL` are metres/seconds.
@@ -603,7 +647,15 @@ export function StartingGroup({
         label="Bias"
         value={bias === null ? '—' : `${bias >= 0 ? '+' : ''}${(bias * RAD_TO_DEG).toFixed(0)}`}
         unit="°"
-        sub={bias === null ? undefined : bias > 0 ? 'port favored' : bias < 0 ? 'stbd favored' : 'square'}
+        sub={
+          bias === null
+            ? undefined
+            : bias > 0
+              ? 'port favored'
+              : bias < 0
+                ? 'stbd favored'
+                : 'square'
+        }
       />
       <HelmTile
         label="OCS"
@@ -614,7 +666,15 @@ export function StartingGroup({
         label="Wind shift"
         value={shift === null ? '—' : `${shift >= 0 ? '+' : ''}${(shift * RAD_TO_DEG).toFixed(0)}`}
         unit="°"
-        sub={shift === null ? undefined : shift > 0 ? 'veer (right)' : shift < 0 ? 'back (left)' : 'steady'}
+        sub={
+          shift === null
+            ? undefined
+            : shift > 0
+              ? 'veer (right)'
+              : shift < 0
+                ? 'back (left)'
+                : 'steady'
+        }
       />
     </div>
   );
@@ -642,6 +702,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 7: NavigatingGroup
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/groups/NavigatingGroup.tsx`
 
 Position, VMC to mark, the three 15-min averages, Drift (COG−HDG), and Motion. Uses `useRollingStats()` and `PositionTile`. The avg/drift/motion tile JSX is moved from today's `page.tsx`.
@@ -694,9 +755,27 @@ export function NavigatingGroup({
         unit="kn"
         sub={vmcMs === null ? 'no mark' : vmcMs >= 0 ? 'closing' : 'opening'}
       />
-      <HelmTile label="Avg SOG" value={avgSog ? (avgSog.ms * MS_TO_KN).toFixed(1) : '—'} unit="kn" sub={sub(avgSog)} small />
-      <HelmTile label="Avg COG" value={avgCog ? fmtHeadingRad(avgCog.rad) : '—'} unit="°" sub={sub(avgCog)} small />
-      <HelmTile label="Avg HDG" value={avgHdg ? fmtHeadingRad(avgHdg.rad) : '—'} unit="°" sub={sub(avgHdg)} small />
+      <HelmTile
+        label="Avg SOG"
+        value={avgSog ? (avgSog.ms * MS_TO_KN).toFixed(1) : '—'}
+        unit="kn"
+        sub={sub(avgSog)}
+        small
+      />
+      <HelmTile
+        label="Avg COG"
+        value={avgCog ? fmtHeadingRad(avgCog.rad) : '—'}
+        unit="°"
+        sub={sub(avgCog)}
+        small
+      />
+      <HelmTile
+        label="Avg HDG"
+        value={avgHdg ? fmtHeadingRad(avgHdg.rad) : '—'}
+        unit="°"
+        sub={sub(avgHdg)}
+        small
+      />
       <HelmTile
         label="Drift (COG−HDG)"
         value={driftDeg === null ? '—' : `${driftDeg >= 0 ? '+' : ''}${driftDeg.toFixed(1)}`}
@@ -746,6 +825,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 8: PerformanceGroup
 
 **Files:**
+
 - Create: `packages/web/src/app/helm/groups/PerformanceGroup.tsx`
 
 Wind (TWA/AWS/AWA — **not** TWS, which is in the core strip), polar targets, the groove cluster, heel/pitch, sail recommendation. JSX moved from today's `page.tsx`.
@@ -789,14 +869,24 @@ export function PerformanceGroup({
       {aws && <HelmTile label="AWS" value={fmtSpeed(aws)} unit="kn" small />}
       {awa && <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />}
       {tbsSample && <HelmTile label="TBS" value={fmtSpeed(tbsSample)} unit="kn" small />}
-      {tTwaSample && <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />}
+      {tTwaSample && (
+        <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />
+      )}
       {pctPolar !== null && <HelmTile label="% polar" value={pctPolar.toFixed(0)} unit="%" small />}
 
       <HelmTile
         label="In groove"
         value={timeInGroove === null ? '—' : timeInGroove.toFixed(0)}
         unit={timeInGroove === null ? undefined : '%'}
-        severity={timeInGroove === null ? 'neutral' : timeInGroove >= 80 ? 'good' : timeInGroove >= 50 ? 'ok' : 'bad'}
+        severity={
+          timeInGroove === null
+            ? 'neutral'
+            : timeInGroove >= 80
+              ? 'good'
+              : timeInGroove >= 50
+                ? 'ok'
+                : 'bad'
+        }
         sub={pointOfSail ?? undefined}
       />
       <HelmTile
@@ -844,6 +934,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 9: Slim page.tsx to a shell + delete RaceTiles
 
 **Files:**
+
 - Modify (replace whole file): `packages/web/src/app/helm/page.tsx`
 - Delete: `packages/web/src/components/RaceTiles.tsx`
 
@@ -963,6 +1054,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Self-Review
 
 **Spec coverage:**
+
 - Segmented tabs (Starting/Navigating/Performance) → Task 4 (HelmTabs) + Task 9 (page shell renders one group). ✅
 - Pinned core strip SOG/HDG/COG/Depth/TWS/TWD → Task 4 (CoreStrip). ✅
 - Persisted group, default navigating, SSR-safe → Task 2 (normalizeGroup) + Task 3 (useHelmGroup). ✅

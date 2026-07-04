@@ -56,7 +56,7 @@ convention, no auth) and runs every stage on it.
 
 ## Configuration — one file drives everything
 
-Everything about *which* contours to draw and *how* they're zoom-gated lives in
+Everything about _which_ contours to draw and _how_ they're zoom-gated lives in
 [`config/levels.json`](./config/levels.json). Edit it and re-run `make`; no
 script changes needed.
 
@@ -80,13 +80,13 @@ coarse isobaths show when zoomed out and the dense 20 m set only appears when
 zoomed in. The `ranks` array is an ordered ladder; **first match wins**, and the
 trailing `"match": "default"` rule must stay last.
 
-| rank  | matches                          | minzoom |
-| ----- | -------------------------------- | ------- |
-| basin | every 1000 m                     | 0       |
-| major | 100 & 200 m shelf lines          | 3       |
-| deep  | every 200 m (not already above)  | 5       |
-| shelf | every 100 m (not already above)  | 6       |
-| fine  | everything else (the 20 m set)   | 8       |
+| rank  | matches                         | minzoom |
+| ----- | ------------------------------- | ------- |
+| basin | every 1000 m                    | 0       |
+| major | 100 & 200 m shelf lines         | 3       |
+| deep  | every 200 m (not already above) | 5       |
+| shelf | every 100 m (not already above) | 6       |
+| fine  | everything else (the 20 m set)  | 8       |
 
 The `basin` tier sits at minzoom 0 so the 1000 m ocean-basin isobaths stay
 visible at a whole-world view; the denser tiers are gated higher to keep low
@@ -94,13 +94,13 @@ zooms legible.
 
 ### Build knobs (`build`)
 
-| key                  | default | meaning                                                     |
-| -------------------- | ------- | ----------------------------------------------------------- |
-| `fullArcsec`         | 15      | native GEBCO resolution; the fine set is contoured here     |
-| `coarseArcsec`       | 60      | downsampled grid for the coarse tiers                       |
-| `coarseForMinzoomLE` | 6       | levels with minzoom ≤ this use the coarse grid              |
-| `maxzoom`            | 11      | tippecanoe max zoom (contours overzoom cleanly beyond)      |
-| `simplification`     | 4       | tippecanoe line simplification                              |
+| key                  | default | meaning                                                 |
+| -------------------- | ------- | ------------------------------------------------------- |
+| `fullArcsec`         | 15      | native GEBCO resolution; the fine set is contoured here |
+| `coarseArcsec`       | 60      | downsampled grid for the coarse tiers                   |
+| `coarseForMinzoomLE` | 6       | levels with minzoom ≤ this use the coarse grid          |
+| `maxzoom`            | 11      | tippecanoe max zoom (contours overzoom cleanly beyond)  |
+| `simplification`     | 4       | tippecanoe line simplification                          |
 
 ## How it works
 
@@ -120,7 +120,7 @@ GEBCO grid ──► gdalwarp ──► coarse grid (60") ─► gdal_contour (c
    downsampled to `coarseArcsec`; only the fine 20 m set uses the full grid.
    This bounds runtime **without chunking the world**, so there are no
    chunk-edge seam artifacts (the trade-off the spec lists as the alternative).
-   *Land exclusion is implicit:* we pass only **negative** levels to
+   _Land exclusion is implicit:_ we pass only **negative** levels to
    `gdal_contour -fl`, so no contour is ever drawn over terrain (elevation > 0).
 3. **Tag** (`scripts/tag_contours.py`) — stream the merged GeoJSONSeq, convert
    signed elevation → positive `depth`, attach `rank`, and set a per-feature
@@ -137,11 +137,11 @@ logic and is import-tested; the Makefile and the tagger both read from it.
 
 Measured on an Apple-silicon Mac (GDAL 3.13, tippecanoe 2.79), full global run:
 
-| stage                              | time    |
-| ---------------------------------- | ------- |
-| download + unzip (4.3 GB → 7 GB)   | ~31 min |
-| build (warp → contour → tag → tile)| ~29 min |
-| **total**                          | **~60 min** |
+| stage                               | time        |
+| ----------------------------------- | ----------- |
+| download + unzip (4.3 GB → 7 GB)    | ~31 min     |
+| build (warp → contour → tag → tile) | ~29 min     |
+| **total**                           | **~60 min** |
 
 Output: **1.5 GB** PMTiles, z0–11, global (−180…180, −81…85), 2.5 M tiles, with
 `GEBCO 2024 Grid` in the header metadata — comfortably inside the spec's
@@ -168,7 +168,7 @@ minzoom:
 
 ## Gotchas
 
-- **Sign convention.** GEBCO stores *elevation*; seabed is negative. We contour
+- **Sign convention.** GEBCO stores _elevation_; seabed is negative. We contour
   on the negative side and present `depth` as positive metres.
 - **Land.** Excluded by only ever requesting negative contour levels.
 - **Antimeridian.** Contours crossing ±180° are handled by gdal_contour +

@@ -74,9 +74,19 @@ function ensureModel(
 
 function removeModel(map: maplibregl.Map, srcId: string, lineId: string, fillId: string): void {
   for (const id of [lineId, fillId]) {
-    if (map.getLayer(id)) try { map.removeLayer(id); } catch { /* ignore */ }
+    if (map.getLayer(id))
+      try {
+        map.removeLayer(id);
+      } catch {
+        /* ignore */
+      }
   }
-  if (map.getSource(srcId)) try { map.removeSource(srcId); } catch { /* ignore */ }
+  if (map.getSource(srcId))
+    try {
+      map.removeSource(srcId);
+    } catch {
+      /* ignore */
+    }
 }
 
 /**
@@ -99,8 +109,17 @@ export function RouteWindLayer({
       if (!map.isStyleLoaded()) return;
       try {
         ensureModel(map, 'rwind-gfs', 'rwind-gfs-line', 'rwind-gfs-fill', COLOR.GFS, routes.GFS);
-        ensureModel(map, 'rwind-ecmwf', 'rwind-ecmwf-line', 'rwind-ecmwf-fill', COLOR.ECMWF, routes.ECMWF);
-      } catch { /* style race */ }
+        ensureModel(
+          map,
+          'rwind-ecmwf',
+          'rwind-ecmwf-line',
+          'rwind-ecmwf-fill',
+          COLOR.ECMWF,
+          routes.ECMWF,
+        );
+      } catch {
+        /* style race */
+      }
     };
 
     if (map.isStyleLoaded()) sync();
@@ -118,9 +137,15 @@ export function RouteWindLayer({
   useEffect(() => {
     if (!map?.isStyleLoaded()) return;
     try {
-      (map.getSource('rwind-gfs') as maplibregl.GeoJSONSource | undefined)?.setData(toGeoJson(routes.GFS));
-      (map.getSource('rwind-ecmwf') as maplibregl.GeoJSONSource | undefined)?.setData(toGeoJson(routes.ECMWF));
-    } catch { /* style race */ }
+      (map.getSource('rwind-gfs') as maplibregl.GeoJSONSource | undefined)?.setData(
+        toGeoJson(routes.GFS),
+      );
+      (map.getSource('rwind-ecmwf') as maplibregl.GeoJSONSource | undefined)?.setData(
+        toGeoJson(routes.ECMWF),
+      );
+    } catch {
+      /* style race */
+    }
   }, [map, routes]);
 
   return null;

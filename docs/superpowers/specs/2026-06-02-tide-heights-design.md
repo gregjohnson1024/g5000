@@ -25,7 +25,7 @@ This spec covers tide **heights** only — not tidal streams/currents (a separat
 
 ## Non-goals
 
-- **No tidal streams / currents** — that is the Copernicus NWS spec (separate). `tide.state` here is a *height* concept (rising/falling/stand), explicitly **not** current "slack".
+- **No tidal streams / currents** — that is the Copernicus NWS spec (separate). `tide.state` here is a _height_ concept (rising/falling/stand), explicitly **not** current "slack".
 - **No under-keel-clearance use.** The curve is an approximation (see below), not the Admiralty spring/neap curve-factor method; the UI labels it as such.
 - **No paid tiers** in v1 — Discovery free tier only (7-day horizon). Foundation/Premium are out of scope.
 - **No observed sea level** (NTSLF/BODC) — predictions only.
@@ -34,7 +34,7 @@ This spec covers tide **heights** only — not tidal streams/currents (a separat
 ## External dependency & Phase 0
 
 - **Requires a free ADMIRALTY Discovery API key** (UKHO account registration — a user action). Stored as env var `ADMIRALTY_TIDAL_API_KEY`, read server-side only.
-- **Phase 0 (live probe) is DEFERRED until the key exists.** The deep-research pass hit Azure HTTP 503s and reconstructed the endpoint shapes from search snippets + the gov.uk catalogue + third-party wrappers (PyPI `ukhotides`), so the shapes below are *documented-but-not-live-verified*. We therefore:
+- **Phase 0 (live probe) is DEFERRED until the key exists.** The deep-research pass hit Azure HTTP 503s and reconstructed the endpoint shapes from search snippets + the gov.uk catalogue + third-party wrappers (PyPI `ukhotides`), so the shapes below are _documented-but-not-live-verified_. We therefore:
   - Build the Admiralty parser **isolated** (one module) and **fixture-tested**, so a real-shape correction is a one-file change.
   - Once the key is set, run one live call to `/Stations` and `/TidalEvents`, diff against the fixtures, adjust the parser if needed, and confirm the Discovery quota.
 
@@ -80,28 +80,29 @@ packages/web/src/app/.../mast/format.ts   teach formatter the new units
 
 ## Bus channels (decomposed — no compound values; registered in `Channels` → `knownChannelSet()` → mast-selectable)
 
-| Channel | Kind / unit | Meaning |
-|---|---|---|
-| `tide.station` | enum | Active station name |
-| `tide.heightNow` | scalar, m | Height above Chart Datum now (suppressed/null when no bracketing pair) |
-| `tide.state` | enum | `rising` \| `falling` \| `stand` (height concept — NOT current "slack") |
-| `tide.nextEventType` | enum | `HW` \| `LW` |
-| `tide.nextEventInSec` | scalar, s | Countdown to next event |
-| `tide.nextEventHeight` | scalar, m | Height of next event (above CD) |
+| Channel                | Kind / unit | Meaning                                                                 |
+| ---------------------- | ----------- | ----------------------------------------------------------------------- |
+| `tide.station`         | enum        | Active station name                                                     |
+| `tide.heightNow`       | scalar, m   | Height above Chart Datum now (suppressed/null when no bracketing pair)  |
+| `tide.state`           | enum        | `rising` \| `falling` \| `stand` (height concept — NOT current "slack") |
+| `tide.nextEventType`   | enum        | `HW` \| `LW`                                                            |
+| `tide.nextEventInSec`  | scalar, s   | Countdown to next event                                                 |
+| `tide.nextEventHeight` | scalar, m   | Height of next event (above CD)                                         |
 
 ## Curve math (`@g5000/tide/curve.ts`)
 
-Piecewise cosine between **consecutive** events A→B (times `tA<tB`, heights `hA,hB`); uses each segment's *actual* Δt because events are irregular (double-tide ports like the Solent especially):
+Piecewise cosine between **consecutive** events A→B (times `tA<tB`, heights `hA,hB`); uses each segment's _actual_ Δt because events are irregular (double-tide ports like the Solent especially):
 
 ```
 interpolateHeight(tA,hA,tB,hB,t) = (hA+hB)/2 + (hA−hB)/2 · cos(π·(t−tA)/(tB−tA))   for tA ≤ t ≤ tB
 ```
+
 Valid for HW→LW and LW→HW segments alike.
 
 - `heightNow(events, nowMs)`: find the pair bracketing `now` (`tA ≤ now < tB`), interpolate. **Returns null when no bracketing pair exists.**
 - `tideState(events, nowMs, standWindowMs=20*60_000)`: `rising` if `hB>hA`, `falling` if `hB<hA`; `stand` when `now` is within `standWindow` of either bracketing event (dh/dt≈0).
 
-**Boundary case (must-handle):** `heightNow` needs the event *before* `now`; a naive "today+6 d" fetch lacks it in the early hours. `TideService` keeps a **rolling cache that retains the most recent past event** across daily fetches. On cold start before any past event exists, `heightNow = null` until the first bracket forms.
+**Boundary case (must-handle):** `heightNow` needs the event _before_ `now`; a naive "today+6 d" fetch lacks it in the early hours. `TideService` keeps a **rolling cache that retains the most recent past event** across daily fetches. On cold start before any past event exists, `heightNow = null` until the first bracket forms.
 
 **Honesty:** this is an **approximation**, not the Admiralty spring/neap curve-factor method. The page labels it "approximate — not for under-keel clearance."
 
@@ -129,9 +130,9 @@ Station picker (search the 607 list + a "nearest" shortcut using boat position);
 
 ```ts
 interface TideConfig {
-  pinnedStationId: string | null;   // null = nearest-auto
-  defaultStationId: string | null;  // no-GPS fallback
-  stationsCache: { fetchedAtMs: number; stations: Station[] } | null;  // weekly-refreshed static list
+  pinnedStationId: string | null; // null = nearest-auto
+  defaultStationId: string | null; // no-GPS fallback
+  stationsCache: { fetchedAtMs: number; stations: Station[] } | null; // weekly-refreshed static list
 }
 ```
 
@@ -159,5 +160,5 @@ interface TideConfig {
 ## Files (anticipated; the plan refines)
 
 Create: `packages/tide/*`, `apps/g5000/src/tide/admiralty-client.ts`, `apps/g5000/src/tide-subsystem.ts`, `packages/web/src/app/api/tide/{stations,events,active,pin}/route.ts`, `packages/web/src/app/tide/page.tsx`.
-Modify: `packages/core/src/channels.ts` (Tide.*), `packages/db/src/{defaults,schema,config-store}.ts` (TideConfig), `apps/g5000/src/index.ts` (start subsystem), the mast formatter, root `tsconfig`/composite refs + `apps/g5000` predev build list (add the new package — the "missing-package-from-tsc-b" foot-gun).
+Modify: `packages/core/src/channels.ts` (Tide.\*), `packages/db/src/{defaults,schema,config-store}.ts` (TideConfig), `apps/g5000/src/index.ts` (start subsystem), the mast formatter, root `tsconfig`/composite refs + `apps/g5000` predev build list (add the new package — the "missing-package-from-tsc-b" foot-gun).
 Out of scope: tidal currents, weather GRIB, paid tiers, observed sea level.

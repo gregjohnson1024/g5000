@@ -9,13 +9,29 @@ import { ConfigStore } from '@g5000/db';
 
 const valid = {
   version: 1,
-  pages: [{ id: 'p', label: 'P', grid: '1', condition: { always: true }, tiles: [{ field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 }] }],
+  pages: [
+    {
+      id: 'p',
+      label: 'P',
+      grid: '1',
+      condition: { always: true },
+      tiles: [{ field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 }],
+    },
+  ],
 };
 
 // A second valid layout distinct from `valid` and DEFAULT.
 const valid2 = {
   version: 1,
-  pages: [{ id: 'q', label: 'Q', grid: '1', condition: { always: true }, tiles: [{ field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 }] }],
+  pages: [
+    {
+      id: 'q',
+      label: 'Q',
+      grid: '1',
+      condition: { always: true },
+      tiles: [{ field: 'nav.gps.sog', label: 'SOG', units: 'kn', decimals: 2 }],
+    },
+  ],
 };
 
 describe('MastService', () => {

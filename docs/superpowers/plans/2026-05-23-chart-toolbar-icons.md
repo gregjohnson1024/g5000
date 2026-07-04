@@ -9,6 +9,7 @@
 **Tech Stack:** TypeScript (ESM, strict), Next.js 16 App Router, React 19, MapLibre, Tailwind 4, vitest. Spec: `docs/superpowers/specs/2026-05-23-chart-toolbar-icons-design.md`.
 
 **Current structure (locate by symbol — lines shift):**
+
 - `LayersControl.tsx`: wrapper `absolute top-2 right-2 z-10`; popover `mt-2 w-44 …` (opens below); props `{ state, onToggle, onSelectModel, onRefreshNoaa }`; chart-only consumer.
 - `AnnotationDropper.tsx` (243 lines): root `<div className={`absolute ${position} z-20 flex flex-col items-end gap-2`}>`; `position` prop (default `'top-2 right-2'`); collapsed pill button label `pillLabel` (`'+ marker'` or `'⏺ open period — N min'`, amber when a period is open); expanded panel below. Consumers: `/chart` (pill) AND `/helm` (`position="top-2 right-2"`, pill).
 - `chart/page.tsx`: mounts `<LayersControl .../>` and `<AnnotationDropper .../>` separately; `<Map>` mounted (no `onClick` passed); `mapInstance` state; `waypoints` state + `setWaypoints`; fetches `/api/waypoints` on mount into `waypoints`.
@@ -18,11 +19,13 @@
 ## File structure
 
 **Create:**
+
 - `packages/web/src/app/chart/waypoint-name.ts` — `nextWaypointName()` pure helper.
 - `packages/web/src/app/chart/waypoint-name.test.ts`
 - `packages/web/src/app/chart/ChartToolbar.tsx` — the icon rail + the Waypoint toggle button.
 
 **Modify:**
+
 - `packages/web/src/components/AnnotationDropper.tsx` — add `variant: 'pill' | 'icon'`.
 - `packages/web/src/app/chart/LayersControl.tsx` — relative wrapper + left-opening popover.
 - `packages/web/src/app/chart/page.tsx` — mount `<ChartToolbar>`; add waypoint-drop state + handler + `<Map onClick>` gating + Esc.
@@ -32,12 +35,14 @@
 ## Task 1: `nextWaypointName` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/waypoint-name.ts`
 - Test: `packages/web/src/app/chart/waypoint-name.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 `packages/web/src/app/chart/waypoint-name.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { nextWaypointName } from './waypoint-name';
@@ -65,6 +70,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Implement the helper**
 
 `packages/web/src/app/chart/waypoint-name.ts`:
+
 ```ts
 /**
  * Auto-name for a chart-dropped waypoint: "WP N" where N is one past the
@@ -100,6 +106,7 @@ git commit -m "feat(web): nextWaypointName helper for chart waypoint drop"
 ## Task 2: AnnotationDropper `variant` prop (icon mode)
 
 **Files:**
+
 - Modify: `packages/web/src/components/AnnotationDropper.tsx`
 
 **Goal:** add `variant?: 'pill' | 'icon'` (default `'pill'`). `'pill'` is exactly today's behavior (so `/helm` and the current `/chart` mount are unchanged). `'icon'` renders a `w-9 h-9` icon trigger, a `relative` root (so a parent flex-col positions it), and opens the panel to the LEFT.
@@ -107,6 +114,7 @@ git commit -m "feat(web): nextWaypointName helper for chart waypoint drop"
 - [ ] **Step 1: Add the prop + branch the root/trigger**
 
 READ `AnnotationDropper.tsx` first. Add `variant` to the props:
+
 ```ts
 export function AnnotationDropper({
   position = 'top-2 right-2',
@@ -118,15 +126,15 @@ export function AnnotationDropper({
 ```
 
 Root wrapper: in `'pill'` mode keep `absolute ${position} z-20 flex flex-col items-end gap-2`; in `'icon'` mode use `relative` (the toolbar positions it) — e.g.:
+
 ```tsx
-  const rootClass =
-    variant === 'icon'
-      ? 'relative'
-      : `absolute ${position} z-20 flex flex-col items-end gap-2`;
-  return <div className={rootClass}>{/* … */}</div>;
+const rootClass =
+  variant === 'icon' ? 'relative' : `absolute ${position} z-20 flex flex-col items-end gap-2`;
+return <div className={rootClass}>{/* … */}</div>;
 ```
 
 Collapsed trigger: in `'pill'` mode keep the existing pill button (`pillLabel`). In `'icon'` mode render a `w-9 h-9` icon button matching the Layers button style, with a small amber dot badge when a period is open (`open_` / `minutesOpen > 0`). Use a marker/flag glyph. Example icon button:
+
 ```tsx
   // when collapsed:
   variant === 'icon' ? (
@@ -151,6 +159,7 @@ Collapsed trigger: in `'pill'` mode keep the existing pill button (`pillLabel`).
     /* existing pill button unchanged */
   )
 ```
+
 Add a small `MarkerIcon` SVG helper (a map-pin/flag). Match the `LayersIcon` SVG conventions (18×18, stroke currentColor).
 
 Expanded panel: in `'icon'` mode position it absolute to the LEFT of the button so it doesn't push the toolbar: wrap the panel with `absolute right-full mr-2 top-0` (instead of the in-flow stacking used by the pill). In `'pill'` mode keep the current below-stacking. Keep ALL panel contents + the post/poll/period logic unchanged.
@@ -172,6 +181,7 @@ git commit -m "feat(web): AnnotationDropper icon variant (pill stays default for
 ## Task 3: ChartToolbar + LayersControl reposition + chart mount swap
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/ChartToolbar.tsx`
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 - Modify: `packages/web/src/app/chart/page.tsx`
@@ -185,6 +195,7 @@ In `LayersControl.tsx`: change the outer wrapper from `absolute top-2 right-2 z-
 - [ ] **Step 2: Create ChartToolbar**
 
 `packages/web/src/app/chart/ChartToolbar.tsx`:
+
 ```tsx
 'use client';
 import { LayersControl, type LayersState } from './LayersControl';
@@ -222,7 +233,11 @@ export function ChartToolbar({
         type="button"
         aria-pressed={waypointDropActive}
         aria-label={waypointDropActive ? 'Cancel waypoint drop' : 'Drop a waypoint'}
-        title={waypointDropActive ? 'Click the map to drop a waypoint (Esc to cancel)' : 'Drop a waypoint on the chart'}
+        title={
+          waypointDropActive
+            ? 'Click the map to drop a waypoint (Esc to cancel)'
+            : 'Drop a waypoint on the chart'
+        }
         onClick={onToggleWaypointDrop}
         className={
           'w-9 h-9 rounded border flex items-center justify-center ' +
@@ -239,21 +254,34 @@ export function ChartToolbar({
 
 function WaypointIcon(): React.ReactElement {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" />
       <circle cx="12" cy="11" r="2" />
     </svg>
   );
 }
 ```
+
 > `LayersControl`'s wrapper is now `relative`, so inside the toolbar's `flex flex-col` it stacks as a normal item and its left-opening popover overlays without disturbing the column. `AnnotationDropper variant="icon"` is also `relative` and behaves the same.
 
 - [ ] **Step 3: Wire chart/page.tsx**
 
 In `chart/page.tsx`:
+
 - Add state near the other chart state: `const [waypointDropActive, setWaypointDropActive] = useState(false);`
 - REMOVE the separate `<LayersControl .../>` mount and the separate `<AnnotationDropper .../>` mount.
 - In their place mount the toolbar (keep it a sibling of `<Map>` inside the relative map-column div, same place LayersControl was):
+
 ```tsx
 <ChartToolbar
   layers={layers}
@@ -264,6 +292,7 @@ In `chart/page.tsx`:
   onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
 />
 ```
+
 Use the ACTUAL existing handlers the old `<LayersControl>` used for `onToggle`/`onSelectModel`/`onRefreshNoaa` (copy them verbatim from the old mount). Add the `ChartToolbar` import. Remove the now-unused `LayersControl` and `AnnotationDropper` imports from page.tsx (they're now imported by ChartToolbar).
 
 - [ ] **Step 4: Typecheck + browser verify the rail**
@@ -284,6 +313,7 @@ git commit -m "feat(web): chart toolbar icon rail (Layers + Annotation + Waypoin
 ## Task 4: Waypoint drop behavior
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 **Goal:** when `waypointDropActive`, set a crosshair cursor and arm `<Map onClick>`; a click auto-names via `nextWaypointName`, POSTs `/api/waypoints`, adds the pin to the chart's `waypoints` state, and exits the mode. Esc cancels.
@@ -291,8 +321,10 @@ git commit -m "feat(web): chart toolbar icon rail (Layers + Annotation + Waypoin
 - [ ] **Step 1: Add the drop handler + cursor + Map onClick gating**
 
 In `chart/page.tsx`:
+
 - Import the helper: `import { nextWaypointName } from './waypoint-name';`
 - Crosshair cursor effect (set while active, restore on exit):
+
 ```tsx
 useEffect(() => {
   if (!mapInstance) return;
@@ -303,7 +335,9 @@ useEffect(() => {
   };
 }, [mapInstance, waypointDropActive]);
 ```
+
 - The drop handler (uses the latest `waypoints` for naming):
+
 ```tsx
 const handleDropClick = async ({ lat, lon }: { lat: number; lon: number }) => {
   const name = nextWaypointName(waypoints.map((w) => w.name));
@@ -314,7 +348,10 @@ const handleDropClick = async ({ lat, lon }: { lat: number; lon: number }) => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, lat, lon }),
     });
-    const j = (await res.json()) as { ok: boolean; waypoint?: { id: string; name: string; lat: number; lon: number } };
+    const j = (await res.json()) as {
+      ok: boolean;
+      waypoint?: { id: string; name: string; lat: number; lon: number };
+    };
     if (res.ok && j.ok && j.waypoint) {
       setWaypoints((prev) => [...prev, j.waypoint!]);
     } else {
@@ -325,19 +362,24 @@ const handleDropClick = async ({ lat, lon }: { lat: number; lon: number }) => {
   }
 };
 ```
+
 > `waypoints` state shape is `{ id, name, lat, lon }[]`; confirm `setWaypoints` accepts the POST's returned waypoint (the API returns `{ id, name, lat, lon, notes?, createdAt }` — map to the chart's shape if narrower).
+
 - Pass the gated handler to `<Map>`:
+
 ```tsx
 <Map
   /* …existing props… */
   onClick={waypointDropActive ? handleDropClick : undefined}
 />
 ```
+
 > Because `<Map>` binds its click listener once and reads `onClickRef.current`, passing `undefined` when inactive makes normal clicks inert; passing the handler when active routes the next click to the drop. (No re-mount needed — Map updates the ref each render.)
 
 - [ ] **Step 2: Esc cancels**
 
 Add an effect: when `waypointDropActive`, a `keydown` listener for `Escape` calls `setWaypointDropActive(false)`:
+
 ```tsx
 useEffect(() => {
   if (!waypointDropActive) return;

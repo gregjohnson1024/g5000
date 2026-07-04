@@ -54,8 +54,18 @@ function ensureModel(
 }
 
 function removeModel(map: maplibregl.Map, sourceId: string, layerId: string): void {
-  if (map.getLayer(layerId)) try { map.removeLayer(layerId); } catch { /* ignore */ }
-  if (map.getSource(sourceId)) try { map.removeSource(sourceId); } catch { /* ignore */ }
+  if (map.getLayer(layerId))
+    try {
+      map.removeLayer(layerId);
+    } catch {
+      /* ignore */
+    }
+  if (map.getSource(sourceId))
+    try {
+      map.removeSource(sourceId);
+    } catch {
+      /* ignore */
+    }
 }
 
 /**
@@ -78,7 +88,9 @@ export function IsochroneLayer({
       try {
         ensureModel(map, SOURCE_GFS, LAYER_GFS, COLOR.GFS, routes.GFS);
         ensureModel(map, SOURCE_ECMWF, LAYER_ECMWF, COLOR.ECMWF, routes.ECMWF);
-      } catch { /* style race */ }
+      } catch {
+        /* style race */
+      }
     };
 
     if (map.isStyleLoaded()) sync();
@@ -96,9 +108,15 @@ export function IsochroneLayer({
   useEffect(() => {
     if (!map?.isStyleLoaded()) return;
     try {
-      (map.getSource(SOURCE_GFS) as maplibregl.GeoJSONSource | undefined)?.setData(toGeoJson(routes.GFS));
-      (map.getSource(SOURCE_ECMWF) as maplibregl.GeoJSONSource | undefined)?.setData(toGeoJson(routes.ECMWF));
-    } catch { /* style race */ }
+      (map.getSource(SOURCE_GFS) as maplibregl.GeoJSONSource | undefined)?.setData(
+        toGeoJson(routes.GFS),
+      );
+      (map.getSource(SOURCE_ECMWF) as maplibregl.GeoJSONSource | undefined)?.setData(
+        toGeoJson(routes.ECMWF),
+      );
+    } catch {
+      /* style race */
+    }
   }, [map, routes]);
 
   return null;

@@ -261,13 +261,11 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
     void (async () => {
       try {
         const r = await fetch(endpoint);
-        const j = (await r.json().catch(() => null)) as
-          | {
-              ok: boolean;
-              sources?: Record<string, { id: string; name: string; lat: number; lon: number }[]>;
-              stations?: { id: string; name: string; lat: number; lon: number }[];
-            }
-          | null;
+        const j = (await r.json().catch(() => null)) as {
+          ok: boolean;
+          sources?: Record<string, { id: string; name: string; lat: number; lon: number }[]>;
+          stations?: { id: string; name: string; lat: number; lon: number }[];
+        } | null;
         if (cancelled || !map || !r.ok || !j || !j.ok) return;
 
         const features: GeoJSON.Feature[] = [];

@@ -23,7 +23,7 @@ delete. Selection is active only when the waypoint-drop mode is off.
   click-to-drop mode (gated `<Map onClick>`), `mapInstance`, and `setError`.
 - API: `PUT /api/waypoints/{id}` (edit; returns updated waypoint),
   `DELETE /api/waypoints/{id}` (returns 200, or **409** `{ error: { code:
-  'waypoint_in_use', message, routes:[{id,name}] } }` when a route references
+'waypoint_in_use', message, routes:[{id,name}] } }` when a route references
   it). `GET /api/waypoints`. Coord parsing/formatting in `lib/coords` /
   `lib/format-coords` (`parseLatLon`, `parseCoordinate`, `formatCoordinate`).
 
@@ -40,6 +40,7 @@ delete. Selection is active only when the waypoint-drop mode is off.
 ## Architecture
 
 ### `WaypointsLayer` changes
+
 - Add `id?: string` to `MarkLike`; include it in each dot feature's
   `properties` (`{ id }`). The chart's mark mapping carries `id` through.
 - Add prop `onSelectWaypoint?: (id: string) => void`.
@@ -53,7 +54,9 @@ delete. Selection is active only when the waypoint-drop mode is off.
   drop-mode doesn't require re-binding the listener).
 
 ### `WaypointEditPopup` (new) — `packages/web/src/components/WaypointEditPopup.tsx`
+
 A React card anchored to a waypoint:
+
 - Props: `{ map, waypoint: { id, name, lat, lon, notes? }, onSaved(updated), onDeleted(id), onClose }`.
 - Projects `waypoint` lat/lon → screen px via `map.project([lon,lat])`; stores
   the px in state; re-projects on map `move` + `zoom` (subscribe in an effect,
@@ -68,6 +71,7 @@ A React card anchored to a waypoint:
   show `error.message` (the route names) inline and keep the popup open.
 
 ### `chart/page.tsx` wiring
+
 - Add `selectedWaypointId: string | null` state.
 - Map `waypoints` → marks WITH `id`: `marks={waypoints.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon, name: w.name }))}`.
 - Pass `onSelectWaypoint={waypointDropActive ? undefined : (id) => setSelectedWaypointId(id)}` to `WaypointsLayer`.

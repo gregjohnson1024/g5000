@@ -14,9 +14,9 @@ sub-groups behind segmented tabs** — **Starting**, **Navigating**,
 **Performance** — with a small **pinned core strip** visible on every tab.
 
 This is a presentation/decomposition change. No channels, compute, or APIs
-change. The `/race` page (race *setup*: timer, line-ping, mark select, wind-shift
+change. The `/race` page (race _setup_: timer, line-ping, mark select, wind-shift
 plot, settings) is unaffected; the new **Starting** tab is the live start
-*readout*, not a second setup surface.
+_readout_, not a second setup surface.
 
 ## Goals
 
@@ -54,9 +54,9 @@ plot, settings) is unaffected; the new **Starting** tab is the live start
   severity/sub/small/children). Unchanged by this work.
 - Channels consumed already exist: `nav.gps.{sog,cog,cog.magnetic,position,depth}`,
   `nav.magvar`, `boat.heading.{true,magnetic}`, `wind.{true.speed,true.angle,
-  true.direction,apparent.speed,apparent.angle}`, `race.{targetSpeed,targetTwa,
-  percentPolar,vmc,line.distanceToLine,line.timeToLine,line.bias,line.ocsPredicted,
-  windShift.bias}`, `groove.*`, `motion.{heel,pitch}`.
+true.direction,apparent.speed,apparent.angle}`, `race.{targetSpeed,targetTwa,
+percentPolar,vmc,line.distanceToLine,line.timeToLine,line.bias,line.ocsPredicted,
+windShift.bias}`, `groove.*`, `motion.{heel,pitch}`.
 
 ## Tab assignment
 
@@ -67,17 +67,20 @@ on a minimal rig → that tile shows `—`). HDG keeps today's True-preferred lo
 True-preferred-else-Magnetic with a `T`/`M` sub-label.
 
 **Starting** — pre-start line work:
+
 - `DTL` (distance to line), `TTL` (time to line), `Bias` (favored end),
   `OCS` (over-early), `Wind-shift bias` (`race.windShift.bias`), and a race timer
   (reuse `RaceMiniTimer`, or a fuller timer — see Open question below).
 - Equivalent to today's `RaceTiles` minus `VMC`, plus the wind-shift indicator.
 
 **Navigating** — getting from A to B:
+
 - `Position` (the `PositionTile` with copy button), `VMC` (made-good to active
   mark), `Avg SOG`, `Avg COG`, `Avg HDG`, `Drift (COG−HDG)`, `Motion` (sea-state
   RMS). Owns the `/api/stats/*` polling.
 
 **Performance** — sailing the boat fast:
+
 - `TWA`, `AWS`, `AWA`, `TBS` (target boat speed), `Target TWA`, `% polar`,
   `In-groove %`, `VMG eff %`, `Helm steadiness / Pilot activity` (+ corrections·
   min⁻¹), `Heel`, `Pitch`, `Sail recommendation` (`SailRecommendationTile`).
@@ -143,6 +146,7 @@ fine (the server owns the rolling buffers, so averages survive remount).
 ## Testing
 
 Matches the repo's pure-logic `.test.ts` pattern (no component harness):
+
 - `helm/helm-group.test.ts` — `normalizeGroup`: each valid value passes through;
   `null`/`''`/unknown → `DEFAULT_GROUP`; `STORAGE_KEY` stable; `DEFAULT_GROUP`
   is `'navigating'`.

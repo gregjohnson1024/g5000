@@ -29,7 +29,14 @@ const DOT_COLOR: Record<Freshness, string> = {
  * One curated sensor's card on /sensors: a freshness dot + name, a
  * ChannelPanel per channel (value + pin), and the "used by" / cal-page extras.
  */
-export function SensorCard({ def, observed, rules, devices, saving, onSaveRules }: SensorCardProps) {
+export function SensorCard({
+  def,
+  observed,
+  rules,
+  devices,
+  saving,
+  onSaveRules,
+}: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);

@@ -52,31 +52,61 @@ export function useRollingStats(): RollingStats {
             stats?: { avgMs: number | null; coveredMs: number; windowMs: number };
           };
           if (j.ok && j.stats && j.stats.avgMs !== null) {
-            setAvgSog({ ms: j.stats.avgMs, coveredMs: j.stats.coveredMs, windowMs: j.stats.windowMs });
+            setAvgSog({
+              ms: j.stats.avgMs,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
           }
         }
         if (cogR.ok) {
           const j = (await cogR.json()) as {
             ok: boolean;
-            stats?: { avgRad: number | null; concentration: number; coveredMs: number; windowMs: number };
+            stats?: {
+              avgRad: number | null;
+              concentration: number;
+              coveredMs: number;
+              windowMs: number;
+            };
           };
           if (j.ok && j.stats && j.stats.avgRad !== null) {
-            setAvgCog({ rad: j.stats.avgRad, concentration: j.stats.concentration, coveredMs: j.stats.coveredMs, windowMs: j.stats.windowMs });
+            setAvgCog({
+              rad: j.stats.avgRad,
+              concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
           }
         }
         if (hdgR.ok) {
           const j = (await hdgR.json()) as {
             ok: boolean;
-            stats?: { avgRad: number | null; concentration: number; coveredMs: number; windowMs: number };
+            stats?: {
+              avgRad: number | null;
+              concentration: number;
+              coveredMs: number;
+              windowMs: number;
+            };
           };
           if (j.ok && j.stats && j.stats.avgRad !== null) {
-            setAvgHdg({ rad: j.stats.avgRad, concentration: j.stats.concentration, coveredMs: j.stats.coveredMs, windowMs: j.stats.windowMs });
+            setAvgHdg({
+              rad: j.stats.avgRad,
+              concentration: j.stats.concentration,
+              coveredMs: j.stats.coveredMs,
+              windowMs: j.stats.windowMs,
+            });
           }
         }
         if (motionR.ok) {
           const j = (await motionR.json()) as {
             ok: boolean;
-            stats?: { heelRmsRad: number | null; pitchRmsRad: number | null; combinedRmsRad: number | null; coveredMs: number; windowMs: number };
+            stats?: {
+              heelRmsRad: number | null;
+              pitchRmsRad: number | null;
+              combinedRmsRad: number | null;
+              coveredMs: number;
+              windowMs: number;
+            };
           };
           if (j.ok && j.stats) {
             setMotion({

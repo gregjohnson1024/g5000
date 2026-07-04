@@ -9,7 +9,9 @@ export async function GET(): Promise<NextResponse> {
   const pin = cfg.pinnedStation;
   let name: string | null = null;
   if (pin) {
-    name = cfg.stationsCacheBySource[pin.sourceId]?.stations.find((s) => s.id === pin.stationId)?.name ?? null;
+    name =
+      cfg.stationsCacheBySource[pin.sourceId]?.stations.find((s) => s.id === pin.stationId)?.name ??
+      null;
   }
   return NextResponse.json({
     ok: true,

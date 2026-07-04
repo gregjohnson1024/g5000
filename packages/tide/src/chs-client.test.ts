@@ -4,9 +4,22 @@ import { parseChsStations, parseChsEvents } from './chs-client.js';
 describe('parseChsStations', () => {
   it('maps prediction-capable stations and skips others', () => {
     const json = [
-      { id: '5cebf1df3d0f4a073c4bbcbb', code: '00490', officialName: 'Halifax', latitude: 44.65914, longitude: -63.583386,
-        timeSeries: [{ code: 'wlp' }, { code: 'wlp-hilo' }] },
-      { id: 'x', code: '0', officialName: 'NoPredict', latitude: 50, longitude: -60, timeSeries: [{ code: 'wlo' }] },
+      {
+        id: '5cebf1df3d0f4a073c4bbcbb',
+        code: '00490',
+        officialName: 'Halifax',
+        latitude: 44.65914,
+        longitude: -63.583386,
+        timeSeries: [{ code: 'wlp' }, { code: 'wlp-hilo' }],
+      },
+      {
+        id: 'x',
+        code: '0',
+        officialName: 'NoPredict',
+        latitude: 50,
+        longitude: -60,
+        timeSeries: [{ code: 'wlo' }],
+      },
       { id: 'y', officialName: 'BadCoords', timeSeries: [{ code: 'wlp-hilo' }] },
     ];
     expect(parseChsStations(json)).toEqual([

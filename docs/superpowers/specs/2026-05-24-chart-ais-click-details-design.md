@@ -20,7 +20,7 @@ target lacks a position — same as `/ais`.
 ## Keeping the two in sync
 
 - New `lib/ais-detail.ts`: `fmtTcpa(seconds)` + `aisDetailRows(target, cpa) →
-  [label, value][]` with the exact `/ais` formatting/units. Unit-tested.
+[label, value][]` with the exact `/ais` formatting/units. Unit-tested.
 - `/ais` client-view's Selected panel re-renders from `aisDetailRows` (single
   source of truth — the two can't drift). Its local `fmtTcpa` is replaced by the
   shared one.

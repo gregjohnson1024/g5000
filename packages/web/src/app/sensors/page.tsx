@@ -130,8 +130,8 @@ export default function SensorsPage() {
       <header>
         <h1 className="text-xl font-semibold text-slate-100">Sensors</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Live readings for connected sensors. When a channel has more than one source, pick the
-          one to use with the radios under its value &mdash; or leave it on &ldquo;Auto&rdquo; (most
+          Live readings for connected sensors. When a channel has more than one source, pick the one
+          to use with the radios under its value &mdash; or leave it on &ldquo;Auto&rdquo; (most
           recent).
         </p>
       </header>

@@ -12,7 +12,7 @@ The current control (`SourcePriorityEditor`) is also collapsed in a `<details>` 
 
 ## Goals
 
-- Per channel, choose **one source** (radio) or **Auto**. A pinned source is the *only* one the whole app uses for that channel — no failover.
+- Per channel, choose **one source** (radio) or **Auto**. A pinned source is the _only_ one the whole app uses for that channel — no failover.
 - The control sits **inline with the per-source values**, **always expanded**.
 - Reuse the existing arbitration machinery unchanged (a "pin" is a one-entry priority rule, which the selector already treats as "use only this source, never fail over").
 
@@ -51,14 +51,17 @@ The collapsed **"Source priorities" `<details>` and the `SourcePriorityEditor` c
 ## Components / files
 
 **New (pure, tested):** `packages/web/src/lib/source-pin.ts` (+ `.test.ts`):
+
 - `pinnedSourceForChannel(rules: SourcePriorityRule[], channel: string): string | null` — the pinned source tag (`sources[0]` of the first rule whose `channelPattern === channel`), or `null` for Auto.
 - `setPinnedSource(rules: SourcePriorityRule[], channel: string, source: string | null): SourcePriorityRule[]` — `source` → replace/add a one-entry rule `{ channelPattern: channel, sources: [source], freshnessSeconds: PIN_FRESHNESS_SECONDS }`; `null` → remove any rule for the channel. Returns a new array; other channels' rules pass through unchanged.
 
 **Modify:**
+
 - `packages/web/src/app/sensors/SensorCard.tsx` — render the radio group; compute pinned source + headline; remove the editor `<details>`. Gains no new props (it already receives `rules`, `onSaveRules`, `devices`, `observed`).
 - `packages/web/src/app/sensors/page.tsx` — stop rendering `SourcePriorityEditor`; keep passing `rules`/`onSaveRules` to the card. Update the type import (see relocation).
 
 **Type relocation + delete:**
+
 - `ObservedEntry` and the local `SourcePriorityRule` interface currently live in `SourcePriorityEditor.tsx` and are imported by `page.tsx`, `SensorCard.tsx`, and `group-sources.ts`. Move `ObservedEntry` into a new `packages/web/src/app/sensors/sensors-types.ts`; import `SourcePriorityRule` from `@g5000/core` (the canonical definition) everywhere it's needed. Then **delete `SourcePriorityEditor.tsx`** (and its test, if any).
 
 **Unchanged / reused:** `@g5000/core` selector (`subscribeSelected`, `pickWinner`), `@g5000/db` config-store/schema/`DEFAULT_SOURCE_PRIORITY`, `/api/config/source-priority` (GET/PUT), `/api/sources/observed`, `/api/devices`, `deviceLabel`, `groupSourcesByChannel`, `formatChannelValue`, the bus, the appliance.

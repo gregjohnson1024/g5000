@@ -57,9 +57,27 @@ export function NavigatingGroup({
         unit="kn"
         sub={vmcMs === null ? 'no mark' : vmcMs >= 0 ? 'closing' : 'opening'}
       />
-      <HelmTile label="Avg SOG" value={avgSog ? (avgSog.ms * MS_TO_KN).toFixed(1) : '—'} unit="kn" sub={sub(avgSog)} small />
-      <HelmTile label="Avg COG" value={avgCog ? fmtHeadingRad(avgCog.rad) : '—'} unit="°" sub={sub(avgCog)} small />
-      <HelmTile label="Avg HDG" value={avgHdg ? fmtHeadingRad(avgHdg.rad) : '—'} unit="°" sub={sub(avgHdg)} small />
+      <HelmTile
+        label="Avg SOG"
+        value={avgSog ? (avgSog.ms * MS_TO_KN).toFixed(1) : '—'}
+        unit="kn"
+        sub={sub(avgSog)}
+        small
+      />
+      <HelmTile
+        label="Avg COG"
+        value={avgCog ? fmtHeadingRad(avgCog.rad) : '—'}
+        unit="°"
+        sub={sub(avgCog)}
+        small
+      />
+      <HelmTile
+        label="Avg HDG"
+        value={avgHdg ? fmtHeadingRad(avgHdg.rad) : '—'}
+        unit="°"
+        sub={sub(avgHdg)}
+        small
+      />
       <HelmTile
         label="Drift (COG−HDG)"
         value={driftDeg === null ? '—' : `${driftDeg >= 0 ? '+' : ''}${driftDeg.toFixed(1)}`}
@@ -92,7 +110,7 @@ export function NavigatingGroup({
         sub={
           tideStation && tideSource
             ? `${tideStation} · ${tideSource}`
-            : tideStation ?? tideSource ?? tideState ?? undefined
+            : (tideStation ?? tideSource ?? tideState ?? undefined)
         }
         small
       />

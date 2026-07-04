@@ -6,21 +6,21 @@
 
 ## Problem
 
-A value like **TWD (true wind direction)** is observed jumping 0° → 83° → 323°. The likely cause is **multiple N2K broadcasters** publishing the same channel, one or more of them wrong, and the display showing whichever updated most recently. Today there is no way to *see* each source's own value to identify the rogue device.
+A value like **TWD (true wind direction)** is observed jumping 0° → 83° → 323°. The likely cause is **multiple N2K broadcasters** publishing the same channel, one or more of them wrong, and the display showing whichever updated most recently. Today there is no way to _see_ each source's own value to identify the rogue device.
 
 ## Background — what already exists (reuse, don't rebuild)
 
 g5000 already tracks the source device for every value end-to-end:
 
 - Every bus `Sample` carries a `source` tag: `n2k:<PGN>@0x<SRC>` (e.g. `n2k:130306@0x11`) or `computed:<name>` (e.g. `computed:true_wind`). (`packages/core/src/types.ts`)
-- **`GET /api/sources/observed`** returns one entry **per (channel × source)**, each with that source's *own* latest value:
+- **`GET /api/sources/observed`** returns one entry **per (channel × source)**, each with that source's _own_ latest value:
   `ObservedEntry = { channel: string; source: string; lastSeenMs: number; ageMs: number; lastValue: unknown }`
   (tracker: `apps/g5000/src/observed-sources.ts`; route: `packages/web/src/app/api/sources/observed/route.ts`)
 - **`GET /api/devices`** returns `{ devices: DeviceInfo[] }`, `DeviceInfo = { src: number; lastSeenMs: number; manufacturerName?: string; modelId?: string; deviceFunctionName?: string; ... }` from N2K PGN 60928 (Address Claim) + 126996 (Product Info). (`packages/bridge/src/devices/device-registry.ts`; route `packages/web/src/app/api/devices/route.ts`)
 - Helpers in `packages/web/src/lib/friendly-source.ts`: `parseN2kSource(tag) → { pgn; srcHex; src } | null`, `friendlySourceLabel(tag) → string` (e.g. `"Wind · 0x11"`), `formatChannelValue(v) → string`.
 - **`/sensors`** (`packages/web/src/app/sensors/`) already polls `/api/sources/observed` every 1 s, renders a `SensorCard` per `SENSOR_DEFS` entry, and includes a working **source-priority editor** (`SourcePriorityEditor`) to choose which source wins per channel.
 
-**The gap:** `SensorCard.tsx:37–42` keeps only the *single freshest* `ObservedEntry` per channel for display and (separately) lists the unique source *names* — it never shows each source's own `lastValue`. So the per-source values are fetched but collapsed away before render. That collapse is exactly why TWD "flaps": the card alternates between competing sources.
+**The gap:** `SensorCard.tsx:37–42` keeps only the _single freshest_ `ObservedEntry` per channel for display and (separately) lists the unique source _names_ — it never shows each source's own `lastValue`. So the per-source values are fetched but collapsed away before render. That collapse is exactly why TWD "flaps": the card alternates between competing sources.
 
 ## Goals
 
@@ -54,6 +54,7 @@ deviceLabel(source: string, devices: Map<number, DeviceLabelInfo>): string
 ```
 
 Rules (first match wins):
+
 1. `parseN2kSource(source)` is non-null **and** `devices.get(src)` exists with `manufacturerName` and/or `modelId` →
    `"<manufacturerName> <modelId> (0x<srcHex>)"`, omitting whichever of manufacturer/model is absent
    (e.g. `"Garmin gWind (0x11)"`, or `"Garmin (0x11)"` if only manufacturer, or `"gWind (0x11)"` if only model).

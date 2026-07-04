@@ -41,17 +41,17 @@ Add a `planning` block to the settings JSON (served by the existing
 
 ```ts
 planning: {
-  stepMinutes: number;        // default 30 — "isochrone length" (time between isochrones)
-  pruneBucketDeg: number;     // default 2  — "frontier size" (smaller = denser frontier, slower/finer)
-  headingFanDeg: number;      // default 90 — search fan half-width
+  stepMinutes: number; // default 30 — "isochrone length" (time between isochrones)
+  pruneBucketDeg: number; // default 2  — "frontier size" (smaller = denser frontier, slower/finer)
+  headingFanDeg: number; // default 90 — search fan half-width
   headingResolutionDeg: number; // default 5 — headings tried per fan
-  maxHours: number;           // default 168 — horizon cap
-  avoidLand: boolean;         // default true — land check
+  maxHours: number; // default 168 — horizon cap
+  avoidLand: boolean; // default true — land check
   autoMotor: {
-    enabled: boolean;         // default false
-    minSailKt: number;        // default 3  — motor when polar speed below this
-    motorKt: number;          // default 5  — speed to motor at
-  };
+    enabled: boolean; // default false
+    minSailKt: number; // default 3  — motor when polar speed below this
+    motorKt: number; // default 5  — speed to motor at
+  }
 }
 ```
 
@@ -153,8 +153,8 @@ A new **PlaybackScrubber** component, shown only when ≥1 route is loaded:
     place a **ghost boat marker** (colour-keyed), oriented to leg `heading`;
   - update that route's **details box** (see below);
   - drive the wind overlay to the forecast hour nearest `T` (for whichever model
-    layer the user currently has displayed — playback sets the *hour*, not the
-    *model*).
+    layer the user currently has displayed — playback sets the _hour_, not the
+    _model_).
 - When `T` passes a route's `end`, its ghost parks at the destination.
 - Stopping playback / clearing routes hides the scrubber and ghosts and restores
   the live view.
@@ -168,19 +168,19 @@ the scrubber moves; when paused they hold the current value.
 
 ## Components & files
 
-| File | Change |
-| --- | --- |
-| `packages/routing/src/types.ts` | add `autoMotor` to `PlanOptions`; add `cog` to `RouteLeg` |
-| `packages/routing/src/plan.ts` | apply auto-motor floor in `propagate`; store `cog` |
-| `packages/web/src/app/api/route/plan/route.ts` | merge settings.planning defaults; honour `captureIsochrones` (default false); accept `autoMotor` (m/s) |
-| `packages/web/src/app/settings/page.tsx` | new Planning section |
-| `packages/web/src/app/chart/RoutePlanPanel.tsx` | multi-model select, auto-motor control, Advanced overrides; fire N plans; store routes by model |
-| `packages/web/src/components/PlanControls.tsx` | rework: multi-model, auto-motor, advanced params (or fold into RoutePlanPanel) |
-| `packages/web/src/app/chart/page.tsx` | routes-by-model state; colour-coded draw; remove isochrone animation; mount PlaybackScrubber + details boxes |
-| `packages/web/src/components/RoutePolyline.tsx` | drop isochrone draw/animation helpers |
-| `packages/web/src/app/chart/PlaybackScrubber.tsx` | **new** — time control + tick loop |
-| `packages/web/src/app/chart/RouteDetailsBox.tsx` | **new** — per-route SOG/COG/HDG/BSP readout |
-| `packages/web/src/lib/route-playback.ts` | **new** — pure helpers: interpolate position + leg state at time T; map T → forecast hour |
+| File                                              | Change                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `packages/routing/src/types.ts`                   | add `autoMotor` to `PlanOptions`; add `cog` to `RouteLeg`                                                    |
+| `packages/routing/src/plan.ts`                    | apply auto-motor floor in `propagate`; store `cog`                                                           |
+| `packages/web/src/app/api/route/plan/route.ts`    | merge settings.planning defaults; honour `captureIsochrones` (default false); accept `autoMotor` (m/s)       |
+| `packages/web/src/app/settings/page.tsx`          | new Planning section                                                                                         |
+| `packages/web/src/app/chart/RoutePlanPanel.tsx`   | multi-model select, auto-motor control, Advanced overrides; fire N plans; store routes by model              |
+| `packages/web/src/components/PlanControls.tsx`    | rework: multi-model, auto-motor, advanced params (or fold into RoutePlanPanel)                               |
+| `packages/web/src/app/chart/page.tsx`             | routes-by-model state; colour-coded draw; remove isochrone animation; mount PlaybackScrubber + details boxes |
+| `packages/web/src/components/RoutePolyline.tsx`   | drop isochrone draw/animation helpers                                                                        |
+| `packages/web/src/app/chart/PlaybackScrubber.tsx` | **new** — time control + tick loop                                                                           |
+| `packages/web/src/app/chart/RouteDetailsBox.tsx`  | **new** — per-route SOG/COG/HDG/BSP readout                                                                  |
+| `packages/web/src/lib/route-playback.ts`          | **new** — pure helpers: interpolate position + leg state at time T; map T → forecast hour                    |
 
 ## Testing
 

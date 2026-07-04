@@ -22,7 +22,9 @@ describe('/api/mast/night-mode', () => {
   });
 
   it('POST round-trips true', async () => {
-    const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: true }) }));
+    const res = await POST(
+      new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: true }) }),
+    );
     expect(res.status).toBe(200);
     const back = (await (await GET()).json()) as { nightMode: boolean };
     expect(back.nightMode).toBe(true);
@@ -30,7 +32,9 @@ describe('/api/mast/night-mode', () => {
 
   it('POST rejects a non-boolean', async () => {
     for (const v of [1, 'true', null]) {
-      const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: v }) }));
+      const res = await POST(
+        new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: v }) }),
+      );
       expect(res.status).toBe(400);
     }
   });

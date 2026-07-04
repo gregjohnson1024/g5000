@@ -39,7 +39,13 @@ export function CoreStrip({
   return (
     <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-3">
       <HelmTile label="SOG" value={fmtSpeed(sog)} unit="kn" small />
-      <HelmTile label="HDG" value={fmtHeadingRad(hdgValueRad)} unit="°" sub={hdgRef ?? undefined} small />
+      <HelmTile
+        label="HDG"
+        value={fmtHeadingRad(hdgValueRad)}
+        unit="°"
+        sub={hdgRef ?? undefined}
+        small
+      />
       <HelmTile label="COG" value={fmtHeading(cog)} unit="°" sub={cogRef ?? undefined} small />
       <HelmTile label="Depth" value={fmtDepth(depth)} unit="m" small />
       <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" small />

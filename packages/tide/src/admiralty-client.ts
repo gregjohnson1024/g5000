@@ -66,7 +66,13 @@ export async function listStations(key: string): Promise<Station[]> {
   return parseStations(await get('/Stations', key));
 }
 
-export async function getTidalEvents(key: string, stationId: string, duration = 7): Promise<TidalEvent[]> {
+export async function getTidalEvents(
+  key: string,
+  stationId: string,
+  duration = 7,
+): Promise<TidalEvent[]> {
   const d = Math.max(1, Math.min(7, duration));
-  return parseTidalEvents(await get(`/Stations/${encodeURIComponent(stationId)}/TidalEvents?duration=${d}`, key));
+  return parseTidalEvents(
+    await get(`/Stations/${encodeURIComponent(stationId)}/TidalEvents?duration=${d}`, key),
+  );
 }

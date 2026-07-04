@@ -50,6 +50,7 @@
 ## Task 1: Pure station-summary module (TDD)
 
 **Files:**
+
 - Create: `packages/web/src/lib/station-summary.ts`
 - Test: `packages/web/src/lib/station-summary.test.ts`
 
@@ -59,12 +60,7 @@ Create `packages/web/src/lib/station-summary.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import {
-  fmtSetDeg,
-  summarizeCurrent,
-  summarizeTide,
-  CURRENT_KIND_LABEL,
-} from './station-summary';
+import { fmtSetDeg, summarizeCurrent, summarizeTide, CURRENT_KIND_LABEL } from './station-summary';
 import type { CurrentPrediction, CurrentEvent, TidalEvent } from '@g5000/tide';
 
 describe('fmtSetDeg', () => {
@@ -232,6 +228,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 2: StationsOverlay component
 
 **Files:**
+
 - Create: `packages/web/src/components/StationsOverlay.tsx`
 
 No unit test — this is MapLibre/React integration (the repo has no React test harness; vitest is node-only). Verified by typecheck + build in this task and manual smoke at the end.
@@ -500,9 +497,11 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
     void (async () => {
       try {
         const r = await fetch(endpoint);
-        const j = (await r.json().catch(() => null)) as
-          | { ok: boolean; sources?: Record<string, { id: string; name: string; lat: number; lon: number }[]>; stations?: { id: string; name: string; lat: number; lon: number }[] }
-          | null;
+        const j = (await r.json().catch(() => null)) as {
+          ok: boolean;
+          sources?: Record<string, { id: string; name: string; lat: number; lon: number }[]>;
+          stations?: { id: string; name: string; lat: number; lon: number }[];
+        } | null;
         if (cancelled || !map || !r.ok || !j || !j.ok) return;
 
         const features: GeoJSON.Feature[] = [];
@@ -600,6 +599,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 3: Layers toggles + chart wiring
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 - Modify: `packages/web/src/app/chart/ChartToolbar.tsx`
 - Modify: `packages/web/src/app/chart/page.tsx`
@@ -609,10 +609,10 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In `packages/web/src/app/chart/LayersControl.tsx`, add two fields to the `LayersState` interface (after `aisCog`):
 
 ```ts
-  /** Tide-station markers overlay. Defaults false. */
-  tideStations: boolean;
-  /** Tidal-current-station markers overlay. Defaults false. */
-  currentStations: boolean;
+/** Tide-station markers overlay. Defaults false. */
+tideStations: boolean;
+/** Tidal-current-station markers overlay. Defaults false. */
+currentStations: boolean;
 ```
 
 Widen the `onToggle` prop type (it currently ends `... | 'ais' | 'aisCog'`):
@@ -699,8 +699,12 @@ import { StationsOverlay } from '../../components/StationsOverlay';
 In the JSX, next to the existing `{layers.ais && (<AisTargets .../>)}` block, add:
 
 ```tsx
-        {layers.tideStations && <StationsOverlay map={mapInstance} kind="tide" />}
-        {layers.currentStations && <StationsOverlay map={mapInstance} kind="current" />}
+{
+  layers.tideStations && <StationsOverlay map={mapInstance} kind="tide" />;
+}
+{
+  layers.currentStations && <StationsOverlay map={mapInstance} kind="current" />;
+}
 ```
 
 - [ ] **Step 6: Typecheck (web + workspace)**
@@ -730,6 +734,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 4: Deep-link pre-selection on /tide and /currents
 
 **Files:**
+
 - Modify: `packages/web/src/app/currents/page.tsx`
 - Modify: `packages/web/src/app/tide/page.tsx`
 
@@ -740,10 +745,9 @@ Both pages are `'use client'` and render fully on the client, so read the query 
 In `packages/web/src/app/currents/page.tsx`, inside the stations mount effect, the default is the single line `setSelectedId(sorted[0]?.id ?? null);`. Replace it with query-takes-precedence logic:
 
 ```ts
-        const qid = new URLSearchParams(window.location.search).get('station');
-        const initialId =
-          qid && sorted.some((s) => s.id === qid) ? qid : (sorted[0]?.id ?? null);
-        setSelectedId(initialId);
+const qid = new URLSearchParams(window.location.search).get('station');
+const initialId = qid && sorted.some((s) => s.id === qid) ? qid : (sorted[0]?.id ?? null);
+setSelectedId(initialId);
 ```
 
 (The predictions effect is keyed on `selectedId`, so setting it once here triggers the fetch — no other change.)
@@ -753,72 +757,72 @@ In `packages/web/src/app/currents/page.tsx`, inside the stations mount effect, t
 In `packages/web/src/app/tide/page.tsx`, the mount effect currently sets `selectedKey` in several branches (pinned-in-list else first, inside the `/api/tide/active` handling). Replace the body of that effect so selection is computed **once at the end** with precedence `query ?? pinned ?? first`. Use this exact structure (preserve the `setTideSource`/`setPinnedStationId`/`setPinnedSourceId` calls — `active` is still fetched for the source label and pin, just no longer used to set the selection directly):
 
 ```ts
-  // Mount: fetch stations + active, then choose the selected entry ONCE
-  // with precedence query-param > pinned > first. Computing it in one place
-  // avoids a late /api/tide/active callback overwriting a deep-link selection.
-  useEffect(() => {
-    void (async () => {
-      const r = await fetch('/api/tide/stations');
-      const j = (await r.json().catch(() => ({ ok: false, sources: {} }))) as {
+// Mount: fetch stations + active, then choose the selected entry ONCE
+// with precedence query-param > pinned > first. Computing it in one place
+// avoids a late /api/tide/active callback overwriting a deep-link selection.
+useEffect(() => {
+  void (async () => {
+    const r = await fetch('/api/tide/stations');
+    const j = (await r.json().catch(() => ({ ok: false, sources: {} }))) as {
+      ok: boolean;
+      sources: Record<string, Station[]>;
+    };
+
+    const entries: PickerEntry[] = [];
+    if (r.ok && j.ok) {
+      for (const [srcId, stationArr] of Object.entries(j.sources)) {
+        for (const station of stationArr) {
+          entries.push({ sourceId: srcId as SourceId, station });
+        }
+      }
+      entries.sort((a, b) => a.station.name.localeCompare(b.station.name));
+    }
+    setPickerList(entries);
+    setStationsLoaded(true);
+
+    // (1) Query-param selection (highest precedence).
+    const params = new URLSearchParams(window.location.search);
+    const qStation = params.get('station');
+    const qSource = params.get('source');
+    let queryKey: string | null = null;
+    if (qStation) {
+      const match = entries.find(
+        (e) => e.station.id === qStation && (!qSource || e.sourceId === qSource),
+      );
+      if (match) queryKey = entryKey(match);
+    }
+
+    // (2) Pinned default — also drives the source label. Fetch regardless.
+    let pinnedKey: string | null = null;
+    const ar = await fetch('/api/tide/active');
+    if (ar.ok) {
+      const aj = (await ar.json()) as {
         ok: boolean;
-        sources: Record<string, Station[]>;
+        tideSource?: string;
+        pinnedStationId?: string | null;
+        pinnedSourceId?: string | null;
       };
-
-      const entries: PickerEntry[] = [];
-      if (r.ok && j.ok) {
-        for (const [srcId, stationArr] of Object.entries(j.sources)) {
-          for (const station of stationArr) {
-            entries.push({ sourceId: srcId as SourceId, station });
-          }
-        }
-        entries.sort((a, b) => a.station.name.localeCompare(b.station.name));
-      }
-      setPickerList(entries);
-      setStationsLoaded(true);
-
-      // (1) Query-param selection (highest precedence).
-      const params = new URLSearchParams(window.location.search);
-      const qStation = params.get('station');
-      const qSource = params.get('source');
-      let queryKey: string | null = null;
-      if (qStation) {
-        const match = entries.find(
-          (e) => e.station.id === qStation && (!qSource || e.sourceId === qSource),
-        );
-        if (match) queryKey = entryKey(match);
-      }
-
-      // (2) Pinned default — also drives the source label. Fetch regardless.
-      let pinnedKey: string | null = null;
-      const ar = await fetch('/api/tide/active');
-      if (ar.ok) {
-        const aj = (await ar.json()) as {
-          ok: boolean;
-          tideSource?: string;
-          pinnedStationId?: string | null;
-          pinnedSourceId?: string | null;
-        };
-        if (aj.ok) {
-          setTideSource(aj.tideSource ?? null);
-          const psId = aj.pinnedStationId ?? null;
-          const pSrc = aj.pinnedSourceId ?? null;
-          setPinnedStationId(psId);
-          setPinnedSourceId(pSrc);
-          if (psId && pSrc) {
-            const pk = `${pSrc}:${psId}`;
-            if (entries.some((e) => entryKey(e) === pk)) pinnedKey = pk;
-          }
+      if (aj.ok) {
+        setTideSource(aj.tideSource ?? null);
+        const psId = aj.pinnedStationId ?? null;
+        const pSrc = aj.pinnedSourceId ?? null;
+        setPinnedStationId(psId);
+        setPinnedSourceId(pSrc);
+        if (psId && pSrc) {
+          const pk = `${pSrc}:${psId}`;
+          if (entries.some((e) => entryKey(e) === pk)) pinnedKey = pk;
         }
       }
+    }
 
-      // (3) First entry as the final fallback. Select once.
-      const firstKey = entries[0] ? entryKey(entries[0]) : null;
-      setSelectedKey(queryKey ?? pinnedKey ?? firstKey);
-    })();
-  }, []);
+    // (3) First entry as the final fallback. Select once.
+    const firstKey = entries[0] ? entryKey(entries[0]) : null;
+    setSelectedKey(queryKey ?? pinnedKey ?? firstKey);
+  })();
+}, []);
 ```
 
-> Note: match the existing identifiers in the file (`PickerEntry`, `SourceId`, `entryKey`, `Station`, the state setters). If any setter name differs from the extraction, keep the file's actual name — only the selection *logic* changes.
+> Note: match the existing identifiers in the file (`PickerEntry`, `SourceId`, `entryKey`, `Station`, the state setters). If any setter name differs from the extraction, keep the file's actual name — only the selection _logic_ changes.
 
 - [ ] **Step 3: Typecheck (web + workspace)**
 
@@ -852,8 +856,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] Manual smoke (recommended, not done by subagents): on `/chart`, open Layers → enable "Current stations" (Canadian waters) and "Tide stations"; confirm clustered markers (cyan droplets / magenta chevrons), tap a cluster to expand, tap a station → popup shows name + live summary + Open; Open lands on `/currents` or `/tide` with that station pre-selected.
 
 ## Notes / non-goals (carried from the spec)
+
 - No live data baked into marker icons; live data is popup-only on tap.
 - No numeric cluster-count labels (the map style has no glyphs URL); density is encoded by bubble size/color.
 - Conditional-mount visibility (overlay unmounts when toggled off); station lists are server-cached so re-enable re-fetch is cheap.
 - No changes to the `/api/*` routes, `@g5000/tide`, the gridded overlays, the bus, or ConfigStore.
+
+```
+
 ```

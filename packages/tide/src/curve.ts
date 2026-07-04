@@ -16,7 +16,10 @@ export function interpolateHeight(
 
 /** Find the consecutive event pair bracketing `nowMs` (tA ≤ now < tB).
  *  Assumes `events` is sorted ascending by timeMs. */
-function bracket(events: ReadonlyArray<TidalEvent>, nowMs: number): [TidalEvent, TidalEvent] | null {
+function bracket(
+  events: ReadonlyArray<TidalEvent>,
+  nowMs: number,
+): [TidalEvent, TidalEvent] | null {
   for (let i = 0; i < events.length - 1; i++) {
     if (events[i]!.timeMs <= nowMs && nowMs < events[i + 1]!.timeMs) {
       return [events[i]!, events[i + 1]!];

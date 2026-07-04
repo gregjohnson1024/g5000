@@ -19,6 +19,7 @@
 ### Task 1: `deviceLabel()` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/lib/device-label.ts`
 - Test: `packages/web/src/lib/device-label.test.ts`
 
@@ -133,6 +134,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: `groupSourcesByChannel()` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/group-sources.ts`
 - Test: `packages/web/src/app/sensors/group-sources.test.ts`
 
@@ -232,6 +234,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Render per-source breakdown in `SensorCard`
 
 **Files:**
+
 - Modify: `packages/web/src/app/sensors/SensorCard.tsx` (full replacement below)
 
 This adds a `devices` prop and, under each channel's headline value, a per-source list (`deviceLabel · value · age`). The freshest-per-channel headline, freshness dot, "Directly used by", cal-page link, and the `SourcePriorityEditor` are unchanged. The old combined "Source: …" line is removed (the per-source list supersedes it). Note the import of `friendlySourceLabel` is dropped — it's no longer used here.
@@ -277,7 +280,14 @@ const DOT_COLOR: Record<Freshness, string> = {
  * competing/disagreeing broadcasters are visible. The freshness dot tracks the
  * most-recent sample across this sensor's channels.
  */
-export function SensorCard({ def, observed, rules, devices, saving, onSaveRules }: SensorCardProps) {
+export function SensorCard({
+  def,
+  observed,
+  rules,
+  devices,
+  saving,
+  onSaveRules,
+}: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
@@ -401,6 +411,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Fetch device registry in the sensors page and pass it down
 
 **Files:**
+
 - Modify: `packages/web/src/app/sensors/page.tsx`
 
 Add a `devices` state, a `useEffect` that loads `/api/devices` on mount and every 15 s (tolerating errors), and pass `devices` to each `SensorCard`. This completes the wiring and clears the Task 3 type error.
@@ -435,7 +446,7 @@ const DEVICES_POLL_MS = 15000;
 After the existing line `const [saving, setSaving] = useState(false);` add:
 
 ```ts
-  const [devices, setDevices] = useState<Map<number, DeviceLabelInfo>>(new Map());
+const [devices, setDevices] = useState<Map<number, DeviceLabelInfo>>(new Map());
 ```
 
 - [ ] **Step 4: Add the devices-loading effect**
@@ -443,37 +454,37 @@ After the existing line `const [saving, setSaving] = useState(false);` add:
 Immediately after the "Poll observed sources." `useEffect(...)` block (the one that ends with `}, []);` near the top), insert a new effect:
 
 ```ts
-  // Load the N2K device registry (for friendly source names). Best-effort:
-  // on failure, source labels just fall back to PGN+address.
-  useEffect(() => {
-    let alive = true;
-    const load = async (): Promise<void> => {
-      try {
-        const res = await fetch('/api/devices', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`GET devices: ${res.status}`);
-        const body = (await res.json()) as DevicesResponse;
-        if (!alive) return;
-        const map = new Map<number, DeviceLabelInfo>();
-        for (const d of body.devices) {
-          map.set(d.src, {
-            src: d.src,
-            manufacturerName: d.manufacturerName,
-            modelId: d.modelId,
-            deviceFunctionName: d.deviceFunctionName,
-          });
-        }
-        setDevices(map);
-      } catch {
-        // Non-fatal — labels fall back to PGN+address.
+// Load the N2K device registry (for friendly source names). Best-effort:
+// on failure, source labels just fall back to PGN+address.
+useEffect(() => {
+  let alive = true;
+  const load = async (): Promise<void> => {
+    try {
+      const res = await fetch('/api/devices', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`GET devices: ${res.status}`);
+      const body = (await res.json()) as DevicesResponse;
+      if (!alive) return;
+      const map = new Map<number, DeviceLabelInfo>();
+      for (const d of body.devices) {
+        map.set(d.src, {
+          src: d.src,
+          manufacturerName: d.manufacturerName,
+          modelId: d.modelId,
+          deviceFunctionName: d.deviceFunctionName,
+        });
       }
-    };
-    void load();
-    const id = window.setInterval(() => void load(), DEVICES_POLL_MS);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-    };
-  }, []);
+      setDevices(map);
+    } catch {
+      // Non-fatal — labels fall back to PGN+address.
+    }
+  };
+  void load();
+  const id = window.setInterval(() => void load(), DEVICES_POLL_MS);
+  return () => {
+    alive = false;
+    window.clearInterval(id);
+  };
+}, []);
 ```
 
 - [ ] **Step 5: Pass `devices` to each card**
@@ -481,15 +492,15 @@ Immediately after the "Poll observed sources." `useEffect(...)` block (the one t
 In the `SENSOR_DEFS.map(...)` render, add the `devices` prop to `<SensorCard>`:
 
 ```tsx
-        <SensorCard
-          key={def.id}
-          def={def}
-          observed={observed}
-          rules={rules}
-          devices={devices}
-          saving={saving}
-          onSaveRules={onSaveRules}
-        />
+<SensorCard
+  key={def.id}
+  def={def}
+  observed={observed}
+  rules={rules}
+  devices={devices}
+  saving={saving}
+  onSaveRules={onSaveRules}
+/>
 ```
 
 - [ ] **Step 6: Run the full gates**
@@ -498,6 +509,7 @@ In the `SENSOR_DEFS.map(...)` render, add the `devices` prop to `<SensorCard>`:
 cd /Users/gregjohnson/code/g5000 && npx tsc -b
 cd /Users/gregjohnson/code/g5000/packages/web && npx vitest run src/lib/device-label.test.ts src/app/sensors/group-sources.test.ts && npm run build
 ```
+
 Expected: `tsc -b` exit 0; both test files pass; `npm run build` succeeds and lists `/sensors` in the route manifest.
 
 - [ ] **Step 7: Commit**

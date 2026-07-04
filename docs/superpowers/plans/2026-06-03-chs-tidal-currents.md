@@ -17,6 +17,7 @@
 **Existing reused:** `@g5000/tide` `types.ts` (`Station`), `chs-client.ts` (`TideApiError`, the private `chsGet` helper + `CHS_BASE` — Task 2 exports `chsGet`). Distinct from the gridded `CurrentOverlay` and `compute/current` — nothing existing changes.
 
 **File structure:**
+
 - `packages/tide/src/current-prediction.ts` (+ test) — pure types + `currentNow` + `nextCurrentEvent`.
 - `packages/tide/src/chs-currents.ts` (+ test) — parsers + fetchers.
 - `packages/tide/src/chs-client.ts` — MODIFY: `export` the `chsGet` helper.
@@ -29,10 +30,12 @@
 ### Task 1: `current-prediction.ts` (pure model)
 
 **Files:**
+
 - Create: `packages/tide/src/current-prediction.ts`
 - Test: `packages/tide/src/current-prediction.test.ts`
 
 - [ ] **Step 1: Write the failing test:**
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { currentNow, nextCurrentEvent } from './current-prediction.js';
@@ -79,6 +82,7 @@ describe('nextCurrentEvent', () => {
 - [ ] **Step 2: Run, verify FAIL:** `npx vitest run packages/tide/src/current-prediction.test.ts`.
 
 - [ ] **Step 3: Implement `packages/tide/src/current-prediction.ts`:**
+
 ```ts
 export interface CurrentPrediction {
   timeMs: number;
@@ -144,6 +148,7 @@ export function nextCurrentEvent(
 - [ ] **Step 4: Run, verify PASS:** `npx vitest run packages/tide/src/current-prediction.test.ts`.
 
 - [ ] **Step 5: Commit:**
+
 ```bash
 git add packages/tide/src/current-prediction.ts packages/tide/src/current-prediction.test.ts
 git commit -m "feat(currents): current-prediction model (currentNow circular interp, nextCurrentEvent)
@@ -156,6 +161,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: `chs-currents.ts` (parsers + fetchers)
 
 **Files:**
+
 - Create: `packages/tide/src/chs-currents.ts`
 - Test: `packages/tide/src/chs-currents.test.ts`
 - Modify: `packages/tide/src/chs-client.ts` (export `chsGet`), `packages/tide/src/index.ts` (exports)
@@ -163,17 +169,39 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Export the CHS HTTP helper.** In `packages/tide/src/chs-client.ts`, change the private `async function chsGet(` to `export async function chsGet(` (no other change). This lets the currents fetchers reuse the same base URL + `TideApiError` handling.
 
 - [ ] **Step 2: Write the failing test `packages/tide/src/chs-currents.test.ts`:**
+
 ```ts
 import { describe, it, expect } from 'vitest';
-import { parseChsCurrentStations, parseChsCurrentSeries, parseChsCurrentEvents } from './chs-currents.js';
+import {
+  parseChsCurrentStations,
+  parseChsCurrentSeries,
+  parseChsCurrentEvents,
+} from './chs-currents.js';
 
 describe('parseChsCurrentStations', () => {
   it('keeps stations with both wcsp1 and wcdp1', () => {
     const json = [
-      { id: 'a', officialName: 'Big Bras dOr', latitude: 46.28, longitude: -60.42,
-        timeSeries: [{ code: 'wcsp1' }, { code: 'wcdp1' }, { code: 'wcp1-events' }] },
-      { id: 'b', officialName: 'SpeedOnly', latitude: 50, longitude: -60, timeSeries: [{ code: 'wcsp1' }] },
-      { id: 'c', officialName: 'Tide', latitude: 50, longitude: -60, timeSeries: [{ code: 'wlp-hilo' }] },
+      {
+        id: 'a',
+        officialName: 'Big Bras dOr',
+        latitude: 46.28,
+        longitude: -60.42,
+        timeSeries: [{ code: 'wcsp1' }, { code: 'wcdp1' }, { code: 'wcp1-events' }],
+      },
+      {
+        id: 'b',
+        officialName: 'SpeedOnly',
+        latitude: 50,
+        longitude: -60,
+        timeSeries: [{ code: 'wcsp1' }],
+      },
+      {
+        id: 'c',
+        officialName: 'Tide',
+        latitude: 50,
+        longitude: -60,
+        timeSeries: [{ code: 'wlp-hilo' }],
+      },
     ];
     expect(parseChsCurrentStations(json)).toEqual([
       { id: 'a', name: 'Big Bras dOr', lat: 46.28, lon: -60.42 },
@@ -228,6 +256,7 @@ describe('parseChsCurrentEvents', () => {
 - [ ] **Step 3: Run, verify FAIL:** `npx vitest run packages/tide/src/chs-currents.test.ts`.
 
 - [ ] **Step 4: Implement `packages/tide/src/chs-currents.ts`:**
+
 ```ts
 import type { Station } from './types.js';
 import { chsGet } from './chs-client.js';
@@ -238,7 +267,10 @@ export function parseChsCurrentStations(json: unknown): Station[] {
   if (!Array.isArray(json)) return [];
   const out: Station[] = [];
   for (const s of json as Array<{
-    id?: unknown; officialName?: unknown; latitude?: unknown; longitude?: unknown;
+    id?: unknown;
+    officialName?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
     timeSeries?: Array<{ code?: unknown }>;
   }>) {
     const codes = Array.isArray(s.timeSeries) ? s.timeSeries.map((t) => t?.code) : [];
@@ -262,13 +294,19 @@ export function parseChsCurrentSeries(speedJson: unknown, dirJson: unknown): Cur
   if (!Array.isArray(speedJson) || !Array.isArray(dirJson)) return [];
   const dirByDate = new Map<string, number>();
   for (const e of dirJson as Array<{ eventDate?: unknown; value?: unknown }>) {
-    if (typeof e.eventDate === 'string' && typeof e.value === 'number') dirByDate.set(e.eventDate, e.value);
+    if (typeof e.eventDate === 'string' && typeof e.value === 'number')
+      dirByDate.set(e.eventDate, e.value);
   }
   const out: CurrentPrediction[] = [];
   for (const e of speedJson as Array<{ eventDate?: unknown; value?: unknown }>) {
-    if (typeof e.eventDate === 'string' && typeof e.value === 'number' && dirByDate.has(e.eventDate)) {
+    if (
+      typeof e.eventDate === 'string' &&
+      typeof e.value === 'number' &&
+      dirByDate.has(e.eventDate)
+    ) {
       const t = Date.parse(e.eventDate);
-      if (!Number.isNaN(t)) out.push({ timeMs: t, speedKn: e.value, dirDeg: dirByDate.get(e.eventDate)! });
+      if (!Number.isNaN(t))
+        out.push({ timeMs: t, speedKn: e.value, dirDeg: dirByDate.get(e.eventDate)! });
     }
   }
   out.sort((a, b) => a.timeMs - b.timeMs);
@@ -305,7 +343,10 @@ export async function chsListCurrentStations(): Promise<Station[]> {
   return parseChsCurrentStations(await chsGet('/stations'));
 }
 
-export async function chsGetCurrentPredictions(stationId: string, hours = 48): Promise<CurrentPrediction[]> {
+export async function chsGetCurrentPredictions(
+  stationId: string,
+  hours = 48,
+): Promise<CurrentPrediction[]> {
   const { from, to } = window(hours);
   const enc = encodeURIComponent(stationId);
   const [speed, dir] = await Promise.all([
@@ -318,21 +359,33 @@ export async function chsGetCurrentPredictions(stationId: string, hours = 48): P
 export async function chsGetCurrentEvents(stationId: string, hours = 48): Promise<CurrentEvent[]> {
   const { from, to } = window(hours);
   const enc = encodeURIComponent(stationId);
-  return parseChsCurrentEvents(await chsGet(`/stations/${enc}/data?time-series-code=wcp1-events&from=${from}&to=${to}`));
+  return parseChsCurrentEvents(
+    await chsGet(`/stations/${enc}/data?time-series-code=wcp1-events&from=${from}&to=${to}`),
+  );
 }
 ```
 
 - [ ] **Step 5: Run, verify PASS:** `npx vitest run packages/tide/src/chs-currents.test.ts`.
 
 - [ ] **Step 6: Export** — append to `packages/tide/src/index.ts`:
+
 ```ts
 export type { CurrentPrediction, CurrentEvent, CurrentEventKind } from './current-prediction.js';
 export { currentNow, nextCurrentEvent } from './current-prediction.js';
-export { chsListCurrentStations, chsGetCurrentPredictions, chsGetCurrentEvents, parseChsCurrentStations, parseChsCurrentSeries, parseChsCurrentEvents } from './chs-currents.js';
+export {
+  chsListCurrentStations,
+  chsGetCurrentPredictions,
+  chsGetCurrentEvents,
+  parseChsCurrentStations,
+  parseChsCurrentSeries,
+  parseChsCurrentEvents,
+} from './chs-currents.js';
 ```
+
 Build: `npx tsc -b packages/tide` (clean). Run `npx vitest run packages/tide` (all pass).
 
 - [ ] **Step 7: Commit:**
+
 ```bash
 git add packages/tide/src/chs-currents.ts packages/tide/src/chs-currents.test.ts packages/tide/src/chs-client.ts packages/tide/src/index.ts
 git commit -m "feat(currents): CHS current client (zip wcsp1+wcdp1, wcp1-events qualifiers)
@@ -345,11 +398,13 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: `/api/currents` routes
 
 **Files:**
+
 - Create: `packages/web/src/app/api/currents/stations/route.ts`, `packages/web/src/app/api/currents/predictions/route.ts`
 
 Read an existing route (`packages/web/src/app/api/tide/events/route.ts`) for the idiom.
 
 - [ ] **Step 1: `stations/route.ts`** (module-cached weekly, since the `/stations` fetch is large):
+
 ```ts
 import { NextResponse } from 'next/server';
 import { chsListCurrentStations } from '@g5000/tide';
@@ -374,6 +429,7 @@ export async function GET(): Promise<NextResponse> {
 ```
 
 - [ ] **Step 2: `predictions/route.ts`** (`?stationId=`, cached per station+UTC day):
+
 ```ts
 import { NextResponse } from 'next/server';
 import { chsGetCurrentPredictions, chsGetCurrentEvents } from '@g5000/tide';
@@ -383,7 +439,8 @@ const cache = new Map<string, { day: number; predictions: unknown; events: unkno
 
 export async function GET(req: Request): Promise<NextResponse> {
   const stationId = new URL(req.url).searchParams.get('stationId');
-  if (!stationId) return NextResponse.json({ ok: false, error: 'stationId required' }, { status: 400 });
+  if (!stationId)
+    return NextResponse.json({ ok: false, error: 'stationId required' }, { status: 400 });
   const day = Math.floor(Date.now() / 86_400_000);
   const hit = cache.get(stationId);
   if (hit && hit.day === day) {
@@ -403,7 +460,8 @@ export async function GET(req: Request): Promise<NextResponse> {
 ```
 
 - [ ] **Step 3: Typecheck + commit**
-Run `cd packages/web && npx tsc --noEmit` (clean; if `@g5000/tide` types missing run `npx tsc -b packages/tide` from root first).
+      Run `cd packages/web && npx tsc --noEmit` (clean; if `@g5000/tide` types missing run `npx tsc -b packages/tide` from root first).
+
 ```bash
 git add packages/web/src/app/api/currents
 git commit -m "feat(currents): /api/currents stations + predictions routes (cached, CHS open)
@@ -416,6 +474,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: `/currents` page + full build/test
 
 **Files:**
+
 - Create: `packages/web/src/app/currents/page.tsx`
 
 Read `packages/web/src/app/tide/page.tsx` and `packages/web/src/components/WindShiftPlot.tsx` first to match the page idiom + SVG style.
@@ -425,19 +484,20 @@ Read `packages/web/src/app/tide/page.tsx` and `packages/web/src/components/WindS
   - On station select, `fetch('/api/currents/predictions?stationId=…')` → `{ok, predictions, events}` (types: `CurrentPrediction[]` / `CurrentEvent[]` from `@g5000/tide`). Wrap `.json()` in `.catch`.
   - **Station picker:** filter input + `<select>` over the stations (search by name); the selected station's id always present in the options.
   - **Drift-over-time SVG graph:** plot `predictions[].speedKn` (y, kn) vs `timeMs` (x) over the window as a polyline (reuse the WindShiftPlot/tide-curve SVG approach — fixed viewBox, padded, y inverted so faster = higher). Overlay `events` as small markers at their `(timeMs, speedKn)` with a one-letter/colour cue per `kind` (slack/flood/ebb). A vertical **now** line at `Date.now()` gated to the x-range.
-  - **Now readout:** `currentNow(predictions, Date.now())` from `@g5000/tide` → "Set 054° · Drift 2.6 kn · → flood" where the phase is `\`→ ${nextCurrentEvent(events, Date.now())?.kind}\`` (heading toward the next event), or "—" when `currentNow` is null.
+  - **Now readout:** `currentNow(predictions, Date.now())` from `@g5000/tide` → "Set 054° · Drift 2.6 kn · → flood" where the phase is `\`→ ${nextCurrentEvent(events, Date.now())?.kind}\``(heading toward the next event), or "—" when`currentNow` is null.
   - **Events table:** rows for each event — local time, `kind` (Slack / Max flood / Max ebb), speed `X.X kn` (omit speed for slack or show 0.0).
   - **Labels:** "Drift in knots", "Set in °true", "predictions · 48 h", local times, and a one-line note: "Tidal-stream predictions at a CHS current station — distinct from the chart's ocean-current overlay."
   - Use `@g5000/tide` (`currentNow`, `nextCurrentEvent`, the types) for the readout; `packages/web` already depends on `@g5000/tide`.
   - Numbers: `speedKn.toFixed(1)`, `dirDeg` rounded to a 3-digit `padStart(3,'0')` degrees. Guard all reads (no NaN; `—` when absent).
 
 - [ ] **Step 2: Build**
-Run `cd packages/web && npx tsc --noEmit` then `cd packages/web && npm run build` → `/currents` in the route manifest. (Do not run a dev server; note manual DEMO_MODE smoke recommended, not performed.)
+      Run `cd packages/web && npx tsc --noEmit` then `cd packages/web && npm run build` → `/currents` in the route manifest. (Do not run a dev server; note manual DEMO_MODE smoke recommended, not performed.)
 
 - [ ] **Step 3: Full workspace gate**
-Run `npx tsc -b` (whole workspace — exit 0) and `npx vitest run packages/tide` (all pass — current-prediction + chs-currents included).
+      Run `npx tsc -b` (whole workspace — exit 0) and `npx vitest run packages/tide` (all pass — current-prediction + chs-currents included).
 
 - [ ] **Step 4: Commit**
+
 ```bash
 git add packages/web/src/app/currents/page.tsx
 git commit -m "feat(web): /currents page (CHS tidal-current set/drift graph + slack/max events)

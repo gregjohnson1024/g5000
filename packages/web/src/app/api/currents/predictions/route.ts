@@ -8,7 +8,8 @@ const cache = new Map<string, { day: number; predictions: unknown; events: unkno
 
 export async function GET(req: Request): Promise<NextResponse> {
   const stationId = new URL(req.url).searchParams.get('stationId');
-  if (!stationId) return NextResponse.json({ ok: false, error: 'stationId required' }, { status: 400 });
+  if (!stationId)
+    return NextResponse.json({ ok: false, error: 'stationId required' }, { status: 400 });
   const day = Math.floor(Date.now() / 86_400_000);
   const hit = cache.get(stationId);
   if (hit && hit.day === day) {
