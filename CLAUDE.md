@@ -37,8 +37,8 @@ Common runtime knobs (set on the g5000 app process):
 - `SKIP_BRIDGE=1` — start without the N2K bridge (web-only smoke testing).
 - `G5000_ENABLE_AP_TX=1` — opt-in three-layer gate that allows the autopilot N2K TX path (fast-packet split via NGT-1 only). Off by default for safety; H5000 currently rejects spoofed `src=254` so this is research-only.
 - `G5000_HIDE_AIS=1` — suppress AIS targets on the chart (used on Pi when running near AIS-equipped boats in port).
-- `G5000_NTFY_TOPIC=<topic>` — enable ntfy push for WARN/CRITICAL alarm fires to this topic (unset = push disabled entirely).
-- `G5000_NTFY_URL=https://ntfy.sh` (default) — ntfy server base URL for alarm push; override for a self-hosted server.
+- `G5000_NTFY_TOPIC=<topic>` — **legacy fallback** for ntfy alarm push. The Notifications setting on `/alerts` (`AlarmsConfig.push.ntfyTopic`) is authoritative; the env var is consulted only when the config value is null/blank. Neither set = push disabled.
+- `G5000_NTFY_URL=https://ntfy.sh` (default) — **legacy fallback** ntfy server base URL for alarm push; the `/alerts` setting (`AlarmsConfig.push.ntfyUrl`) wins when set.
 - `YDWG_HOST=192.168.1.100` (default) — set to `none` to disable the YDWG-02 TCP driver; override for a different boat.
 - `HLINK_ENABLED=0` / `HLINK_PORT=5050` — toggle / move the H-LINK TCP server.
 - `NGT1_PATH=/dev/ttyUSB0` / `NGT1_BAUD=115200` — NGT-1 serial.

@@ -63,6 +63,38 @@ describe('AlarmsConfig persistence', () => {
     for (const id of ['mob', 'anchor-watch', 'shallow-water', 'over-speed', 'low-battery']) {
       expect(cfg.enabled[id]).toBe(true);
     }
+    // high-wind is opt-in (demo wind would false-alarm)
+    expect(cfg.enabled['high-wind']).toBe(false);
+  });
+
+  it('backfills thresholds and push for a pre-existing row missing the new keys', async () => {
+    // Simulate a config.db row written before highWind/push existed.
+    const legacy = structuredClone(DEFAULT_ALARMS_CONFIG) as Record<string, unknown>;
+    delete (legacy.thresholds as Record<string, unknown>).highWind;
+    delete legacy.push;
+    (legacy.enabled as Record<string, boolean>)['over-speed'] = false; // a stored value that must survive
+    await saveAlarmsConfig(store, legacy as unknown as AlarmsConfig);
+
+    const cfg = await loadAlarmsConfig(store);
+    expect(cfg.thresholds.highWind).toEqual({ thresholdKn: 30, holdMs: 60000 });
+    expect(cfg.push).toEqual({ ntfyTopic: null, ntfyUrl: null });
+    expect(cfg.enabled['high-wind']).toBe(false);
+    expect(cfg.enabled['over-speed']).toBe(false); // stored still wins
+  });
+
+  it('stored thresholds and push values win over the defaults on backfill', async () => {
+    const next: AlarmsConfig = {
+      ...structuredClone(DEFAULT_ALARMS_CONFIG),
+      thresholds: {
+        ...structuredClone(DEFAULT_ALARMS_CONFIG.thresholds),
+        highWind: { thresholdKn: 25, holdMs: 30000 },
+      },
+      push: { ntfyTopic: 'sula-alarms', ntfyUrl: 'https://push.example.com' },
+    };
+    await saveAlarmsConfig(store, next);
+    const cfg = await loadAlarmsConfig(store);
+    expect(cfg.thresholds.highWind).toEqual({ thresholdKn: 25, holdMs: 30000 });
+    expect(cfg.push).toEqual({ ntfyTopic: 'sula-alarms', ntfyUrl: 'https://push.example.com' });
   });
 });
 
@@ -141,5 +173,38 @@ describe('isAlarmsConfig guard', () => {
       enabled: { ...DEFAULT_ALARMS_CONFIG.enabled, mob: 'yes' },
     };
     expect(isAlarmsConfig(cfg)).toBe(false);
+  });
+
+  it('accepts a config without a push block (pre-push wire shape)', () => {
+    const { push: _drop, ...noPush } = DEFAULT_ALARMS_CONFIG;
+    expect(isAlarmsConfig(noPush)).toBe(true);
+  });
+
+  it('accepts valid push topic/url values', () => {
+    expect(
+      isAlarmsConfig({
+        ...DEFAULT_ALARMS_CONFIG,
+        push: { ntfyTopic: 'sula-alarms_2026', ntfyUrl: 'https://push.example.com' },
+      }),
+    ).toBe(true);
+    expect(
+      isAlarmsConfig({ ...DEFAULT_ALARMS_CONFIG, push: { ntfyTopic: null, ntfyUrl: null } }),
+    ).toBe(true);
+  });
+
+  it('rejects a push topic with URL-unsafe characters or over-length', () => {
+    for (const bad of ['has space', 'slash/y', 'topic!', 'x'.repeat(65), '']) {
+      expect(
+        isAlarmsConfig({ ...DEFAULT_ALARMS_CONFIG, push: { ntfyTopic: bad, ntfyUrl: null } }),
+      ).toBe(false);
+    }
+  });
+
+  it('rejects a push url that is not an http(s) URL', () => {
+    for (const bad of ['not a url', 'ftp://x.example', 'ntfy.sh']) {
+      expect(
+        isAlarmsConfig({ ...DEFAULT_ALARMS_CONFIG, push: { ntfyTopic: null, ntfyUrl: bad } }),
+      ).toBe(false);
+    }
   });
 });
