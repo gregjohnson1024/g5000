@@ -26,6 +26,7 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/waypoints', label: 'Waypoints' },
   { href: '/routes', label: 'Routes' },
   { href: '/tracks', label: 'Tracks' },
+  { href: '/trips', label: 'Trips' },
   { href: '/log', label: 'Log' },
   { href: '/autopilot', label: 'Autopilot' },
   { href: '/wind-diag', label: 'Wind Dx' },

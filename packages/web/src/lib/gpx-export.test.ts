@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { waypointsToGpx, savedRouteToGpx } from './gpx-export';
+import { waypointsToGpx, savedRouteToGpx, trackToGpx } from './gpx-export';
 import type { Route, Waypoint } from '@g5000/db';
 
 const wp = (over: Partial<Waypoint> & Pick<Waypoint, 'id' | 'name' | 'lat' | 'lon'>): Waypoint => ({
@@ -78,5 +78,41 @@ describe('savedRouteToGpx', () => {
 
   it('throws on a waypointId with no matching waypoint', () => {
     expect(() => savedRouteToGpx(route, [NEWPORT])).toThrow(/unknown waypoint id "block-island"/);
+  });
+});
+
+describe('trackToGpx', () => {
+  const points = [
+    { t: 1750000000, lat: 41.4869, lon: -71.3258 },
+    { t: 1750000030, lat: 41.487, lon: -71.326 },
+  ];
+
+  it('produces GPX 1.1 with one <trkpt> per point, in order, with ISO <time>', () => {
+    const gpx = trackToGpx(points, 'Leg 1');
+    expect(gpx).toContain('<?xml version="1.0"');
+    expect(gpx).toContain('<gpx version="1.1"');
+    expect(gpx).toContain('<trk>');
+    expect(gpx).toContain('<trkseg>');
+    expect(gpx.match(/<trkpt /g)).toHaveLength(2);
+    const iFirst = gpx.indexOf('lat="41.4869"');
+    const iSecond = gpx.indexOf('lat="41.487"');
+    expect(iFirst).toBeGreaterThan(-1);
+    expect(iSecond).toBeGreaterThan(iFirst);
+    expect(gpx).toContain(`<time>${new Date(1750000000 * 1000).toISOString()}</time>`);
+    expect(gpx).toContain(`<time>${new Date(1750000030 * 1000).toISOString()}</time>`);
+    expect(gpx.trimEnd().endsWith('</gpx>')).toBe(true);
+  });
+
+  it('escapes XML special characters in the track name', () => {
+    const gpx = trackToGpx(points, 'A <"&\'> B');
+    expect(gpx).toContain('<name>A &lt;&quot;&amp;&apos;&gt; B</name>');
+    expect(gpx).not.toContain('<"');
+  });
+
+  it('handles an empty point list', () => {
+    const gpx = trackToGpx([], 'empty');
+    expect(gpx).not.toContain('<trkpt');
+    expect(gpx).toContain('<trkseg>');
+    expect(gpx).toContain('</gpx>');
   });
 });

@@ -34,6 +34,39 @@ export function waypointsToGpx(waypoints: Waypoint[]): string {
   return `${GPX_OPEN}\n${wpts}${wpts ? '\n' : ''}</gpx>`;
 }
 
+/** Structural subset of a lib/tracks TrackPoint that the GPX export needs. */
+export interface TrackGpxPoint {
+  /** Unix seconds (float OK). */
+  t: number;
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Export a recorded track's points as a GPX 1.1 <trk>/<trkseg> with one
+ * <trkpt> (incl. ISO <time> from the unix-second `t`) per point.
+ */
+export function trackToGpx(points: readonly TrackGpxPoint[], name: string): string {
+  const trkpts = points
+    .map(
+      (p) =>
+        `      <trkpt lat="${p.lat}" lon="${p.lon}">\n` +
+        `        <time>${new Date(p.t * 1000).toISOString()}</time>\n` +
+        `      </trkpt>`,
+    )
+    .join('\n');
+  return (
+    `${GPX_OPEN}\n` +
+    `  <trk>\n` +
+    `    <name>${escapeXml(name)}</name>\n` +
+    `    <trkseg>\n` +
+    `${trkpts}${trkpts ? '\n' : ''}` +
+    `    </trkseg>\n` +
+    `  </trk>\n` +
+    `</gpx>`
+  );
+}
+
 /**
  * Export a saved route as <rte>/<rtept>, resolving the route's ordered
  * waypointIds against the supplied waypoint list. Throws if any id is
