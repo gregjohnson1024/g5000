@@ -246,7 +246,9 @@ export function AnchorWatchPanel({
         const body = (await r.json()) as PollResult;
         if (body.ok) {
           setPollResult(body);
-          if (body.anchor?.radiusM) setRadiusInput(body.anchor.radiusM);
+          // Only sync radiusInput from the server when ARMED — preserves the
+          // user's typed value while they're in the disarmed "set drop radius" state.
+          if (body.anchor?.armed && body.anchor.radiusM) setRadiusInput(body.anchor.radiusM);
         }
       } catch {
         // transient network error — keep going

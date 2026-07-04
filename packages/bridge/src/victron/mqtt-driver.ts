@@ -68,11 +68,19 @@ export function startVictronMqttDriver(opts: VictronDriverOpts): () => void {
   let keepaliveTimer: ReturnType<typeof setInterval> | undefined;
   let publishTimer: ReturnType<typeof setInterval> | undefined;
 
-  function clearTimers(): void {
+  // Clear ONLY the keepalive — called on disconnect so the keepalive doesn't
+  // fire against a dead connection.  The publish timer is intentionally kept
+  // running across reconnects so Bus consumers never go silent.
+  function clearKeepalive(): void {
     if (keepaliveTimer !== undefined) {
       clearInterval(keepaliveTimer);
       keepaliveTimer = undefined;
     }
+  }
+
+  // Full teardown — clear both timers.  Only called by stop().
+  function clearAllTimers(): void {
+    clearKeepalive();
     if (publishTimer !== undefined) {
       clearInterval(publishTimer);
       publishTimer = undefined;
@@ -115,16 +123,18 @@ export function startVictronMqttDriver(opts: VictronDriverOpts): () => void {
 
   client.on('close', () => {
     registry.markStale();
-    clearTimers();
+    clearKeepalive(); // keep the publish loop alive for the reconnect
     // mqtt's built-in reconnect (reconnectPeriod) handles retry backoff.
   });
 
   client.on('error', () => {
     registry.markStale();
-    clearTimers();
+    clearKeepalive(); // keep the publish loop alive for the reconnect
   });
 
-  // Periodic bus publish so headline channels stay fresh.
+  // Periodic bus publish so headline channels stay fresh.  Kept running across
+  // reconnects — registry.markStale() ensures the snapshot reflects the
+  // disconnected state until the connection is restored.
   publishTimer = setInterval(() => {
     publishVictronToBus(bus, registry.snapshot());
   }, publishIntervalMs);
@@ -134,7 +144,7 @@ export function startVictronMqttDriver(opts: VictronDriverOpts): () => void {
   // ---------------------------------------------------------------------------
   return function stop(): void {
     try {
-      clearTimers();
+      clearAllTimers();
       client.end();
       registry.markStale();
     } catch {

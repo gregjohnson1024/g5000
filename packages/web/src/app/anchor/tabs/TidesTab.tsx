@@ -74,6 +74,7 @@ function fmtTime(ms: number): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   });
 }
 
@@ -84,6 +85,7 @@ function groupByDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
+      timeZone: 'UTC',
     });
     if (!m.has(key)) m.set(key, []);
     m.get(key)!.push(ev);
@@ -421,7 +423,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
           <table className="w-full text-xs font-mono border-collapse">
             <thead>
               <tr className="text-slate-500 border-b border-slate-700">
-                <th className="text-left py-1 pr-3">Time (local)</th>
+                <th className="text-left py-1 pr-3">Time (UTC)</th>
                 <th className="text-left py-1 pr-3">Type</th>
                 <th className="text-right py-1">Height</th>
               </tr>
@@ -445,6 +447,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
                           {new Date(ev.timeMs).toLocaleString(undefined, {
                             hour: '2-digit',
                             minute: '2-digit',
+                            timeZone: 'UTC',
                           })}
                         </td>
                         <td

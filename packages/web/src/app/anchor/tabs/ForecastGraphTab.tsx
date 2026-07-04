@@ -375,6 +375,7 @@ export function ForecastGraphTab({ lat, lon }: { lat: number; lon: number }): Re
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      setError(false);
       try {
         const r = await fetch(`/api/weather/forecast?lat=${effectiveLat}&lon=${effectiveLon}`);
         if (cancelled) return;

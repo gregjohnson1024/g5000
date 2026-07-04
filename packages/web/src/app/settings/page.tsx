@@ -250,9 +250,10 @@ function AnchorDashboardSection() {
 
   const save = async () => {
     setStatus('Saving…');
-    const weatherPin: AnchorDashboardConfig['weatherPin'] = pinEnabled
-      ? { lat: parseFloat(pinLat) || 0, lon: parseFloat(pinLon) || 0 }
-      : null;
+    const la = parseFloat(pinLat);
+    const lo = parseFloat(pinLon);
+    const weatherPin: AnchorDashboardConfig['weatherPin'] =
+      pinEnabled && Number.isFinite(la) && Number.isFinite(lo) ? { lat: la, lon: lo } : null;
     const next: AnchorDashboardConfig = { ...cfg, weatherPin };
     const cur = await fetch('/api/settings')
       .then((r) => r.json())

@@ -71,4 +71,49 @@ describe('startVictronMqttDriver', () => {
     );
     expect(registry.snapshot().battery.soc).toBe(55);
   });
+
+  it('publish loop survives a disconnect/reconnect cycle', () => {
+    const { client } = fakeClient();
+    const bus = new Bus();
+    const registry = createVictronRegistry();
+
+    // Collect every electrical.** publish on the bus.
+    const received: string[] = [];
+    bus.subscribe('electrical.**', (ch) => received.push(ch));
+
+    startVictronMqttDriver({
+      host: 'x',
+      portalId: 'p',
+      registry,
+      bus,
+      publishIntervalMs: 1_000,
+      connect: () => client,
+    });
+
+    // ── First connect ──────────────────────────────────────────────────────
+    client.emit('connect');
+    client.emit(
+      'message',
+      'N/p/system/0/Dc/Battery/Soc',
+      Buffer.from(JSON.stringify({ value: 70 })),
+    );
+    vi.advanceTimersByTime(1_000);
+    const afterFirst = received.length;
+    // At least one electrical channel was published after the first connect.
+    expect(afterFirst).toBeGreaterThan(0);
+
+    // ── Transient disconnect ───────────────────────────────────────────────
+    client.emit('close');
+
+    // ── Reconnect ─────────────────────────────────────────────────────────
+    client.emit('connect');
+    client.emit(
+      'message',
+      'N/p/system/0/Dc/Battery/Soc',
+      Buffer.from(JSON.stringify({ value: 80 })),
+    );
+    vi.advanceTimersByTime(1_000);
+    // The publish loop must still be running — we should have received MORE publishes.
+    expect(received.length).toBeGreaterThan(afterFirst);
+  });
 });
