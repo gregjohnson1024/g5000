@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ForecastGraphTab } from './tabs/ForecastGraphTab';
+import { ForecastTableTab } from './tabs/ForecastTableTab';
 
 type DrawerTab = 'forecast' | 'table' | 'tides' | 'radar' | 'sky' | 'solar';
 
@@ -37,7 +39,17 @@ function writeStoredTab(tab: DrawerTab | null): void {
   }
 }
 
-export function AnchorDrawer(): React.ReactElement {
+// Default coordinates used when no GPS fix is available yet.
+const DEFAULT_LAT = 32.3;
+const DEFAULT_LON = -64.7;
+
+export function AnchorDrawer({
+  lat,
+  lon,
+}: {
+  lat: number | null;
+  lon: number | null;
+}): React.ReactElement {
   // Start null (collapsed) for SSR safety; hydrate from localStorage in effect.
   const [activeTab, setActiveTab] = useState<DrawerTab | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -54,6 +66,24 @@ export function AnchorDrawer(): React.ReactElement {
   }
 
   const isOpen = hydrated && activeTab !== null;
+
+  const effectiveLat = lat ?? DEFAULT_LAT;
+  const effectiveLon = lon ?? DEFAULT_LON;
+
+  function renderTabContent(): React.ReactElement {
+    switch (activeTab) {
+      case 'forecast':
+        return <ForecastGraphTab lat={effectiveLat} lon={effectiveLon} />;
+      case 'table':
+        return <ForecastTableTab lat={effectiveLat} lon={effectiveLon} />;
+      default:
+        return (
+          <p className="text-slate-500 text-sm italic">
+            {activeTab} content — placeholder (task fills this in)
+          </p>
+        );
+    }
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-30 bg-slate-950 border-t border-slate-800">
@@ -83,9 +113,7 @@ export function AnchorDrawer(): React.ReactElement {
               </svg>
             </button>
           </div>
-          <p className="text-slate-500 text-sm italic">
-            {activeTab} content — placeholder (task fills this in)
-          </p>
+          {renderTabContent()}
         </div>
       )}
 

@@ -8,9 +8,10 @@ import { PositionPanel } from './panels/PositionPanel';
 import { NearbyVesselsPanel } from './panels/NearbyVesselsPanel';
 import { WindDial } from './panels/WindDial';
 import { AnchorWatchPanel } from './panels/AnchorWatchPanel';
+import { TodayNowPanel } from './panels/TodayNowPanel';
 import type { DepthOffsets } from '../../lib/depth-offset';
 
-const PLACEHOLDER_PANELS = ['Today & Now', 'Systems'] as const;
+const PLACEHOLDER_PANELS = ['Systems'] as const;
 
 type PlaceholderName = (typeof PLACEHOLDER_PANELS)[number];
 
@@ -35,8 +36,17 @@ function PanelCard({
 // Task 21 will wire the real offsets from ConfigStore; pass empty for now.
 const DEPTH_OFFSETS: DepthOffsets = {};
 
+function geoFromChannels(
+  channels: ReadonlyMap<string, JsonSafeSample>,
+): { lat: number; lon: number } | null {
+  const s = channels.get('nav.gps.position');
+  if (!s || s.value.kind !== 'geo') return null;
+  return s.value.value;
+}
+
 export default function AnchorPage(): React.ReactElement {
   const { channels, connected } = useSse();
+  const position = geoFromChannels(channels);
 
   return (
     // pb-24 leaves room for the fixed drawer (tab bar ~44px + content panel up to 224px)
@@ -56,13 +66,14 @@ export default function AnchorPage(): React.ReactElement {
         <PositionPanel channels={channels} />
         <NearbyVesselsPanel channels={channels} />
         <AnchorWatchPanel channels={channels} />
+        <TodayNowPanel channels={channels} />
         {PLACEHOLDER_PANELS.map((name) => (
           <PanelCard key={name} title={name} channels={channels} />
         ))}
       </div>
 
-      {/* Fixed slide-up drawer at bottom */}
-      <AnchorDrawer />
+      {/* Fixed slide-up drawer at bottom — pass position for weather/forecast tabs */}
+      <AnchorDrawer lat={position?.lat ?? null} lon={position?.lon ?? null} />
     </main>
   );
 }
