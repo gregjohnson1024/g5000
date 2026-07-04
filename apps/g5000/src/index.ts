@@ -103,12 +103,17 @@ async function main(): Promise<void> {
   // the alarms_history table (best-effort; a DB hiccup never fails an alarm).
   wireAlarmsHistory({ store, registry: alarmsRegistry });
 
-  // Forward WARN/CRITICAL fires to an ntfy topic (phones off the boat wifi).
-  // No-op unless G5000_NTFY_TOPIC is set; fire-and-forget, never throws.
-  wireAlarmPush(alarmsRegistry);
-
   const initialAlarmsConfig = await loadAlarmsConfig(store);
   const alarmsConfigRef: { current: AlarmsConfig } = { current: initialAlarmsConfig };
+
+  // Forward WARN/CRITICAL fires to an ntfy topic (phones off the boat wifi).
+  // Topic/server are read at push time from the live config ref (set on
+  // /alerts); env G5000_NTFY_TOPIC/G5000_NTFY_URL are the legacy fallback.
+  // No-op per fire when neither is configured; fire-and-forget, never throws.
+  // The bus feeds a last-known-fix cache so context-less MOB fires still push
+  // a position.
+  wireAlarmPush(alarmsRegistry, { configRef: alarmsConfigRef, bus });
+
   const alarmsPipelineHandle = startAlarmsPipeline(bus, alarmsRegistry, alarmsConfigRef);
   // Expose the ref so API routes that update config (e.g. PUT /api/alarms/config)
   // can swap it without restarting the predicates.
