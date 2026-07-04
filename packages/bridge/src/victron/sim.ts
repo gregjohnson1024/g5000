@@ -157,7 +157,7 @@ export function simSnapshotAt(tSec: number): Array<[string, unknown]> {
   const battCurrentA = battVoltage !== 0 ? netBatteryW / battVoltage : 0;
   // Time to go (seconds) — only meaningful when discharging
   const remainingKwh = ((soc / 100) * BATTERY_CAPACITY_KWH * 1000) / battVoltage; // Ah → kWh
-  const timeToGoS = netBatteryW < 0 ? (remainingKwh / Math.abs(netBatteryW)) * 3600 * 1000 : null;
+  const timeToGoS = netBatteryW < 0 ? (remainingKwh * 3_600_000) / Math.abs(netBatteryW) : null;
 
   emit(topic('system', 0, 'Dc/Battery/Soc'), soc);
   emit(topic('system', 0, 'Dc/Battery/Voltage'), battVoltage);
