@@ -13,47 +13,6 @@ interface SourceModeStatus {
   errorMessage?: string;
 }
 
-interface Bbox {
-  latMin: number;
-  latMax: number;
-  lonMin: number;
-  lonMax: number;
-}
-
-interface SocketCanConfig {
-  enabled: boolean;
-  interface: string;
-}
-
-interface Settings {
-  g5000Host?: string;
-  wgrib2Path?: string;
-  cacheRoot?: string;
-  /**
-   * Region of interest for the periodic forecast refresh timer on the Pi.
-   * Set generously enough to cover where the boat might be over a passage
-   * — the script reads this on every fire, so changing it here takes effect
-   * on the next 3 h tick.
-   */
-  forecastBbox?: Bbox;
-  /**
-   * Opt-in SocketCAN ingest for the PiCAN-M HAT. Default: disabled (current
-   * fleet uses YDWG/NGT-1). When enabled, the g5000 app boots an
-   * additional SocketCanDriver alongside YDWG. Takes effect on next service
-   * restart — the bridge wires drivers at boot.
-   */
-  socketCan?: SocketCanConfig;
-}
-
-// Env-derived defaults shown alongside persisted values so the user sees
-// what the system falls back to when a setting is empty. Kept in sync with
-// `lib/paths.ts` and `lib/g5000-client.ts`.
-const DEFAULTS = {
-  g5000Host: 'http://g5000.local:3000',
-  wgrib2Path: 'wgrib2',
-  cacheRoot: '~/.g5000-router/grib-cache',
-};
-
 // A fresh, mutable copy of the engine defaults. Used both for initial state and
 // the Reset button so the two never drift apart.
 function freshDefaults(): Required<PlanningSettings> {
@@ -203,14 +162,6 @@ function PlanningSection() {
 }
 
 export default function SettingsPage() {
-  const [g5000Host, setG5000Host] = useState<string>('');
-  const [wgrib2Path, setWgrib2Path] = useState<string>('');
-  const [cacheRoot, setCacheRoot] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [status, setStatus] = useState<string | undefined>();
-  const [error, setError] = useState<string | undefined>();
-
   // Source-mode state — separate from the persisted settings above because
   // it's a runtime-only switch (lives in the SourceModeController, not
   // settings.json). Polled so the UI reflects any out-of-band switch.
@@ -227,35 +178,6 @@ export default function SettingsPage() {
   const [socketCanRunning, setSocketCanRunning] = useState<boolean>(false);
   const [socketCanBusy, setSocketCanBusy] = useState<boolean>(false);
   const [socketCanError, setSocketCanError] = useState<string | undefined>();
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/settings');
-        const j = await res.json();
-        if (cancelled) return;
-        if (!j.ok) {
-          setError(j.error?.message ?? 'failed to load settings');
-          return;
-        }
-        const s: Settings = j.settings ?? {};
-        setG5000Host(typeof s.g5000Host === 'string' ? s.g5000Host : '');
-        setWgrib2Path(typeof s.wgrib2Path === 'string' ? s.wgrib2Path : '');
-        setCacheRoot(typeof s.cacheRoot === 'string' ? s.cacheRoot : '');
-        // SocketCAN state is fetched from its dedicated endpoint (which
-        // also reports the live `running` flag) — see the separate
-        // useEffect below.
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Poll source mode so the radio reflects out-of-band switches (e.g.,
   // someone hit /api/source-mode from curl or another tab).
@@ -374,43 +296,6 @@ export default function SettingsPage() {
       setSourceModeError(String(e));
     } finally {
       setSourceModeBusy(false);
-    }
-  };
-
-  const onSave = async () => {
-    setError(undefined);
-    setStatus(undefined);
-    setSaving(true);
-    try {
-      // PUT /api/settings replaces the whole file, so merge onto the current
-      // settings rather than building from scratch — otherwise we'd wipe keys
-      // this page doesn't edit (forecastBbox, owned by the chart's draggable
-      // ROI; socketCan, hot-applied via /api/socketcan).
-      const cur = (await (await fetch('/api/settings')).json())?.settings ?? {};
-      const body: Settings = { ...cur };
-      // Managed text fields: a blank value means "fall back to the default",
-      // so drop the key rather than persisting an empty string.
-      if (g5000Host.trim()) body.g5000Host = g5000Host.trim();
-      else delete body.g5000Host;
-      if (wgrib2Path.trim()) body.wgrib2Path = wgrib2Path.trim();
-      else delete body.wgrib2Path;
-      if (cacheRoot.trim()) body.cacheRoot = cacheRoot.trim();
-      else delete body.cacheRoot;
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const j = await res.json();
-      if (!j.ok) {
-        setError(j.error?.message ?? 'save failed');
-        return;
-      }
-      setStatus('Saved.');
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -546,65 +431,6 @@ export default function SettingsPage() {
       <SatelliteCachePanel />
 
       <PlanningSection />
-
-      <p className="text-xs text-slate-400">
-        The fields below are persisted to <code>~/.g5000-router/settings.json</code>. Leave a field
-        blank to fall back to the env-derived default shown below it.
-      </p>
-      {loading ? (
-        <div className="text-slate-400 text-sm">Loading…</div>
-      ) : (
-        <div className="space-y-4">
-          <label className="block text-sm">
-            G5000 host URL
-            <input
-              type="text"
-              value={g5000Host}
-              onChange={(e) => setG5000Host(e.target.value)}
-              placeholder={DEFAULTS.g5000Host}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full font-mono"
-            />
-            <span className="text-[10px] text-slate-500">
-              default: <code>{DEFAULTS.g5000Host}</code> (env <code>G5000_HOST</code>)
-            </span>
-          </label>
-          <label className="block text-sm">
-            wgrib2 path
-            <input
-              type="text"
-              value={wgrib2Path}
-              onChange={(e) => setWgrib2Path(e.target.value)}
-              placeholder={DEFAULTS.wgrib2Path}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full font-mono"
-            />
-            <span className="text-[10px] text-slate-500">
-              default: <code>{DEFAULTS.wgrib2Path}</code> (resolved on PATH)
-            </span>
-          </label>
-          <label className="block text-sm">
-            Cache root
-            <input
-              type="text"
-              value={cacheRoot}
-              onChange={(e) => setCacheRoot(e.target.value)}
-              placeholder={DEFAULTS.cacheRoot}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-full font-mono"
-            />
-            <span className="text-[10px] text-slate-500">
-              default: <code>{DEFAULTS.cacheRoot}</code> (env <code>G5000_ROUTER_ROOT</code>)
-            </span>
-          </label>
-          <button
-            disabled={saving}
-            onClick={onSave}
-            className="bg-emerald-700 disabled:bg-slate-700 px-4 py-2 rounded text-sm"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          {status && <div className="text-emerald-400 text-xs">{status}</div>}
-          {error && <div className="text-rose-400 text-xs">{error}</div>}
-        </div>
-      )}
     </main>
   );
 }
