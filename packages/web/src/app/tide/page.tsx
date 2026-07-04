@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, Fragment } from 'react';
+import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { interpolateHeight, tideSnapshot } from '@g5000/tide';
 import type { Station, TidalEvent } from '@g5000/tide';
+import { fetchBoatFix } from '../../lib/boat-fix';
+import { fmtDistanceNm, sortByDistanceNm, type LatLon } from '../../lib/station-distance';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type SourceId = 'admiralty' | 'chs';
@@ -110,6 +112,29 @@ export default function TidePage() {
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [pinning, setPinning] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // Feature gate: settings.canadianTideCurrents (default false). null = loading.
+  const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  // One-shot boat fix for station distances; null = no fix (render undistanced).
+  const [boatFix, setBoatFix] = useState<LatLon | null>(null);
+
+  // Mount: read the feature gate and grab a one-shot fix for distances.
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setFeatureEnabled(j?.settings?.canadianTideCurrents === true);
+      })
+      .catch(() => {
+        if (!cancelled) setFeatureEnabled(false);
+      });
+    void fetchBoatFix().then((f) => {
+      if (!cancelled) setBoatFix(f);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Tick the "now" pointer once per minute.
   useEffect(() => {
@@ -226,15 +251,12 @@ export default function TidePage() {
   const handlePin = useCallback(async () => {
     if (!selectedKey) return;
     const { sourceId, stationId } = parseEntryKey(selectedKey);
-    const isCurrentlyPinned =
-      pinnedStationId === stationId && pinnedSourceId === sourceId;
+    const isCurrentlyPinned = pinnedStationId === stationId && pinnedSourceId === sourceId;
     setPinning(true);
     await fetch('/api/tide/pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        isCurrentlyPinned ? { stationId: null } : { stationId, sourceId },
-      ),
+      body: JSON.stringify(isCurrentlyPinned ? { stationId: null } : { stationId, sourceId }),
     });
     await refreshActive();
     setPinning(false);
@@ -243,10 +265,16 @@ export default function TidePage() {
   // ── Derived display data ───────────────────────────────────────────────────
   const multiSource = new Set(pickerList.map((e) => e.sourceId)).size > 1;
 
-  const filtered = pickerList.filter(
-    (e) =>
-      e.station.name.toLowerCase().includes(filter.toLowerCase()) ||
-      entryKey(e) === selectedKey,
+  // Distance-annotated list, closest-first when a fix is available; otherwise
+  // the original (name-sorted) order with null distances.
+  const annotated = useMemo(
+    () => sortByDistanceNm(pickerList, boatFix, (e) => e.station),
+    [pickerList, boatFix],
+  );
+
+  const filtered = annotated.filter(
+    ({ item: e }) =>
+      e.station.name.toLowerCase().includes(filter.toLowerCase()) || entryKey(e) === selectedKey,
   );
 
   const selectedEntry = selectedKey
@@ -276,6 +304,24 @@ export default function TidePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // Feature gate: hidden by default until settings.canadianTideCurrents is on.
+  if (featureEnabled !== true) {
+    return (
+      <main className="p-6 max-w-3xl mx-auto text-slate-100">
+        <h1 className="text-2xl font-semibold mb-4">Tide Planning</h1>
+        {featureEnabled === false && (
+          <p className="text-sm text-slate-400">
+            Canadian Tide/Currents is disabled — enable it in{' '}
+            <a href="/settings" className="text-sky-400 underline">
+              Settings
+            </a>
+            .
+          </p>
+        )}
+      </main>
+    );
+  }
+
   // No-source state: loaded but nothing came back.
   if (stationsLoaded && pickerList.length === 0) {
     return (
@@ -300,13 +346,9 @@ export default function TidePage() {
         {selectedEntry && (
           <span className="text-sm text-slate-400">
             Source:{' '}
-            <span className="font-medium text-slate-200 uppercase">
-              {selectedEntry.sourceId}
-            </span>
+            <span className="font-medium text-slate-200 uppercase">{selectedEntry.sourceId}</span>
             {tideSource && (
-              <span className="ml-2 text-xs text-slate-500">
-                (mode: {tideSource})
-              </span>
+              <span className="ml-2 text-xs text-slate-500">(mode: {tideSource})</span>
             )}
           </span>
         )}
@@ -332,16 +374,14 @@ export default function TidePage() {
           {pickerList.length === 0 && !stationsLoaded && (
             <option value="">Loading stations…</option>
           )}
-          {filtered.map((e) => {
+          {filtered.map(({ item: e, distanceNm }) => {
             const key = entryKey(e);
-            const isEntryPinned =
-              pinnedStationId === e.station.id && pinnedSourceId === e.sourceId;
-            const label = multiSource
-              ? `${e.station.name} (${e.sourceId})`
-              : e.station.name;
+            const isEntryPinned = pinnedStationId === e.station.id && pinnedSourceId === e.sourceId;
+            const label = multiSource ? `${e.station.name} (${e.sourceId})` : e.station.name;
             return (
               <option key={key} value={key}>
                 {label}
+                {distanceNm !== null ? ` — ${fmtDistanceNm(distanceNm)}` : ''}
                 {isEntryPinned ? ' ★' : ''}
               </option>
             );
@@ -424,11 +464,8 @@ export default function TidePage() {
           <div className="mt-1 text-xs font-mono text-slate-300">
             {snapshot?.heightNowM != null ? (
               <>
-                Now:{' '}
-                <span className="text-sky-300">{snapshot.heightNowM.toFixed(2)} m</span>
-                {snapshot.state && (
-                  <span className="ml-2 text-slate-400">{snapshot.state}</span>
-                )}
+                Now: <span className="text-sky-300">{snapshot.heightNowM.toFixed(2)} m</span>
+                {snapshot.state && <span className="ml-2 text-slate-400">{snapshot.state}</span>}
                 {snapshot.next && (
                   <span className="ml-2 text-slate-400">
                     → {snapshot.next.type} {snapshot.next.heightM.toFixed(2)} m at{' '}
@@ -443,9 +480,7 @@ export default function TidePage() {
         </div>
       )}
 
-      {loadingEvents && (
-        <div className="mb-4 text-sm text-slate-500">Loading tide events…</div>
-      )}
+      {loadingEvents && <div className="mb-4 text-sm text-slate-500">Loading tide events…</div>}
 
       {/* Tide table */}
       {!loadingEvents && events.length > 0 && (
@@ -470,10 +505,7 @@ export default function TidePage() {
                     </td>
                   </tr>
                   {dayEvents.map((ev) => (
-                    <tr
-                      key={ev.timeMs}
-                      className="border-b border-slate-800 hover:bg-slate-900/40"
-                    >
+                    <tr key={ev.timeMs} className="border-b border-slate-800 hover:bg-slate-900/40">
                       <td className="py-1.5 pr-4 text-slate-300">
                         {new Date(ev.timeMs).toLocaleString(undefined, {
                           hour: '2-digit',
@@ -487,9 +519,7 @@ export default function TidePage() {
                       >
                         {ev.type}
                       </td>
-                      <td className="py-1.5 text-right">
-                        {ev.heightM.toFixed(1)} m
-                      </td>
+                      <td className="py-1.5 text-right">{ev.heightM.toFixed(1)} m</td>
                     </tr>
                   ))}
                 </Fragment>

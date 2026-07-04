@@ -117,6 +117,9 @@ function ChartPageInner() {
     lonMin: number;
     lonMax: number;
   } | null>(null);
+  // Feature gate for the CHS tide/current-station overlays (Canada-only data).
+  // Synced from /api/settings by the ROI effect below; default hidden.
+  const [canadianTideCurrents, setCanadianTideCurrents] = useState(false);
   const [currentRefreshKey, setCurrentRefreshKey] = useState(1);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const [availableHours, setAvailableHours] = useState<{
@@ -619,6 +622,7 @@ function ChartPageInner() {
         const j = await r.json();
         const roi = j?.settings?.forecastBbox as typeof forecastBbox;
         if (!alive) return;
+        setCanadianTideCurrents(j?.settings?.canadianTideCurrents === true);
         setForecastBbox((prev) => {
           const next = roi ?? null;
           if (prev === next) return prev;
@@ -987,8 +991,12 @@ function ChartPageInner() {
             own={livePos}
           />
         )}
-        {layers.tideStations && <StationsOverlay map={mapInstance} kind="tide" />}
-        {layers.currentStations && <StationsOverlay map={mapInstance} kind="current" />}
+        {canadianTideCurrents && layers.tideStations && (
+          <StationsOverlay map={mapInstance} kind="tide" />
+        )}
+        {canadianTideCurrents && layers.currentStations && (
+          <StationsOverlay map={mapInstance} kind="current" />
+        )}
         <ForecastRoi
           map={mapInstance}
           defaultBbox={
@@ -1132,6 +1140,7 @@ function ChartPageInner() {
           onSafetyDepthM={setSafetyDepthM}
           waypointDropActive={waypointDropActive}
           onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
+          showTideCurrents={canadianTideCurrents}
         />
         <MobLayer map={mapInstance} livePos={livePos} />
         <AnchorWatchLayer map={mapInstance} livePos={livePos} />

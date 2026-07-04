@@ -24,6 +24,8 @@ export interface ChartToolbarProps {
   onSafetyDepthM: (m: number) => void;
   waypointDropActive: boolean;
   onToggleWaypointDrop: () => void;
+  /** settings.canadianTideCurrents gate — hides the CHS station toggles when off. */
+  showTideCurrents: boolean;
 }
 
 export function ChartToolbar({
@@ -34,6 +36,7 @@ export function ChartToolbar({
   onSafetyDepthM,
   waypointDropActive,
   onToggleWaypointDrop,
+  showTideCurrents,
 }: ChartToolbarProps): React.ReactElement {
   return (
     <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end">
@@ -43,6 +46,7 @@ export function ChartToolbar({
         onSelectModel={onSelectModel}
         safetyDepthM={safetyDepthM}
         onSafetyDepthM={onSafetyDepthM}
+        showTideCurrents={showTideCurrents}
       />
       <AnnotationDropper variant="icon" />
       <button

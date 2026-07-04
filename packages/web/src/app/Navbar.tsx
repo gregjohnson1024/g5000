@@ -108,10 +108,31 @@ function isAnySettingsActive(activeHref: string | null): boolean {
   return activeHref !== null && SETTINGS_HREFS.has(activeHref);
 }
 
+/** Tabs gated behind settings.canadianTideCurrents (CHS data is Canada-only). */
+const CANADIAN_TIDE_HREFS: ReadonlySet<string> = new Set(['/tide', '/currents']);
+
 export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
   const pathname = usePathname();
+  // Default false = hidden until the settings fetch resolves (no layout flash).
+  const [canadianTideCurrents, setCanadianTideCurrents] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setCanadianTideCurrents(j?.settings?.canadianTideCurrents === true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const hidden = new Set(hiddenHrefs ?? []);
-  const topItems = TOP_LEVEL.filter((it) => !hidden.has(it.href));
+  const topItems = TOP_LEVEL.filter(
+    (it) => !hidden.has(it.href) && (canadianTideCurrents || !CANADIAN_TIDE_HREFS.has(it.href)),
+  );
   const visibleGroups: SettingsGroup[] = SETTINGS_GROUPS.map((g) => ({
     label: g.label,
     items: g.items.filter((it) => !hidden.has(it.href)),

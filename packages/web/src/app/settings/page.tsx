@@ -143,7 +143,9 @@ function PlanningSection() {
           />{' '}
           kn
         </div>
-        <p className="text-[11px] text-slate-500">0 kn threshold = never motor. Set high to always motor.</p>
+        <p className="text-[11px] text-slate-500">
+          0 kn threshold = never motor. Set high to always motor.
+        </p>
       </fieldset>
       <div className="flex items-center gap-3">
         <button onClick={save} className="bg-emerald-700 px-3 py-1 rounded text-sm">
@@ -157,6 +159,53 @@ function PlanningSection() {
         </button>
         {status && <span className="text-sm text-slate-400">{status}</span>}
       </div>
+    </section>
+  );
+}
+
+function TideCurrentsSection() {
+  const [enabled, setEnabled] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetch('/api/settings')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setEnabled(j.settings?.canadianTideCurrents === true);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Read-merge-write: PUT /api/settings replaces the whole file, so merge
+  // onto the current settings rather than clobbering keys other sections own.
+  const apply = async (next: boolean) => {
+    setEnabled(next);
+    setStatus('Saving…');
+    const cur = await fetch('/api/settings')
+      .then((r) => r.json())
+      .catch(() => ({ settings: {} }));
+    const merged = { ...(cur.settings ?? {}), canadianTideCurrents: next };
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    setStatus(res.ok ? 'Saved' : 'Save failed');
+    setTimeout(() => setStatus(null), 2500);
+  };
+
+  return (
+    <section className="space-y-3 border border-slate-800 rounded p-3">
+      <h2 className="text-lg font-semibold">Tide &amp; currents</h2>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={enabled} onChange={(e) => void apply(e.target.checked)} />
+        Canadian Tide/Currents (CHS stations)
+      </label>
+      <p className="text-[11px] text-slate-500">
+        Shows the Tide and Currents tabs plus the chart&apos;s station overlays. Station data covers
+        Canadian waters only, so this is off by default.
+      </p>
+      {status && <span className="text-sm text-slate-400">{status}</span>}
     </section>
   );
 }
@@ -431,6 +480,8 @@ export default function SettingsPage() {
       <SatelliteCachePanel />
 
       <PlanningSection />
+
+      <TideCurrentsSection />
     </main>
   );
 }
