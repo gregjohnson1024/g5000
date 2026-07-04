@@ -79,7 +79,7 @@ describe('startVictronMqttDriver', () => {
 
     // Collect every electrical.** publish on the bus.
     const received: string[] = [];
-    bus.subscribe('electrical.**', (ch) => received.push(ch));
+    bus.subscribe('electrical.**', (s) => received.push(s.channel));
 
     startVictronMqttDriver({
       host: 'x',
