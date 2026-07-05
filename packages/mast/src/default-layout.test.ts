@@ -8,6 +8,8 @@ describe('DEFAULT_MAST_LAYOUT', () => {
     expect(r.ok).toBe(true);
   });
   it('has at least one always-on page', () => {
-    expect(DEFAULT_MAST_LAYOUT.pages.some((p) => p.condition && 'always' in p.condition)).toBe(true);
+    expect(DEFAULT_MAST_LAYOUT.pages.some((p) => p.condition && 'always' in p.condition)).toBe(
+      true,
+    );
   });
 });

@@ -28,6 +28,9 @@ export async function POST(req: Request): Promise<NextResponse> {
     );
   }
   const store = getSharedConfigStore();
-  await store.setDisplayConfig({ ...store.getDisplayConfig(), dayBaseColor: b.dayBaseColor as DayBaseColor });
+  await store.setDisplayConfig({
+    ...store.getDisplayConfig(),
+    dayBaseColor: b.dayBaseColor as DayBaseColor,
+  });
   return NextResponse.json({ ok: true, dayBaseColor: b.dayBaseColor });
 }

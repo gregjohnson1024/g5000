@@ -46,6 +46,10 @@ Common runtime knobs (set on the g5000 app process):
 - `CONFIG_DB=./data/config.db` and `SESSION_LOG_DIR=./data/sessions` — persistence paths.
 - `G5000_BOAT_ID=sula` (default) — single active boat id for this process. Polar revisions and the wardrobe filter on this id. Multi-tenant migration of other config tables is a separate spec.
 - `G5000_ROUTER_ROOT=~/.g5000-router` — OSM tile + GRIB cache root.
+- `VICTRON_MQTT_HOST=<host>` — Cerbo GX MQTT broker host (e.g. `192.168.1.129`); unset or `none` = Victron driver off.
+- `VICTRON_MQTT_PORT=1883` (default) — Cerbo MQTT port; override if non-standard.
+- `VICTRON_SIM=1` — run the deterministic Victron simulator instead of the live MQTT driver (also implied by `DEMO_MODE=1`).
+- `VICTRON_PORTAL_ID=<id>` — optional; normally auto-discovered from the broker's `N/<id>/#` topic prefix.
 
 ## Architecture
 
@@ -167,6 +171,18 @@ Disabled / preserved-but-unmounted (one-line revert):
 - **Same-origin tile proxies are the pattern.** All four tile types (`/api/tiles`, `/api/seamark-tiles`, `/api/enc-tiles`, `/api/sat-tiles`) follow the same shape: regex-validate `z`/`x`/`y`, serve from disk if fresh, otherwise fetch upstream, write to disk best-effort, stream the response. `x-cache: HIT | MISS | EMPTY`, transparent 1×1 PNG for off-coverage zooms. If you add another raster overlay, copy one of these as a starting point (`/api/sat-tiles` is the most recent and passes the upstream content-type through for JPEG).
 - **Cap each raster source's `maxzoom` at its upstream's ceiling so MapLibre overzooms.** OSM and Esri publish to z19, NOAA to z18. Without `maxzoom` on the source, MapLibre requests tiles past coverage and the proxy returns 404/502 on the upstream miss (this bit the OSM basemap at z20). With it set, MapLibre scales the deepest available tiles for closer harbour-detail views.
 - **For a live, frequently-updated raster from an offscreen `<canvas>`, use an `ImageSource` + `updateImage`, NOT a `CanvasSource`.** MapLibre only re-uploads a `CanvasSource`'s GL texture during a source-update pass (`_sourcesDirty`), not on a plain repaint — so unless something else is _continuously_ animating, a `CanvasSource` uploads its (often blank) texture once and never refreshes. `animate: true` and `map.triggerRepaint()` (even at 60 fps) do **not** fix it; only a source mutation does. This silently bit the radar overlay: spokes were painted to the canvas (verified pixels via `getImageData`) but never appeared on the map. The fix is to drive an `image` source and push the canvas in on a cadence with `source.updateImage({ url: canvas.toDataURL('image/png'), coordinates })` — `updateImage` re-uploads the texture explicitly. `toDataURL` reads the canvas's CPU backing store, so the canvas can stay detached from the DOM (attaching it, hidden or not, does **not** help — that was a red herring). Diagnosed on real Apple-M4 hardware GL, so it is browser-agnostic (not a Safari/headless quirk): in the same map, vector layers, raster-tile sources, and `ImageSource` all render; only `CanvasSource` does not. See `packages/web/src/components/RadarOverlay.tsx`.
+
+## At-anchor page (`/anchor`)
+
+`packages/web/src/app/anchor/page.tsx` is a dedicated monitoring dashboard for when Sula is on the hook. It has a fixed **top zone** of panels (Depth, Position, Nearby Vessels, an apparent-wind course-up dial with gust ring, Anchor Watch + rode/scope calculator, Today & Now, and Systems/Tanks/Temps) plus a **slide-up drawer** at the bottom with sub-tabs:
+
+- **Forecast** — Open-Meteo 7-day graph + hourly table (cached under `~/.g5000-router/weather-cache/`; degrades to last-good data offline).
+- **Tides** — tide prediction (reuses the tides infrastructure).
+- **Radar** — Windy radar embed (requires internet; shows a "no connection" state offline).
+- **Sky** — suncalc sun/moon rise–set, golden hour, and civil-twilight times.
+- **Solar** — per-MPPT solar yield + battery state from the Victron Cerbo GX.
+
+Victron data flows from `VictronDriver` (live MQTT from the Cerbo) or `VictronSim` (under `VICTRON_SIM=1` or `DEMO_MODE=1`) → bus `electrical.*` channels → `/api/victron` route → `<SolarTab/>`. When `VICTRON_MQTT_HOST` is unset or `none` the driver is off and the Solar tab shows a "Cerbo offline" state; all other tabs are unaffected.
 
 ## Branching model
 

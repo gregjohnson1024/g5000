@@ -7,7 +7,10 @@ export function parseChsCurrentStations(json: unknown): Station[] {
   if (!Array.isArray(json)) return [];
   const out: Station[] = [];
   for (const s of json as Array<{
-    id?: unknown; officialName?: unknown; latitude?: unknown; longitude?: unknown;
+    id?: unknown;
+    officialName?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
     timeSeries?: Array<{ code?: unknown }>;
   }>) {
     const codes = Array.isArray(s.timeSeries) ? s.timeSeries.map((t) => t?.code) : [];
@@ -31,13 +34,19 @@ export function parseChsCurrentSeries(speedJson: unknown, dirJson: unknown): Cur
   if (!Array.isArray(speedJson) || !Array.isArray(dirJson)) return [];
   const dirByDate = new Map<string, number>();
   for (const e of dirJson as Array<{ eventDate?: unknown; value?: unknown }>) {
-    if (typeof e.eventDate === 'string' && typeof e.value === 'number') dirByDate.set(e.eventDate, e.value);
+    if (typeof e.eventDate === 'string' && typeof e.value === 'number')
+      dirByDate.set(e.eventDate, e.value);
   }
   const out: CurrentPrediction[] = [];
   for (const e of speedJson as Array<{ eventDate?: unknown; value?: unknown }>) {
-    if (typeof e.eventDate === 'string' && typeof e.value === 'number' && dirByDate.has(e.eventDate)) {
+    if (
+      typeof e.eventDate === 'string' &&
+      typeof e.value === 'number' &&
+      dirByDate.has(e.eventDate)
+    ) {
       const t = Date.parse(e.eventDate);
-      if (!Number.isNaN(t)) out.push({ timeMs: t, speedKn: e.value, dirDeg: dirByDate.get(e.eventDate)! });
+      if (!Number.isNaN(t))
+        out.push({ timeMs: t, speedKn: e.value, dirDeg: dirByDate.get(e.eventDate)! });
     }
   }
   out.sort((a, b) => a.timeMs - b.timeMs);
@@ -74,7 +83,10 @@ export async function chsListCurrentStations(): Promise<Station[]> {
   return parseChsCurrentStations(await chsGet('/stations'));
 }
 
-export async function chsGetCurrentPredictions(stationId: string, hours = 48): Promise<CurrentPrediction[]> {
+export async function chsGetCurrentPredictions(
+  stationId: string,
+  hours = 48,
+): Promise<CurrentPrediction[]> {
   const { from, to } = predictWindow(hours);
   const enc = encodeURIComponent(stationId);
   const [speed, dir] = await Promise.all([
@@ -87,5 +99,7 @@ export async function chsGetCurrentPredictions(stationId: string, hours = 48): P
 export async function chsGetCurrentEvents(stationId: string, hours = 48): Promise<CurrentEvent[]> {
   const { from, to } = predictWindow(hours);
   const enc = encodeURIComponent(stationId);
-  return parseChsCurrentEvents(await chsGet(`/stations/${enc}/data?time-series-code=wcp1-events&from=${from}&to=${to}`));
+  return parseChsCurrentEvents(
+    await chsGet(`/stations/${enc}/data?time-series-code=wcp1-events&from=${from}&to=${to}`),
+  );
 }

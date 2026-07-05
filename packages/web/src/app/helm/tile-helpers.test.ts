@@ -3,7 +3,7 @@ import type { JsonSafeSample } from '@g5000/core';
 import { scalar, enumVal, geo, fmtSpeed, fmtAngleSigned, fmtHeadingRad } from './tile-helpers';
 
 const s = (v: JsonSafeSample['value']): JsonSafeSample =>
-  ({ channel: 'x', t_ns: '0', value: v, source: 'test' } as unknown as JsonSafeSample);
+  ({ channel: 'x', t_ns: '0', value: v, source: 'test' }) as unknown as JsonSafeSample;
 
 describe('value extractors', () => {
   it('scalar returns the number only for scalar samples', () => {

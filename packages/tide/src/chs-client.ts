@@ -9,7 +9,10 @@ export function parseChsStations(json: unknown): Station[] {
   if (!Array.isArray(json)) return [];
   const out: Station[] = [];
   for (const s of json as Array<{
-    id?: unknown; officialName?: unknown; latitude?: unknown; longitude?: unknown;
+    id?: unknown;
+    officialName?: unknown;
+    latitude?: unknown;
+    longitude?: unknown;
     timeSeries?: Array<{ code?: unknown }>;
   }>) {
     const series = Array.isArray(s.timeSeries) ? s.timeSeries : [];

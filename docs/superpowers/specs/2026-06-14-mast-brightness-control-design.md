@@ -49,7 +49,7 @@ Mirrors the existing mast-control plumbing (the `override`/`active-page` pattern
   1. read `max_brightness` from sysfs (hardware-agnostic), map `raw = round(pct/100 × max)`, enforce a **floor** `MAST_BACKLIGHT_MIN` (default 2 of 99) so it can never go fully black;
   2. write `raw` to `/sys/class/backlight/pwm-backlight/brightness`;
   3. atomically cache `raw` to `/var/lib/mast-display/brightness`.
-  On SSE drop, `curl` exits → systemd restarts → reconnects (replays current value).
+     On SSE drop, `curl` exits → systemd restarts → reconnects (replays current value).
 - **`appliance/brightness-boot.sh`** + **`appliance/mast-brightness-boot.service`** (new, early oneshot, `DefaultDependencies=no`, ordered as early as possible — before the splash settles, `WantedBy=sysinit.target`): read the cached raw value (or a safe default 80 %→raw if absent) and write it to the backlight, so the boot/splash comes up dim. The backlight node exists early (kernel DT overlay); exact ordering tuned on the unit.
 - **`provision.sh`**: install the two new services + scripts, create `/var/lib/mast-display`, enable both; **remove the auto-dimmer** (`systemctl disable --now mast-backlight.timer`; delete `backlight-sync.sh`, `mast-backlight.{service,timer}`).
 

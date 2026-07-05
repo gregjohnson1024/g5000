@@ -49,8 +49,14 @@ export function Tile({ label, units, fmt }: { label: string; units: string; fmt:
   }, [fmt.text, fit]);
 
   return (
-    <div ref={cellRef} className="mast-tile flex flex-col items-center justify-center h-full w-full">
-      <div className="mast-tile-label uppercase tracking-widest" style={{ color: 'var(--mast-muted)' }}>
+    <div
+      ref={cellRef}
+      className="mast-tile flex flex-col items-center justify-center h-full w-full"
+    >
+      <div
+        className="mast-tile-label uppercase tracking-widest"
+        style={{ color: 'var(--mast-muted)' }}
+      >
         {label}
       </div>
       <span

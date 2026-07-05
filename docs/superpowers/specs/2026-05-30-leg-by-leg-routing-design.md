@@ -30,14 +30,14 @@ primitive — `plan()` itself does not change.
   motor into the bay) is the obvious v2 and is called out where the seam is, but
   is not built here.
 - **Automatic enclosed-water detection** (#21 item 2). This spec gives the
-  *manual* tool (route via a bay-mouth waypoint); auto-detecting that a
+  _manual_ tool (route via a bay-mouth waypoint); auto-detecting that a
   destination sits inside enclosed water is a separate spec.
 - **Waypoint-order optimization.** The sequence is honoured as given; we do not
   reorder it to minimize ETA.
 - **Cross-segment isochrone sharing.** Each segment is an independent fan that
   restarts at its waypoint. Waypoints are hard constraints, so there is nothing
   to share.
-- **Changes to saved-route CRUD.** We only *read* saved routes; the `/routes`
+- **Changes to saved-route CRUD.** We only _read_ saved routes; the `/routes`
   page and `RouteBuilder` are untouched.
 - **Re-planning during playback.** Unchanged from today — playback replays the
   computed legs.
@@ -61,7 +61,7 @@ export function planVia(input: PlanInput, intermediates: LatLon[]): Route;
 For each consecutive pair `(path[i], path[i+1])`:
 
 1. Call `plan()` with `start = path[i]`, `end = path[i+1]`, `departure = ETA of
-   the previous segment` (first segment uses `input.departure`), and the
+the previous segment` (first segment uses `input.departure`), and the
    segment's `maxHours` set to the **remaining** time budget (see below).
 2. Append the segment's legs to the accumulated legs, **dropping the duplicated
    waypoint vertex** between consecutive segments (segment i+1's synthetic start
@@ -125,7 +125,7 @@ options apply to every segment.
 ## 3. UI — chart plan panel (both sources)
 
 The plan panel (`RoutePlanPanel.tsx` + `PlanControls.tsx`) gains a small mode
-switch for *where the ordered waypoints come from*:
+switch for _where the ordered waypoints come from_:
 
 - **Saved route** — a dropdown of saved routes from `GET /api/routes`
   (`{ id, name, waypointIds }`). The panel resolves `waypointIds` → coordinates

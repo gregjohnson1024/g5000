@@ -1,6 +1,14 @@
 import { Bus, Channels } from '@g5000/core';
 import type { ConfigStore } from '@g5000/db';
-import { tideSnapshot, nearestStation, createTideSources, selectSource, type TideSource, type Station, type TidalEvent } from '@g5000/tide';
+import {
+  tideSnapshot,
+  nearestStation,
+  createTideSources,
+  selectSource,
+  type TideSource,
+  type Station,
+  type TidalEvent,
+} from '@g5000/tide';
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -66,7 +74,10 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
       const cfg = store.getTideConfig();
       await store.setTideConfig({
         ...cfg,
-        stationsCacheBySource: { ...cfg.stationsCacheBySource, [source.id]: { fetchedAtMs: Date.now(), stations } },
+        stationsCacheBySource: {
+          ...cfg.stationsCacheBySource,
+          [source.id]: { fetchedAtMs: Date.now(), stations },
+        },
       });
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -76,7 +87,8 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
 
   function resolveStation(source: TideSource): Station | null {
     const pin = store.getTideConfig().pinnedStation;
-    if (pin && pin.sourceId === source.id) return stations.find((s) => s.id === pin.stationId) ?? active;
+    if (pin && pin.sourceId === source.id)
+      return stations.find((s) => s.id === pin.stationId) ?? active;
     if (lastPos) return nearestStation(stations, lastPos, active);
     return active;
   }
@@ -106,7 +118,9 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
         const fresh = await nextSource.getTidalEvents(nextStation.id, 7);
         const now = Date.now();
         const pastKept = activeEvents.filter((e) => e.timeMs <= now).slice(-1);
-        const merged = stationChanged ? fresh : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
+        const merged = stationChanged
+          ? fresh
+          : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
         activeEvents = merged.filter((e, i, arr) => i === 0 || e.timeMs !== arr[i - 1]!.timeMs);
         active = nextStation;
         lastFetchDay = today;

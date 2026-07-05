@@ -58,12 +58,14 @@ changes; all groups show current state and enforce one selection per group.
 ## New persisted state
 
 New ConfigStore singleton-blob table `boat_state`:
+
 ```ts
 export interface BoatState {
   daggerboards: { port: number; starboard: number }; // % down: 0 (up) … 100 (down)
   engines: { port: { running: boolean }; starboard: { running: boolean } };
 }
 ```
+
 - **Default:** `{ daggerboards: { port: 0, starboard: 0 }, engines: { port: { running: false }, starboard: { running: false } } }`.
 - ConfigStore gains `boatState$` (Observable), `getBoatState()`, `setBoatState(value)` — mirroring the waypoints/routes accessors; `BoatState` exported from `@g5000/db`.
 - API: `GET /api/boat-state` → `{ ok, boatState }`; `POST /api/boat-state` accepts a **partial merge** `{ daggerboards?: Partial<{port,starboard}>, engines?: Partial<{port,starboard}> }`, validates (board % in {0,25,50,75,100}; running boolean), merges into the stored state, returns the updated `boatState`.
@@ -78,15 +80,18 @@ groups. Panel content becomes scrollable (`max-h-[70vh] overflow-y-auto`) since
 it now holds more.
 
 ### Sails (3 groups)
+
 Iterate `SAIL_CATEGORIES`. For each (Headsail / Main / Downwind):
+
 - buttons for each `wardrobe.sails` of that category (label = sail name), the
   one matching `wardrobe.active[category]` highlighted (amber);
 - a **"down"** button (clears the group).
 - Tap a sail → `POST /api/sails/active { category, sailId }` + annotation
   `{ label: sailName, kind: 'event' }`. Tap down → `POST /api/sails/active
-  { category, sailId: null }` + annotation `"<Group> down"`.
+{ category, sailId: null }` + annotation `"<Group> down"`.
 
 ### Daggerboards (Port, Starboard)
+
 Two rows. Each: five buttons **Up (0%) · 25% · 50% · 75% · Down (100%)**, the
 current `boatState.daggerboards[side]` highlighted. Tap → `POST /api/boat-state
 { daggerboards: { [side]: pct } }` + annotation
@@ -94,12 +99,14 @@ current `boatState.daggerboards[side]` highlighted. Tap → `POST /api/boat-stat
 There is no separate "none" — 0 % (Up) is the cleared position.
 
 ### Engines (Port, Starboard)
+
 Two rows. Each: **Run** / **Stop**, with the current
 `boatState.engines[side].running` highlighted. Tap Run → `POST /api/boat-state
 { engines: { [side]: { running: true } } }` + annotation `"<Side> engine on"`;
 Stop → `{ running: false }` + annotation `"<Side> engine off"`.
 
 ### Track-dependence
+
 The state-setting POST (sails/active or boat-state) **always** runs — these are
 boat-state controls usable before/without recording. The annotation log is a
 secondary effect that only fires when `state.trackId` is non-null. So the sail /
@@ -108,6 +115,7 @@ pure-event buttons (Tack / Gybe / Custom / period) keep the current
 "disabled when no active track" behavior.
 
 ### Kept / removed
+
 - **Kept** as pure-event annotations: Tack, Gybe, Custom label + kind, Start/End
   period.
 - **Removed** hardcoded buttons: Reef in/out, Main up/down, J1/J2/J3, Spinnaker

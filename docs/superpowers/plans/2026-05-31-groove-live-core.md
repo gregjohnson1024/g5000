@@ -4,19 +4,21 @@
 
 **Goal:** Publish live "groove" performance metrics on the g5000 bus (time-in-groove, VMG-efficiency, steering steadiness/effort, speed-CV, build-rate, point-of-sail, helm-source, leeway) and surface them on the `/helm` view and the Sula mast display.
 
-**Architecture:** A new `@g5000/compute/groove` pipeline subscribes to channels already on the RxJS bus (true wind, boat speed, the `race.targetSpeed`/`race.targetTwa` targets, rudder, heel, autopilot mode) and publishes derived `groove.*` / `boat.leeway` channels. It *composes* existing true-wind and polar-target math — it does not re-derive them. Pure, independently-testable units (point-of-sail classifier, rolling-window math, metric formulas, leeway) feed a thin wiring pipeline modelled on the existing `race/polar-targets.ts`. Because every metric is a bus channel, the same code feeds live tiles, the H-LINK re-emit, session logging, and replay.
+**Architecture:** A new `@g5000/compute/groove` pipeline subscribes to channels already on the RxJS bus (true wind, boat speed, the `race.targetSpeed`/`race.targetTwa` targets, rudder, heel, autopilot mode) and publishes derived `groove.*` / `boat.leeway` channels. It _composes_ existing true-wind and polar-target math — it does not re-derive them. Pure, independently-testable units (point-of-sail classifier, rolling-window math, metric formulas, leeway) feed a thin wiring pipeline modelled on the existing `race/polar-targets.ts`. Because every metric is a bus channel, the same code feeds live tiles, the H-LINK re-emit, session logging, and replay.
 
 **Tech Stack:** Node ≥22, ESM-only, strict TypeScript (composite project refs, `tsc -b`), RxJS bus, SQLite/Drizzle via `ConfigStore`, Next.js 16 + React 19 web UI, Vitest (+ fast-check) for tests.
 
 **Scope:** This is Phase 0 + the **core** of Phase 1 from the design spec (`docs/superpowers/specs/2026-05-31-groove-performance-telemetry-design.md`). Deferred to follow-on plans: the diagnostic add-ons (pitch-risk, maneuver cost, puff gain/lag — "groove diagnostics" plan), the envelope-polar builder (Phase 2), and attribution + scorecard depth (Phase 3). `helmNervousness` is Phase 3 and is **not** in this plan.
 
 **Conventions:**
+
 - Run a single test file from the repo root with: `npx vitest run <path>`.
 - Build the whole workspace with: `npm run -ws build` is not used — use `npx tsc -b` from the repo root (composite refs).
 - Internal units are SI (radians, m/s); convert to °/kn/% only at the formatter.
 - Commit messages end with the trailer `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 
 **File structure (created/modified by this plan):**
+
 - `packages/core/src/channels.ts` — MODIFY: add `Boat.Leeway` and the `Groove` channel group.
 - `packages/bridge/src/channel-mapper.ts` — MODIFY: add PGN 127245 handler → `boat.rudder.angle`.
 - `packages/bridge/src/channel-mapper.test.ts` — MODIFY: test for the above.
@@ -41,6 +43,7 @@
 ### Task 1: Channel constants for groove + leeway
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts`
 
 `knownChannelSet()` walks the `Channels` registry, so adding constants here automatically makes them selectable as mast tiles. No separate registration needed.
@@ -104,22 +107,23 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Map PGN 127245 (Rudder) → `boat.rudder.angle`
 
 **Files:**
+
 - Modify: `packages/bridge/src/channel-mapper.ts`
 - Test: `packages/bridge/src/channel-mapper.test.ts`
 
-Today the *commanded* rudder is decoded from PGN **127237** → `autopilot.commandedRudder`. There is **no** handler for the dedicated Rudder PGN **127245**; its `Position` field is the actual rudder angle. Add that mapping.
+Today the _commanded_ rudder is decoded from PGN **127237** → `autopilot.commandedRudder`. There is **no** handler for the dedicated Rudder PGN **127245**; its `Position` field is the actual rudder angle. Add that mapping.
 
 - [ ] **Step 1: Write the failing test**
 
 In `packages/bridge/src/channel-mapper.test.ts`, add inside the `describe('mapPgnToSamples', ...)` block:
 
 ```ts
-  it('maps PGN 127245 rudder Position to boat.rudder.angle', () => {
-    const decoded = make(127245, { Instance: 0, Position: -0.12 });
-    const samples = mapPgnToSamples(decoded);
-    expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.RudderAngle]);
-    expect(samples[0]?.value).toEqual({ kind: 'scalar', value: -0.12, unit: 'rad' });
-  });
+it('maps PGN 127245 rudder Position to boat.rudder.angle', () => {
+  const decoded = make(127245, { Instance: 0, Position: -0.12 });
+  const samples = mapPgnToSamples(decoded);
+  expect(samples.map((s) => s.channel)).toEqual([Channels.Boat.RudderAngle]);
+  expect(samples[0]?.value).toEqual({ kind: 'scalar', value: -0.12, unit: 'rad' });
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -173,6 +177,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: `GrooveSettings` in ConfigStore
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts`
 - Modify: `packages/db/src/schema.ts`
 - Modify: `packages/db/src/config-store.ts`
@@ -248,13 +253,13 @@ export const grooveSettings = sqliteTable('groove_settings', {
 In `packages/db/src/config-store.test.ts`, add a test mirroring the existing crossover-settings test (find it with `grep -n crossover packages/db/src/config-store.test.ts` and copy its structure). The test:
 
 ```ts
-  it('seeds groove settings with defaults and round-trips a set', async () => {
-    const store = await openTestStore(); // use whatever helper the file already uses to open an in-memory store
-    expect(store.getGrooveSettings()).toEqual(DEFAULT_GROOVE_SETTINGS);
-    const next = { ...DEFAULT_GROOVE_SETTINGS, windowSec: 90 };
-    await store.setGrooveSettings(next);
-    expect(store.getGrooveSettings()).toEqual(next);
-  });
+it('seeds groove settings with defaults and round-trips a set', async () => {
+  const store = await openTestStore(); // use whatever helper the file already uses to open an in-memory store
+  expect(store.getGrooveSettings()).toEqual(DEFAULT_GROOVE_SETTINGS);
+  const next = { ...DEFAULT_GROOVE_SETTINGS, windowSec: 90 };
+  await store.setGrooveSettings(next);
+  expect(store.getGrooveSettings()).toEqual(next);
+});
 ```
 
 Import `DEFAULT_GROOVE_SETTINGS` at the top of the test file. If the file's store-open helper is named differently than `openTestStore`, use the existing one (check the crossover test).
@@ -273,15 +278,14 @@ In `packages/db/src/config-store.ts`:
 3. In `open()` where `crossover_settings` is loaded and seeded, add the analogous block for `groove_settings`:
 
 ```ts
-    const grooveRow = this.raw
-      .prepare('SELECT value FROM groove_settings WHERE boat_id = ?')
-      .get(this.__activeBoatId) as { value: string } | undefined;
-    const grooveLoaded = grooveRow ? (JSON.parse(grooveRow.value) as Partial<GrooveSettings>) : {};
-    this.subjects.grooveSettings.next({ ...DEFAULT_GROOVE_SETTINGS, ...grooveLoaded });
+const grooveRow = this.raw
+  .prepare('SELECT value FROM groove_settings WHERE boat_id = ?')
+  .get(this.__activeBoatId) as { value: string } | undefined;
+const grooveLoaded = grooveRow ? (JSON.parse(grooveRow.value) as Partial<GrooveSettings>) : {};
+this.subjects.grooveSettings.next({ ...DEFAULT_GROOVE_SETTINGS, ...grooveLoaded });
 ```
 
-   Ensure the `CREATE TABLE IF NOT EXISTS groove_settings (boat_id TEXT PRIMARY KEY, value TEXT NOT NULL)` runs where the other `CREATE TABLE IF NOT EXISTS crossover_settings (...)` runs.
-4. Add the accessors next to `crossoverSettings$`:
+Ensure the `CREATE TABLE IF NOT EXISTS groove_settings (boat_id TEXT PRIMARY KEY, value TEXT NOT NULL)` runs where the other `CREATE TABLE IF NOT EXISTS crossover_settings (...)` runs. 4. Add the accessors next to `crossoverSettings$`:
 
 ```ts
   get grooveSettings$(): Observable<GrooveSettings> {
@@ -322,6 +326,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Point-of-sail classifier
 
 **Files:**
+
 - Create: `packages/compute/src/groove/point-of-sail.ts`
 - Test: `packages/compute/src/groove/point-of-sail.test.ts`
 
@@ -344,10 +349,14 @@ const base = {
 
 describe('classifyPointOfSail', () => {
   it('returns not-sailing below the wind floor', () => {
-    expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, twsMs: 2 * KN })).toBe<PointOfSail>('not-sailing');
+    expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, twsMs: 2 * KN })).toBe<PointOfSail>(
+      'not-sailing',
+    );
   });
   it('returns not-sailing below steerage', () => {
-    expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, bspMs: 0.5 * KN })).toBe<PointOfSail>('not-sailing');
+    expect(
+      classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG, bspMs: 0.5 * KN }),
+    ).toBe<PointOfSail>('not-sailing');
   });
   it('classifies a beat as upwind', () => {
     expect(classifyPointOfSail({ ...base, twaAbsRad: 45 * DEG })).toBe<PointOfSail>('upwind');
@@ -420,6 +429,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 5: Rolling-window math
 
 **Files:**
+
 - Create: `packages/compute/src/groove/windows.ts`
 - Test: `packages/compute/src/groove/windows.test.ts`
 
@@ -457,9 +467,14 @@ describe('timeWeightedFraction', () => {
   it('is always within [0,1] (property)', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.record({ s: fc.integer({ min: 0, max: 1000 }), f: fc.boolean() }), { minLength: 2, maxLength: 50 }),
+        fc.array(fc.record({ s: fc.integer({ min: 0, max: 1000 }), f: fc.boolean() }), {
+          minLength: 2,
+          maxLength: 50,
+        }),
         (xs) => {
-          const sorted = xs.map((x, i) => ({ t_ns: ns(x.s + i * 0.001), flag: x.f })).sort((a, b) => Number(a.t_ns - b.t_ns));
+          const sorted = xs
+            .map((x, i) => ({ t_ns: ns(x.s + i * 0.001), flag: x.f }))
+            .sort((a, b) => Number(a.t_ns - b.t_ns));
           const r = timeWeightedFraction(sorted);
           return r === null || (r >= 0 && r <= 1);
         },
@@ -481,10 +496,16 @@ describe('circularStdDev', () => {
   });
   it('is non-negative (property)', () => {
     fc.assert(
-      fc.property(fc.array(fc.double({ min: -Math.PI, max: Math.PI, noNaN: true }), { minLength: 1, maxLength: 50 }), (xs) => {
-        const sd = circularStdDev(xs);
-        return sd !== null && sd >= 0;
-      }),
+      fc.property(
+        fc.array(fc.double({ min: -Math.PI, max: Math.PI, noNaN: true }), {
+          minLength: 1,
+          maxLength: 50,
+        }),
+        (xs) => {
+          const sd = circularStdDev(xs);
+          return sd !== null && sd >= 0;
+        },
+      ),
     );
   });
 });
@@ -619,7 +640,10 @@ export function coefficientOfVariation(values: ReadonlyArray<number>): number | 
  * deltas whose magnitude is below the dead-band. Null with < 2 samples or
  * zero span.
  */
-export function reversalsPerMinute(samples: ReadonlyArray<NumSample>, deadband: number): number | null {
+export function reversalsPerMinute(
+  samples: ReadonlyArray<NumSample>,
+  deadband: number,
+): number | null {
   if (samples.length < 2) return null;
   const span = secondsBetween(samples[0]!.t_ns, samples[samples.length - 1]!.t_ns);
   if (span <= 0) return null;
@@ -649,7 +673,10 @@ export function maxRisingSlope(samples: ReadonlyArray<NumSample>): number | null
 }
 
 /** Drop samples older than `cutoff_ns`. Returns a new array. */
-export function pruneBefore<T extends { t_ns: bigint }>(samples: ReadonlyArray<T>, cutoff_ns: bigint): T[] {
+export function pruneBefore<T extends { t_ns: bigint }>(
+  samples: ReadonlyArray<T>,
+  cutoff_ns: bigint,
+): T[] {
   return samples.filter((s) => s.t_ns >= cutoff_ns);
 }
 ```
@@ -673,6 +700,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 6: Leeway model
 
 **Files:**
+
 - Create: `packages/compute/src/groove/leeway.ts`
 - Test: `packages/compute/src/groove/leeway.test.ts`
 
@@ -688,14 +716,23 @@ describe('leewayRad', () => {
   });
   it('follows λ = k·heel / STW²', () => {
     // k=4, heel=0.1, stw=2 → 4*0.1/4 = 0.1
-    expect(leewayRad({ heelRad: 0.1, stwMs: 2, k: 4, maxRad: 1, stwFloorMs: 0.5 })).toBeCloseTo(0.1, 9);
+    expect(leewayRad({ heelRad: 0.1, stwMs: 2, k: 4, maxRad: 1, stwFloorMs: 0.5 })).toBeCloseTo(
+      0.1,
+      9,
+    );
   });
   it('clamps the STW floor to avoid blow-up at low speed', () => {
     // stw below floor → uses floor 0.5 → 4*0.1/0.25 = 1.6, clamped to maxRad 0.2
-    expect(leewayRad({ heelRad: 0.1, stwMs: 0.1, k: 4, maxRad: 0.2, stwFloorMs: 0.5 })).toBeCloseTo(0.2, 9);
+    expect(leewayRad({ heelRad: 0.1, stwMs: 0.1, k: 4, maxRad: 0.2, stwFloorMs: 0.5 })).toBeCloseTo(
+      0.2,
+      9,
+    );
   });
   it('preserves heel sign and clamps magnitude', () => {
-    expect(leewayRad({ heelRad: -0.5, stwMs: 1, k: 10, maxRad: 0.2, stwFloorMs: 0.5 })).toBeCloseTo(-0.2, 9);
+    expect(leewayRad({ heelRad: -0.5, stwMs: 1, k: 10, maxRad: 0.2, stwFloorMs: 0.5 })).toBeCloseTo(
+      -0.2,
+      9,
+    );
   });
 });
 ```
@@ -751,6 +788,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 7: Metric formulas (in-groove, VMG-efficiency, VMG, target-Δ)
 
 **Files:**
+
 - Create: `packages/compute/src/groove/metrics.ts`
 - Test: `packages/compute/src/groove/metrics.test.ts`
 
@@ -774,35 +812,118 @@ describe('targetTwaErrorRad', () => {
 describe('isInGroove', () => {
   const s = { toleranceRad: 5 * DEG, speedFraction: 0.95 };
   it('upwind: requires angle band AND speed', () => {
-    expect(isInGroove({ pointOfSail: 'upwind', twaAbsRad: 44 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 6, ...s })).toBe(true);
-    expect(isInGroove({ pointOfSail: 'upwind', twaAbsRad: 50 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 6, ...s })).toBe(false); // angle out
-    expect(isInGroove({ pointOfSail: 'upwind', twaAbsRad: 44 * DEG, targetTwaRad: 42 * DEG, bspMs: 5, targetSpeedMs: 6, ...s })).toBe(false); // slow
+    expect(
+      isInGroove({
+        pointOfSail: 'upwind',
+        twaAbsRad: 44 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 6,
+        ...s,
+      }),
+    ).toBe(true);
+    expect(
+      isInGroove({
+        pointOfSail: 'upwind',
+        twaAbsRad: 50 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 6,
+        ...s,
+      }),
+    ).toBe(false); // angle out
+    expect(
+      isInGroove({
+        pointOfSail: 'upwind',
+        twaAbsRad: 44 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 5,
+        targetSpeedMs: 6,
+        ...s,
+      }),
+    ).toBe(false); // slow
   });
   it('reaching: speed only (angle is set by course)', () => {
-    expect(isInGroove({ pointOfSail: 'reaching', twaAbsRad: 90 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 6, ...s })).toBe(true);
+    expect(
+      isInGroove({
+        pointOfSail: 'reaching',
+        twaAbsRad: 90 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 6,
+        ...s,
+      }),
+    ).toBe(true);
   });
   it('not-sailing: null', () => {
-    expect(isInGroove({ pointOfSail: 'not-sailing', twaAbsRad: 90 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 6, ...s })).toBeNull();
+    expect(
+      isInGroove({
+        pointOfSail: 'not-sailing',
+        twaAbsRad: 90 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 6,
+        ...s,
+      }),
+    ).toBeNull();
   });
 });
 
 describe('vmgEfficiencyPct', () => {
   it('upwind: ratio of actual VMG to target VMG', () => {
     // both at 42°, bsp=target → 100%
-    expect(vmgEfficiencyPct({ pointOfSail: 'upwind', twaRad: 42 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 6 })).toBeCloseTo(100, 4);
+    expect(
+      vmgEfficiencyPct({
+        pointOfSail: 'upwind',
+        twaRad: 42 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 6,
+      }),
+    ).toBeCloseTo(100, 4);
   });
   it('downwind: valid (both cos terms negative)', () => {
-    const v = vmgEfficiencyPct({ pointOfSail: 'downwind', twaRad: 150 * DEG, targetTwaRad: 150 * DEG, bspMs: 7, targetSpeedMs: 7 });
+    const v = vmgEfficiencyPct({
+      pointOfSail: 'downwind',
+      twaRad: 150 * DEG,
+      targetTwaRad: 150 * DEG,
+      bspMs: 7,
+      targetSpeedMs: 7,
+    });
     expect(v).toBeCloseTo(100, 4);
   });
   it('reaching: plain speed ratio', () => {
-    expect(vmgEfficiencyPct({ pointOfSail: 'reaching', twaRad: 90 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 8 })).toBeCloseTo(75, 4);
+    expect(
+      vmgEfficiencyPct({
+        pointOfSail: 'reaching',
+        twaRad: 90 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 8,
+      }),
+    ).toBeCloseTo(75, 4);
   });
   it('clamps to [0,120]', () => {
-    expect(vmgEfficiencyPct({ pointOfSail: 'reaching', twaRad: 90 * DEG, targetTwaRad: 42 * DEG, bspMs: 100, targetSpeedMs: 6 })).toBe(120);
+    expect(
+      vmgEfficiencyPct({
+        pointOfSail: 'reaching',
+        twaRad: 90 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 100,
+        targetSpeedMs: 6,
+      }),
+    ).toBe(120);
   });
   it('null when target speed is non-positive', () => {
-    expect(vmgEfficiencyPct({ pointOfSail: 'upwind', twaRad: 42 * DEG, targetTwaRad: 42 * DEG, bspMs: 6, targetSpeedMs: 0 })).toBeNull();
+    expect(
+      vmgEfficiencyPct({
+        pointOfSail: 'upwind',
+        twaRad: 42 * DEG,
+        targetTwaRad: 42 * DEG,
+        bspMs: 6,
+        targetSpeedMs: 0,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -902,6 +1023,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 8: Groove compute pipeline
 
 **Files:**
+
 - Create: `packages/compute/src/groove/pipeline.ts`
 - Test: `packages/compute/src/groove/pipeline.test.ts`
 
@@ -920,10 +1042,20 @@ const DEG = Math.PI / 180;
 const KN = 0.514444;
 
 function scalar(channel: string, value: number, t: number): Sample {
-  return { channel, t_ns: BigInt(Math.round(t * 1e9)), value: { kind: 'scalar', value }, source: 'test' };
+  return {
+    channel,
+    t_ns: BigInt(Math.round(t * 1e9)),
+    value: { kind: 'scalar', value },
+    source: 'test',
+  };
 }
 function enumSample(channel: string, value: string, t: number): Sample {
-  return { channel, t_ns: BigInt(Math.round(t * 1e9)), value: { kind: 'enum', value }, source: 'test' };
+  return {
+    channel,
+    t_ns: BigInt(Math.round(t * 1e9)),
+    value: { kind: 'enum', value },
+    source: 'test',
+  };
 }
 
 describe('groove pipeline', () => {
@@ -971,7 +1103,10 @@ describe('groove pipeline', () => {
       bus.publish(scalar(Channels.Boat.SpeedWater, 6, t));
       bus.publish(scalar(Channels.Wind.TrueAngle, 44 * DEG, t));
     }
-    expect(seen.get(Channels.Groove.PointOfSail)?.value).toEqual({ kind: 'enum', value: 'not-sailing' });
+    expect(seen.get(Channels.Groove.PointOfSail)?.value).toEqual({
+      kind: 'enum',
+      value: 'not-sailing',
+    });
     expect(seen.has(Channels.Groove.TimeInGroove)).toBe(false);
     expect(seen.has(Channels.Groove.VmgEfficiency)).toBe(false);
     handle.dispose();
@@ -991,7 +1126,10 @@ describe('groove pipeline', () => {
     bus.publish(scalar(Channels.Boat.SpeedWater, 6, 0.1));
     bus.publish(scalar(Channels.Wind.TrueAngle, 44 * DEG, 0.1));
 
-    expect(seen.get(Channels.Groove.HelmSource)?.value).toEqual({ kind: 'enum', value: 'autopilot' });
+    expect(seen.get(Channels.Groove.HelmSource)?.value).toEqual({
+      kind: 'enum',
+      value: 'autopilot',
+    });
     handle.dispose();
   });
 });
@@ -1050,7 +1188,10 @@ interface Latest {
   apModeT_ns?: bigint;
 }
 
-export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettingsRef): GroovePipelineHandle {
+export function startGrooveComputePipeline(
+  bus: Bus,
+  settingsRef: GrooveSettingsRef,
+): GroovePipelineHandle {
   const latest: Latest = {};
   const inGrooveBuf: FlagSample[] = [];
   const twaBuf: NumSample[] = [];
@@ -1086,7 +1227,11 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
 
     // Helm source (always publishable).
     let helmSource: 'human' | 'autopilot' = 'human';
-    if (latest.apMode !== undefined && latest.apModeT_ns !== undefined && isApEngaged(latest.apMode)) {
+    if (
+      latest.apMode !== undefined &&
+      latest.apModeT_ns !== undefined &&
+      isApEngaged(latest.apMode)
+    ) {
       const apAgeS = Number(t_ns - latest.apModeT_ns) / 1e9;
       if (apAgeS >= 0 && apAgeS <= s.helmSourceTtlSec) helmSource = 'autopilot';
     }
@@ -1123,7 +1268,12 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     publishEnum(Channels.Groove.PointOfSail, pos, t_ns);
 
     // Suppress sailing-specific metrics when not-sailing or no target.
-    if (pos === 'not-sailing' || latest.targetSpeed === undefined || latest.targetTwa === undefined || latest.targetSpeed <= 0) {
+    if (
+      pos === 'not-sailing' ||
+      latest.targetSpeed === undefined ||
+      latest.targetTwa === undefined ||
+      latest.targetSpeed <= 0
+    ) {
       // Clear in-groove accumulation so a motoring gap doesn't bleed into the next leg.
       inGrooveBuf.length = 0;
       twaBuf.length = 0;
@@ -1131,7 +1281,8 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
       return;
     }
 
-    const tolerance = s.twaToleranceDeg * DEG * (pos === 'downwind' ? s.downwindToleranceFactor : 1);
+    const tolerance =
+      s.twaToleranceDeg * DEG * (pos === 'downwind' ? s.downwindToleranceFactor : 1);
 
     const flag = isInGroove({
       pointOfSail: pos,
@@ -1159,7 +1310,12 @@ export function startGrooveComputePipeline(bus: Bus, settingsRef: GrooveSettings
     if (eff !== null) publishScalar(Channels.Groove.VmgEfficiency, eff, t_ns, '%');
 
     publishScalar(Channels.Groove.Vmg, vmgMs(latest.bsp, latest.twa), t_ns, 'm/s');
-    publishScalar(Channels.Groove.TargetTwaError, targetTwaErrorRad(twaAbs, latest.targetTwa), t_ns, 'rad');
+    publishScalar(
+      Channels.Groove.TargetTwaError,
+      targetTwaErrorRad(twaAbs, latest.targetTwa),
+      t_ns,
+      'rad',
+    );
 
     // TWA steadiness + speed CV over the window.
     twaBuf.push({ t_ns, value: latest.twa });
@@ -1256,6 +1412,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 9: Barrel export + package subpath
 
 **Files:**
+
 - Create: `packages/compute/src/groove/index.ts`
 - Modify: `packages/compute/package.json`
 
@@ -1264,7 +1421,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 `packages/compute/src/groove/index.ts`:
 
 ```ts
-export { startGrooveComputePipeline, type GroovePipelineHandle, type GrooveSettingsRef } from './pipeline.js';
+export {
+  startGrooveComputePipeline,
+  type GroovePipelineHandle,
+  type GrooveSettingsRef,
+} from './pipeline.js';
 export { classifyPointOfSail, type PointOfSail } from './point-of-sail.js';
 export { isInGroove, vmgEfficiencyPct, vmgMs, targetTwaErrorRad } from './metrics.js';
 export { leewayRad } from './leeway.js';
@@ -1305,6 +1466,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 10: Boot wiring (groove subsystem)
 
 **Files:**
+
 - Create: `apps/g5000/src/groove-subsystem.ts`
 - Modify: `apps/g5000/src/index.ts:204-205`
 
@@ -1322,7 +1484,10 @@ import { startGrooveComputePipeline, type GrooveSettingsRef } from '@g5000/compu
  * integration tests exercise the same path. Settings are read through a ref
  * that tracks ConfigStore, so a settings change applies on the next sample.
  */
-export async function startGrooveSubsystem(deps: { bus: Bus; store: ConfigStore }): Promise<() => Promise<void>> {
+export async function startGrooveSubsystem(deps: {
+  bus: Bus;
+  store: ConfigStore;
+}): Promise<() => Promise<void>> {
   const { bus, store } = deps;
   const settingsRef: GrooveSettingsRef = { current: store.getGrooveSettings() };
   const sub = store.grooveSettings$.subscribe((s: GrooveSettings) => {
@@ -1349,15 +1514,15 @@ import { startGrooveSubsystem } from './groove-subsystem.js';
 Then immediately after the existing lines 204-205:
 
 ```ts
-  const stopRaceSubsystem = await startRaceSubsystem({ bus, store });
-  teardown.push(stopRaceSubsystem);
+const stopRaceSubsystem = await startRaceSubsystem({ bus, store });
+teardown.push(stopRaceSubsystem);
 ```
 
 add:
 
 ```ts
-  const stopGrooveSubsystem = await startGrooveSubsystem({ bus, store });
-  teardown.push(stopGrooveSubsystem);
+const stopGrooveSubsystem = await startGrooveSubsystem({ bus, store });
+teardown.push(stopGrooveSubsystem);
 ```
 
 - [ ] **Step 3: Build the app**
@@ -1379,6 +1544,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 11: Helm view groove tiles
 
 **Files:**
+
 - Modify: `packages/web/src/app/helm/page.tsx`
 
 Reuse the existing `HelmTile` component and the `useSse()` hook (returns `channels: Map<string, JsonSafeSample>`).
@@ -1395,7 +1561,11 @@ Add these helpers near the top of the component module (after imports), adjustin
 ```tsx
 const RAD_TO_DEG = 180 / Math.PI;
 
-function grooveSeverity(pct: number | null, good: number, ok: number): 'good' | 'ok' | 'bad' | 'neutral' {
+function grooveSeverity(
+  pct: number | null,
+  good: number,
+  ok: number,
+): 'good' | 'ok' | 'bad' | 'neutral' {
   if (pct === null) return 'neutral';
   if (pct >= good) return 'good';
   if (pct >= ok) return 'ok';
@@ -1406,50 +1576,52 @@ function grooveSeverity(pct: number | null, good: number, ok: number): 'good' | 
 In the JSX, add a groove cluster (read from the `channels` map the page already has). Example block:
 
 ```tsx
-{(() => {
-  const num = (ch: string): number | null => {
-    const v = channels.get(ch)?.value;
-    return v && v.kind === 'scalar' ? v.value : null;
-  };
-  const str = (ch: string): string | null => {
-    const v = channels.get(ch)?.value;
-    return v && v.kind === 'enum' ? v.value : null;
-  };
-  const tig = num('groove.timeInGroove');
-  const eff = num('groove.vmgEfficiency');
-  const steadiness = num('groove.twaSteadiness');
-  const effort = num('groove.steeringEffort');
-  const pos = str('groove.pointOfSail');
-  const helm = str('groove.helmSource');
-  const steerLabel = helm === 'autopilot' ? 'Pilot activity' : 'Helm steadiness';
-  return (
-    <>
-      <HelmTile
-        label="In groove"
-        value={tig === null ? '—' : tig.toFixed(0)}
-        unit={tig === null ? undefined : '%'}
-        severity={grooveSeverity(tig, 80, 50)}
-        sub={pos ?? undefined}
-      />
-      <HelmTile
-        label="VMG eff"
-        value={eff === null ? '—' : eff.toFixed(0)}
-        unit={eff === null ? undefined : '%'}
-        severity={grooveSeverity(eff, 98, 90)}
-      />
-      <HelmTile
-        label={steerLabel}
-        small
-        value={steadiness === null ? '—' : (steadiness * RAD_TO_DEG).toFixed(1)}
-        unit={steadiness === null ? undefined : '°σ'}
-      >
-        {effort !== null && (
-          <div className="text-xs text-slate-500">{effort.toFixed(0)} corr·min⁻¹</div>
-        )}
-      </HelmTile>
-    </>
-  );
-})()}
+{
+  (() => {
+    const num = (ch: string): number | null => {
+      const v = channels.get(ch)?.value;
+      return v && v.kind === 'scalar' ? v.value : null;
+    };
+    const str = (ch: string): string | null => {
+      const v = channels.get(ch)?.value;
+      return v && v.kind === 'enum' ? v.value : null;
+    };
+    const tig = num('groove.timeInGroove');
+    const eff = num('groove.vmgEfficiency');
+    const steadiness = num('groove.twaSteadiness');
+    const effort = num('groove.steeringEffort');
+    const pos = str('groove.pointOfSail');
+    const helm = str('groove.helmSource');
+    const steerLabel = helm === 'autopilot' ? 'Pilot activity' : 'Helm steadiness';
+    return (
+      <>
+        <HelmTile
+          label="In groove"
+          value={tig === null ? '—' : tig.toFixed(0)}
+          unit={tig === null ? undefined : '%'}
+          severity={grooveSeverity(tig, 80, 50)}
+          sub={pos ?? undefined}
+        />
+        <HelmTile
+          label="VMG eff"
+          value={eff === null ? '—' : eff.toFixed(0)}
+          unit={eff === null ? undefined : '%'}
+          severity={grooveSeverity(eff, 98, 90)}
+        />
+        <HelmTile
+          label={steerLabel}
+          small
+          value={steadiness === null ? '—' : (steadiness * RAD_TO_DEG).toFixed(1)}
+          unit={steadiness === null ? undefined : '°σ'}
+        >
+          {effort !== null && (
+            <div className="text-xs text-slate-500">{effort.toFixed(0)} corr·min⁻¹</div>
+          )}
+        </HelmTile>
+      </>
+    );
+  })();
+}
 ```
 
 Place this inside the same tile grid container the page already uses.
@@ -1477,6 +1649,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 12: Mast display formatting for groove channels
 
 **Files:**
+
 - Modify: the mast tile value formatter (locate in Step 1)
 
 The mast layout editor already lists `groove.*` channels automatically (via `knownChannelSet()`), and per-cell threshold colours already exist. This task ensures the numeric formatter renders the new channels with sensible units.
@@ -1489,6 +1662,7 @@ Identify the function that converts a channel `{kind:'scalar', value, unit}` sam
 - [ ] **Step 2: Extend the formatter**
 
 Add cases so that:
+
 - `groove.timeInGroove`, `groove.vmgEfficiency` → render the raw value with 0 decimals and a `%` suffix (value is already a percentage; do **not** convert).
 - `groove.twaSteadiness`, `groove.targetTwaError`, `boat.leeway` → convert radians→degrees (multiply by `180/Math.PI`), 1 decimal, `°` suffix.
 - `groove.steeringEffort` → raw value, 0 decimals, `/min` suffix.
@@ -1521,6 +1695,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 13: Correct the stale heel-sensor doc + full build/test
 
 **Files:**
+
 - Modify: `docs/design/hercules-feature-notes.md:82`
 
 - [ ] **Step 1: Fix the stale claim**
@@ -1551,6 +1726,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Self-Review
 
 **Spec coverage (Phase 0 + Phase 1 core):**
+
 - Rudder mapping → Task 2. ✅
 - Leeway model + `boat.leeway` → Task 6 (pure) + Task 8 (publish). Wiring leeway into `current/math.ts` is intentionally deferred until `leewayK` is calibrated (default 0); noted here as the one deferred Phase-0 item.
 - Channel constants / mast selectability → Task 1.

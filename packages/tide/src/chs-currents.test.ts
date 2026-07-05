@@ -1,13 +1,34 @@
 import { describe, it, expect } from 'vitest';
-import { parseChsCurrentStations, parseChsCurrentSeries, parseChsCurrentEvents } from './chs-currents.js';
+import {
+  parseChsCurrentStations,
+  parseChsCurrentSeries,
+  parseChsCurrentEvents,
+} from './chs-currents.js';
 
 describe('parseChsCurrentStations', () => {
   it('keeps stations with both wcsp1 and wcdp1', () => {
     const json = [
-      { id: 'a', officialName: 'Big Bras dOr', latitude: 46.28, longitude: -60.42,
-        timeSeries: [{ code: 'wcsp1' }, { code: 'wcdp1' }, { code: 'wcp1-events' }] },
-      { id: 'b', officialName: 'SpeedOnly', latitude: 50, longitude: -60, timeSeries: [{ code: 'wcsp1' }] },
-      { id: 'c', officialName: 'Tide', latitude: 50, longitude: -60, timeSeries: [{ code: 'wlp-hilo' }] },
+      {
+        id: 'a',
+        officialName: 'Big Bras dOr',
+        latitude: 46.28,
+        longitude: -60.42,
+        timeSeries: [{ code: 'wcsp1' }, { code: 'wcdp1' }, { code: 'wcp1-events' }],
+      },
+      {
+        id: 'b',
+        officialName: 'SpeedOnly',
+        latitude: 50,
+        longitude: -60,
+        timeSeries: [{ code: 'wcsp1' }],
+      },
+      {
+        id: 'c',
+        officialName: 'Tide',
+        latitude: 50,
+        longitude: -60,
+        timeSeries: [{ code: 'wlp-hilo' }],
+      },
     ];
     expect(parseChsCurrentStations(json)).toEqual([
       { id: 'a', name: 'Big Bras dOr', lat: 46.28, lon: -60.42 },

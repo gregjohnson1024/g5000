@@ -11,7 +11,10 @@ export async function GET(req: Request): Promise<NextResponse> {
   const stationId = url.searchParams.get('stationId');
   const sourceId = url.searchParams.get('source');
   if (!stationId || !sourceId) {
-    return NextResponse.json({ ok: false, error: 'stationId and source required' }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: 'stationId and source required' },
+      { status: 400 },
+    );
   }
   const sources = createTideSources({ getAdmiraltyKey: () => process.env.ADMIRALTY_TIDAL_API_KEY });
   const source = getTideSource(sources, sourceId);

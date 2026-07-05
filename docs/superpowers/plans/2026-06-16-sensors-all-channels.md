@@ -13,6 +13,7 @@
 **Branch:** all work on `feature/sensors-all-channels` (from `develop`).
 
 **Context — current state (verified):**
+
 - `SensorCard.tsx` currently inlines the per-channel block (headline + `Auto`/source radio group) and imports `formatChannelValue`, `deviceLabel`/`DeviceLabelInfo`, `pinnedSourceForChannel`/`setPinnedSource`, `groupSourcesByChannel`, `freshnessOf`/`Freshness`, `SensorDef`, `ObservedEntry`.
 - `sensor-definitions.ts` exports `SENSOR_DEFS` (`{ id; label; channels: string[]; usedBy: string[]; calPage?: {...} }[]`).
 - Helpers already present and reused: `groupSourcesByChannel(entries) → Map<string, ObservedEntry[]>` (sorted by source), `pinnedSourceForChannel`/`setPinnedSource` (`packages/web/src/lib/source-pin.ts`), `deviceLabel`/`DeviceLabelInfo`, `formatChannelValue`, `freshnessOf`/`Freshness`, `ObservedEntry` (`./sensors-types`), `SourcePriorityRule` (`@g5000/core`).
@@ -22,6 +23,7 @@
 ### Task 1: `channel-label.ts` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/lib/channel-label.ts`
 - Test: `packages/web/src/lib/channel-label.test.ts`
 
@@ -80,8 +82,22 @@ Create `packages/web/src/lib/channel-label.ts`:
 ```ts
 /** Lower-case tokens to render upper-case in channel labels. */
 const ACRONYMS = new Set([
-  'gps', 'cog', 'sog', 'vmg', 'twa', 'tws', 'twd', 'awa', 'aws', 'ais', 'imu', 'eta', 'hdg',
-  'xte', 'rpm', 'utc',
+  'gps',
+  'cog',
+  'sog',
+  'vmg',
+  'twa',
+  'tws',
+  'twd',
+  'awa',
+  'aws',
+  'ais',
+  'imu',
+  'eta',
+  'hdg',
+  'xte',
+  'rpm',
+  'utc',
 ]);
 
 /** Channels whose path-derived label reads poorly. */
@@ -148,6 +164,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Extract `ChannelPanel` and refactor `SensorCard`
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/ChannelPanel.tsx`
 - Modify: `packages/web/src/app/sensors/SensorCard.tsx` (full replacement)
 
@@ -309,7 +326,14 @@ const DOT_COLOR: Record<Freshness, string> = {
  * One curated sensor's card on /sensors: a freshness dot + name, a
  * ChannelPanel per channel (value + pin), and the "used by" / cal-page extras.
  */
-export function SensorCard({ def, observed, rules, devices, saving, onSaveRules }: SensorCardProps) {
+export function SensorCard({
+  def,
+  observed,
+  rules,
+  devices,
+  saving,
+  onSaveRules,
+}: SensorCardProps) {
   const own = observed.filter((e) => def.channels.includes(e.channel));
   const minAge = own.length === 0 ? null : Math.min(...own.map((e) => e.ageMs));
   const dot = freshnessOf(minAge);
@@ -388,6 +412,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: `AllChannels` section + wire into the page
 
 **Files:**
+
 - Create: `packages/web/src/app/sensors/AllChannels.tsx`
 - Modify: `packages/web/src/app/sensors/page.tsx`
 
@@ -467,19 +492,21 @@ export function AllChannels({ observed, rules, devices, saving, onSaveRules }: A
 - [ ] **Step 2: Wire it into `page.tsx`**
 
 Add the import after the existing `import { SensorCard } from './SensorCard';` line:
+
 ```ts
 import { AllChannels } from './AllChannels';
 ```
 
 In the JSX, immediately after the `{SENSOR_DEFS.map((def) => ( <SensorCard ... /> ))}` block (and before the closing `</main>`), add:
+
 ```tsx
-      <AllChannels
-        observed={observed}
-        rules={rules}
-        devices={devices}
-        saving={saving}
-        onSaveRules={onSaveRules}
-      />
+<AllChannels
+  observed={observed}
+  rules={rules}
+  devices={devices}
+  saving={saving}
+  onSaveRules={onSaveRules}
+/>
 ```
 
 - [ ] **Step 3: Run the full gates**
@@ -489,6 +516,7 @@ cd /Users/gregjohnson/code/g5000 && npx tsc -b
 cd /Users/gregjohnson/code/g5000 && npx vitest run packages/web/src/lib/channel-label.test.ts packages/web/src/lib/source-pin.test.ts packages/web/src/lib/device-label.test.ts packages/web/src/app/sensors/group-sources.test.ts
 cd /Users/gregjohnson/code/g5000/packages/web && npm run build
 ```
+
 Expected: `tsc -b` exit 0; tests pass (6 + 7 + 8 + 3 = 24); `npm run build` succeeds with `/sensors` in the route manifest.
 
 - [ ] **Step 4: Commit**

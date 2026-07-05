@@ -95,7 +95,17 @@ map.addLayer({
   layout: { 'line-join': 'round' },
   paint: {
     // keep the existing depth-graduated cyan -> navy ramp
-    'line-color': ['step', ['get', 'depth'], '#7dd3fc', 50, '#38bdf8', 200, '#2563eb', 1000, '#1e3a8a'],
+    'line-color': [
+      'step',
+      ['get', 'depth'],
+      '#7dd3fc',
+      50,
+      '#38bdf8',
+      200,
+      '#2563eb',
+      1000,
+      '#1e3a8a',
+    ],
     // thicker for major isobaths
     'line-width': ['case', ['>=', ['get', 'depth'], 200], 1.6, 0.8],
     'line-opacity': ['case', ['>=', ['get', 'depth'], 200], 0.9, 0.6],
@@ -104,6 +114,7 @@ map.addLayer({
 ```
 
 Notes:
+
 - The `ensure()` + `styledata` retry + visibility-toggle pattern stays; only the
   source type and the data plumbing change.
 - **Per-feature minzoom is already in the tiles**, so you don't need a zoom

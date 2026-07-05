@@ -30,6 +30,7 @@ import { wireAlarmPush } from './alarm-push.js';
 import { createLiveFactory, createDemoFactory, type BaseTeardownHolder } from './live-factory.js';
 import { startRaceSubsystem } from './race-subsystem.js';
 import { startGrooveSubsystem } from './groove-subsystem.js';
+import { startVictron } from './victron.js';
 import { startTideSubsystem } from './tide-subsystem.js';
 import { startHlink, startWebServer } from './server-setup.js';
 import { startRadarStatusPoller } from './radar/status-poller.js';
@@ -134,6 +135,10 @@ async function main(): Promise<void> {
     aisRegistry.evictStale(AIS_MAX_AGE_MS);
   }, 15_000);
   teardown.push(async () => clearInterval(aisEvictTimer));
+
+  // Victron Venus OS (Cerbo) — battery/solar/tanks/temps via MQTT (or sim).
+  const stopVictron = startVictron(bus);
+  teardown.push(async () => stopVictron());
 
   // Ship's log hourly auto-logger. Persists a position snapshot every hour
   // so the narrative log doesn't depend on someone remembering to write

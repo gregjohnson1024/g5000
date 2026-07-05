@@ -12,25 +12,26 @@
 
 ## File Structure
 
-| File | Responsibility | Change |
-|------|----------------|--------|
-| `packages/routing/src/types.ts` | Route type | Modify: add `incompleteVia?` |
-| `packages/routing/src/plan-via.ts` | `planVia` orchestrator | Create |
-| `packages/routing/src/plan-via.test.ts` | Engine tests | Create |
-| `packages/routing/src/index.ts` | Package exports | Modify: export `planVia` |
-| `packages/web/src/lib/route-bbox.ts` | Pure bbox-from-N-points helper | Create |
-| `packages/web/src/lib/route-bbox.test.ts` | Bbox helper test | Create |
-| `packages/web/src/app/api/route/plan/route.ts` | Plan API | Modify: accept `via`, widen bbox, dispatch to `planVia` |
-| `packages/web/src/lib/plan-via.ts` | Pure saved-route → ordered-points resolver | Create |
-| `packages/web/src/lib/plan-via.test.ts` | Resolver test | Create |
-| `packages/web/src/components/PlanControls.tsx` | Plan controls | Modify: `via` in `PlanParams`, thread through |
-| `packages/web/src/app/chart/RoutePlanPanel.tsx` | Chart plan panel | Modify: mode switch, saved-route + ad-hoc via, send `via` |
+| File                                            | Responsibility                             | Change                                                    |
+| ----------------------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| `packages/routing/src/types.ts`                 | Route type                                 | Modify: add `incompleteVia?`                              |
+| `packages/routing/src/plan-via.ts`              | `planVia` orchestrator                     | Create                                                    |
+| `packages/routing/src/plan-via.test.ts`         | Engine tests                               | Create                                                    |
+| `packages/routing/src/index.ts`                 | Package exports                            | Modify: export `planVia`                                  |
+| `packages/web/src/lib/route-bbox.ts`            | Pure bbox-from-N-points helper             | Create                                                    |
+| `packages/web/src/lib/route-bbox.test.ts`       | Bbox helper test                           | Create                                                    |
+| `packages/web/src/app/api/route/plan/route.ts`  | Plan API                                   | Modify: accept `via`, widen bbox, dispatch to `planVia`   |
+| `packages/web/src/lib/plan-via.ts`              | Pure saved-route → ordered-points resolver | Create                                                    |
+| `packages/web/src/lib/plan-via.test.ts`         | Resolver test                              | Create                                                    |
+| `packages/web/src/components/PlanControls.tsx`  | Plan controls                              | Modify: `via` in `PlanParams`, thread through             |
+| `packages/web/src/app/chart/RoutePlanPanel.tsx` | Chart plan panel                           | Modify: mode switch, saved-route + ad-hoc via, send `via` |
 
 ---
 
 ## Task 1: `planVia` engine + types
 
 **Files:**
+
 - Modify: `packages/routing/src/types.ts`
 - Create: `packages/routing/src/plan-via.ts`
 - Create: `packages/routing/src/plan-via.test.ts`
@@ -137,10 +138,9 @@ describe('planVia', () => {
 
     // Budget covers segment 0 but not segment 1 ⇒ fails at via index 1.
     // (Proves the budget is shared, not per-segment.)
-    const r1 = planVia(
-      baseInput({ options: { avoidLand: false, maxHours: t0h + t1h / 2 } }),
-      [MID],
-    );
+    const r1 = planVia(baseInput({ options: { avoidLand: false, maxHours: t0h + t1h / 2 } }), [
+      MID,
+    ]);
     expect(r1.incomplete).toBe(true);
     expect(r1.incompleteVia).toBe(1);
   });
@@ -252,6 +252,7 @@ git commit -m "feat(routing): planVia() — leg-by-leg routing through waypoints
 ## Task 2: API `via` support + bbox helper
 
 **Files:**
+
 - Create: `packages/web/src/lib/route-bbox.ts`
 - Create: `packages/web/src/lib/route-bbox.test.ts`
 - Modify: `packages/web/src/app/api/route/plan/route.ts`
@@ -266,14 +267,24 @@ import { boundingBoxFor } from './route-bbox.js';
 
 describe('boundingBoxFor', () => {
   it('encloses a single start/end pair with the buffer', () => {
-    const b = boundingBoxFor([{ lat: 38, lon: -64 }, { lat: 40, lon: -62 }], 2);
+    const b = boundingBoxFor(
+      [
+        { lat: 38, lon: -64 },
+        { lat: 40, lon: -62 },
+      ],
+      2,
+    );
     expect(b).toEqual({ latMin: 36, latMax: 42, lonMin: -66, lonMax: -60 });
   });
 
   it('expands to enclose intermediate waypoints off the direct line', () => {
     // A via point west of both endpoints must widen lonMin.
     const b = boundingBoxFor(
-      [{ lat: 38, lon: -64 }, { lat: 41, lon: -71 }, { lat: 40, lon: -62 }],
+      [
+        { lat: 38, lon: -64 },
+        { lat: 41, lon: -71 },
+        { lat: 40, lon: -62 },
+      ],
       2,
     );
     expect(b.latMin).toBe(36);
@@ -333,6 +344,7 @@ In `packages/web/src/app/api/route/plan/route.ts`:
 ```ts
 import { plan, planVia } from '@g5000/routing';
 ```
+
 ```ts
 import { boundingBoxFor } from '../../../../lib/route-bbox';
 ```
@@ -346,48 +358,47 @@ import { boundingBoxFor } from '../../../../lib/route-bbox';
 (c) Replace the `bboxAround` function (currently lines 27-35) with a call to the shared helper. Delete `bboxAround` and, inside `POST`, replace `const bbox = bboxAround(b.start, b.end);` with:
 
 ```ts
-    const bbox = boundingBoxFor([b.start, ...(b.via ?? []), b.end], 2);
+const bbox = boundingBoxFor([b.start, ...(b.via ?? []), b.end], 2);
 ```
 
 (d) In `validate`, reject a malformed `via` (add before `return true;`):
 
 ```ts
-  if (o.via !== undefined) {
-    if (
-      !Array.isArray(o.via) ||
-      !o.via.every(
-        (p) =>
-          !!p &&
-          typeof p === 'object' &&
-          typeof (p as { lat?: unknown }).lat === 'number' &&
-          typeof (p as { lon?: unknown }).lon === 'number',
-      )
-    ) {
-      return false;
-    }
+if (o.via !== undefined) {
+  if (
+    !Array.isArray(o.via) ||
+    !o.via.every(
+      (p) =>
+        !!p &&
+        typeof p === 'object' &&
+        typeof (p as { lat?: unknown }).lat === 'number' &&
+        typeof (p as { lon?: unknown }).lon === 'number',
+    )
+  ) {
+    return false;
   }
+}
 ```
 
 (e) Replace the `const route = plan({ ... });` call with a dispatch on `via`:
 
 ```ts
-    const planInput = {
-      start: b.start,
-      end: b.end,
-      departure: b.departure,
-      wind,
-      polar,
-      polarId: 'active',
-      coastline,
-      currents,
-      options: {
-        ...resolved,
-        useCurrents: !!b.useCurrents,
-        captureIsochrones: !!b.options?.captureIsochrones,
-      },
-    };
-    const route =
-      b.via && b.via.length > 0 ? planVia(planInput, b.via) : plan(planInput);
+const planInput = {
+  start: b.start,
+  end: b.end,
+  departure: b.departure,
+  wind,
+  polar,
+  polarId: 'active',
+  coastline,
+  currents,
+  options: {
+    ...resolved,
+    useCurrents: !!b.useCurrents,
+    captureIsochrones: !!b.options?.captureIsochrones,
+  },
+};
+const route = b.via && b.via.length > 0 ? planVia(planInput, b.via) : plan(planInput);
 ```
 
 - [ ] **Step 6: Rebuild routing dist + typecheck + web build**
@@ -395,11 +406,13 @@ import { boundingBoxFor } from '../../../../lib/route-bbox';
 The web build resolves `@g5000/routing` through its compiled `dist/` (stale-dist trap — see CLAUDE.md §Deployment), so `planVia` must be built before `next build` sees it.
 
 Run:
+
 ```bash
 npx tsc -b packages/routing
 npm run typecheck
 npm run build --workspace @g5000/web
 ```
+
 Expected: tsc clean; typecheck clean; web build completes with no type errors on `/api/route/plan`.
 
 - [ ] **Step 7: Commit**
@@ -415,6 +428,7 @@ git commit -m "feat(web): /api/route/plan accepts ordered via waypoints (#21)"
 ## Task 3: Pure saved-route → ordered-points resolver
 
 **Files:**
+
 - Create: `packages/web/src/lib/plan-via.ts`
 - Create: `packages/web/src/lib/plan-via.test.ts`
 
@@ -448,15 +462,14 @@ describe('orderedPlanFromRoute', () => {
   });
 
   it('skips waypoint ids that no longer resolve', () => {
-    const r = orderedPlanFromRoute(
-      { id: 'r1', name: 'R', waypointIds: ['a', 'gone', 'c'] },
-      WPS,
-    );
+    const r = orderedPlanFromRoute({ id: 'r1', name: 'R', waypointIds: ['a', 'gone', 'c'] }, WPS);
     expect(r?.via).toEqual([]); // 'gone' dropped ⇒ just start + end
   });
 
   it('returns null when fewer than two waypoints resolve', () => {
-    expect(orderedPlanFromRoute({ id: 'r1', name: 'R', waypointIds: ['a', 'gone'] }, WPS)).toBeNull();
+    expect(
+      orderedPlanFromRoute({ id: 'r1', name: 'R', waypointIds: ['a', 'gone'] }, WPS),
+    ).toBeNull();
   });
 });
 ```
@@ -530,6 +543,7 @@ git commit -m "feat(web): pure resolver for saved-route → ordered plan points 
 No DOM test harness exists for `packages/web` (#19), so this task is verified by `next build` plus a manual smoke check. The testable logic was extracted into the pure helpers in Tasks 2–3.
 
 **Files:**
+
 - Modify: `packages/web/src/components/PlanControls.tsx`
 - Modify: `packages/web/src/app/chart/RoutePlanPanel.tsx`
 
@@ -570,19 +584,19 @@ import { orderedPlanFromRoute, type SavedRouteLite } from '../../lib/plan-via';
 (b) Inside `RoutePlanPanel`, after the existing `const [summary, setSummary] = ...` line, add state for the mode, saved routes, the selected route, and the ad-hoc intermediate list:
 
 ```ts
-  const [mode, setMode] = useState<'waypoints' | 'route'>('waypoints');
-  const [routes, setRoutes] = useState<SavedRouteLite[]>([]);
-  const [routeId, setRouteId] = useState<string>('');
-  const [viaIds, setViaIds] = useState<string[]>([]); // ad-hoc intermediates
+const [mode, setMode] = useState<'waypoints' | 'route'>('waypoints');
+const [routes, setRoutes] = useState<SavedRouteLite[]>([]);
+const [routeId, setRouteId] = useState<string>('');
+const [viaIds, setViaIds] = useState<string[]>([]); // ad-hoc intermediates
 
-  useEffect(() => {
-    void fetch('/api/routes')
-      .then((r) => r.json())
-      .then((j) => {
-        if (j?.ok && Array.isArray(j.routes)) setRoutes(j.routes as SavedRouteLite[]);
-      })
-      .catch(() => {});
-  }, []);
+useEffect(() => {
+  void fetch('/api/routes')
+    .then((r) => r.json())
+    .then((j) => {
+      if (j?.ok && Array.isArray(j.routes)) setRoutes(j.routes as SavedRouteLite[]);
+    })
+    .catch(() => {});
+}, []);
 ```
 
 Add `useEffect` to the React import at the top of the file:
@@ -596,30 +610,30 @@ import { useState, useRef, useEffect } from 'react';
 In `RoutePlanPanel`, replace the existing `const start = ...` / `const end = ...` lines with a mode-aware computation:
 
 ```ts
-  const wpById = new Map(waypoints.map((w) => [w.id, w]));
+const wpById = new Map(waypoints.map((w) => [w.id, w]));
 
-  // Resolve the ordered plan (start/end/via) for the active mode.
-  let start: { lat: number; lon: number } | undefined;
-  let end: { lat: number; lon: number } | undefined;
-  let via: { lat: number; lon: number }[] = [];
-  if (mode === 'route') {
-    const route = routes.find((r) => r.id === routeId);
-    const ordered = route ? orderedPlanFromRoute(route, waypoints) : null;
-    if (ordered) {
-      start = ordered.start;
-      end = ordered.end;
-      via = ordered.via;
-    }
-  } else {
-    const s = wpById.get(startId);
-    const e = wpById.get(endId);
-    start = s ? { lat: s.lat, lon: s.lon } : undefined;
-    end = e ? { lat: e.lat, lon: e.lon } : undefined;
-    via = viaIds
-      .map((id) => wpById.get(id))
-      .filter((w): w is Wp => !!w)
-      .map((w) => ({ lat: w.lat, lon: w.lon }));
+// Resolve the ordered plan (start/end/via) for the active mode.
+let start: { lat: number; lon: number } | undefined;
+let end: { lat: number; lon: number } | undefined;
+let via: { lat: number; lon: number }[] = [];
+if (mode === 'route') {
+  const route = routes.find((r) => r.id === routeId);
+  const ordered = route ? orderedPlanFromRoute(route, waypoints) : null;
+  if (ordered) {
+    start = ordered.start;
+    end = ordered.end;
+    via = ordered.via;
   }
+} else {
+  const s = wpById.get(startId);
+  const e = wpById.get(endId);
+  start = s ? { lat: s.lat, lon: s.lon } : undefined;
+  end = e ? { lat: e.lat, lon: e.lon } : undefined;
+  via = viaIds
+    .map((id) => wpById.get(id))
+    .filter((w): w is Wp => !!w)
+    .map((w) => ({ lat: w.lat, lon: w.lon }));
+}
 ```
 
 - [ ] **Step 4: Send `via` in the plan request**
@@ -635,86 +649,84 @@ In `RoutePlanPanel`, inside `onPlan`, add `via` to the POST body (after `departu
 In `RoutePlanPanel`'s JSX, replace the two `<WaypointSelect ... />` Start/End blocks with the mode switch and conditional pickers:
 
 ```tsx
-          <div className="flex gap-2 text-xs">
-            {(['waypoints', 'route'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-2 py-1 rounded ${mode === m ? 'bg-emerald-700' : 'bg-slate-800'}`}
-              >
-                {m === 'waypoints' ? 'Pick waypoints' : 'Saved route'}
-              </button>
-            ))}
-          </div>
+<div className="flex gap-2 text-xs">
+  {(['waypoints', 'route'] as const).map((m) => (
+    <button
+      key={m}
+      onClick={() => setMode(m)}
+      className={`px-2 py-1 rounded ${mode === m ? 'bg-emerald-700' : 'bg-slate-800'}`}
+    >
+      {m === 'waypoints' ? 'Pick waypoints' : 'Saved route'}
+    </button>
+  ))}
+</div>;
 
-          {mode === 'route' ? (
-            <label className="block text-sm">
-              Route
-              <select
-                value={routeId}
-                onChange={(e) => setRouteId(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">— select route —</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <>
-              <WaypointSelect
-                label="Start"
-                value={startId}
-                waypoints={waypoints}
-                disabledId={endId}
-                onChange={props.onStartId}
-              />
-              {viaIds.map((id, i) => (
-                <div key={`${id}-${i}`} className="flex items-end gap-1">
-                  <div className="flex-1">
-                    <WaypointSelect
-                      label={`Via ${i + 1}`}
-                      value={id}
-                      waypoints={waypoints}
-                      disabledId=""
-                      onChange={(v) => setViaIds((xs) => xs.map((x, j) => (j === i ? v : x)))}
-                    />
-                  </div>
-                  <button
-                    onClick={() => setViaIds((xs) => (i > 0 ? reorder(xs, i, i - 1) : xs))}
-                    className="px-2 py-1 text-xs bg-slate-800 rounded"
-                    title="Move up"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => setViaIds((xs) => xs.filter((_, j) => j !== i))}
-                    className="px-2 py-1 text-xs bg-slate-800 rounded"
-                    title="Remove"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={() => setViaIds((xs) => [...xs, waypoints[0]?.id ?? ''])}
-                disabled={waypoints.length === 0}
-                className="text-xs px-2 py-1 bg-slate-800 rounded disabled:opacity-40"
-              >
-                + add via waypoint
-              </button>
-              <WaypointSelect
-                label="End"
-                value={endId}
-                waypoints={waypoints}
-                disabledId={startId}
-                onChange={props.onEndId}
-              />
-            </>
-          )}
+{
+  mode === 'route' ? (
+    <label className="block text-sm">
+      Route
+      <select value={routeId} onChange={(e) => setRouteId(e.target.value)} className={selectClass}>
+        <option value="">— select route —</option>
+        {routes.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : (
+    <>
+      <WaypointSelect
+        label="Start"
+        value={startId}
+        waypoints={waypoints}
+        disabledId={endId}
+        onChange={props.onStartId}
+      />
+      {viaIds.map((id, i) => (
+        <div key={`${id}-${i}`} className="flex items-end gap-1">
+          <div className="flex-1">
+            <WaypointSelect
+              label={`Via ${i + 1}`}
+              value={id}
+              waypoints={waypoints}
+              disabledId=""
+              onChange={(v) => setViaIds((xs) => xs.map((x, j) => (j === i ? v : x)))}
+            />
+          </div>
+          <button
+            onClick={() => setViaIds((xs) => (i > 0 ? reorder(xs, i, i - 1) : xs))}
+            className="px-2 py-1 text-xs bg-slate-800 rounded"
+            title="Move up"
+          >
+            ↑
+          </button>
+          <button
+            onClick={() => setViaIds((xs) => xs.filter((_, j) => j !== i))}
+            className="px-2 py-1 text-xs bg-slate-800 rounded"
+            title="Remove"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={() => setViaIds((xs) => [...xs, waypoints[0]?.id ?? ''])}
+        disabled={waypoints.length === 0}
+        className="text-xs px-2 py-1 bg-slate-800 rounded disabled:opacity-40"
+      >
+        + add via waypoint
+      </button>
+      <WaypointSelect
+        label="End"
+        value={endId}
+        waypoints={waypoints}
+        disabledId={startId}
+        onChange={props.onEndId}
+      />
+    </>
+  );
+}
 ```
 
 - [ ] **Step 6: Pass `via` to PlanControls**
@@ -722,20 +734,23 @@ In `RoutePlanPanel`'s JSX, replace the two `<WaypointSelect ... />` Start/End bl
 In `RoutePlanPanel`'s `<PlanControls ... />` element, add the `via` prop (after `end={...}`):
 
 ```tsx
-            via={via}
+via = { via };
 ```
 
 - [ ] **Step 7: Verify with a web build**
 
 Run:
+
 ```bash
 npm run build --workspace @g5000/web
 ```
+
 Expected: build completes, no type errors. (`PlanParams.via`, the new state, and the resolver all typecheck.)
 
 - [ ] **Step 8: Manual smoke check**
 
 Start dev (`npm run dev --workspace @g5000/app`), open `/chart`, drop ≥3 waypoints. In the Route planner:
+
 - "Pick waypoints" mode: choose Start + End, add a Via waypoint, Plan → route bends through the via point; the summary shows distance/duration.
 - "Saved route" mode: pick a saved route → route chains through its waypoints.
 
@@ -754,6 +769,7 @@ git commit -m "feat(web): leg-by-leg plan UI — saved route + ad-hoc via waypoi
 Skip unless wanted. Adds small dots at the via vertices on the chart polyline.
 
 **Files:**
+
 - Modify: `packages/web/src/components/RoutePolyline.tsx`
 
 - [ ] **Step 1:** Identify the via-vertex legs (a leg whose `lat`/`lon` matches a requested via point) and render a small circle layer at those coordinates, styled distinctly from the start (green) / end (red) marks. Verify with `npm run build --workspace @g5000/web` and a manual check. Commit:

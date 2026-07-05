@@ -16,24 +16,24 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `packages/routing/src/types.ts` | add `autoMotor` to `PlanOptions`, `cog` to `RouteLeg` |
-| `packages/routing/src/prune.ts` | add `cog` to `FrontierNode` |
-| `packages/routing/src/plan.ts` | auto-motor floor in `propagate`; populate `cog`; thread through start/final nodes |
-| `packages/routing/src/auto-motor.test.ts` | **new** — engine tests for auto-motor + cog |
-| `packages/web/src/lib/planning-settings.ts` | **new** — planning defaults + merge helper (knots↔m/s) |
-| `packages/web/src/lib/planning-settings.test.ts` | **new** — merge tests |
-| `packages/web/src/app/api/route/plan/route.ts` | merge settings.planning; honour `captureIsochrones`; accept `autoMotor` |
-| `packages/web/src/app/settings/page.tsx` | new Planning section |
-| `packages/web/src/components/PlanControls.tsx` | multi-model, auto-motor, advanced overrides |
-| `packages/web/src/app/chart/RoutePlanPanel.tsx` | fire N plans, store routes by model, per-model status |
-| `packages/web/src/components/RoutePolyline.tsx` | drop isochrone helpers |
-| `packages/web/src/lib/route-playback.ts` | **new** — interpolate position + leg state at time T |
-| `packages/web/src/lib/route-playback.test.ts` | **new** — playback lib tests |
-| `packages/web/src/app/chart/PlaybackScrubber.tsx` | **new** — time control + tick loop |
-| `packages/web/src/app/chart/RouteDetailsBox.tsx` | **new** — per-route SOG/COG/HDG/BSP |
-| `packages/web/src/app/chart/page.tsx` | routes-by-model state, colour-coded draw, mount scrubber + boxes, remove isochrone animation |
+| File                                              | Responsibility                                                                               |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `packages/routing/src/types.ts`                   | add `autoMotor` to `PlanOptions`, `cog` to `RouteLeg`                                        |
+| `packages/routing/src/prune.ts`                   | add `cog` to `FrontierNode`                                                                  |
+| `packages/routing/src/plan.ts`                    | auto-motor floor in `propagate`; populate `cog`; thread through start/final nodes            |
+| `packages/routing/src/auto-motor.test.ts`         | **new** — engine tests for auto-motor + cog                                                  |
+| `packages/web/src/lib/planning-settings.ts`       | **new** — planning defaults + merge helper (knots↔m/s)                                       |
+| `packages/web/src/lib/planning-settings.test.ts`  | **new** — merge tests                                                                        |
+| `packages/web/src/app/api/route/plan/route.ts`    | merge settings.planning; honour `captureIsochrones`; accept `autoMotor`                      |
+| `packages/web/src/app/settings/page.tsx`          | new Planning section                                                                         |
+| `packages/web/src/components/PlanControls.tsx`    | multi-model, auto-motor, advanced overrides                                                  |
+| `packages/web/src/app/chart/RoutePlanPanel.tsx`   | fire N plans, store routes by model, per-model status                                        |
+| `packages/web/src/components/RoutePolyline.tsx`   | drop isochrone helpers                                                                       |
+| `packages/web/src/lib/route-playback.ts`          | **new** — interpolate position + leg state at time T                                         |
+| `packages/web/src/lib/route-playback.test.ts`     | **new** — playback lib tests                                                                 |
+| `packages/web/src/app/chart/PlaybackScrubber.tsx` | **new** — time control + tick loop                                                           |
+| `packages/web/src/app/chart/RouteDetailsBox.tsx`  | **new** — per-route SOG/COG/HDG/BSP                                                          |
+| `packages/web/src/app/chart/page.tsx`             | routes-by-model state, colour-coded draw, mount scrubber + boxes, remove isochrone animation |
 
 ---
 
@@ -42,6 +42,7 @@
 ### Task 1: Add `cog` to RouteLeg and `autoMotor` to PlanOptions
 
 **Files:**
+
 - Modify: `packages/routing/src/types.ts`
 - Modify: `packages/routing/src/prune.ts`
 - Modify: `packages/routing/src/plan.ts`
@@ -146,9 +147,9 @@ Expected: FAIL — `autoMotor` not in `PlanOptions` type (tsc) and `l.cog` undef
 In `packages/routing/src/types.ts`, add to `RouteLeg` (after `heading`):
 
 ```ts
-  /** Course over ground (water+current), radians true. Equals heading with
-   *  currents off. */
-  cog: number;
+/** Course over ground (water+current), radians true. Equals heading with
+ *  currents off. */
+cog: number;
 ```
 
 Add to `PlanOptions` (after `motorSpeed`):
@@ -166,7 +167,7 @@ Add to `PlanOptions` (after `motorSpeed`):
 In `packages/routing/src/prune.ts`, add to the `FrontierNode` interface (after `heading`):
 
 ```ts
-  cog: number;
+cog: number;
 ```
 
 - [ ] **Step 5: Populate cog and apply auto-motor in plan.ts**
@@ -176,31 +177,31 @@ In `packages/routing/src/plan.ts`:
 In `propagate()`, replace the bsp line:
 
 ```ts
-  const bsp = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+const bsp = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
 ```
 
 with:
 
 ```ts
-  const bspRaw = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
-  const bsp = o.autoMotor && bspRaw < o.autoMotor.minSail ? o.autoMotor.motor : bspRaw;
+const bspRaw = o.motor ? o.motorSpeed : interpolatePolarSpeed(input.polar, tws, Math.abs(twa));
+const bsp = o.autoMotor && bspRaw < o.autoMotor.minSail ? o.autoMotor.motor : bspRaw;
 ```
 
 In `propagate()`, the returned node — add `cog: groundBearing` (the `groundBearing` const already exists above the return):
 
 ```ts
-  return {
-    pos: newPos,
-    t: n.t + stepSec,
-    parent: n,
-    heading,
-    cog: groundBearing,
-    twa: Math.abs(twa),
-    tws,
-    bsp,
-    sogGround,
-    distFromStart: n.distFromStart + distance,
-  };
+return {
+  pos: newPos,
+  t: n.t + stepSec,
+  parent: n,
+  heading,
+  cog: groundBearing,
+  twa: Math.abs(twa),
+  tws,
+  bsp,
+  sogGround,
+  distFromStart: n.distFromStart + distance,
+};
 ```
 
 In `plan()`, the `startNode` literal — add `cog: 0,` after `heading: 0,`.
@@ -236,6 +237,7 @@ git commit -m "feat(routing): per-step auto-motor speed floor and leg cog"
 ### Task 2: Planning-settings merge helper
 
 **Files:**
+
 - Create: `packages/web/src/lib/planning-settings.ts`
 - Test: `packages/web/src/lib/planning-settings.test.ts`
 
@@ -258,7 +260,11 @@ it('returns engine defaults when settings and overrides are empty', () => {
 });
 
 it('settings override defaults, request overrides settings', () => {
-  const settings = { pruneBucketDeg: 5, avoidLand: true, autoMotor: { enabled: true, minSailKt: 3, motorKt: 6 } };
+  const settings = {
+    pruneBucketDeg: 5,
+    avoidLand: true,
+    autoMotor: { enabled: true, minSailKt: 3, motorKt: 6 },
+  };
   const o = resolvePlanOptions(settings, { avoidLand: false, maxHours: 48 });
   expect(o.pruneBucketDeg).toBe(5); // from settings
   expect(o.avoidLand).toBe(false); // request wins
@@ -266,10 +272,16 @@ it('settings override defaults, request overrides settings', () => {
 });
 
 it('converts auto-motor knots to m/s and only when enabled', () => {
-  const on = resolvePlanOptions({ autoMotor: { enabled: true, minSailKt: 3, motorKt: 5 } }, undefined);
+  const on = resolvePlanOptions(
+    { autoMotor: { enabled: true, minSailKt: 3, motorKt: 5 } },
+    undefined,
+  );
   expect(on.autoMotor!.minSail).toBeCloseTo(3 * KN, 5);
   expect(on.autoMotor!.motor).toBeCloseTo(5 * KN, 5);
-  const off = resolvePlanOptions({ autoMotor: { enabled: false, minSailKt: 3, motorKt: 5 } }, undefined);
+  const off = resolvePlanOptions(
+    { autoMotor: { enabled: false, minSailKt: 3, motorKt: 5 } },
+    undefined,
+  );
   expect(off.autoMotor).toBeUndefined();
 });
 ```
@@ -321,9 +333,11 @@ export interface ResolvedPlanOptions {
 /** Merge engine defaults < settings.planning < per-request overrides. */
 export function resolvePlanOptions(
   settings: PlanningSettings | undefined,
-  request: Partial<Omit<ResolvedPlanOptions, 'autoMotor' | 'captureIsochrones'>> & {
-    autoMotor?: { minSail: number; motor: number };
-  } | undefined,
+  request:
+    | (Partial<Omit<ResolvedPlanOptions, 'autoMotor' | 'captureIsochrones'>> & {
+        autoMotor?: { minSail: number; motor: number };
+      })
+    | undefined,
 ): ResolvedPlanOptions {
   const s = settings ?? {};
   const r = request ?? {};
@@ -332,7 +346,9 @@ export function resolvePlanOptions(
 
   const am = s.autoMotor;
   const settingsAutoMotor =
-    am && am.enabled ? { minSail: am.minSailKt * KN_TO_MS, motor: am.motorKt * KN_TO_MS } : undefined;
+    am && am.enabled
+      ? { minSail: am.minSailKt * KN_TO_MS, motor: am.motorKt * KN_TO_MS }
+      : undefined;
 
   return {
     stepMinutes: pick('stepMinutes', r.stepMinutes) as number,
@@ -362,6 +378,7 @@ git commit -m "feat(web): planning-settings merge helper (defaults<settings<requ
 ### Task 3: Wire the merge into /api/route/plan
 
 **Files:**
+
 - Modify: `packages/web/src/app/api/route/plan/route.ts`
 
 - [ ] **Step 1: Read settings + use the merge**
@@ -408,19 +425,19 @@ with:
 Note: this requires the `options` value to be computed before the `plan()` call. Since `readJson` is async, hoist it above the `plan()` call instead of using an inline IIFE if cleaner:
 
 ```ts
-    const settings = ((await readJson(SETTINGS)) ?? {}) as { planning?: PlanningSettings };
-    const resolved = resolvePlanOptions(settings.planning, b.options as never);
-    const route = plan({
-      start: b.start,
-      end: b.end,
-      departure: b.departure,
-      wind,
-      polar,
-      polarId: 'active',
-      coastline,
-      currents,
-      options: { ...resolved, useCurrents: !!b.useCurrents },
-    });
+const settings = ((await readJson(SETTINGS)) ?? {}) as { planning?: PlanningSettings };
+const resolved = resolvePlanOptions(settings.planning, b.options as never);
+const route = plan({
+  start: b.start,
+  end: b.end,
+  departure: b.departure,
+  wind,
+  polar,
+  polarId: 'active',
+  coastline,
+  currents,
+  options: { ...resolved, useCurrents: !!b.useCurrents },
+});
 ```
 
 - [ ] **Step 2: Typecheck**
@@ -438,6 +455,7 @@ curl -s -X POST http://localhost:3000/api/route/plan -H 'content-type: applicati
   -d '{"start":{"lat":40.88,"lon":-69.35},"end":{"lat":36.73,"lon":-65.45},"departure":'$DEP',"model":"GFS","useCurrents":false,"options":{"avoidLand":false,"autoMotor":{"minSail":99,"motor":2.572}}}' \
   | python3 -c "import sys,json; r=json.load(sys.stdin)['route']; print('legs',len(r['legs']),'iso',len(r.get('isochrones',[])),'cog0',r['legs'][1]['cog'])"
 ```
+
 Expected: `iso 0` (isochrones dropped), legs present, `cog` field exists. A `minSail:99` (m/s) auto-motor forces motoring everywhere → near-straight route.
 
 - [ ] **Step 4: Commit**
@@ -454,6 +472,7 @@ git commit -m "feat(web): /api/route/plan merges settings.planning, drops forced
 ### Task 4: Add a Planning section to Settings
 
 **Files:**
+
 - Modify: `packages/web/src/app/settings/page.tsx`
 
 - [ ] **Step 1: Inspect the page structure**
@@ -486,16 +505,27 @@ function PlanningSection() {
     void fetch('/api/settings')
       .then((r) => r.json())
       .then((j) => {
-        if (j.ok && j.settings?.planning) setP((prev) => ({ ...prev, ...j.settings.planning, autoMotor: { ...prev.autoMotor, ...(j.settings.planning.autoMotor ?? {}) } }));
+        if (j.ok && j.settings?.planning)
+          setP((prev) => ({
+            ...prev,
+            ...j.settings.planning,
+            autoMotor: { ...prev.autoMotor, ...(j.settings.planning.autoMotor ?? {}) },
+          }));
       })
       .catch(() => {});
   }, []);
 
   const save = async () => {
     setStatus('Saving…');
-    const cur = await fetch('/api/settings').then((r) => r.json()).catch(() => ({ settings: {} }));
+    const cur = await fetch('/api/settings')
+      .then((r) => r.json())
+      .catch(() => ({ settings: {} }));
     const merged = { ...(cur.settings ?? {}), planning: p };
-    const res = await fetch('/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(merged) });
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
     setStatus(res.ok ? 'Saved' : 'Save failed');
     setTimeout(() => setStatus(null), 2500);
   };
@@ -503,9 +533,14 @@ function PlanningSection() {
   const num = (label: string, hint: string, key: keyof PlanningSettings, step = 1, min = 0) => (
     <label className="block text-sm">
       {label}
-      <input type="number" min={min} step={step} value={p[key] as number}
+      <input
+        type="number"
+        min={min}
+        step={step}
+        value={p[key] as number}
         onChange={(e) => setP((s) => ({ ...s, [key]: Number(e.target.value) }))}
-        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-28 ml-2" />
+        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-28 ml-2"
+      />
       <span className="block text-[11px] text-slate-500">{hint}</span>
     </label>
   );
@@ -513,38 +548,101 @@ function PlanningSection() {
   return (
     <section className="space-y-3 border border-slate-800 rounded p-3">
       <h2 className="text-lg font-semibold">Planning</h2>
-      {num('Frontier size (°)', 'Smaller = denser frontier, slower but finer.', 'pruneBucketDeg', 0.5, 0.5)}
-      {num('Isochrone length (min)', 'Time between isochrones / planner step.', 'stepMinutes', 5, 5)}
-      {num('Heading fan (±°)', 'Search width around bearing-to-destination.', 'headingFanDeg', 5, 5)}
+      {num(
+        'Frontier size (°)',
+        'Smaller = denser frontier, slower but finer.',
+        'pruneBucketDeg',
+        0.5,
+        0.5,
+      )}
+      {num(
+        'Isochrone length (min)',
+        'Time between isochrones / planner step.',
+        'stepMinutes',
+        5,
+        5,
+      )}
+      {num(
+        'Heading fan (±°)',
+        'Search width around bearing-to-destination.',
+        'headingFanDeg',
+        5,
+        5,
+      )}
       {num('Heading resolution (°)', 'Headings tried per fan.', 'headingResolutionDeg', 1, 1)}
       {num('Max hours', 'Planning horizon cap.', 'maxHours', 12, 12)}
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={p.avoidLand}
-          onChange={(e) => setP((s) => ({ ...s, avoidLand: e.target.checked }))} />
+        <input
+          type="checkbox"
+          checked={p.avoidLand}
+          onChange={(e) => setP((s) => ({ ...s, avoidLand: e.target.checked }))}
+        />
         Avoid land (uncheck to skip the land check on open-ocean routes — faster)
       </label>
       <fieldset className="border border-slate-800 rounded p-2 space-y-2">
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={p.autoMotor.enabled}
-            onChange={(e) => setP((s) => ({ ...s, autoMotor: { ...s.autoMotor, enabled: e.target.checked } }))} />
+          <input
+            type="checkbox"
+            checked={p.autoMotor.enabled}
+            onChange={(e) =>
+              setP((s) => ({ ...s, autoMotor: { ...s.autoMotor, enabled: e.target.checked } }))
+            }
+          />
           Auto-motor
         </label>
         <div className="text-sm pl-6">
           motor when slower than
-          <input type="number" min={0} step={0.5} value={p.autoMotor.minSailKt}
-            onChange={(e) => setP((s) => ({ ...s, autoMotor: { ...s.autoMotor, minSailKt: Number(e.target.value) } }))}
-            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1" /> kn,
-          at
-          <input type="number" min={0} step={0.5} value={p.autoMotor.motorKt}
-            onChange={(e) => setP((s) => ({ ...s, autoMotor: { ...s.autoMotor, motorKt: Number(e.target.value) } }))}
-            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1" /> kn
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={p.autoMotor.minSailKt}
+            onChange={(e) =>
+              setP((s) => ({
+                ...s,
+                autoMotor: { ...s.autoMotor, minSailKt: Number(e.target.value) },
+              }))
+            }
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1"
+          />{' '}
+          kn, at
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={p.autoMotor.motorKt}
+            onChange={(e) =>
+              setP((s) => ({
+                ...s,
+                autoMotor: { ...s.autoMotor, motorKt: Number(e.target.value) },
+              }))
+            }
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1"
+          />{' '}
+          kn
         </div>
         <p className="text-[11px] text-slate-500 pl-6">Set the threshold high to always motor.</p>
       </fieldset>
       <div className="flex items-center gap-3">
-        <button onClick={save} className="bg-emerald-700 px-3 py-1 rounded text-sm">Save planning</button>
-        <button onClick={() => setP({ stepMinutes: PLANNING_DEFAULTS.stepMinutes, pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg, headingFanDeg: PLANNING_DEFAULTS.headingFanDeg, headingResolutionDeg: PLANNING_DEFAULTS.headingResolutionDeg, maxHours: PLANNING_DEFAULTS.maxHours, avoidLand: PLANNING_DEFAULTS.avoidLand, autoMotor: { ...PLANNING_DEFAULTS.autoMotor } })}
-          className="bg-slate-700 px-3 py-1 rounded text-sm">Reset to defaults</button>
+        <button onClick={save} className="bg-emerald-700 px-3 py-1 rounded text-sm">
+          Save planning
+        </button>
+        <button
+          onClick={() =>
+            setP({
+              stepMinutes: PLANNING_DEFAULTS.stepMinutes,
+              pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg,
+              headingFanDeg: PLANNING_DEFAULTS.headingFanDeg,
+              headingResolutionDeg: PLANNING_DEFAULTS.headingResolutionDeg,
+              maxHours: PLANNING_DEFAULTS.maxHours,
+              avoidLand: PLANNING_DEFAULTS.avoidLand,
+              autoMotor: { ...PLANNING_DEFAULTS.autoMotor },
+            })
+          }
+          className="bg-slate-700 px-3 py-1 rounded text-sm"
+        >
+          Reset to defaults
+        </button>
         {status && <span className="text-sm text-slate-400">{status}</span>}
       </div>
     </section>
@@ -577,6 +675,7 @@ git commit -m "feat(web): Settings/Planning section for planner defaults"
 ### Task 5: Rework PlanControls for multi-model + auto-motor + advanced
 
 **Files:**
+
 - Modify: `packages/web/src/components/PlanControls.tsx`
 
 - [ ] **Step 1: Update the PlanRequest type and props**
@@ -614,13 +713,27 @@ Seed defaults on mount:
 
 ```tsx
 useEffect(() => {
-  void fetch('/api/settings').then((r) => r.json()).then((j) => {
-    const pl = j?.settings?.planning;
-    if (pl) {
-      if (pl.autoMotor) setAuto({ enabled: !!pl.autoMotor.enabled, minSailKt: pl.autoMotor.minSailKt ?? 3, motorKt: pl.autoMotor.motorKt ?? 5 });
-      setAdv((a) => ({ ...a, avoidLand: pl.avoidLand ?? a.avoidLand, pruneBucketDeg: pl.pruneBucketDeg ?? a.pruneBucketDeg, stepMinutes: pl.stepMinutes ?? a.stepMinutes, maxHours: pl.maxHours ?? a.maxHours }));
-    }
-  }).catch(() => {});
+  void fetch('/api/settings')
+    .then((r) => r.json())
+    .then((j) => {
+      const pl = j?.settings?.planning;
+      if (pl) {
+        if (pl.autoMotor)
+          setAuto({
+            enabled: !!pl.autoMotor.enabled,
+            minSailKt: pl.autoMotor.minSailKt ?? 3,
+            motorKt: pl.autoMotor.motorKt ?? 5,
+          });
+        setAdv((a) => ({
+          ...a,
+          avoidLand: pl.avoidLand ?? a.avoidLand,
+          pruneBucketDeg: pl.pruneBucketDeg ?? a.pruneBucketDeg,
+          stepMinutes: pl.stepMinutes ?? a.stepMinutes,
+          maxHours: pl.maxHours ?? a.maxHours,
+        }));
+      }
+    })
+    .catch(() => {});
 }, []);
 ```
 
@@ -630,9 +743,13 @@ Use a single model-selection state: `const [models, setModels] = useState({ gfs:
 
 ```ts
 const KN = 0.514444;
-const selected = [models.gfs && 'GFS', models.ecmwf && 'ECMWF'].filter(Boolean) as Array<'GFS' | 'ECMWF'>;
+const selected = [models.gfs && 'GFS', models.ecmwf && 'ECMWF'].filter(Boolean) as Array<
+  'GFS' | 'ECMWF'
+>;
 props.onPlan({
-  start: props.start!, end: props.end!, departure: Math.floor(departureAnchor),
+  start: props.start!,
+  end: props.end!,
+  departure: Math.floor(departureAnchor),
   models: selected,
   useCurrents,
   options: {
@@ -640,7 +757,9 @@ props.onPlan({
     pruneBucketDeg: adv.pruneBucketDeg,
     stepMinutes: adv.stepMinutes,
     maxHours: adv.maxHours,
-    autoMotor: auto.enabled ? { minSail: auto.minSailKt * KN, motor: auto.motorKt * KN } : undefined,
+    autoMotor: auto.enabled
+      ? { minSail: auto.minSailKt * KN, motor: auto.motorKt * KN }
+      : undefined,
   },
 });
 ```
@@ -659,6 +778,7 @@ Hold the commit until Task 6 compiles together.
 ### Task 6: RoutePlanPanel fans out one plan per model, stores routes by model
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/RoutePlanPanel.tsx`
 
 - [ ] **Step 1: Update onPlan to fire N requests**
@@ -692,11 +812,19 @@ const onPlan = async (params: PlanParams): Promise<void> => {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            start: params.start, end: params.end, departure: params.departure,
-            model, useCurrents: params.useCurrents, options: params.options,
+            start: params.start,
+            end: params.end,
+            departure: params.departure,
+            model,
+            useCurrents: params.useCurrents,
+            options: params.options,
           }),
         });
-        const j = (await res.json()) as { ok: boolean; route?: Route; error?: { message?: string } };
+        const j = (await res.json()) as {
+          ok: boolean;
+          route?: Route;
+          error?: { message?: string };
+        };
         if (!j.ok || !j.route) errs.push(`${model}: ${j.error?.message ?? 'plan failed'}`);
         else results[model] = j.route;
       } catch (e) {
@@ -708,7 +836,8 @@ const onPlan = async (params: PlanParams): Promise<void> => {
   if (errs.length) setError(errs.join(' · '));
   if (Object.keys(results).length) {
     const parts = (Object.entries(results) as Array<['GFS' | 'ECMWF', Route]>).map(
-      ([m, r]) => `${m}: ${(r.distance / 1852).toFixed(0)} NM / ${((r.end - r.start) / 3600).toFixed(1)} h${r.incomplete ? ' (incomplete)' : ''}`,
+      ([m, r]) =>
+        `${m}: ${(r.distance / 1852).toFixed(0)} NM / ${((r.end - r.start) / 3600).toFixed(1)} h${r.incomplete ? ' (incomplete)' : ''}`,
     );
     setSummary(parts.join(' · '));
     props.onRouted(results);
@@ -738,6 +867,7 @@ git commit -m "feat(web): plan GFS+ECMWF together with auto-motor and advanced o
 ### Task 7: Routes-by-model state + colour-coded draw; remove isochrone animation
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 - Modify: `packages/web/src/components/RoutePolyline.tsx`
 
@@ -746,15 +876,35 @@ git commit -m "feat(web): plan GFS+ECMWF together with auto-motor and advanced o
 In `packages/web/src/components/RoutePolyline.tsx`: delete `attachIsochronesUpTo`, `attachIsochrones`, the `ISOCHRONE_*` constants, and the isochrone branches. `attachRoute(map, id, route, color)` should just set/add the line source+layer and `detachRoute(map, id)` removes that line layer+source. Final `attachRoute`:
 
 ```ts
-export function attachRoute(map: maplibregl.Map, id: string, route: Route, color = '#000000'): void {
+export function attachRoute(
+  map: maplibregl.Map,
+  id: string,
+  route: Route,
+  color = '#000000',
+): void {
   const data: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
-    features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route.legs.map((l) => [l.lon, l.lat]) } }],
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: route.legs.map((l) => [l.lon, l.lat]) },
+      },
+    ],
   };
   const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
-  if (src) { src.setData(data); if (map.getLayer(id)) map.setPaintProperty(id, 'line-color', color); }
-  else { map.addSource(id, { type: 'geojson', data }); map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': color, 'line-width': 3 } }); }
-  try { map.moveLayer(id); } catch { /* style not ready */ }
+  if (src) {
+    src.setData(data);
+    if (map.getLayer(id)) map.setPaintProperty(id, 'line-color', color);
+  } else {
+    map.addSource(id, { type: 'geojson', data });
+    map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': color, 'line-width': 3 } });
+  }
+  try {
+    map.moveLayer(id);
+  } catch {
+    /* style not ready */
+  }
 }
 
 export function detachRoute(map: maplibregl.Map, id: string): void {
@@ -800,11 +950,28 @@ const handleRouted = (next: Partial<Record<'GFS' | 'ECMWF', Route>>): void => {
   if (!map) return;
   if (camera.follow) camera.toggleFollow();
   const pts: Array<{ lat: number; lon: number }> = [];
-  for (const r of Object.values(next)) if (r) for (const l of r.legs) pts.push({ lat: l.lat, lon: l.lon });
+  for (const r of Object.values(next))
+    if (r) for (const l of r.legs) pts.push({ lat: l.lat, lon: l.lon });
   if (pts.length >= 2) {
-    let latMin = Infinity, latMax = -Infinity, lonMin = Infinity, lonMax = -Infinity;
-    for (const p of pts) { latMin = Math.min(latMin, p.lat); latMax = Math.max(latMax, p.lat); lonMin = Math.min(lonMin, p.lon); lonMax = Math.max(lonMax, p.lon); }
-    try { map.fitBounds([[lonMin, latMin], [lonMax, latMax]], { padding: 60, duration: 800 }); } catch {}
+    let latMin = Infinity,
+      latMax = -Infinity,
+      lonMin = Infinity,
+      lonMax = -Infinity;
+    for (const p of pts) {
+      latMin = Math.min(latMin, p.lat);
+      latMax = Math.max(latMax, p.lat);
+      lonMin = Math.min(lonMin, p.lon);
+      lonMax = Math.max(lonMax, p.lon);
+    }
+    try {
+      map.fitBounds(
+        [
+          [lonMin, latMin],
+          [lonMax, latMax],
+        ],
+        { padding: 60, duration: 800 },
+      );
+    } catch {}
   }
 };
 ```
@@ -814,7 +981,8 @@ const handleRouted = (next: Partial<Record<'GFS' | 'ECMWF', Route>>): void => {
 ```ts
 const handleClearRoute = (): void => {
   setRoutes({});
-  if (mapInstance) (['GFS','ECMWF'] as const).forEach((m) => detachRoute(mapInstance, ROUTE_LAYER[m]));
+  if (mapInstance)
+    (['GFS', 'ECMWF'] as const).forEach((m) => detachRoute(mapInstance, ROUTE_LAYER[m]));
 };
 ```
 
@@ -845,6 +1013,7 @@ git commit -m "feat(web): colour-coded GFS/ECMWF route lines; remove isochrone f
 ### Task 8: route-playback interpolation lib
 
 **Files:**
+
 - Create: `packages/web/src/lib/route-playback.ts`
 - Test: `packages/web/src/lib/route-playback.test.ts`
 
@@ -940,10 +1109,28 @@ export function stateAtTime(route: PlaybackRoute, t: number): PlaybackState {
   const first = legs[0]!;
   const last = legs[legs.length - 1]!;
   if (t <= first.t) {
-    return { lat: first.lat, lon: first.lon, hdg: first.heading, cog: first.cog, sog: first.sogGround, bsp: first.bsp, beforeStart: true, atEnd: false };
+    return {
+      lat: first.lat,
+      lon: first.lon,
+      hdg: first.heading,
+      cog: first.cog,
+      sog: first.sogGround,
+      bsp: first.bsp,
+      beforeStart: true,
+      atEnd: false,
+    };
   }
   if (t >= last.t) {
-    return { lat: last.lat, lon: last.lon, hdg: last.heading, cog: last.cog, sog: last.sogGround, bsp: last.bsp, beforeStart: false, atEnd: true };
+    return {
+      lat: last.lat,
+      lon: last.lon,
+      hdg: last.heading,
+      cog: last.cog,
+      sog: last.sogGround,
+      bsp: last.bsp,
+      beforeStart: false,
+      atEnd: true,
+    };
   }
   let i = 0;
   for (; i < legs.length - 1; i++) if (t >= legs[i]!.t && t < legs[i + 1]!.t) break;
@@ -964,14 +1151,21 @@ export function stateAtTime(route: PlaybackRoute, t: number): PlaybackState {
 
 /** Forecast hour (offset from runTime) nearest wall-clock `t`, clamped to the
  *  available hours. */
-export function nearestForecastHour(runTime: number, t: number, availableHours: number[]): number | null {
+export function nearestForecastHour(
+  runTime: number,
+  t: number,
+  availableHours: number[],
+): number | null {
   if (availableHours.length === 0) return null;
   const target = (t - runTime) / 3600;
   let best = availableHours[0]!;
   let bestD = Math.abs(target - best);
   for (const h of availableHours) {
     const d = Math.abs(target - h);
-    if (d < bestD) { bestD = d; best = h; }
+    if (d < bestD) {
+      bestD = d;
+      best = h;
+    }
   }
   return best;
 }
@@ -992,6 +1186,7 @@ git commit -m "feat(web): route-playback interpolation lib"
 ### Task 9: RouteDetailsBox component
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/RouteDetailsBox.tsx`
 
 - [ ] **Step 1: Implement the box**
@@ -1004,10 +1199,14 @@ import type { PlaybackState } from '../../lib/route-playback';
 
 const MS_TO_KN = 1.94384;
 const RAD_TO_DEG = 180 / Math.PI;
-const deg = (rad: number): string => `${Math.round(((rad * RAD_TO_DEG) % 360 + 360) % 360)}° T`;
+const deg = (rad: number): string => `${Math.round((((rad * RAD_TO_DEG) % 360) + 360) % 360)}° T`;
 const kn = (ms: number): string => `${(ms * MS_TO_KN).toFixed(1)} kn`;
 
-export function RouteDetailsBox(props: { model: string; color: string; state: PlaybackState | null }) {
+export function RouteDetailsBox(props: {
+  model: string;
+  color: string;
+  state: PlaybackState | null;
+}) {
   const s = props.state;
   return (
     <div className="text-xs border rounded p-2 space-y-0.5" style={{ borderColor: props.color }}>
@@ -1037,6 +1236,7 @@ git commit -m "feat(web): per-route SOG/COG/HDG/BSP details box"
 ### Task 10: PlaybackScrubber + ghost boats + wire into the chart
 
 **Files:**
+
 - Create: `packages/web/src/app/chart/PlaybackScrubber.tsx`
 - Modify: `packages/web/src/app/chart/page.tsx`
 
@@ -1066,7 +1266,9 @@ export function PlaybackScrubber(props: {
   onStates: (states: Partial<Record<Model, PlaybackState>>) => void;
   onWindHour: (hour: number) => void; // wall-clock-driven; parent maps to overlay
 }) {
-  const entries = MODELS.filter((m) => props.routes[m]).map((m) => [m, toPlayback(props.routes[m]!)] as const);
+  const entries = MODELS.filter((m) => props.routes[m]).map(
+    (m) => [m, toPlayback(props.routes[m]!)] as const,
+  );
   const tMin = entries.length ? Math.min(...entries.map(([, r]) => r.start)) : 0;
   const tMax = entries.length ? Math.max(...entries.map(([, r]) => r.end)) : 0;
 
@@ -1078,7 +1280,10 @@ export function PlaybackScrubber(props: {
   const last = useRef<number>(0);
 
   // Reset to start whenever the routes change.
-  useEffect(() => { setT(tMin); setPlaying(false); }, [tMin, tMax]);
+  useEffect(() => {
+    setT(tMin);
+    setPlaying(false);
+  }, [tMin, tMax]);
 
   // Animation loop.
   useEffect(() => {
@@ -1089,13 +1294,18 @@ export function PlaybackScrubber(props: {
       last.current = now;
       setT((prev) => {
         const next = prev + dt * speed * 60; // 1 real-sec = speed minutes of sim
-        if (next >= tMax) { setPlaying(false); return tMax; }
+        if (next >= tMax) {
+          setPlaying(false);
+          return tMax;
+        }
         return next;
       });
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
-    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
+    return () => {
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
   }, [playing, speed, tMax]);
 
   // On every t change: move ghosts, push states + wind hour.
@@ -1123,7 +1333,12 @@ export function PlaybackScrubber(props: {
 
   // Cleanup markers on unmount / no routes.
   useEffect(() => {
-    return () => { for (const m of MODELS) { markers.current[m]?.remove(); markers.current[m] = undefined; } };
+    return () => {
+      for (const m of MODELS) {
+        markers.current[m]?.remove();
+        markers.current[m] = undefined;
+      }
+    };
   }, []);
 
   if (entries.length === 0) return null;
@@ -1132,17 +1347,37 @@ export function PlaybackScrubber(props: {
   return (
     <section className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
       <div className="flex items-center gap-2">
-        <button onClick={() => setPlaying((p) => !p)} className="px-2 py-1 text-sm bg-slate-700 rounded w-16">
+        <button
+          onClick={() => setPlaying((p) => !p)}
+          className="px-2 py-1 text-sm bg-slate-700 rounded w-16"
+        >
           {playing ? 'Pause' : 'Play'}
         </button>
         <span className="text-xs font-mono">{fmt(t)}</span>
-        <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="bg-slate-900 border border-slate-700 rounded text-xs ml-auto">
-          {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
+        <select
+          value={speed}
+          onChange={(e) => setSpeed(Number(e.target.value))}
+          className="bg-slate-900 border border-slate-700 rounded text-xs ml-auto"
+        >
+          {SPEEDS.map((s) => (
+            <option key={s} value={s}>
+              {s}×
+            </option>
+          ))}
         </select>
       </div>
-      <input type="range" min={tMin} max={tMax} step={60} value={t}
-        onChange={(e) => { setPlaying(false); setT(Number(e.target.value)); }}
-        className="w-full" />
+      <input
+        type="range"
+        min={tMin}
+        max={tMax}
+        step={60}
+        value={t}
+        onChange={(e) => {
+          setPlaying(false);
+          setT(Number(e.target.value));
+        }}
+        className="w-full"
+      />
     </section>
   );
 }
@@ -1165,21 +1400,38 @@ const onWindHour = (t: number) => {
   const run = latestRunAt[model];
   if (run == null) return;
   const h = nearestForecastHour(run, t, availableHours[model]);
-  if (h != null) { setWindLockNow(false); setWindHours(h); }
+  if (h != null) {
+    setWindLockNow(false);
+    setWindHours(h);
+  }
 };
 ```
 
 - In the sidebar (after `<RoutePlanPanel/>`), mount the scrubber + boxes when routes exist:
 
 ```tsx
-{Object.keys(routes).length > 0 && (
-  <>
-    <PlaybackScrubber map={mapInstance} routes={routes} onStates={setPlaybackStates} onWindHour={onWindHour} />
-    {(['GFS','ECMWF'] as const).filter((m) => routes[m]).map((m) => (
-      <RouteDetailsBox key={m} model={m} color={ROUTE_COLOR[m]} state={playbackStates[m] ?? null} />
-    ))}
-  </>
-)}
+{
+  Object.keys(routes).length > 0 && (
+    <>
+      <PlaybackScrubber
+        map={mapInstance}
+        routes={routes}
+        onStates={setPlaybackStates}
+        onWindHour={onWindHour}
+      />
+      {(['GFS', 'ECMWF'] as const)
+        .filter((m) => routes[m])
+        .map((m) => (
+          <RouteDetailsBox
+            key={m}
+            model={m}
+            color={ROUTE_COLOR[m]}
+            state={playbackStates[m] ?? null}
+          />
+        ))}
+    </>
+  );
+}
 ```
 
 - [ ] **Step 3: Typecheck + prettier**

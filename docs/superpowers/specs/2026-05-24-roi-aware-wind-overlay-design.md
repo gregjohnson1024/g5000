@@ -10,7 +10,7 @@ which returns the most-recently-cached grid for `(model, hour)` **regardless of
 bbox**. The slider/banner, however, derive `availableHours` from the manifest
 **filtered to the current ROI box**. So when the user draws a box that hasn't
 been fetched, the banner correctly says "No GFS forecast cached" while the overlay
-still draws an overlapping grid from a *different* previously-fetched region —
+still draws an overlapping grid from a _different_ previously-fetched region —
 a confusing contradiction (overlay shows wind, banner says nothing cached).
 
 Fix: make the overlay request data for the ROI box, so "overlay shows wind" ⟺

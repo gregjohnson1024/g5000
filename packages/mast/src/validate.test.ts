@@ -6,7 +6,15 @@ const KNOWN = new Set(['wind.true.angle', 'wind.true.speed', 'boat.speed.water',
 const goodTile = { field: 'boat.speed.water', label: 'BSP', units: 'kn', decimals: 2 };
 const goodLayout = {
   version: 1,
-  pages: [{ id: 'main', label: 'Main', grid: '2', condition: { always: true }, tiles: [goodTile, { ...goodTile, field: 'wind.true.speed', label: 'TWS' }] }],
+  pages: [
+    {
+      id: 'main',
+      label: 'Main',
+      grid: '2',
+      condition: { always: true },
+      tiles: [goodTile, { ...goodTile, field: 'wind.true.speed', label: 'TWS' }],
+    },
+  ],
 };
 
 describe('validateMastLayout', () => {

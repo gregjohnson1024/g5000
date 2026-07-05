@@ -14,28 +14,29 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `packages/web/src/lib/sat-cache.ts` (new) | Cache stats + prune core; one source of truth |
-| `packages/web/src/lib/sat-cache.test.ts` (new) | Unit tests for the above |
-| `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.ts` (new) | Esri tile proxy + disk cache + mtime-on-HIT |
-| `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.test.ts` (new) | Proxy route tests |
-| `packages/web/src/components/SatelliteLayer.tsx` (new) | MapLibre raster layer + `refreshSatTiles` |
-| `packages/web/src/app/chart/LayersControl.tsx` (edit) | Add Satellite toggle + refresh button |
-| `packages/web/src/app/chart/page.tsx` (edit) | Mount layer, state, refresh wiring |
-| `packages/web/src/app/api/sat-cache/route.ts` (new) | GET cache stats |
-| `packages/web/src/app/api/sat-cache/prune/route.ts` (new) | POST prune |
-| `packages/web/src/app/api/sat-cache/prune/route.test.ts` (new) | Prune route test |
-| `packages/web/src/app/settings/SatelliteCachePanel.tsx` (new) | Admin UI panel (child component) |
-| `packages/web/src/app/settings/page.tsx` (edit) | Render the panel |
-| `scripts/sat-seed.ts` (new) | Pre-warm: `regions` + `global` |
-| `scripts/sat-cache.ts` (new) | CLI: `report` + `prune` |
+| File                                                                 | Responsibility                                |
+| -------------------------------------------------------------------- | --------------------------------------------- |
+| `packages/web/src/lib/sat-cache.ts` (new)                            | Cache stats + prune core; one source of truth |
+| `packages/web/src/lib/sat-cache.test.ts` (new)                       | Unit tests for the above                      |
+| `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.ts` (new)      | Esri tile proxy + disk cache + mtime-on-HIT   |
+| `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.test.ts` (new) | Proxy route tests                             |
+| `packages/web/src/components/SatelliteLayer.tsx` (new)               | MapLibre raster layer + `refreshSatTiles`     |
+| `packages/web/src/app/chart/LayersControl.tsx` (edit)                | Add Satellite toggle + refresh button         |
+| `packages/web/src/app/chart/page.tsx` (edit)                         | Mount layer, state, refresh wiring            |
+| `packages/web/src/app/api/sat-cache/route.ts` (new)                  | GET cache stats                               |
+| `packages/web/src/app/api/sat-cache/prune/route.ts` (new)            | POST prune                                    |
+| `packages/web/src/app/api/sat-cache/prune/route.test.ts` (new)       | Prune route test                              |
+| `packages/web/src/app/settings/SatelliteCachePanel.tsx` (new)        | Admin UI panel (child component)              |
+| `packages/web/src/app/settings/page.tsx` (edit)                      | Render the panel                              |
+| `scripts/sat-seed.ts` (new)                                          | Pre-warm: `regions` + `global`                |
+| `scripts/sat-cache.ts` (new)                                         | CLI: `report` + `prune`                       |
 
 ---
 
 ## Task 1: Cache stats + prune library
 
 **Files:**
+
 - Create: `packages/web/src/lib/sat-cache.ts`
 - Test: `packages/web/src/lib/sat-cache.test.ts`
 
@@ -293,6 +294,7 @@ git commit -m "feat(web): sat-cache stats + LRU prune library"
 ## Task 2: Esri tile proxy route
 
 **Files:**
+
 - Create: `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.ts`
 - Test: `packages/web/src/app/api/sat-tiles/[z]/[x]/[y]/route.test.ts`
 
@@ -306,7 +308,10 @@ import { mkdtemp, rm, mkdir, writeFile, stat, utimes } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-let GET: (req: Request, ctx: { params: Promise<{ z: string; x: string; y: string }> }) => Promise<Response>;
+let GET: (
+  req: Request,
+  ctx: { params: Promise<{ z: string; x: string; y: string }> },
+) => Promise<Response>;
 let root: string;
 
 function params(z: string, x: string, y: string) {
@@ -357,9 +362,11 @@ describe('sat-tiles proxy', () => {
 
   it('fetches Esri on MISS, passes content-type through, writes disk', async () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(jpeg, { status: 200, headers: { 'content-type': 'image/jpeg' } }),
-    );
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(jpeg, { status: 200, headers: { 'content-type': 'image/jpeg' } }),
+      );
     const res = await GET(new Request('http://x'), params('10', '3', '4'));
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('MISS');
@@ -415,12 +422,11 @@ const MAX_Z = 19;
 
 // 67-byte fully-transparent 1x1 PNG.
 const TRANSPARENT_PNG = new Uint8Array([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
-  0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
-  0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+  0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+  0x42, 0x60, 0x82,
 ]);
 
 function tilePath(z: string, x: string, y: string): string {
@@ -474,7 +480,12 @@ function transparent(xCache: string): Response {
   });
 }
 
-async function fetchAndCache(zNum: number, x: string, y: string, diskPath: string): Promise<Response> {
+async function fetchAndCache(
+  zNum: number,
+  x: string,
+  y: string,
+  diskPath: string,
+): Promise<Response> {
   const yBase = y.replace(/\.jpg$/, '');
   // ArcGIS row/col order: {z}/{y}/{x}. No zoom offset.
   const url =
@@ -556,6 +567,7 @@ git commit -m "feat(web): /api/sat-tiles Esri imagery proxy with disk cache"
 ## Task 3: SatelliteLayer component
 
 **Files:**
+
 - Create: `packages/web/src/components/SatelliteLayer.tsx`
 
 No unit test (MapLibre is hard to unit-test — matches `EncLayer`'s convention). Verified in Task 5's manual check.
@@ -580,13 +592,7 @@ const LAYER_ID = 'esri-satellite-layer';
  * IMPORTANT: mount this AFTER <EncLayer> in chart/page.tsx so satellite
  * stacks on top of the NOAA chart but below the vector buoys + annotations.
  */
-export function SatelliteLayer({
-  map,
-  visible,
-}: {
-  map: maplibregl.Map | null;
-  visible: boolean;
-}) {
+export function SatelliteLayer({ map, visible }: { map: maplibregl.Map | null; visible: boolean }) {
   useEffect(() => {
     if (!map) return;
     // Do NOT gate on map.isStyleLoaded(); the chart page hands us `map` from
@@ -673,6 +679,7 @@ git commit -m "feat(web): SatelliteLayer MapLibre raster component"
 ## Task 4: Satellite toggle in LayersControl
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/LayersControl.tsx`
 
 - [ ] **Step 1: Add `satellite` to `LayersState`**
@@ -719,8 +726,7 @@ export function LayersControl({
 Change the `onCount` line:
 
 ```ts
-  const onCount =
-    (state.enc ? 1 : 0) + (state.satellite ? 1 : 0) + (state.buoys ? 1 : 0);
+const onCount = (state.enc ? 1 : 0) + (state.satellite ? 1 : 0) + (state.buoys ? 1 : 0);
 ```
 
 - [ ] **Step 4: Add the Satellite row and refresh button**
@@ -774,6 +780,7 @@ git commit -m "feat(web): Satellite toggle + refresh in LayersControl"
 ## Task 5: Mount SatelliteLayer on the chart page
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 - [ ] **Step 1: Import the component**
@@ -789,13 +796,13 @@ import { SatelliteLayer, refreshSatTiles } from '../../components/SatelliteLayer
 In the `useState<LayersState>({ ... })` default (line ~362), add `satellite: false`:
 
 ```ts
-  const [layers, setLayers] = useState<LayersState>({
-    osm: true,
-    enc: false,
-    satellite: false,
-    buoys: false,
-    tileGrid: false,
-  });
+const [layers, setLayers] = useState<LayersState>({
+  osm: true,
+  enc: false,
+  satellite: false,
+  buoys: false,
+  tileGrid: false,
+});
 ```
 
 - [ ] **Step 3: Add `satellite` to the hydration parse**
@@ -803,13 +810,13 @@ In the `useState<LayersState>({ ... })` default (line ~362), add `satellite: fal
 In the `setLayers({ ... })` inside the localStorage hydration effect (line ~374), add:
 
 ```ts
-        setLayers({
-          osm: parsed.osm ?? true,
-          enc: parsed.enc ?? false,
-          satellite: parsed.satellite ?? false,
-          buoys: parsed.buoys ?? false,
-          tileGrid: parsed.tileGrid ?? false,
-        });
+setLayers({
+  osm: parsed.osm ?? true,
+  enc: parsed.enc ?? false,
+  satellite: parsed.satellite ?? false,
+  buoys: parsed.buoys ?? false,
+  tileGrid: parsed.tileGrid ?? false,
+});
 ```
 
 - [ ] **Step 4: Mount the layer between EncLayer and EncBuoyLayer**
@@ -827,12 +834,12 @@ At line ~598, insert `<SatelliteLayer>` directly after `<EncLayer>` (so NOAA →
 In the `<LayersControl>` props (line ~601), add `onRefreshSatellite`:
 
 ```tsx
-        <LayersControl
-          state={layers}
-          onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
-          onRefreshNoaa={() => refreshEncTiles(mapInstance)}
-          onRefreshSatellite={() => refreshSatTiles(mapInstance)}
-        />
+<LayersControl
+  state={layers}
+  onToggle={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+  onRefreshNoaa={() => refreshEncTiles(mapInstance)}
+  onRefreshSatellite={() => refreshSatTiles(mapInstance)}
+/>
 ```
 
 - [ ] **Step 6: Typecheck**
@@ -844,6 +851,7 @@ Expected: PASS (no errors).
 
 Run: `npm run dev --workspace @g5000/app` (boots web at :3000; use `DEMO_MODE=1` if no hardware).
 In the browser at `http://localhost:3000/chart`:
+
 - Open the Layers popover (top-right), toggle **Satellite** on → imagery renders over OSM.
 - Toggle **NOAA chart** on too → satellite is visible on top of NOAA; toggle satellite off → NOAA shows.
 - Confirm AIS/route/boat-marker annotations still draw above satellite.
@@ -861,6 +869,7 @@ git commit -m "feat(web): mount SatelliteLayer on the chart page"
 ## Task 6: Cache admin API
 
 **Files:**
+
 - Create: `packages/web/src/app/api/sat-cache/route.ts`
 - Create: `packages/web/src/app/api/sat-cache/prune/route.ts`
 - Test: `packages/web/src/app/api/sat-cache/prune/route.test.ts`
@@ -992,6 +1001,7 @@ git commit -m "feat(web): /api/sat-cache stats + prune endpoints"
 ## Task 7: Satellite cache admin panel on /settings
 
 **Files:**
+
 - Create: `packages/web/src/app/settings/SatelliteCachePanel.tsx`
 - Modify: `packages/web/src/app/settings/page.tsx`
 
@@ -1080,8 +1090,13 @@ export function SatelliteCachePanel(): React.ReactElement {
   );
 
   const overBudget = stats ? stats.totalBytes > stats.capBytes : false;
-  const pct = stats && stats.capBytes > 0 ? Math.min(100, (stats.totalBytes / stats.capBytes) * 100) : 0;
-  const zooms = stats ? Object.keys(stats.byZoom).map(Number).sort((a, b) => a - b) : [];
+  const pct =
+    stats && stats.capBytes > 0 ? Math.min(100, (stats.totalBytes / stats.capBytes) * 100) : 0;
+  const zooms = stats
+    ? Object.keys(stats.byZoom)
+        .map(Number)
+        .sort((a, b) => a - b)
+    : [];
 
   return (
     <section className="rounded border border-zinc-700 bg-zinc-900/50 p-4">
@@ -1172,7 +1187,7 @@ import { SatelliteCachePanel } from './SatelliteCachePanel';
 Then render `<SatelliteCachePanel />` within the page's returned JSX, alongside the other sections (place it near the forecast / cache-root settings block — exact location is cosmetic). Example:
 
 ```tsx
-        <SatelliteCachePanel />
+<SatelliteCachePanel />
 ```
 
 - [ ] **Step 3: Typecheck**
@@ -1183,6 +1198,7 @@ Expected: PASS.
 - [ ] **Step 4: Manual browser check**
 
 With `npm run dev --workspace @g5000/app` running, open `http://localhost:3000/settings`:
+
 - The "Satellite tile cache" panel loads and shows usage (0 B initially, or current size).
 - After seeding (Task 8) and reloading, the per-zoom table populates.
 - Entering a day count and clicking **Prune unused tiles** shows a "Freed …" message and the readout refreshes.
@@ -1199,6 +1215,7 @@ git commit -m "feat(web): satellite tile-cache admin panel on /settings"
 ## Task 8: Pre-warm script (sat-seed)
 
 **Files:**
+
 - Create: `scripts/sat-seed.ts`
 
 - [ ] **Step 1: Create the script**
@@ -1331,7 +1348,11 @@ async function fetchTile(t: Tile): Promise<FetchResult> {
   return 'fetched';
 }
 
-async function runPool<T>(items: T[], workers: number, fn: (item: T) => Promise<void>): Promise<void> {
+async function runPool<T>(
+  items: T[],
+  workers: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
   let i = 0;
   const run = async (): Promise<void> => {
     while (true) {
@@ -1373,7 +1394,11 @@ async function overBudget(capGb: number): Promise<boolean> {
   return false;
 }
 
-async function seedTiles(label: string, tilesByZoom: Map<number, Tile[]>, capGb: number): Promise<void> {
+async function seedTiles(
+  label: string,
+  tilesByZoom: Map<number, Tile[]>,
+  capGb: number,
+): Promise<void> {
   const concurrency = Number(parseArg('--concurrency') ?? 8);
   for (const z of [...tilesByZoom.keys()].sort((a, b) => a - b)) {
     if (await overBudget(capGb)) return;
@@ -1383,7 +1408,9 @@ async function seedTiles(label: string, tilesByZoom: Map<number, Tile[]>, capGb:
     await runPool(tiles, concurrency, async (t) => {
       counts[await fetchTile(t)]++;
     });
-    console.log(`[${label}] z=${z} done — cached=${counts.cached} new=${counts.fetched} err=${counts.error}`);
+    console.log(
+      `[${label}] z=${z} done — cached=${counts.cached} new=${counts.fetched} err=${counts.error}`,
+    );
   }
 }
 
@@ -1443,6 +1470,7 @@ git commit -m "feat(scripts): sat-seed pre-warm (regions + global) for satellite
 ## Task 9: Cache CLI (sat-cache)
 
 **Files:**
+
 - Create: `scripts/sat-cache.ts`
 
 - [ ] **Step 1: Create the script**
@@ -1479,7 +1507,9 @@ async function report(): Promise<void> {
   const s = await readCacheStats(CACHE_ROOT);
   console.log(`cache: ${CACHE_ROOT}`);
   console.log(`total: ${gb(s.totalBytes)} of ${gb(s.capBytes)} cap · ${s.tileCount} tiles`);
-  for (const z of Object.keys(s.byZoom).map(Number).sort((a, b) => a - b)) {
+  for (const z of Object.keys(s.byZoom)
+    .map(Number)
+    .sort((a, b) => a - b)) {
     console.log(`  z${z}: ${s.byZoom[z]!.tiles} tiles, ${gb(s.byZoom[z]!.bytes)}`);
   }
   if (s.totalBytes > s.capBytes) console.warn('WARNING: over cap — run `prune`.');
@@ -1494,7 +1524,9 @@ async function prune(): Promise<void> {
   // Default to the 8 GB cap when no flag is given.
   opts.maxBytes = (maxGbRaw !== undefined ? Number(maxGbRaw) : CAP_BYTES / 1024 ** 3) * 1024 ** 3;
   const r = await pruneCache(CACHE_ROOT, opts);
-  console.log(`pruned ${r.removedTiles} tiles, freed ${gb(r.removedBytes)}; now ${gb(r.totalBytesAfter)}`);
+  console.log(
+    `pruned ${r.removedTiles} tiles, freed ${gb(r.removedBytes)}; now ${gb(r.totalBytesAfter)}`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -1563,4 +1595,4 @@ With `npm run dev --workspace @g5000/app`: seed a small area (`npx tsx scripts/s
 - **ESM imports need no file extension** in `packages/web` (bundler resolution); the standalone `scripts/*.ts` import the web lib by relative path and run via `npx tsx`, which resolves TS across the repo. If a script import fails at runtime, the fallback is to copy the two small functions into the script — but try the import first.
 - **Do not reorder `<EncLayer>` and `<SatelliteLayer>`** in `chart/page.tsx` — satellite must mount after NOAA to win the z-order (both use `beforeId='__above-wind__'`).
 - **Before opening the PR:** `git rebase develop` (this worktree was cut from `origin/main`, which is behind `develop`). No chart-code conflict expected.
-</content>
+  </content>

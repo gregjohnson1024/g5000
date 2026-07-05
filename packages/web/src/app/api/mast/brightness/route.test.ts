@@ -22,7 +22,10 @@ describe('/api/mast/brightness', () => {
   });
 
   it('POST round-trips a valid value', async () => {
-    const req = new Request('http://x', { method: 'POST', body: JSON.stringify({ brightnessPct: 30 }) });
+    const req = new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ brightnessPct: 30 }),
+    });
     const res = await POST(req);
     expect(res.status).toBe(200);
     const back = (await (await GET()).json()) as { brightnessPct: number };
@@ -31,7 +34,9 @@ describe('/api/mast/brightness', () => {
 
   it('POST rejects out-of-range / non-integer', async () => {
     for (const v of [-1, 101, 4.2, 'x']) {
-      const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ brightnessPct: v }) }));
+      const res = await POST(
+        new Request('http://x', { method: 'POST', body: JSON.stringify({ brightnessPct: v }) }),
+      );
       expect(res.status).toBe(400);
     }
   });

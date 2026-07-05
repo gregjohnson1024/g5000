@@ -26,38 +26,47 @@ Night mode is just a CSS class the browser applies — so unlike brightness (OS 
 ## Architecture (mirrors brightness)
 
 ### State (extend the existing DisplayConfig — no new table)
+
 - `DisplayConfig` currently `{ brightnessPct }` (`packages/db/src/defaults.ts`). Add `nightMode: boolean`, default `false`. The merge-over-defaults load already in ConfigStore picks up the new field; the schema/table is unchanged (same single JSON row).
 - `DEFAULT_DISPLAY_CONFIG = { brightnessPct: 80, nightMode: false }`.
 
 ### Runtime + SSE
+
 - `MastRuntime` (`packages/mast/src/types.ts`) gains `readonly nightMode$: Observable<boolean>` + `getNightMode(): boolean`.
 - `MastService` (`apps/g5000/src/mast/service.ts`) implements them from `configStore.displayConfig$` (`map(c => c.nightMode)`) + `getDisplayConfig().nightMode` — exactly like `brightness$`/`getBrightness`.
 - `/api/mast/stream` emits a `nightmode` event (boolean), sent on connect and on change, alongside `layout`/`override`/`brightness`.
 
 ### Setter route
+
 - `POST /api/mast/night-mode { nightMode: boolean }` → validate it's a boolean (400 otherwise) → `setDisplayConfig({ ...current, nightMode })` → returns `{ ok: true, nightMode }`. `GET` returns `{ ok: true, nightMode }`. Mirrors `/api/mast/brightness/route.ts`.
 
 ### Apply it (the `/mast` page)
+
 - `packages/web/src/hooks/use-mast-control.ts` (already subscribes to `/api/mast/stream`) gains a `nightMode: boolean` field (listens for the `nightmode` event; default false until received).
-- `packages/web/src/app/mast/page.tsx`: replace `const night = pos ? isNight(pos.lat, pos.lon, new Date()) : false;` with `const { …, nightMode } = useMastControl();` → `const night = nightMode;`. The `<div className={\`mast-root${night ? ' mast-night' : ''}\`}>` is unchanged. Remove the now-unused `isNight`/`pos`-for-night usage (keep `pos` if still used for anything else; it's also used for nothing else night-related — verify and drop the `isNight` import if fully unused).
+- `packages/web/src/app/mast/page.tsx`: replace `const night = pos ? isNight(pos.lat, pos.lon, new Date()) : false;` with `const { …, nightMode } = useMastControl();` → `const night = nightMode;`. The `<div className={\`mast-root${night ? ' mast-night' : ''}\`}>`is unchanged. Remove the now-unused`isNight`/`pos`-for-night usage (keep `pos`if still used for anything else; it's also used for nothing else night-related — verify and drop the`isNight` import if fully unused).
 
 ### Control UI
+
 - `/mast-config` (which already has the brightness slider): add a **night-mode toggle** (checkbox/switch) next to it. Loads current state via `GET /api/mast/night-mode`; POSTs on change (no debounce needed — it's a discrete toggle).
 
 ## Data flow
+
 toggle in g5000 → `POST /api/mast/night-mode` → ConfigStore (persist) → `nightMode$` → SSE `nightmode` event → the kiosk `/mast` page flips `.mast-night` instantly. Persists across reboots; replays on reconnect. No appliance involvement.
 
 ## Error handling / edges
+
 - `/mast` page before the first `nightmode` event arrives → defaults to day (false); flips when the event lands on connect.
 - Invalid POST (non-boolean) → 400, state unchanged.
 - g5000 restart → persisted, replayed on the SSE; the page re-applies on reconnect.
 - (Broader display error states — disconnect/stale-data styling — are a separate queued brainstorm, not handled here. The existing "NO DATA — g5000 disconnected" banner is unchanged.)
 
 ## Testing
+
 - **ConfigStore (vitest):** `DisplayConfig` round-trip including `nightMode` (default false → set true → reopen → true), mirroring the brightness test.
 - **Route (vitest):** `GET` returns `{ ok, nightMode }`; `POST true` persists (GET→true); `POST` rejects non-boolean (e.g. `1`, `"x"`) with 400. Mirrors the brightness route test.
 - **SSE:** emits `nightmode` with the current value on connect (covered by tsc + manual; the stream has no unit harness).
 - Gates: `npx tsc -b` (exit 0) + `npx vitest run packages/db packages/web/src/app/api/mast`; `cd packages/web && npm run build`. Manual: flip the toggle → `/mast` goes red-on-black instantly; reload → state persists.
 
 ## Files
+
 **g5000.** Modify: `packages/db/src/defaults.ts` (add `nightMode` + default), `packages/db/src/config-store.test.ts` (round-trip incl. nightMode), `packages/mast/src/types.ts` (`nightMode$`/`getNightMode`), `apps/g5000/src/mast/service.ts` (wire from `displayConfig$`), `packages/web/src/app/api/mast/stream/route.ts` (emit `nightmode`), `packages/web/src/hooks/use-mast-control.ts` (`nightMode` field), `packages/web/src/app/mast/page.tsx` (apply from setting, drop `isNight`), `packages/web/src/app/mast-config/page.tsx` (toggle). Create: `packages/web/src/app/api/mast/night-mode/route.ts` (+ `route.test.ts`). Unchanged: `mast.css` (reuses `.mast-night`), the appliance.

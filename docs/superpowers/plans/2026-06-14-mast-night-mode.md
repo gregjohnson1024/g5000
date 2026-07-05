@@ -21,6 +21,7 @@ No schema/table change — `DisplayConfig` is a single JSON row, and ConfigStore
 - [ ] **Step 1: Extend the type + default (`defaults.ts`)**
 
 Change the existing `DisplayConfig` interface and its default to:
+
 ```ts
 export interface DisplayConfig {
   /** Panel backlight brightness, 0–100 % (UI-friendly; the unit maps to hardware). */
@@ -38,9 +39,11 @@ export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
 - [ ] **Step 2: Update the ConfigStore round-trip test (`config-store.test.ts`)**
 
 The existing display-config test sets `brightnessPct`. Extend its `next` to also flip `nightMode` so the round-trip covers the new field. Replace the `const next = { ...DEFAULT_DISPLAY_CONFIG, brightnessPct: 35 };` line in that test with:
+
 ```ts
-    const next = { ...DEFAULT_DISPLAY_CONFIG, brightnessPct: 35, nightMode: true };
+const next = { ...DEFAULT_DISPLAY_CONFIG, brightnessPct: 35, nightMode: true };
 ```
+
 (The `expect(store.getDisplayConfig()).toEqual(DEFAULT_DISPLAY_CONFIG)` assertion still holds because the default now includes `nightMode: false`.)
 
 - [ ] **Step 3: Run the test + typecheck**
@@ -49,6 +52,7 @@ Run: `cd /Users/gregjohnson/code/g5000 && npx vitest run packages/db/src/config-
 Run: `cd /Users/gregjohnson/code/g5000 && npx tsc -b` → exit 0.
 
 - [ ] **Step 4: Commit**
+
 ```bash
 cd /Users/gregjohnson/code/g5000
 git add packages/db/src/defaults.ts packages/db/src/config-store.test.ts
@@ -66,6 +70,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Extend the runtime contract (`types.ts`)**
 
 In `MastRuntime`, after the `brightness$`/`getBrightness` members, add:
+
 ```ts
   readonly nightMode$: Observable<boolean>;
   getNightMode(): boolean;
@@ -74,6 +79,7 @@ In `MastRuntime`, after the `brightness$`/`getBrightness` members, add:
 - [ ] **Step 2: Implement in `MastService` (`service.ts`)**
 
 `map` is already imported (added for `brightness$`). Add, next to `brightness$`/`getBrightness`:
+
 ```ts
   get nightMode$(): Observable<boolean> {
     return this.configStore.displayConfig$.pipe(map((c) => c.nightMode));
@@ -87,16 +93,21 @@ In `MastRuntime`, after the `brightness$`/`getBrightness` members, add:
 - [ ] **Step 3: Emit on the SSE (`stream/route.ts`)**
 
 After `send('brightness', mastRuntime.getBrightness());` add:
+
 ```ts
-      send('nightmode', mastRuntime.getNightMode());
+send('nightmode', mastRuntime.getNightMode());
 ```
+
 After the `const brightnessSub = mastRuntime.brightness$.subscribe(...)` line add:
+
 ```ts
-      const nightModeSub = mastRuntime.nightMode$.subscribe((n) => send('nightmode', n));
+const nightModeSub = mastRuntime.nightMode$.subscribe((n) => send('nightmode', n));
 ```
+
 In the `abort` handler, alongside the other `.unsubscribe()` calls, add:
+
 ```ts
-        nightModeSub.unsubscribe();
+nightModeSub.unsubscribe();
 ```
 
 - [ ] **Step 4: Verify**
@@ -105,6 +116,7 @@ Run: `cd /Users/gregjohnson/code/g5000 && npx tsc -b` → exit 0.
 Run: `cd /Users/gregjohnson/code/g5000 && npx vitest run apps/g5000/src/mast` → existing mast tests pass.
 
 - [ ] **Step 5: Commit**
+
 ```bash
 cd /Users/gregjohnson/code/g5000
 git add packages/mast/src/types.ts apps/g5000/src/mast/service.ts packages/web/src/app/api/mast/stream/route.ts
@@ -120,6 +132,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 **Files:** Create `packages/web/src/app/api/mast/night-mode/route.ts` + `route.test.ts`.
 
 - [ ] **Step 1: Write the failing test (`route.test.ts`)**
+
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
@@ -145,7 +158,9 @@ describe('/api/mast/night-mode', () => {
   });
 
   it('POST round-trips true', async () => {
-    const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: true }) }));
+    const res = await POST(
+      new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: true }) }),
+    );
     expect(res.status).toBe(200);
     const back = (await (await GET()).json()) as { nightMode: boolean };
     expect(back.nightMode).toBe(true);
@@ -153,15 +168,19 @@ describe('/api/mast/night-mode', () => {
 
   it('POST rejects a non-boolean', async () => {
     for (const v of [1, 'true', null]) {
-      const res = await POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: v }) }));
+      const res = await POST(
+        new Request('http://x', { method: 'POST', body: JSON.stringify({ nightMode: v }) }),
+      );
       expect(res.status).toBe(400);
     }
   });
 });
 ```
+
 Run: `cd /Users/gregjohnson/code/g5000 && npx vitest run packages/web/src/app/api/mast/night-mode` → FAIL (no module).
 
 - [ ] **Step 2: Implement (`route.ts`)**
+
 ```ts
 import { NextResponse } from 'next/server';
 import { getSharedConfigStore } from '@g5000/db';
@@ -190,9 +209,11 @@ export async function POST(req: Request): Promise<NextResponse> {
   return NextResponse.json({ ok: true, nightMode: b.nightMode });
 }
 ```
+
 Run: `cd /Users/gregjohnson/code/g5000 && npx vitest run packages/web/src/app/api/mast/night-mode` → PASS (3). Then `npx tsc -b` → exit 0.
 
 - [ ] **Step 3: Commit**
+
 ```bash
 cd /Users/gregjohnson/code/g5000
 git add packages/web/src/app/api/mast/night-mode/route.ts packages/web/src/app/api/mast/night-mode/route.test.ts
@@ -210,23 +231,27 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Add `nightMode` to the hook (`use-mast-control.ts`)**
 
 Read the file. It exposes `UseMastControlResult { layout, override, connected }` and subscribes to `/api/mast/stream` for `layout`/`override` events. Make these changes:
+
 - Add `nightMode: boolean;` to the `UseMastControlResult` interface.
 - Add state: `const [nightMode, setNightMode] = useState(false);`
 - In the effect, add a listener mirroring the `override` one:
+
 ```ts
-    es.addEventListener('nightmode', (ev) => {
-      try {
-        setNightMode(JSON.parse((ev as MessageEvent).data) as boolean);
-      } catch {
-        /* ignore malformed payloads */
-      }
-    });
+es.addEventListener('nightmode', (ev) => {
+  try {
+    setNightMode(JSON.parse((ev as MessageEvent).data) as boolean);
+  } catch {
+    /* ignore malformed payloads */
+  }
+});
 ```
+
 - Add `nightMode` to the returned object.
 
 - [ ] **Step 2: Apply it on the page (`mast/page.tsx`)**
 
 The page currently has roughly:
+
 ```tsx
   const { layout, override } = useMastControl();
   ...
@@ -234,7 +259,9 @@ The page currently has roughly:
   ...
   const night = pos ? isNight(pos.lat, pos.lon, new Date()) : false;
 ```
+
 Change to:
+
 - Destructure `nightMode` from the hook: `const { layout, override, nightMode } = useMastControl();`
 - Replace the `night` computation with: `const night = nightMode;`
 - Remove the now-unused `isNight` import. If `pos` (and the `geo` helper) are now unused, remove them too (strict tsc flags unused `pos` local + the unused `isNight` import; remove the `geo` function if it has no remaining caller). Verify by reading the file — `pos`/`geo` may have no other use once `isNight` is gone.
@@ -247,6 +274,7 @@ Run: `cd /Users/gregjohnson/code/g5000/packages/web && npx tsc --noEmit` → cle
 Run: `cd /Users/gregjohnson/code/g5000 && npx tsc -b` → exit 0.
 
 - [ ] **Step 4: Commit**
+
 ```bash
 cd /Users/gregjohnson/code/g5000
 git add packages/web/src/hooks/use-mast-control.ts packages/web/src/app/mast/page.tsx
@@ -266,48 +294,54 @@ The page already has the brightness slider (loads via `GET /api/mast/brightness`
 - [ ] **Step 1: State + load + save**
 
 Add state near `brightnessPct`:
+
 ```tsx
-  const [nightMode, setNightMode] = useState<boolean>(false);
+const [nightMode, setNightMode] = useState<boolean>(false);
 ```
+
 In `reload()`, after the brightness fetch (guarded the same way), add:
+
 ```tsx
-      const nmRes = await fetch('/api/mast/night-mode', { cache: 'no-store' });
-      if (nmRes.ok) {
-        const nmBody = (await nmRes.json()) as { ok: boolean; nightMode: boolean };
-        if (nmBody.ok) setNightMode(nmBody.nightMode);
-      }
+const nmRes = await fetch('/api/mast/night-mode', { cache: 'no-store' });
+if (nmRes.ok) {
+  const nmBody = (await nmRes.json()) as { ok: boolean; nightMode: boolean };
+  if (nmBody.ok) setNightMode(nmBody.nightMode);
+}
 ```
+
 Add a save handler (discrete toggle — no debounce):
+
 ```tsx
-  const onNightModeChange = (on: boolean): void => {
-    setNightMode(on);
-    void fetch('/api/mast/night-mode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nightMode: on }),
-    });
-  };
+const onNightModeChange = (on: boolean): void => {
+  setNightMode(on);
+  void fetch('/api/mast/night-mode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nightMode: on }),
+  });
+};
 ```
 
 - [ ] **Step 2: Toggle UI**
 
 In the "Panel brightness" `<section>` (or a sibling section right after it), add a night-mode row matching the dark-theme idiom:
+
 ```tsx
-      <section className="border border-slate-700 rounded-md p-4 space-y-2">
-        <div className="text-sm font-medium">Night mode</div>
-        <label className="flex items-center gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={nightMode}
-            onChange={(e) => onNightModeChange(e.target.checked)}
-            aria-label="Night mode"
-          />
-          <span className="text-slate-300">{nightMode ? 'On — red on black' : 'Off — day theme'}</span>
-        </label>
-        <p className="text-xs text-slate-400">
-          Forces the mast display's red-on-black night theme on/off. Persists across reboots.
-        </p>
-      </section>
+<section className="border border-slate-700 rounded-md p-4 space-y-2">
+  <div className="text-sm font-medium">Night mode</div>
+  <label className="flex items-center gap-3 text-sm">
+    <input
+      type="checkbox"
+      checked={nightMode}
+      onChange={(e) => onNightModeChange(e.target.checked)}
+      aria-label="Night mode"
+    />
+    <span className="text-slate-300">{nightMode ? 'On — red on black' : 'Off — day theme'}</span>
+  </label>
+  <p className="text-xs text-slate-400">
+    Forces the mast display's red-on-black night theme on/off. Persists across reboots.
+  </p>
+</section>
 ```
 
 - [ ] **Step 3: Verify**
@@ -317,6 +351,7 @@ Run: `cd /Users/gregjohnson/code/g5000/packages/web && npm run build` → succee
 Run: `cd /Users/gregjohnson/code/g5000 && npx tsc -b` → exit 0.
 
 - [ ] **Step 4: Commit**
+
 ```bash
 cd /Users/gregjohnson/code/g5000
 git add packages/web/src/app/mast-config/page.tsx
@@ -335,6 +370,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] Manual (recommended): on `/mast-config`, flip Night mode → the `/mast` display goes red-on-black instantly; reload → persists. (No appliance change; no redeploy of the unit needed beyond the g5000 deploy.)
 
 ## Notes
+
 - Replaces the automatic `isNight` sun-switch with the manual toggle (manual-only, consistent with brightness). `isNight` stays in `@g5000/mast` (unused) for a possible future auto mode.
 - Reuses the existing `.mast-night` CSS — no style changes.
 - Queued follow-up brainstorms (NOT this plan): per-cell colours (8 options), rows×columns layout, one-line title+units/bigger fonts, graphical cells, and display error states (network loss / stale data).

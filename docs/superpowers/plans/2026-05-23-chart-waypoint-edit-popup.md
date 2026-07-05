@@ -9,6 +9,7 @@
 **Tech Stack:** TypeScript (ESM, strict), Next.js 16, React 19, MapLibre, vitest. Spec: `docs/superpowers/specs/2026-05-23-chart-waypoint-edit-popup-design.md`.
 
 **Current refs:**
+
 - `WaypointsLayer.tsx`: `MarkLike = { lat, lon, name?, badge? }`; `DOT_LAYER = 'waypoints-dot'`; dot features set `properties.id = '${i}'` (index). Mount-once effect on `[map]`; `sync()` builds features from `marksRef.current`.
 - `chart/page.tsx`: `waypoints` state `Array<{ id, name, lat, lon }>`; maps to `marks={waypoints.map((w) => ({ lat, lon, name }))}`; has `waypointDropActive`, `mapInstance`, `setError`. `fmtLatLonDmm(lat, lon)` from `../../lib/format-coords`. `parseLatLon(raw)` from `../../lib/coords` (throws on bad input).
 - API: `PUT /api/waypoints/{id}` body `{ name, lat, lon, notes? }`; `DELETE /api/waypoints/{id}` → 200 or 409 `{ error: { code:'waypoint_in_use', message, routes } }`.
@@ -18,11 +19,13 @@
 ## File structure
 
 **Create:**
+
 - `packages/web/src/components/waypoint-form.ts` — `parseWaypointForm` pure helper.
 - `packages/web/src/components/waypoint-form.test.ts`
 - `packages/web/src/components/WaypointEditPopup.tsx` — anchored editable card.
 
 **Modify:**
+
 - `packages/web/src/components/WaypointsLayer.tsx` — `id` on `MarkLike` + dot props; `onSelectWaypoint` click handler + pointer cursor.
 - `packages/web/src/app/chart/page.tsx` — `selectedWaypointId`; marks carry `id`; gated `onSelectWaypoint`; render popup; update state on save/delete; clear selection on drop-mode.
 
@@ -31,19 +34,25 @@
 ## Task 1: `parseWaypointForm` pure helper
 
 **Files:**
+
 - Create: `packages/web/src/components/waypoint-form.ts`
 - Test: `packages/web/src/components/waypoint-form.test.ts`
 
 - [ ] **Step 1: Write the failing test**
 
 `packages/web/src/components/waypoint-form.test.ts`:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { parseWaypointForm } from './waypoint-form';
 
 describe('parseWaypointForm', () => {
   it('parses a valid name + DMM position + notes', () => {
-    const r = parseWaypointForm({ name: 'Newport', positionRaw: '41 29.2n 71 19.5w', notes: 'fuel' });
+    const r = parseWaypointForm({
+      name: 'Newport',
+      positionRaw: '41 29.2n 71 19.5w',
+      notes: 'fuel',
+    });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.patch.name).toBe('Newport');
@@ -78,6 +87,7 @@ Expected: FAIL — module not found.
 - [ ] **Step 3: Implement the helper**
 
 `packages/web/src/components/waypoint-form.ts`:
+
 ```ts
 import { parseLatLon } from '../lib/coords';
 
@@ -131,11 +141,13 @@ git commit -m "feat(web): parseWaypointForm helper for waypoint edit popup"
 ## Task 2: WaypointsLayer — selectable dots
 
 **Files:**
+
 - Modify: `packages/web/src/components/WaypointsLayer.tsx`
 
 - [ ] **Step 1: Add `id` to `MarkLike` + dot feature properties**
 
 Add to the interface:
+
 ```ts
 export interface MarkLike {
   /** Waypoint id, when this mark is a saved waypoint (enables selection). */
@@ -146,7 +158,9 @@ export interface MarkLike {
   badge?: 'S' | 'E';
 }
 ```
+
 In `sync()`, change the feature `properties.id` from the index to the mark's id, falling back to the index for id-less marks:
+
 ```ts
 properties: {
   id: m.id ?? `${i}`,
@@ -158,6 +172,7 @@ properties: {
 - [ ] **Step 2: Add `onSelectWaypoint` prop + a ref for the latest callback**
 
 Change the signature:
+
 ```ts
 export function WaypointsLayer({
   map,
@@ -171,7 +186,9 @@ export function WaypointsLayer({
   onSelectWaypoint?: (id: string) => void;
 }) {
 ```
+
 Add a ref so the bound listeners always see the latest callback without rebinding:
+
 ```ts
 const onSelectRef = useRef<((id: string) => void) | undefined>(onSelectWaypoint);
 onSelectRef.current = onSelectWaypoint;
@@ -180,6 +197,7 @@ onSelectRef.current = onSelectWaypoint;
 - [ ] **Step 3: Bind click + cursor handlers in the mount-once effect**
 
 Inside the `useEffect(..., [map])`, after `syncRef.current = sync;` and before the `return`, add:
+
 ```ts
 const onDotClick = (e: maplibregl.MapLayerMouseEvent): void => {
   const id = e.features?.[0]?.properties?.id;
@@ -198,7 +216,9 @@ map.on('click', DOT_LAYER, onDotClick);
 map.on('mouseenter', DOT_LAYER, onEnter);
 map.on('mouseleave', DOT_LAYER, onLeave);
 ```
+
 And in the cleanup `return () => { ... }`, before the layer removal, add:
+
 ```ts
 map.off('click', DOT_LAYER, onDotClick);
 map.off('mouseenter', DOT_LAYER, onEnter);
@@ -222,11 +242,13 @@ git commit -m "feat(web): WaypointsLayer dots are selectable (onSelectWaypoint)"
 ## Task 3: `WaypointEditPopup` anchored editable card
 
 **Files:**
+
 - Create: `packages/web/src/components/WaypointEditPopup.tsx`
 
 - [ ] **Step 1: Implement the component**
 
 `packages/web/src/components/WaypointEditPopup.tsx`:
+
 ```tsx
 'use client';
 import { useEffect, useState } from 'react';
@@ -311,7 +333,11 @@ export function WaypointEditPopup({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(parsed.patch),
       });
-      const j = (await res.json()) as { ok: boolean; waypoint?: EditableWaypoint; error?: { message?: string } };
+      const j = (await res.json()) as {
+        ok: boolean;
+        waypoint?: EditableWaypoint;
+        error?: { message?: string };
+      };
       if (res.ok && j.ok && j.waypoint) {
         onSaved({
           id: j.waypoint.id,
@@ -355,7 +381,12 @@ export function WaypointEditPopup({
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-100">Edit waypoint</span>
-        <button type="button" onClick={onClose} aria-label="close" className="text-xs text-slate-400 hover:text-slate-200">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="close"
+          className="text-xs text-slate-400 hover:text-slate-200"
+        >
           ✕
         </button>
       </div>
@@ -385,10 +416,20 @@ export function WaypointEditPopup({
       />
       {error && <div className="text-xs text-rose-400">{error}</div>}
       <div className="flex gap-2">
-        <button type="button" onClick={() => void save()} disabled={busy} className="flex-1 px-2 py-1 text-xs rounded border bg-sky-600 text-white border-sky-700 hover:bg-sky-500 disabled:opacity-40">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy}
+          className="flex-1 px-2 py-1 text-xs rounded border bg-sky-600 text-white border-sky-700 hover:bg-sky-500 disabled:opacity-40"
+        >
           Save
         </button>
-        <button type="button" onClick={() => void del()} disabled={busy} className="px-2 py-1 text-xs rounded border bg-slate-800 text-rose-300 border-rose-800 hover:bg-rose-950 disabled:opacity-40">
+        <button
+          type="button"
+          onClick={() => void del()}
+          disabled={busy}
+          className="px-2 py-1 text-xs rounded border bg-slate-800 text-rose-300 border-rose-800 hover:bg-rose-950 disabled:opacity-40"
+        >
           Delete
         </button>
       </div>
@@ -396,11 +437,13 @@ export function WaypointEditPopup({
   );
 }
 ```
+
 > The popup is positioned at the waypoint's screen px with `-translate-x-1/2 -translate-y-full -mt-3` so it sits centered just above the dot. Verify `fmtLatLonDmm(lat, lon)` exists with that signature in `lib/format-coords` (the chart imports it); if it's named differently, use the chart's existing import.
 
 - [ ] **Step 2: Typecheck + commit**
 
 Run: `npm run typecheck --workspace @g5000/web` → passes.
+
 ```bash
 git add packages/web/src/components/WaypointEditPopup.tsx
 git commit -m "feat(web): WaypointEditPopup anchored edit card"
@@ -411,6 +454,7 @@ git commit -m "feat(web): WaypointEditPopup anchored edit card"
 ## Task 4: Wire selection + popup into the chart
 
 **Files:**
+
 - Modify: `packages/web/src/app/chart/page.tsx`
 
 - [ ] **Step 1: State + imports**
@@ -421,6 +465,7 @@ git commit -m "feat(web): WaypointEditPopup anchored edit card"
 - [ ] **Step 2: Marks carry the id; selection gated on drop-mode**
 
 Find the `<WaypointsLayer ... />` mount. Change its `marks` to include the id and add the gated `onSelectWaypoint`:
+
 ```tsx
 <WaypointsLayer
   map={mapInstance}
@@ -432,6 +477,7 @@ Find the `<WaypointsLayer ... />` mount. Change its `marks` to include the id an
 - [ ] **Step 3: Clear selection when entering drop-mode**
 
 Where `waypointDropActive` is toggled on (the `onToggleWaypointDrop` handler passed to `ChartToolbar`), also clear the selection so the two don't overlap. Simplest — add an effect:
+
 ```tsx
 useEffect(() => {
   if (waypointDropActive) setSelectedWaypointId(null);
@@ -441,32 +487,43 @@ useEffect(() => {
 - [ ] **Step 4: Render the popup**
 
 After the `<WaypointsLayer>` / near the other map-overlay React nodes, add:
+
 ```tsx
-{(() => {
-  const sel = selectedWaypointId ? waypoints.find((w) => w.id === selectedWaypointId) : null;
-  if (!sel) return null;
-  return (
-    <WaypointEditPopup
-      map={mapInstance}
-      waypoint={{ id: sel.id, name: sel.name, lat: sel.lat, lon: sel.lon }}
-      onSaved={(updated) => {
-        setWaypoints((prev) => prev.map((w) => (w.id === updated.id ? { id: updated.id, name: updated.name, lat: updated.lat, lon: updated.lon } : w)));
-      }}
-      onDeleted={(id) => {
-        setWaypoints((prev) => prev.filter((w) => w.id !== id));
-        setSelectedWaypointId(null);
-      }}
-      onClose={() => setSelectedWaypointId(null)}
-    />
-  );
-})()}
+{
+  (() => {
+    const sel = selectedWaypointId ? waypoints.find((w) => w.id === selectedWaypointId) : null;
+    if (!sel) return null;
+    return (
+      <WaypointEditPopup
+        map={mapInstance}
+        waypoint={{ id: sel.id, name: sel.name, lat: sel.lat, lon: sel.lon }}
+        onSaved={(updated) => {
+          setWaypoints((prev) =>
+            prev.map((w) =>
+              w.id === updated.id
+                ? { id: updated.id, name: updated.name, lat: updated.lat, lon: updated.lon }
+                : w,
+            ),
+          );
+        }}
+        onDeleted={(id) => {
+          setWaypoints((prev) => prev.filter((w) => w.id !== id));
+          setSelectedWaypointId(null);
+        }}
+        onClose={() => setSelectedWaypointId(null)}
+      />
+    );
+  })();
+}
 ```
+
 > The chart's `waypoints` state element is `{ id, name, lat, lon }` (no `notes`). The popup's `EditableWaypoint` accepts an optional `notes`; passing it absent is fine. If you want notes to round-trip in the chart state, widen the `waypoints` state to include `notes?` — optional, not required for this task. Keep the popup mounted inside the relative map-column div so its `absolute` positioning is relative to the map, matching where `ChartToolbar` sits.
 
 - [ ] **Step 5: Typecheck + smoke + commit**
 
 Run: `npm run typecheck --workspace @g5000/web` → passes.
 `curl -s -o /dev/null -w "/chart %{http_code}\n" http://localhost:3000/chart` → 200.
+
 ```bash
 git add packages/web/src/app/chart/page.tsx
 git commit -m "feat(web): chart waypoint selection + edit popup wiring"
@@ -496,4 +553,7 @@ Load `/chart`. With drop-mode OFF: click a waypoint dot → the edit bubble open
 - **Spec coverage:** id threaded into MarkLike + dot props + click handler (T2); anchored React overlay projected + tracked (T3); full edit name/position/notes via `parseWaypointForm` (T1, T3); Save PUT + Delete with 409 message (T3); selection gated to non-drop-mode + cleared on drop-mode (T4); state updates on save/delete (T4). All spec sections mapped.
 - **Type consistency:** `parseWaypointForm`/`WaypointPatch` (T1) used by `WaypointEditPopup` (T3); `EditableWaypoint` shape consistent T3↔T4; `onSelectWaypoint: (id: string) => void` consistent T2↔T4; chart `waypoints` element `{id,name,lat,lon}` used consistently.
 - **Soft spots flagged:** `parseLatLon` signature (T1) and `fmtLatLonDmm` signature (T3) to verify against the real lib; the chart `waypoints` state omits `notes` so the popup can edit notes but the chart won't re-display them until the state is widened (noted in T4, optional).
+
+```
+
 ```

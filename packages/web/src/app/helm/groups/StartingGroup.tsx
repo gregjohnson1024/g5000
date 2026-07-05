@@ -30,7 +30,15 @@ export function StartingGroup({
         label="Bias"
         value={bias === null ? '—' : `${bias >= 0 ? '+' : ''}${(bias * RAD_TO_DEG).toFixed(0)}`}
         unit="°"
-        sub={bias === null ? undefined : bias > 0 ? 'port favored' : bias < 0 ? 'stbd favored' : 'square'}
+        sub={
+          bias === null
+            ? undefined
+            : bias > 0
+              ? 'port favored'
+              : bias < 0
+                ? 'stbd favored'
+                : 'square'
+        }
       />
       <HelmTile
         label="OCS"
@@ -41,7 +49,15 @@ export function StartingGroup({
         label="Wind shift"
         value={shift === null ? '—' : `${shift >= 0 ? '+' : ''}${(shift * RAD_TO_DEG).toFixed(0)}`}
         unit="°"
-        sub={shift === null ? undefined : shift > 0 ? 'veer (right)' : shift < 0 ? 'back (left)' : 'steady'}
+        sub={
+          shift === null
+            ? undefined
+            : shift > 0
+              ? 'veer (right)'
+              : shift < 0
+                ? 'back (left)'
+                : 'steady'
+        }
       />
     </div>
   );

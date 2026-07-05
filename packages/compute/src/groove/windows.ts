@@ -62,7 +62,10 @@ export function coefficientOfVariation(values: ReadonlyArray<number>): number | 
  * deltas whose magnitude is below the dead-band. Null with < 2 samples or
  * zero span.
  */
-export function reversalsPerMinute(samples: ReadonlyArray<NumSample>, deadband: number): number | null {
+export function reversalsPerMinute(
+  samples: ReadonlyArray<NumSample>,
+  deadband: number,
+): number | null {
   if (samples.length < 2) return null;
   const span = secondsBetween(samples[0]!.t_ns, samples[samples.length - 1]!.t_ns);
   if (span <= 0) return null;
@@ -92,6 +95,9 @@ export function maxRisingSlope(samples: ReadonlyArray<NumSample>): number | null
 }
 
 /** Drop samples older than `cutoff_ns`. Returns a new array. */
-export function pruneBefore<T extends { t_ns: bigint }>(samples: ReadonlyArray<T>, cutoff_ns: bigint): T[] {
+export function pruneBefore<T extends { t_ns: bigint }>(
+  samples: ReadonlyArray<T>,
+  cutoff_ns: bigint,
+): T[] {
   return samples.filter((s) => s.t_ns >= cutoff_ns);
 }

@@ -41,7 +41,11 @@ export default function MastPage() {
   return (
     <div
       className={`mast-root${night ? ' mast-night' : ''}`}
-      style={night ? undefined : ({ ['--mast-fg']: MAST_BASE_COLOR_HEX[dayBaseColor] } as React.CSSProperties)}
+      style={
+        night
+          ? undefined
+          : ({ ['--mast-fg']: MAST_BASE_COLOR_HEX[dayBaseColor] } as React.CSSProperties)
+      }
     >
       {!dataConnected && (
         <div
@@ -53,7 +57,12 @@ export default function MastPage() {
       )}
       <Grid grid={page.grid}>
         {page.tiles.map((t, i) => (
-          <Tile key={i} label={t.label} units={t.units} fmt={formatTile(t, channels.get(t.field), now)} />
+          <Tile
+            key={i}
+            label={t.label}
+            units={t.units}
+            fmt={formatTile(t, channels.get(t.field), now)}
+          />
         ))}
       </Grid>
     </div>

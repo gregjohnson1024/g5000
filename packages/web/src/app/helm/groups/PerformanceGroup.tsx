@@ -34,14 +34,24 @@ export function PerformanceGroup({
       {aws && <HelmTile label="AWS" value={fmtSpeed(aws)} unit="kn" small />}
       {awa && <HelmTile label="AWA" value={fmtAngleSigned(awa)} unit="°" small />}
       {tbsSample && <HelmTile label="TBS" value={fmtSpeed(tbsSample)} unit="kn" small />}
-      {tTwaSample && <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />}
+      {tTwaSample && (
+        <HelmTile label="Target TWA" value={fmtAngleSigned(tTwaSample)} unit="°" small />
+      )}
       {pctPolar !== null && <HelmTile label="% polar" value={pctPolar.toFixed(0)} unit="%" small />}
 
       <HelmTile
         label="In groove"
         value={timeInGroove === null ? '—' : timeInGroove.toFixed(0)}
         unit={timeInGroove === null ? undefined : '%'}
-        severity={timeInGroove === null ? 'neutral' : timeInGroove >= 80 ? 'good' : timeInGroove >= 50 ? 'ok' : 'bad'}
+        severity={
+          timeInGroove === null
+            ? 'neutral'
+            : timeInGroove >= 80
+              ? 'good'
+              : timeInGroove >= 50
+                ? 'ok'
+                : 'bad'
+        }
         sub={pointOfSail ?? undefined}
       />
       <HelmTile

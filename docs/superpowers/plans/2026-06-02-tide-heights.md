@@ -11,19 +11,31 @@
 **Spec:** `docs/superpowers/specs/2026-06-02-tide-heights-design.md`
 
 **Conventions:**
+
 - Run one test file: `npx vitest run <path>` from repo root. Web typecheck: `cd packages/web && npx tsc --noEmit`. Full build: `npx tsc -b`.
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 - `Bus` (from `@g5000/core`) publishes `{ channel, t_ns: bigint, value: ChannelValue, source }`; `ChannelValue` is `{kind:'scalar',value,unit?}` | `{kind:'enum',value}` | `{kind:'geo',...}` | …. `bus.subscribe(channel, handler)` returns an unsubscribe fn.
 - **`ADMIRALTY_TIDAL_API_KEY` is not available during implementation.** Build against the documented response shape with fixtures; the live Phase-0 probe is deferred. The Admiralty parser is isolated so a real-shape correction is one file.
 
 **Shared types (defined Task 2, used everywhere — keep names exact):**
+
 ```ts
-export interface Station { id: string; name: string; lat: number; lon: number }
-export interface TidalEvent { type: 'HW' | 'LW'; timeMs: number; heightM: number }  // timeMs = epoch ms; heightM above Chart Datum
+export interface Station {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+}
+export interface TidalEvent {
+  type: 'HW' | 'LW';
+  timeMs: number;
+  heightM: number;
+} // timeMs = epoch ms; heightM above Chart Datum
 export type TideState = 'rising' | 'falling' | 'stand';
 ```
 
 **File structure:**
+
 - `packages/tide/` — new pure package `@g5000/tide`: `types.ts`, `curve.ts`, `nearest.ts`, `next-event.ts`, `snapshot.ts`, `index.ts` (+ tests).
 - `packages/core/src/channels.ts` — add `Tide.*`.
 - `packages/db/src/{defaults,schema,config-store}.ts` — `TideConfig`.
@@ -38,6 +50,7 @@ export type TideState = 'rising' | 'falling' | 'stand';
 ### Task 1: Scaffold the `@g5000/tide` package
 
 **Files:**
+
 - Create: `packages/tide/package.json`, `packages/tide/tsconfig.json`, `packages/tide/src/index.ts`
 - Modify: `tsconfig.json` (root refs), `apps/g5000/package.json` (predev build list + deps), `packages/web/package.json` (deps)
 
@@ -115,6 +128,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 2: Types + curve math
 
 **Files:**
+
 - Create: `packages/tide/src/types.ts`, `packages/tide/src/curve.ts`
 - Test: `packages/tide/src/curve.test.ts`
 
@@ -219,7 +233,10 @@ export function interpolateHeight(
 
 /** Find the consecutive event pair bracketing `nowMs` (tA ≤ now < tB).
  *  Assumes `events` is sorted ascending by timeMs. */
-function bracket(events: ReadonlyArray<TidalEvent>, nowMs: number): [TidalEvent, TidalEvent] | null {
+function bracket(
+  events: ReadonlyArray<TidalEvent>,
+  nowMs: number,
+): [TidalEvent, TidalEvent] | null {
   for (let i = 0; i < events.length - 1; i++) {
     if (events[i]!.timeMs <= nowMs && nowMs < events[i + 1]!.timeMs) {
       return [events[i]!, events[i + 1]!];
@@ -267,6 +284,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 3: Nearest-station (haversine + hysteresis)
 
 **Files:**
+
 - Create: `packages/tide/src/nearest.ts`
 - Test: `packages/tide/src/nearest.test.ts`
 
@@ -375,12 +393,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Next-event + snapshot
 
 **Files:**
+
 - Create: `packages/tide/src/next-event.ts`, `packages/tide/src/snapshot.ts`
 - Test: `packages/tide/src/next-event.test.ts`, `packages/tide/src/snapshot.test.ts`
 
 - [ ] **Step 1: Write the failing tests.**
 
 `packages/tide/src/next-event.test.ts`:
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { nextEvent } from './next-event.js';
@@ -403,6 +423,7 @@ describe('nextEvent', () => {
 ```
 
 `packages/tide/src/snapshot.test.ts`:
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { tideSnapshot } from './snapshot.js';
@@ -437,6 +458,7 @@ describe('tideSnapshot', () => {
 - [ ] **Step 3: Implement.**
 
 `packages/tide/src/next-event.ts`:
+
 ```ts
 import type { TidalEvent } from './types.js';
 
@@ -450,6 +472,7 @@ export function nextEvent(events: ReadonlyArray<TidalEvent>, nowMs: number): Tid
 ```
 
 `packages/tide/src/snapshot.ts`:
+
 ```ts
 import type { TidalEvent, TideState } from './types.js';
 import { heightNow, tideState } from './curve.js';
@@ -487,6 +510,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 5: Barrel export + build
 
 **Files:**
+
 - Modify: `packages/tide/src/index.ts`
 
 - [ ] **Step 1: Replace `packages/tide/src/index.ts`:**
@@ -518,6 +542,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 6: Tide channel constants
 
 **Files:**
+
 - Modify: `packages/core/src/channels.ts`
 
 - [ ] **Step 1: Add a `Tide` group** to the `Channels` object (after the `Groove` block, before the closing `} as const;`):
@@ -542,6 +567,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 2: Typecheck + commit**
 
 Run: `npx tsc -b packages/core` → clean.
+
 ```bash
 git add packages/core/src/channels.ts
 git commit -m "feat(tide): tide.* channel constants
@@ -554,6 +580,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 7: TideConfig in ConfigStore
 
 **Files:**
+
 - Modify: `packages/db/src/defaults.ts`, `packages/db/src/schema.ts`, `packages/db/src/config-store.ts`
 - Test: `packages/db/src/config-store.test.ts`
 
@@ -588,20 +615,22 @@ export const tideConfig = sqliteTable('tide_config', {
   value: text('value', { mode: 'json' }).notNull(),
 });
 ```
+
 (Match the exact column style `grooveSettings` uses.)
 
 - [ ] **Step 3: Write the failing test** in `packages/db/src/config-store.test.ts` (mirror the groove settings reopen test; import `DEFAULT_TIDE_CONFIG`):
 
 ```ts
-  it('seeds tide config with defaults and persists a set across reopen', async () => {
-    expect(store.getTideConfig()).toEqual(DEFAULT_TIDE_CONFIG);
-    const next = { ...DEFAULT_TIDE_CONFIG, pinnedStationId: '0001' };
-    await store.setTideConfig(next);
-    await store.close();
-    store = await ConfigStore.open(dbPath);
-    expect(store.getTideConfig()).toEqual(next);
-  });
+it('seeds tide config with defaults and persists a set across reopen', async () => {
+  expect(store.getTideConfig()).toEqual(DEFAULT_TIDE_CONFIG);
+  const next = { ...DEFAULT_TIDE_CONFIG, pinnedStationId: '0001' };
+  await store.setTideConfig(next);
+  await store.close();
+  store = await ConfigStore.open(dbPath);
+  expect(store.getTideConfig()).toEqual(next);
+});
 ```
+
 Run it; confirm FAIL (`getTideConfig` not a function): `npx vitest run packages/db/src/config-store.test.ts -t "tide config"`.
 
 - [ ] **Step 4: Wire `config-store.ts`** exactly like `grooveSettings`: import `DEFAULT_TIDE_CONFIG, type TideConfig`; add a `tideConfig` BehaviorSubject seeded with `DEFAULT_TIDE_CONFIG`; in `open()` add `CREATE TABLE IF NOT EXISTS tide_config (boat_id TEXT PRIMARY KEY, value TEXT NOT NULL)` and the Drizzle load-merge over defaults (copy the groove block, swap names/table); add accessors:
@@ -622,6 +651,7 @@ Run it; confirm FAIL (`getTideConfig` not a function): `npx vitest run packages/
     this.subjects.tideConfig.next(value);
   }
 ```
+
 Also add `tideConfig` to the SimpleKey-exclusion comment list (the same comment groove was added to).
 
 - [ ] **Step 5: Run, verify PASS:** `npx vitest run packages/db/src/config-store.test.ts -t "tide config"`, then the full file. Build: `npx tsc -b packages/db` (clean — needs the `@g5000/tide` ref from Step 1).
@@ -640,6 +670,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 8: ADMIRALTY client + pure parsers
 
 **Files:**
+
 - Create: `packages/tide/src/admiralty-client.ts`
 - Test: `packages/tide/src/admiralty-client.test.ts`
 - Modify: `packages/tide/src/index.ts` (export the client)
@@ -758,18 +789,32 @@ export async function listStations(key: string): Promise<Station[]> {
   return parseStations(await get('/Stations', key));
 }
 
-export async function getTidalEvents(key: string, stationId: string, duration = 7): Promise<TidalEvent[]> {
+export async function getTidalEvents(
+  key: string,
+  stationId: string,
+  duration = 7,
+): Promise<TidalEvent[]> {
   const d = Math.max(1, Math.min(7, duration));
-  return parseTidalEvents(await get(`/Stations/${encodeURIComponent(stationId)}/TidalEvents?duration=${d}`, key));
+  return parseTidalEvents(
+    await get(`/Stations/${encodeURIComponent(stationId)}/TidalEvents?duration=${d}`, key),
+  );
 }
 ```
 
 - [ ] **Step 4: Run, verify PASS:** `npx vitest run packages/tide/src/admiralty-client.test.ts`.
 
 - [ ] **Step 4b: Export from the barrel** — append to `packages/tide/src/index.ts`:
+
 ```ts
-export { listStations, getTidalEvents, parseStations, parseTidalEvents, TideApiError } from './admiralty-client.js';
+export {
+  listStations,
+  getTidalEvents,
+  parseStations,
+  parseTidalEvents,
+  TideApiError,
+} from './admiralty-client.js';
 ```
+
 Build: `npx tsc -b packages/tide` (clean).
 
 > **Phase-0 note (deferred):** once `ADMIRALTY_TIDAL_API_KEY` exists, run one live `listStations`/`getTidalEvents` call, diff the real JSON against these fixtures, and adjust `parseStations`/`parseTidalEvents` only if the shape differs.
@@ -788,6 +833,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 9: TideService (bus publisher) + boot wiring
 
 **Files:**
+
 - Create: `apps/g5000/src/tide-subsystem.ts`
 - Test: `apps/g5000/src/tide-subsystem.test.ts`
 - Modify: `apps/g5000/src/index.ts`
@@ -846,7 +892,14 @@ describe('publishTideSnapshot', () => {
 ```ts
 import { Bus, Channels } from '@g5000/core';
 import type { ConfigStore } from '@g5000/db';
-import { tideSnapshot, nearestStation, listStations, getTidalEvents, type Station, type TidalEvent } from '@g5000/tide';
+import {
+  tideSnapshot,
+  nearestStation,
+  listStations,
+  getTidalEvents,
+  type Station,
+  type TidalEvent,
+} from '@g5000/tide';
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -913,7 +966,10 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
     }
     try {
       stations = await listStations(key!);
-      await store.setTideConfig({ ...store.getTideConfig(), stationsCache: { fetchedAtMs: Date.now(), stations } });
+      await store.setTideConfig({
+        ...store.getTideConfig(),
+        stationsCache: { fetchedAtMs: Date.now(), stations },
+      });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[tide] station list fetch failed; using cache', e);
@@ -940,7 +996,9 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
         // Rolling cache: keep the most recent past event so heightNow can bracket "now".
         const now = Date.now();
         const pastKept = activeEvents.filter((e) => e.timeMs <= now).slice(-1);
-        const merged = changed ? fresh : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
+        const merged = changed
+          ? fresh
+          : [...pastKept, ...fresh].sort((a, b) => a.timeMs - b.timeMs);
         // De-dup identical timestamps.
         activeEvents = merged.filter((e, i, arr) => i === 0 || e.timeMs !== arr[i - 1]!.timeMs);
         active = next;
@@ -980,19 +1038,22 @@ export async function startTideSubsystem(deps: TideSubsystemDeps): Promise<() =>
   };
 }
 ```
+
 (Remove the `KN_UNUSED` line — it's a placeholder to delete; if an unused-var lint fires, drop it.)
 
 - [ ] **Step 4: Run, verify PASS:** `npx vitest run apps/g5000/src/tide-subsystem.test.ts`.
 
 - [ ] **Step 5: Wire at boot** in `apps/g5000/src/index.ts`: add `import { startTideSubsystem } from './tide-subsystem.js';` near the other subsystem imports; after the groove subsystem start lines add:
+
 ```ts
-  const stopTideSubsystem = await startTideSubsystem({ bus, store });
-  teardown.push(stopTideSubsystem);
+const stopTideSubsystem = await startTideSubsystem({ bus, store });
+teardown.push(stopTideSubsystem);
 ```
 
 - [ ] **Step 6: Build + commit**
 
 Run: `npx tsc -b apps/g5000` → clean (delete the `KN_UNUSED` line if it trips noUnusedLocals).
+
 ```bash
 git add apps/g5000/src/tide-subsystem.ts apps/g5000/src/tide-subsystem.test.ts apps/g5000/src/index.ts
 git commit -m "feat(tide): TideService bus publisher + boot wiring (graceful-off)
@@ -1005,11 +1066,13 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 10: /api/tide routes
 
 **Files:**
+
 - Create: `packages/web/src/app/api/tide/stations/route.ts`, `.../events/route.ts`, `.../active/route.ts`, `.../pin/route.ts`
 
 These run in the Next server (same process); they read the shared `ConfigStore` (via the app's shared instance — find how other routes get it, e.g. `getSharedConfigStore()` from `@g5000/db`, used by existing routes) and call the Admiralty client server-side. FIRST read an existing route (e.g. `packages/web/src/app/api/settings/route.ts`) to copy the exact ConfigStore-access + response idiom.
 
 - [ ] **Step 1: `stations/route.ts`** — return the cached station list (from `getTideConfig().stationsCache`), or `{ ok:false, error:'tide not configured' }` when the key is unset and no cache:
+
 ```ts
 import { NextResponse } from 'next/server';
 import { getSharedConfigStore } from '@g5000/db';
@@ -1019,13 +1082,19 @@ export const dynamic = 'force-dynamic';
 export async function GET(): Promise<NextResponse> {
   const store = getSharedConfigStore();
   const cache = store?.getTideConfig().stationsCache ?? null;
-  if (!cache) return NextResponse.json({ ok: false, error: 'tide not configured or station list not yet loaded' }, { status: 503 });
+  if (!cache)
+    return NextResponse.json(
+      { ok: false, error: 'tide not configured or station list not yet loaded' },
+      { status: 503 },
+    );
   return NextResponse.json({ ok: true, stations: cache.stations });
 }
 ```
+
 (Adjust `getSharedConfigStore` to the real accessor used by sibling routes.)
 
 - [ ] **Step 2: `events/route.ts`** — `GET ?stationId=…`; server-side fetch via `getTidalEvents` from `@g5000/tide` (the client lives there per Task 8), cached per (station, UTC day) in a module-level `Map`:
+
 ```ts
 import { NextResponse } from 'next/server';
 import { getTidalEvents } from '@g5000/tide';
@@ -1037,7 +1106,8 @@ export async function GET(req: Request): Promise<NextResponse> {
   const key = process.env.ADMIRALTY_TIDAL_API_KEY;
   if (!key) return NextResponse.json({ ok: false, error: 'tide not configured' }, { status: 503 });
   const stationId = new URL(req.url).searchParams.get('stationId');
-  if (!stationId) return NextResponse.json({ ok: false, error: 'stationId required' }, { status: 400 });
+  if (!stationId)
+    return NextResponse.json({ ok: false, error: 'stationId required' }, { status: 400 });
   const day = Math.floor(Date.now() / 86_400_000);
   const hit = cache.get(stationId);
   if (hit && hit.day === day) return NextResponse.json({ ok: true, events: hit.events });
@@ -1058,6 +1128,7 @@ export async function GET(req: Request): Promise<NextResponse> {
 - [ ] **Step 5: Typecheck + commit**
 
 Run: `cd packages/web && npx tsc --noEmit` → clean.
+
 ```bash
 git add packages/web/src/app/api/tide
 git commit -m "feat(tide): /api/tide stations/events/active/pin routes (cached, server-side key)
@@ -1070,6 +1141,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 11: /tide page
 
 **Files:**
+
 - Create: `packages/web/src/app/tide/page.tsx`
 
 - [ ] **Step 1: Read** an existing page that uses `fetch` + lists + a small SVG (e.g. `app/sessions/page.tsx`, `components/WindShiftPlot.tsx`) to match style.
@@ -1082,7 +1154,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - **Pin** button → `POST /api/tide/pin {stationId}`; **Un-pin** → `POST {stationId:null}`; reflect `active.pinned`.
   - Labels: "Heights in metres above Chart Datum", "Approximate curve — not for under-keel clearance", "Free Discovery tier: 7-day horizon".
   - Graceful: if `/api/tide/stations` returns `503 not configured`, show "Tide API not configured — set ADMIRALTY_TIDAL_API_KEY."
-  Use `@g5000/tide` (`interpolateHeight`, `tideSnapshot`, types) client-side for the curve — `packages/web` already depends on it (Task 1). Keep the SVG simple and consistent with `WindShiftPlot`.
+    Use `@g5000/tide` (`interpolateHeight`, `tideSnapshot`, types) client-side for the curve — `packages/web` already depends on it (Task 1). Keep the SVG simple and consistent with `WindShiftPlot`.
 
 - [ ] **Step 3: Build**
 
@@ -1102,6 +1174,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 12: Mast formatter for tide channels + full build/test
 
 **Files:**
+
 - Modify: `packages/web/src/app/mast/format.ts` (+ its test)
 - Modify: `docs/superpowers/specs/...` not needed
 
@@ -1127,6 +1200,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Self-Review
 
 **Spec coverage:**
+
 - `@g5000/tide` pure package (curve/nearest/next-event/snapshot) → Tasks 1–5. ✅
 - `tide.*` decomposed channels + mast-selectable → Task 6 (+ Task 12 formatter). ✅
 - TideConfig (pinned/default/cache) → Task 7. ✅

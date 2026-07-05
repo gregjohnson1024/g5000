@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  fmtSetDeg,
-  summarizeCurrent,
-  summarizeTide,
-  CURRENT_KIND_LABEL,
-} from './station-summary';
+import { fmtSetDeg, summarizeCurrent, summarizeTide, CURRENT_KIND_LABEL } from './station-summary';
 import type { CurrentPrediction, CurrentEvent, TidalEvent } from '@g5000/tide';
 
 describe('fmtSetDeg', () => {

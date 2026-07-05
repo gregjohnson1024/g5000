@@ -39,6 +39,7 @@ Generalize the tide feature to **multiple sources**, auto-selected by the boat's
 ## Architecture
 
 ### `TideSource` interface (`@g5000/tide`)
+
 ```ts
 interface TideSource {
   id: 'admiralty' | 'chs';
@@ -48,45 +49,61 @@ interface TideSource {
   getTidalEvents(stationId: string, days: number): Promise<TidalEvent[]>;
 }
 ```
+
 - **Shared factory (keeps the package pure):** `createTideSources(opts: { getAdmiraltyKey: () => string | undefined }): TideSource[]` returns `[admiralty, chs]`. The ADMIRALTY key is **injected** via `getAdmiraltyKey` — `@g5000/tide` never reads `process.env`. Both the `TideService` and the `/api/tide` routes build sources through this one factory (no divergence). `getTideSource(sources, id)` helper for the routes' `source` param.
 - **`admiralty` source:** wraps the existing `admiralty-client`; `coversPosition` = UK EEZ bbox (lon −14…+3, lat 48…62); `available()` = `getAdmiraltyKey() != null`; `listStations`/`getTidalEvents` call the existing client with the injected key.
 - **`chs` source:** wraps the new `chs-client`; `coversPosition` = Canadian-waters bbox (lon −141…−52, lat 41…84 — both coasts, Arctic, Great Lakes); `available()` = always true; no key. The bboxes are coarse rectangles (documented as heuristic/tunable); UK and CA don't overlap.
 
 ### `chs-client.ts` (`@g5000/tide`, no key)
+
 - `parseChsStations(json)`: array → `{ id, name: officialName, lat: latitude, lon: longitude }` for each station **whose `timeSeries` includes `wlp-hilo`** (so the picker only shows prediction-capable stations). Skips entries missing id/name/numeric coords. Pure.
-- `parseChsEvents(json)`: array of `{eventDate, value}` (sorted ascending by time) → `TidalEvent[]`, **deriving HW/LW by alternation**: event *i* is `HW` iff its `value` is greater than the adjacent extremum — for `i ≥ 1`, `value[i] > value[i-1]` → HW else LW; for `i = 0`, `value[0] > value[1]` → HW else LW (single-element input → classify against itself is undefined, return that one event typed by comparison to none → treat a lone event as HW if no neighbor; documented edge). Pure.
+- `parseChsEvents(json)`: array of `{eventDate, value}` (sorted ascending by time) → `TidalEvent[]`, **deriving HW/LW by alternation**: event _i_ is `HW` iff its `value` is greater than the adjacent extremum — for `i ≥ 1`, `value[i] > value[i-1]` → HW else LW; for `i = 0`, `value[0] > value[1]` → HW else LW (single-element input → classify against itself is undefined, return that one event typed by comparison to none → treat a lone event as HW if no neighbor; documented edge). Pure.
 - `listStations()` → `GET /stations` → `parseChsStations`. `getTidalEvents(stationId, days)` → `GET /stations/{id}/data?time-series-code=wlp-hilo&from={now}&to={now+days}` → `parseChsEvents`. Errors (429/5xx) throw a typed `TideApiError` like the ADMIRALTY client.
 
 ### Selection (`TideService`)
+
 Config `tideSource`:
-- **`auto`** (default): first *available* source whose `coversPosition(lat,lon)` is true for the live `nav.gps.position`.
+
+- **`auto`** (default): first _available_ source whose `coversPosition(lat,lon)` is true for the live `nav.gps.position`.
 - **`'admiralty'` / `'chs'`**: force that source if available.
 - **No active source** (no GPS + no override, position outside all bboxes, or matched source unavailable) → suppress all `tide.*` channels; `/tide` page shows the no-source state.
 
 On active-source change: fetch that source's station list (per-source cache), re-resolve the active station (matching-source pin, else nearest within that source's list), fetch its events. The ~30 s interpolation tick and `publishTideSnapshot` are unchanged, plus a new `tide.source` enum publish.
 
 ## Bus channels
+
 Add `Tide.Source: 'tide.source'` (enum `'admiralty'|'chs'`) to the `Channels` catalog (auto mast-selectable; enum passthrough already handled by the mast formatter). All existing `tide.*` channels unchanged.
 
 ## ConfigStore — `TideConfig` evolves
+
 (merge-over-defaults migration is trivial — new keys default in; the dropped single cache rebuilds on next fetch)
+
 ```ts
 interface TideConfig {
-  tideSource: 'auto' | 'admiralty' | 'chs';                 // default 'auto'
-  pinnedStation: { sourceId: 'admiralty' | 'chs'; stationId: string } | null;  // pin carries its source; honored only when it matches the active source; doubles as the no-GPS anchor
-  stationsCacheBySource: Partial<Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>>;  // per-source weekly cache
+  tideSource: 'auto' | 'admiralty' | 'chs'; // default 'auto'
+  pinnedStation: { sourceId: 'admiralty' | 'chs'; stationId: string } | null; // pin carries its source; honored only when it matches the active source; doubles as the no-GPS anchor
+  stationsCacheBySource: Partial<
+    Record<'admiralty' | 'chs', { fetchedAtMs: number; stations: Station[] }>
+  >; // per-source weekly cache
 }
-export const DEFAULT_TIDE_CONFIG: TideConfig = { tideSource: 'auto', pinnedStation: null, stationsCacheBySource: {} };
+export const DEFAULT_TIDE_CONFIG: TideConfig = {
+  tideSource: 'auto',
+  pinnedStation: null,
+  stationsCacheBySource: {},
+};
 ```
+
 (Replaces the old `pinnedStationId`/`defaultStationId`/`stationsCache`. `defaultStationId` is dropped — the pin doubles as the no-GPS anchor.)
 
 ## Touchpoint refactors
+
 - `apps/g5000/src/tide-subsystem.ts`: build sources via `createTideSources({ getAdmiraltyKey: () => process.env.ADMIRALTY_TIDAL_API_KEY })`; replace the single-source key-gate + `listStations`/`getTidalEvents` calls with source resolution + per-source cache + the new pin model; publish `tide.source`. Graceful-off becomes "no active source → suppress."
 - `packages/web/src/app/api/tide/`: `stations` returns the active source's list + `sourceId`; `events?stationId=&source=` resolves the named source via the factory and calls its `getTidalEvents` (drops the direct `ADMIRALTY_TIDAL_API_KEY` read); `active` → `{sourceId, pinned, stationId, name}`; `pin` accepts `{stationId, sourceId} | {stationId:null}`.
 - `packages/web/src/app/tide/page.tsx`: show the active source label; the picker lists the active source's stations; replace the hardcoded "set ADMIRALTY_TIDAL_API_KEY" message with a source-aware state ("No tide source for this region" / "UK waters but ADMIRALTY key not set").
 - `packages/web/src/app/helm/groups/NavigatingGroup.tsx`: the tide tile's `sub` shows `tide.source`.
 
 ## Testing (repo's pure-logic vitest convention)
+
 - `@g5000/tide`:
   - `sources.test.ts` — `coversPosition` (UK pos → admiralty true / chs false; Canadian pos → chs true / admiralty false; mid-Atlantic → neither); `available()` (admiralty with/without injected key; chs always true); `createTideSources` selection helper (auto picks covering+available; explicit override; unavailable → null).
   - `chs-client.test.ts` — `parseChsStations` (maps fields; filters to `wlp-hilo`-capable; skips bad), `parseChsEvents` (**HW/LW derived by alternation** — e.g. `[0.74,1.706,0.425]` → `[LW,HW,LW]`; single event edge; non-array → []).
@@ -97,6 +114,7 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = { tideSource: 'auto', pinnedStati
 - ADMIRALTY parser tests unchanged.
 
 ## Edge cases
+
 - No GPS + `auto` + no pin → no active source → suppress (page: "no position / pick a source").
 - Position in UK bbox but `ADMIRALTY_TIDAL_API_KEY` unset → admiralty unavailable → no source → suppress with a "set key" hint.
 - Source switch (UK↔Canada crossing): new source's list fetched, nearest re-resolved, pin ignored if it belonged to the other source.
@@ -105,4 +123,5 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = { tideSource: 'auto', pinnedStati
 - All times UTC; display local. Heights above Chart Datum (CD/CLLW) for both sources.
 
 ## Files (anticipated; the plan refines)
+
 Create: `packages/tide/src/{sources.ts, chs-client.ts}` (+ tests). Modify: `packages/tide/src/index.ts` (export sources + chs client + the `TideSource` type), `packages/core/src/channels.ts` (`Tide.Source`), `packages/db/src/{defaults,schema?,config-store}.ts` (TideConfig shape — schema table unchanged, just the JSON value shape + accessors), `apps/g5000/src/tide-subsystem.ts`, `packages/web/src/app/api/tide/{stations,events,active,pin}/route.ts`, `packages/web/src/app/tide/page.tsx`, `packages/web/src/app/helm/groups/NavigatingGroup.tsx`. The ADMIRALTY client + the pure curve/nearest/snapshot modules are unchanged (ADMIRALTY client gets wrapped by a source, not rewritten).
