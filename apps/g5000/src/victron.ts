@@ -17,6 +17,8 @@ export function startVictron(bus: Bus): () => void {
         host,
         port: Number(process.env.VICTRON_MQTT_PORT ?? 1883),
         portalId: process.env.VICTRON_PORTAL_ID,
+        username: process.env.VICTRON_MQTT_USER,
+        password: process.env.VICTRON_MQTT_PASS,
         registry,
         bus,
       });

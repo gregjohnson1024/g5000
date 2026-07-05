@@ -24,6 +24,25 @@ describe('parseTopic', () => {
   });
 });
 
+describe('deriveSnapshot null/empty handling', () => {
+  it('generator.state is null (not the string "undefined") when no genset is present', () => {
+    const snap = deriveSnapshot(feed([[`${N('system')}/0/Dc/Battery/Soc`, 80]]), 1, true);
+    expect(snap.generator.state).toBeNull();
+  });
+  it('falls back to a default name when CustomName is empty', () => {
+    const snap = deriveSnapshot(
+      feed([
+        [`${N('temperature')}/20/Temperature`, 33.9],
+        [`${N('temperature')}/20/CustomName`, ''],
+      ]),
+      1,
+      true,
+    );
+    expect(snap.temperatures[0]?.name).toBe('Temp 20');
+    expect(snap.temperatures[0]?.celsius).toBeCloseTo(33.9, 5);
+  });
+});
+
 describe('applyMessage + deriveSnapshot', () => {
   it('derives battery/solar/tanks/temps from system + device services', () => {
     const state = feed([

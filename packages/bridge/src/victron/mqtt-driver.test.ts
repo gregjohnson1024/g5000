@@ -2,8 +2,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Bus } from '@g5000/core';
 import { createVictronRegistry } from './registry.js';
-import { startVictronMqttDriver, type MqttLike } from './mqtt-driver.js';
+import { startVictronMqttDriver, buildConnectOptions, type MqttLike } from './mqtt-driver.js';
 import { setSharedVictron } from '@g5000/core';
+
+describe('buildConnectOptions', () => {
+  it('passes username/password through for FlashMQ auth', () => {
+    expect(buildConnectOptions('g5000', 'secret')).toEqual({
+      reconnectPeriod: 5_000,
+      username: 'g5000',
+      password: 'secret',
+    });
+  });
+  it('leaves credentials undefined when not provided (anonymous)', () => {
+    const o = buildConnectOptions();
+    expect(o.username).toBeUndefined();
+    expect(o.password).toBeUndefined();
+  });
+});
 
 function fakeClient() {
   const handlers = new Map<string, (...a: any[]) => void>();

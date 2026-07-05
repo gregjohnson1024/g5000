@@ -182,7 +182,7 @@ export function SystemsPanel(): React.ReactElement {
           <span className="text-slate-200 tabular-nums">{fmtW(snapshot.dc.power)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-slate-500">24 V</span>
+          <span className="text-slate-500">Batt</span>
           <span className="text-slate-200 tabular-nums">{fmtNum(bat.voltage, 1)} V</span>
         </div>
         {bat.temperatureC != null && (

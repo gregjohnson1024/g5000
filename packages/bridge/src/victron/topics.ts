@@ -39,8 +39,13 @@ const num = (state: RawVictronState, key: string): number | null => {
 };
 const str = (state: RawVictronState, key: string): string | null => {
   const v = state.byKey.get(key);
-  return typeof v === 'string' ? v : v === null ? null : String(v);
+  if (typeof v === 'string') return v;
+  // Absent (undefined) or explicit null → null. Guards against String(undefined)
+  // leaking the literal "undefined" (e.g. generator.state on a system with no genset).
+  return v == null ? null : String(v);
 };
+/** Non-blank string, else null — so an empty CustomName falls back to a default name. */
+const nonEmpty = (s: string | null): string | null => (s && s.trim() !== '' ? s : null);
 
 // Victron numeric enums → labels (partial; unknowns fall back to the number).
 const CHARGER_STATE: Record<number, string> = {
@@ -80,7 +85,10 @@ export function deriveSnapshot(
     const stateNum = num(state, `${p}/State`);
     return {
       id: p,
-      name: str(state, `${p}/CustomName`) ?? str(state, `${p}/ProductName`) ?? `MPPT ${inst}`,
+      name:
+        nonEmpty(str(state, `${p}/CustomName`)) ??
+        nonEmpty(str(state, `${p}/ProductName`)) ??
+        `MPPT ${inst}`,
       power: num(state, `${p}/Yield/Power`) ?? 0,
       voltage: num(state, `${p}/Dc/0/Voltage`) ?? 0,
       current: num(state, `${p}/Dc/0/Current`) ?? 0,
@@ -105,7 +113,7 @@ export function deriveSnapshot(
     const p = `temperature/${inst}`;
     return {
       id: p,
-      name: str(state, `${p}/CustomName`) ?? `Temp ${inst}`,
+      name: nonEmpty(str(state, `${p}/CustomName`)) ?? `Temp ${inst}`,
       celsius: num(state, `${p}/Temperature`) ?? 0,
     };
   });

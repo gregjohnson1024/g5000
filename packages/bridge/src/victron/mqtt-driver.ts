@@ -19,6 +19,11 @@ export interface VictronDriverOpts {
   host: string;
   port?: number;
   portalId?: string;
+  /** MQTT username — FlashMQ (Venus OS 3.20+) rejects anonymous connections.
+   *  Any value works when the GX has no VNC password set. */
+  username?: string;
+  /** MQTT password — the GX Remote Console / VNC password when one is set. */
+  password?: string;
   registry: VictronRegistry;
   bus: Bus;
   publishIntervalMs?: number;
@@ -33,6 +38,18 @@ export interface VictronDriverOpts {
 const DEFAULT_PUBLISH_MS = 1_000;
 const DEFAULT_KEEPALIVE_MS = 30_000;
 const KEEPALIVE_PAYLOAD = JSON.stringify({ 'keepalive-options': ['suppress-republish'] });
+
+/**
+ * MQTT connect options. Credentials pass through when provided — FlashMQ
+ * (Venus OS 3.20+) rejects anonymous connections, so a username/password
+ * (from VICTRON_MQTT_USER/PASS) is required against a real Cerbo GX.
+ */
+export function buildConnectOptions(
+  username?: string,
+  password?: string,
+): { reconnectPeriod: number; username?: string; password?: string } {
+  return { reconnectPeriod: 5_000, username, password };
+}
 
 /**
  * Start the Victron MQTT driver.
@@ -60,7 +77,7 @@ export function startVictronMqttDriver(opts: VictronDriverOpts): () => void {
 
   // Injected connect factory (for tests) or the real mqtt.connect.
   const connectFn: MqttConnectFn =
-    opts.connect ?? ((url) => mqtt.connect(url, { reconnectPeriod: 5_000 }));
+    opts.connect ?? ((url) => mqtt.connect(url, buildConnectOptions(opts.username, opts.password)));
 
   const url = `mqtt://${host}:${port}`;
   const client = connectFn(url);
