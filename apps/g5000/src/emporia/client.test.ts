@@ -72,7 +72,10 @@ describe('createEmporiaClient — Node compat rejection check', () => {
     expect(msg).not.toMatch(/navigator is not defined/i);
     expect(msg).not.toMatch(/window is not defined/i);
     expect(msg).not.toMatch(/document is not defined/i);
-    // Should be some kind of auth/network rejection
-    // (NotAuthorizedException, NetworkError, fetch error, etc.)
+    // MUST be a real Cognito auth rejection (proves SRP ran in Node)
+    const errorCode = (caught as any)?.code ?? (caught as any)?.name ?? '';
+    expect(String(errorCode)).toMatch(
+      /NotAuthorizedException|UserNotFoundException|InvalidParameterException/,
+    );
   }, 30_000);
 });
