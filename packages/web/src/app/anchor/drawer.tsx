@@ -7,8 +7,9 @@ import { SolarTab } from './tabs/SolarTab';
 import { TidesTab } from './tabs/TidesTab';
 import { SkyTab } from './tabs/SkyTab';
 import { RadarTab } from './tabs/RadarTab';
+import { AcLoadsTab } from './tabs/AcLoadsTab';
 
-type DrawerTab = 'forecast' | 'table' | 'tides' | 'radar' | 'sky' | 'solar';
+type DrawerTab = 'forecast' | 'table' | 'tides' | 'radar' | 'sky' | 'solar' | 'ac';
 
 const TABS: { id: DrawerTab; label: string }[] = [
   { id: 'forecast', label: 'Forecast' },
@@ -17,6 +18,7 @@ const TABS: { id: DrawerTab; label: string }[] = [
   { id: 'radar', label: 'Radar' },
   { id: 'sky', label: 'Sky' },
   { id: 'solar', label: 'Solar' },
+  { id: 'ac', label: 'AC' },
 ];
 
 const LS_KEY = 'anchor:drawer';
@@ -99,6 +101,8 @@ export function AnchorDrawer({
         return <SkyTab lat={wxLat} lon={wxLon} />;
       case 'radar':
         return <RadarTab lat={effectiveLat} lon={effectiveLon} />;
+      case 'ac':
+        return <AcLoadsTab />;
       default:
         return (
           <p className="text-slate-500 text-sm italic">

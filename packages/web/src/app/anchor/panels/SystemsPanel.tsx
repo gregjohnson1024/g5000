@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { VictronSnapshot } from '@g5000/core';
+import type { VictronSnapshot, EmporiaSnapshot } from '@g5000/core';
 
 const POLL_MS = 2_000;
 
@@ -84,6 +84,7 @@ function OfflineCard({ label }: { label: string }): React.ReactElement {
 export function SystemsPanel(): React.ReactElement {
   const [snapshot, setSnapshot] = useState<VictronSnapshot | null>(null);
   const [offline, setOffline] = useState(false);
+  const [emporiaMainsW, setEmporiaMainsW] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +110,30 @@ export function SystemsPanel(): React.ReactElement {
 
     void poll();
     const timer = setInterval(poll, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const pollEmporia = async (): Promise<void> => {
+      try {
+        const r = await fetch('/api/emporia/state', { cache: 'no-store' });
+        if (cancelled) return;
+        if (!r.ok) return;
+        const j = (await r.json()) as EmporiaSnapshot & { offline?: boolean };
+        if (cancelled) return;
+        setEmporiaMainsW(j.connected && !j.offline ? (j.mainsW ?? null) : null);
+      } catch {
+        /* upstream blip — next tick retries */
+      }
+    };
+
+    void pollEmporia();
+    const timer = setInterval(pollEmporia, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -176,6 +201,10 @@ export function SystemsPanel(): React.ReactElement {
         <div className="flex items-center justify-between">
           <span className="text-slate-500">AC IN</span>
           <span className="text-slate-200 tabular-nums">{fmtW(snapshot.ac.inputPower)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">AC loads</span>
+          <span className="text-slate-200 tabular-nums">{fmtW(emporiaMainsW)}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-slate-500">DC</span>
