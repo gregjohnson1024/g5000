@@ -141,9 +141,33 @@ export function SystemsPanel(): React.ReactElement {
   }, []);
 
   // ── Battery & Power card ───────────────────────────────────────────────────
+  // The AC-loads row is independent of Victron: it shows whenever Emporia has
+  // data, even when Victron is offline. We render the outer card always and
+  // gate only the Victron-sourced content on `offline / snapshot === null`.
+
   if (offline || snapshot === null) {
-    // Show offline for all three conceptual sections as a single card.
-    return <OfflineCard label="Battery & Power" />;
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 min-h-[100px]">
+        <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
+          Battery &amp; Power
+        </span>
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-slate-600 text-xs italic">Cerbo offline</span>
+        </div>
+        {/* AC-loads row visible even when Victron is offline */}
+        {emporiaMainsW !== null && (
+          <>
+            <div className="border-t border-slate-800" />
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">AC loads</span>
+                <span className="text-slate-200 tabular-nums">{fmtW(emporiaMainsW)}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
   }
 
   const bat = snapshot.battery;
@@ -202,6 +226,7 @@ export function SystemsPanel(): React.ReactElement {
           <span className="text-slate-500">AC IN</span>
           <span className="text-slate-200 tabular-nums">{fmtW(snapshot.ac.inputPower)}</span>
         </div>
+        {/* AC loads row: always visible regardless of Victron state */}
         <div className="flex items-center justify-between">
           <span className="text-slate-500">AC loads</span>
           <span className="text-slate-200 tabular-nums">{fmtW(emporiaMainsW)}</span>

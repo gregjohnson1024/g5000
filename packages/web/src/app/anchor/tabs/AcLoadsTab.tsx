@@ -284,11 +284,12 @@ interface HistoryState {
   bucketMs: number;
   totalKwh: number;
   capped: boolean; // true if some channels were dropped due to FETCH_CAP
+  totalChannels: number; // total visible channels before cap
 }
 
 // ── AcHistoryView ─────────────────────────────────────────────────────────────
 
-function AcHistoryView(): React.ReactElement {
+function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): React.ReactElement {
   const [selected, setSelected] = useState<HistoryScale>('DAY');
   const [hist, setHist] = useState<HistoryState>({
     status: 'idle',
@@ -298,6 +299,7 @@ function AcHistoryView(): React.ReactElement {
     bucketMs: 3_600_000,
     totalKwh: 0,
     capped: false,
+    totalChannels: 0,
   });
 
   // Use a ref to track the current "generation" of fetch — lets us cancel
@@ -307,7 +309,13 @@ function AcHistoryView(): React.ReactElement {
   useEffect(() => {
     const gen = ++genRef.current;
 
-    setHist((prev) => ({ ...prev, status: 'loading', series: [], capped: false }));
+    setHist((prev) => ({
+      ...prev,
+      status: 'loading',
+      series: [],
+      capped: false,
+      totalChannels: 0,
+    }));
 
     const win = buildWindow(selected);
 
@@ -336,10 +344,13 @@ function AcHistoryView(): React.ReactElement {
         return;
       }
 
-      // 2. Collect visible channels from all devices, excluding aggregates.
-      // We skip "1,2,3" (mains) and "Balance" channels.
+      // 2. Collect visible channels from all devices, excluding aggregates and
+      // hidden channels. We skip "1,2,3" (mains), "Balance", and any channel
+      // the user has hidden in Emporia config — hidden channels must be dropped
+      // BEFORE the FETCH_CAP slice so they don't consume cap slots.
       const SKIP_NAMES = /^balance$/i;
       const SKIP_CHANNEL_NUMS = new Set(['1,2,3']);
+      const hiddenSet = new Set(emporiaConfig.hiddenChannels);
 
       interface ChannelRef {
         gid: number;
@@ -353,6 +364,7 @@ function AcHistoryView(): React.ReactElement {
         for (const ch of dev.channels) {
           if (SKIP_CHANNEL_NUMS.has(ch.channelNum)) continue;
           if (SKIP_NAMES.test(ch.name)) continue;
+          if (hiddenSet.has(ch.channelNum)) continue;
           channels.push({
             gid: dev.deviceGid,
             channelNum: ch.channelNum,
@@ -362,6 +374,7 @@ function AcHistoryView(): React.ReactElement {
         }
       }
 
+      const totalCount = channels.length;
       let capped = false;
       let fetchList = channels;
       if (fetchList.length > FETCH_CAP) {
@@ -420,7 +433,11 @@ function AcHistoryView(): React.ReactElement {
 
       if (gen !== genRef.current) return;
 
-      const good = results.filter((r): r is RawResult => r !== null);
+      // Drop results with a malformed firstUsageInstant before alignment —
+      // a NaN epoch would make Array(NaN).fill(0) throw a RangeError and leave
+      // the view stuck on "Loading history…" forever.
+      const allGood = results.filter((r): r is RawResult => r !== null);
+      const good = allGood.filter((r) => !Number.isNaN(new Date(r.firstUsageInstant).getTime()));
       if (good.length === 0) {
         setHist((prev) => ({ ...prev, status: 'error' }));
         return;
@@ -429,54 +446,61 @@ function AcHistoryView(): React.ReactElement {
       // 4. Align series by firstUsageInstant.
       // Find the earliest firstUsageInstant and compute the shared origin epoch.
       // All buckets are assumed to share the same bucket grid (same start+scale).
-      const firstEpochMs = Math.min(...good.map((r) => new Date(r.firstUsageInstant).getTime()));
-      const bucketMs = win.bucketMs;
+      // Wrap in try/catch so any unexpected RangeError falls back gracefully.
+      try {
+        const firstEpochMs = Math.min(...good.map((r) => new Date(r.firstUsageInstant).getTime()));
+        const bucketMs = win.bucketMs;
 
-      // Each series is offset by how many buckets its own firstUsageInstant is
-      // ahead of the global firstEpochMs. We pad the front with zeros.
-      const bucketCount = Math.max(
-        ...good.map((r) => {
+        // Each series is offset by how many buckets its own firstUsageInstant is
+        // ahead of the global firstEpochMs. We pad the front with zeros.
+        const bucketCount = Math.max(
+          ...good.map((r) => {
+            const offset = Math.round(
+              (new Date(r.firstUsageInstant).getTime() - firstEpochMs) / bucketMs,
+            );
+            return offset + r.usageList.length;
+          }),
+        );
+
+        const seriesArr: CircuitSeries[] = good.map((r, idx) => {
           const offset = Math.round(
             (new Date(r.firstUsageInstant).getTime() - firstEpochMs) / bucketMs,
           );
-          return offset + r.usageList.length;
-        }),
-      );
+          const aligned = Array<number>(bucketCount).fill(0);
+          for (let i = 0; i < r.usageList.length; i++) {
+            const raw = r.usageList[i] ?? 0;
+            // Apply multiplier (240V paired circuits) — values are already kWh.
+            aligned[offset + i] = Math.max(0, raw * r.multiplier);
+          }
+          const total = aligned.reduce((s, v) => s + v, 0);
+          return {
+            channelNum: r.channelNum,
+            name: r.name,
+            color: circuitColor(idx),
+            buckets: aligned,
+            total,
+          };
+        });
 
-      const seriesArr: CircuitSeries[] = good.map((r, idx) => {
-        const offset = Math.round(
-          (new Date(r.firstUsageInstant).getTime() - firstEpochMs) / bucketMs,
-        );
-        const aligned = Array<number>(bucketCount).fill(0);
-        for (let i = 0; i < r.usageList.length; i++) {
-          const raw = r.usageList[i] ?? 0;
-          // Apply multiplier (240V paired circuits) — values are already kWh.
-          aligned[offset + i] = Math.max(0, raw * r.multiplier);
-        }
-        const total = aligned.reduce((s, v) => s + v, 0);
-        return {
-          channelNum: r.channelNum,
-          name: r.name,
-          color: circuitColor(idx),
-          buckets: aligned,
-          total,
-        };
-      });
+        // Sort series by total desc (top consumers first in the legend + bars).
+        seriesArr.sort((a, b) => b.total - a.total);
 
-      // Sort series by total desc (top consumers first in the legend + bars).
-      seriesArr.sort((a, b) => b.total - a.total);
+        const totalKwh = seriesArr.reduce((s, c) => s + c.total, 0);
 
-      const totalKwh = seriesArr.reduce((s, c) => s + c.total, 0);
-
-      setHist({
-        status: 'loaded',
-        series: seriesArr,
-        bucketCount,
-        firstEpochMs,
-        bucketMs,
-        totalKwh,
-        capped,
-      });
+        setHist({
+          status: 'loaded',
+          series: seriesArr,
+          bucketCount,
+          firstEpochMs,
+          bucketMs,
+          totalKwh,
+          capped,
+          totalChannels: totalCount,
+        });
+      } catch {
+        // Alignment failed (e.g. unexpected NaN bucketCount) — fall back gracefully.
+        setHist((prev) => ({ ...prev, status: 'error' }));
+      }
     }
 
     void load();
@@ -528,7 +552,7 @@ function AcHistoryView(): React.ReactElement {
 
           {hist.capped && (
             <p className="text-[10px] text-amber-500/80 italic">
-              Showing top {FETCH_CAP} circuits (channel count exceeded fetch cap).
+              Showing first {FETCH_CAP} of {hist.totalChannels} circuits (fetch cap).
             </p>
           )}
 
@@ -650,7 +674,7 @@ export function AcLoadsTab(): React.ReactElement {
     return (
       <div className="flex flex-col gap-1">
         {toggle}
-        <AcHistoryView />
+        <AcHistoryView emporiaConfig={emporiaConfig} />
       </div>
     );
   }

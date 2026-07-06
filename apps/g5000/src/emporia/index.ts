@@ -15,13 +15,24 @@ import { parseDevices, deriveSnapshot } from './transform.js';
 import { createEmporiaRegistry } from './registry.js';
 import { simSnapshotAt, simHistory } from './sim.js';
 
+/**
+ * Parse EMPORIA_POLL_S into a poll interval in milliseconds.
+ * Falls back to 15 000 ms when the value is NaN, zero, or negative to prevent
+ * a setInterval(fn, NaN) tight-loop that would hammer the rate-limited API.
+ * Exported for unit-testing.
+ */
+export function parsePollMs(raw: string | undefined): number {
+  const n = Number(raw);
+  return (Number.isFinite(n) && n > 0 ? n : 15) * 1000;
+}
+
 export function startEmporia(): () => void {
   try {
     const registry = createEmporiaRegistry();
 
     const email = process.env.EMPORIA_EMAIL ?? '';
     const password = process.env.EMPORIA_PASSWORD ?? '';
-    const pollMs = Number(process.env.EMPORIA_POLL_S ?? 15) * 1000;
+    const pollMs = parsePollMs(process.env.EMPORIA_POLL_S);
     const simMode = process.env.EMPORIA_SIM === '1' || process.env.DEMO_MODE === '1';
 
     // ── Mode 1: live client ────────────────────────────────────────────────
@@ -48,8 +59,11 @@ export function startEmporia(): () => void {
       timers.push(setInterval(fetchDevices, 60 * 60 * 1000));
 
       // Poll usages on the configured interval.
+      // Phase 1: single-primary-device — request only the first device's gid.
+      // deriveSnapshot() likewise reads only devices[0] from the response.
+      // Multi-device support is a documented future enhancement.
       const pollUsages = (): void => {
-        const gids = devices.map((d) => d.deviceGid);
+        const gids = devices.length ? [devices[0]!.deviceGid] : [];
         if (gids.length === 0) return;
         client
           .getDeviceListUsages(gids, '1S')

@@ -8,7 +8,7 @@
 
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { EmporiaScale } from '@g5000/core';
 
@@ -193,37 +193,50 @@ export function createEmporiaClient(
 
   let cachedToken: TokenCache | null = null;
 
-  async function ensureToken(): Promise<string> {
-    // 1. Check in-memory cache
-    if (cachedToken && cachedToken.expMs - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
-      return cachedToken.idToken;
-    }
-
-    // 2. Load from disk if nothing in memory
-    if (!cachedToken) {
-      cachedToken = loadCache(cachePath);
-    }
-
-    // 3. Reuse if still fresh
-    if (cachedToken && cachedToken.expMs - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
-      return cachedToken.idToken;
-    }
-
-    // 4. Refresh via refresh token if we have one
-    if (cachedToken?.refreshToken) {
+  async function ensureToken(forceRefresh = false): Promise<string> {
+    // On forceRefresh: wipe both in-memory and on-disk caches so a poisoned
+    // token can't be re-read, then go straight to full SRP — skip all
+    // short-circuit paths that would re-use the rejected token.
+    if (forceRefresh) {
+      cachedToken = null;
       try {
-        const refreshToken = new CognitoRefreshToken({ RefreshToken: cachedToken.refreshToken });
-        const session = await refreshCognitoSession(cognitoUser, refreshToken);
-        const idTok = session.getIdToken();
-        cachedToken = {
-          idToken: idTok.getJwtToken(),
-          refreshToken: cachedToken.refreshToken,
-          expMs: idTok.getExpiration() * 1000,
-        };
-        saveCache(cachePath, cachedToken);
-        return cachedToken.idToken;
+        unlinkSync(cachePath);
       } catch {
-        // refresh failed — fall through to full SRP
+        // best-effort — file may not exist
+      }
+      // Fall through to step 5 (full SRP) without attempting a disk read.
+    } else {
+      // 1. Check in-memory cache
+      if (cachedToken && cachedToken.expMs - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
+        return cachedToken.idToken;
+      }
+
+      // 2. Load from disk if nothing in memory
+      if (!cachedToken) {
+        cachedToken = loadCache(cachePath);
+      }
+
+      // 3. Reuse if still fresh
+      if (cachedToken && cachedToken.expMs - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
+        return cachedToken.idToken;
+      }
+
+      // 4. Refresh via refresh token if we have one
+      if (cachedToken?.refreshToken) {
+        try {
+          const refreshToken = new CognitoRefreshToken({ RefreshToken: cachedToken.refreshToken });
+          const session = await refreshCognitoSession(cognitoUser, refreshToken);
+          const idTok = session.getIdToken();
+          cachedToken = {
+            idToken: idTok.getJwtToken(),
+            refreshToken: cachedToken.refreshToken,
+            expMs: idTok.getExpiration() * 1000,
+          };
+          saveCache(cachePath, cachedToken);
+          return cachedToken.idToken;
+        } catch {
+          // refresh failed — fall through to full SRP
+        }
       }
     }
 
@@ -241,11 +254,10 @@ export function createEmporiaClient(
   }
 
   async function apiFetch(url: string, forceRefresh = false): Promise<unknown> {
-    if (forceRefresh) cachedToken = null;
-    const idToken = await ensureToken();
+    const idToken = await ensureToken(forceRefresh);
     const resp = await fetch(url, { headers: { authtoken: idToken } });
     if (resp.status === 401 && !forceRefresh) {
-      // Force a full token refresh and retry once
+      // Force a genuinely fresh token (bypasses all caches) and retry once.
       return apiFetch(url, true);
     }
     if (!resp.ok) {

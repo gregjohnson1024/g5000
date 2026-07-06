@@ -467,10 +467,25 @@ function EmporiaAcSection() {
 
   const save = async () => {
     setStatus('Saving…');
-    const cur = await fetch('/api/settings')
-      .then((r) => r.json())
-      .catch(() => ({ settings: {} }));
-    const merged = { ...(cur.settings ?? {}), emporiaConfig: cfg };
+    // Abort instead of clobbering: if we can't read the current settings we
+    // must NOT PUT, because PUT replaces the whole file and would wipe every
+    // other section's keys.
+    let curSettings: Record<string, unknown> | null = null;
+    try {
+      const r = await fetch('/api/settings');
+      if (r.ok) {
+        const j = (await r.json()) as { ok?: boolean; settings?: Record<string, unknown> };
+        if (j.ok && j.settings) curSettings = j.settings;
+      }
+    } catch {
+      // network error — handled below
+    }
+    if (!curSettings) {
+      setStatus("Save failed — couldn't read current settings");
+      setTimeout(() => setStatus(null), 4000);
+      return;
+    }
+    const merged = { ...curSettings, emporiaConfig: cfg };
     const res = await fetch('/api/settings', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },

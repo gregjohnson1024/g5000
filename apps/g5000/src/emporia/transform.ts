@@ -44,6 +44,10 @@ export function parseDevices(raw: unknown): EmporiaDevice[] {
   }));
 }
 
+// Phase 1 — single-primary-device assumption: only the first device in the
+// deviceListUsages response is used. The live poller requests usages for only
+// the first device's gid, so devices[0] is always the one we want here.
+// Multi-device support is a documented future enhancement.
 export function deriveSnapshot(
   devices: EmporiaDevice[],
   usagesRaw: unknown,
