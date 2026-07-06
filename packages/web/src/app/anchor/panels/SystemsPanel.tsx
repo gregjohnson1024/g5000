@@ -66,19 +66,6 @@ function TankCard({ tank }: { tank: TankInfo }): React.ReactElement {
   );
 }
 
-// ── Offline state ─────────────────────────────────────────────────────────────
-
-function OfflineCard({ label }: { label: string }): React.ReactElement {
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1 min-h-[100px]">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">{label}</span>
-      <div className="flex-1 flex items-center justify-center">
-        <span className="text-slate-600 text-xs italic">Cerbo offline</span>
-      </div>
-    </div>
-  );
-}
-
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export function SystemsPanel(): React.ReactElement {

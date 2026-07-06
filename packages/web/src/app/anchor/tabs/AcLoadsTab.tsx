@@ -509,7 +509,7 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
     return () => {
       genRef.current++;
     };
-  }, [selected]);
+  }, [selected, emporiaConfig.hiddenChannels]);
 
   const scales: HistoryScale[] = ['DAY', 'WEEK', 'MONTH'];
 
