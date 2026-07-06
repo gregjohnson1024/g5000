@@ -20,6 +20,7 @@
     "@g5000/mast": "*",
     "@g5000/tide": "*",
     "@g5000/web": "*",
+    "amazon-cognito-identity-js": "^6.3.20",
     "next": "^16",
     "react": "^19",
     "react-dom": "^19",
