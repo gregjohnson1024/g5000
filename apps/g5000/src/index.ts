@@ -31,6 +31,7 @@ import { createLiveFactory, createDemoFactory, type BaseTeardownHolder } from '.
 import { startRaceSubsystem } from './race-subsystem.js';
 import { startGrooveSubsystem } from './groove-subsystem.js';
 import { startVictron } from './victron.js';
+import { startEmporia } from './emporia/index.js';
 import { startTideSubsystem } from './tide-subsystem.js';
 import { startHlink, startWebServer } from './server-setup.js';
 import { startRadarStatusPoller } from './radar/status-poller.js';
@@ -139,6 +140,12 @@ async function main(): Promise<void> {
   // Victron Venus OS (Cerbo) — battery/solar/tanks/temps via MQTT (or sim).
   const stopVictron = startVictron(bus);
   teardown.push(async () => stopVictron());
+
+  // Emporia Vue 3 energy monitor — circuit-level power data via Cognito API
+  // (or deterministic simulator in demo/sim mode). Never throws; offline if
+  // neither EMPORIA_EMAIL/PASSWORD nor EMPORIA_SIM is set.
+  const stopEmporia = startEmporia();
+  teardown.push(async () => stopEmporia());
 
   // Ship's log hourly auto-logger. Persists a position snapshot every hour
   // so the narrative log doesn't depend on someone remembering to write
