@@ -34,7 +34,7 @@ Last written: 2026-07-06.
   `/tmp` on **tmpfs**, enable **SQLite WAL**, and mount with **noatime**.
   Do **not** stand up a cloud Postgres for live logging — it can't work
   offshore.
-- **"Postgres for every parameter":** the *local* version is defensible
+- **"Postgres for every parameter":** the _local_ version is defensible
   (TimescaleDB or, more proportionately, keep the existing
   session-`.jsonl.gz` as the raw tier). At full sensor rate it's
   ~130–400 MB/day of time-series — a companion datastore is only worth it
@@ -51,19 +51,19 @@ GPS/heading at ~10 Hz + depth/AIS/log). Actual bus rate is an open item.
 
 ### The write ledger
 
-| Path | What writes it | Cadence | Est. MB/day | Wear |
-|------|----------------|---------|------------|------|
-| `data/sessions/<id>.jsonl.gz` | `startSessionLogger()` — `packages/bridge/src/persistence/session-logger.ts` | **Continuous**, per-frame `gzip.write()`, no app-level batch | **~130** underway | **HIGH** |
-| `~/.g5000-router/tracks/track-NNN.json` | `writeTrack()`/`appendPoint()` — `packages/web/src/lib/tracks.ts`, `track-recorder.ts` | Every 5–60 s, **full-file rewrite** (`.tmp`+rename) | **~80** | **MED-HIGH** |
-| `/tmp/g5000-grib-*/` (GRIB2 processing) | `wind-fetch.ts` / `hrrr-fetch.ts` `mkdtemp`→write→`grib_get_data`→`rm -rf` | Per forecast fetch (~3 h timer) | 50–200 transient **if `/tmp` on SD** | **MED-HIGH (avoidable)** |
-| `~/.g5000-router/wind-cache/*.json` | `wind-cache.ts` `persist()` | Per forecast refresh (~3 h) | 40–300 (model-dependent, burst) | **MED (burst)** |
-| `~/.g5000-router/ecmwf-global-cache/*.bin` | `ecmwf-global-cache.ts` `writeGlobalGrid()` | Per ECMWF fetch (~3 h) | ~100 if enabled (burst) | **MED (burst)** |
-| `data/config.db` (SQLite) | `ConfigStore` + `ship-log.ts`, `alarms-history.ts`, `trips.ts` | **Event-driven**: hourly auto-log + user actions | **< 1** | **LOW** (but no WAL — see below) |
-| `~/.g5000-router/weather-cache/*.json` | `weather-cache.ts` `writeDisk()` | Every 10–30 min if `/forecast` open | ~5 | Negligible |
-| `~/.g5000-router/current-cache/*.json` | `current-fetch.ts` `PersistentCurrentCache.set()` | Per CMEMS grid, 36 h TTL | Negligible | Negligible |
-| `~/.g5000-router/gulf-stream/north-wall.json` | `gulf-stream.ts` `writeCache()` | Every ~6 h | Negligible | Negligible |
-| `~/.g5000-router/{tile,sat,enc}-cache/` | tile proxy routes, on cache **MISS** only | Near-zero offshore; burst on shore pre-warm | ~0 at sea | Negligible |
-| `~/.g5000-router/engine-log.json` | `engine-log.ts` `writeFile()` | User action only | Negligible | Negligible |
+| Path                                          | What writes it                                                                         | Cadence                                                      | Est. MB/day                          | Wear                             |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------ | -------------------------------- |
+| `data/sessions/<id>.jsonl.gz`                 | `startSessionLogger()` — `packages/bridge/src/persistence/session-logger.ts`           | **Continuous**, per-frame `gzip.write()`, no app-level batch | **~130** underway                    | **HIGH**                         |
+| `~/.g5000-router/tracks/track-NNN.json`       | `writeTrack()`/`appendPoint()` — `packages/web/src/lib/tracks.ts`, `track-recorder.ts` | Every 5–60 s, **full-file rewrite** (`.tmp`+rename)          | **~80**                              | **MED-HIGH**                     |
+| `/tmp/g5000-grib-*/` (GRIB2 processing)       | `wind-fetch.ts` / `hrrr-fetch.ts` `mkdtemp`→write→`grib_get_data`→`rm -rf`             | Per forecast fetch (~3 h timer)                              | 50–200 transient **if `/tmp` on SD** | **MED-HIGH (avoidable)**         |
+| `~/.g5000-router/wind-cache/*.json`           | `wind-cache.ts` `persist()`                                                            | Per forecast refresh (~3 h)                                  | 40–300 (model-dependent, burst)      | **MED (burst)**                  |
+| `~/.g5000-router/ecmwf-global-cache/*.bin`    | `ecmwf-global-cache.ts` `writeGlobalGrid()`                                            | Per ECMWF fetch (~3 h)                                       | ~100 if enabled (burst)              | **MED (burst)**                  |
+| `data/config.db` (SQLite)                     | `ConfigStore` + `ship-log.ts`, `alarms-history.ts`, `trips.ts`                         | **Event-driven**: hourly auto-log + user actions             | **< 1**                              | **LOW** (but no WAL — see below) |
+| `~/.g5000-router/weather-cache/*.json`        | `weather-cache.ts` `writeDisk()`                                                       | Every 10–30 min if `/forecast` open                          | ~5                                   | Negligible                       |
+| `~/.g5000-router/current-cache/*.json`        | `current-fetch.ts` `PersistentCurrentCache.set()`                                      | Per CMEMS grid, 36 h TTL                                     | Negligible                           | Negligible                       |
+| `~/.g5000-router/gulf-stream/north-wall.json` | `gulf-stream.ts` `writeCache()`                                                        | Every ~6 h                                                   | Negligible                           | Negligible                       |
+| `~/.g5000-router/{tile,sat,enc}-cache/`       | tile proxy routes, on cache **MISS** only                                              | Near-zero offshore; burst on shore pre-warm                  | ~0 at sea                            | Negligible                       |
+| `~/.g5000-router/engine-log.json`             | `engine-log.ts` `writeFile()`                                                          | User action only                                             | Negligible                           | Negligible                       |
 
 ### Notes on the two dominant writers
 
@@ -101,7 +101,7 @@ gated (no demo/replay writes).
 better-sqlite3 defaults to `DELETE` journal mode, so each commit writes
 the data page **and** a rollback journal — ~2× write amplification per
 transaction, plus journal-file create/delete churn. config.db write
-*volume* is tiny (<1 MB/day), so this is a **low-severity** item, but WAL
+_volume_ is tiny (<1 MB/day), so this is a **low-severity** item, but WAL
 is a one-line, free improvement and reduces the per-write amplification
 and fsync pattern that is hardest on flash.
 
@@ -122,14 +122,14 @@ and fsync pattern that is hardest on flash.
   **up and in `live` mode** (`/api/source-mode` → `{"mode":"live"}`),
   which confirms the session logger is actively writing right now.
 
-### What the public URL *did* confirm (Verified)
+### What the public URL _did_ confirm (Verified)
 
 - **Source mode = `live`** → session logger + track recorder both active.
 - **Satellite tile cache** (`/api/sat-cache`): **16.5 MB used of an
   8 GB cap**, 1470 tiles. This confirms the tile/sat caches are
   effectively static and **not** a wear driver in normal use.
 - `/api/sessions` returns `{"sessions":[]}` — the listing endpoint reports
-  no *completed/indexed* sessions over the public surface (does not prove
+  no _completed/indexed_ sessions over the public surface (does not prove
   the on-disk `sessions/` dir is empty; likely the current session is
   still open/unindexed). **Needs on-Pi `ls -lth` to confirm.**
 
@@ -165,7 +165,7 @@ not)? (c) is the card an endurance/A2 card or a no-name commodity card?
 - Estimated write load underway: **~0.2–0.5 GB/day** ≈ **70–180 GB/year**.
 - A reputable **A2 / high-endurance** card is rated ~30–100+ TBW. At
   ~0.15 TB/year that's **decades** of flash endurance — flash wear is
-  *not* the limiting factor if the card is good.
+  _not_ the limiting factor if the card is good.
 - A **cheap/no-name** card may have effectively <10 TBW and poor wear
   levelling; combined with write amplification (full-file rewrites,
   DELETE-journal SQLite, `/tmp` on SD) real life can drop to **~1–3
@@ -185,9 +185,9 @@ ungracefully on a boat's power. Mitigation is cheap; do it.
 > **Hard constraint:** the boat goes offshore with **no internet**. Any
 > live datastore must be **local to the boat**. A cloud Postgres (AWS RDS,
 > the rbr2 `legacy-postgres`) **cannot** serve live logging at sea — it is
-> only viable as an *opportunistic sync target* (Option 3).
+> only viable as an _opportunistic sync target_ (Option 3).
 
-### Option 1 — Cheapest mitigation: USB SSD + tune the writes  ✅ recommended first
+### Option 1 — Cheapest mitigation: USB SSD + tune the writes ✅ recommended first
 
 Move the write-heavy paths off the SD card and reduce amplification.
 
@@ -225,14 +225,14 @@ Volume sanity check first: "every parameter at full rate" ≈ the same
 5–20×) → ~20–80 MB/day on disk. **Sane only if downsampled or you accept
 the SSD.** At full fidelity you'd want the SSD anyway.
 
-| Engine | Pros | Cons (on a Pi, offshore) |
-|--------|------|--------------------------|
-| **PostgreSQL + TimescaleDB** | Real SQL, hypertables + native compression, continuous aggregates for downsampling, one query surface for the web app; runs fine on Pi 5 | Heaviest footprint (~200–400 MB RAM idle); another service to babysit; overkill if you only ever read recent windows |
-| **InfluxDB (v2/v3)** | Purpose-built for high-freq sensor data, best raw write efficiency, cheap retention/downsampling policies | Non-SQL (Flux/InfluxQL) → the Next.js app would need a second data-access path; v2 memory footprint is notable on a Pi; another daemon |
-| **SQLite time-series** (keep in-process, add a rollup table or use `sqlite-zstd`) | Zero new service, already embedded, in-process, tiny footprint, trivial to query from the app | No native TS compression/retention; you hand-roll downsampling + pruning; high-cardinality/high-freq inserts stress it (mitigated by WAL + batched tx) |
+| Engine                                                                            | Pros                                                                                                                                     | Cons (on a Pi, offshore)                                                                                                                               |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **PostgreSQL + TimescaleDB**                                                      | Real SQL, hypertables + native compression, continuous aggregates for downsampling, one query surface for the web app; runs fine on Pi 5 | Heaviest footprint (~200–400 MB RAM idle); another service to babysit; overkill if you only ever read recent windows                                   |
+| **InfluxDB (v2/v3)**                                                              | Purpose-built for high-freq sensor data, best raw write efficiency, cheap retention/downsampling policies                                | Non-SQL (Flux/InfluxQL) → the Next.js app would need a second data-access path; v2 memory footprint is notable on a Pi; another daemon                 |
+| **SQLite time-series** (keep in-process, add a rollup table or use `sqlite-zstd`) | Zero new service, already embedded, in-process, tiny footprint, trivial to query from the app                                            | No native TS compression/retention; you hand-roll downsampling + pruning; high-cardinality/high-freq inserts stress it (mitigated by WAL + batched tx) |
 
 **Honest take:** the app **already has a raw tier** — the session
-`.jsonl.gz` files *are* "every parameter", replayable end-to-end, and
+`.jsonl.gz` files _are_ "every parameter", replayable end-to-end, and
 gzip-compressed. Standing up Timescale/Influx duplicates that unless you
 specifically want **ad-hoc SQL over history** (e.g. "max TWS per hour last
 month"). If that's the actual want, **TimescaleDB on the USB SSD** is the

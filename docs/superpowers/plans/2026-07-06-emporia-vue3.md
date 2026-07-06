@@ -17,7 +17,7 @@
 - **Read-only.** Never blocks boot (a mis-configured/offline Emporia must not affect the app).
 - **Emporia data does NOT go on the RxJS Bus / H-LINK / session log** — dedicated registry + API only.
 - **Config** (`emporiaConfig`) lives in the existing file-based app-settings blob via `GET/PUT /api/settings` (same as `anchorDashboard`) — MERGE, don't clobber other keys.
-- **Test baseline:** the known-environmental failures in CLAUDE.md + the 6 pre-existing tile-proxy `*.char.test.ts` are the accepted red baseline; any *other* new failure is a regression.
+- **Test baseline:** the known-environmental failures in CLAUDE.md + the 6 pre-existing tile-proxy `*.char.test.ts` are the accepted red baseline; any _other_ new failure is a regression.
 - **`npm run typecheck` does NOT cover `packages/web` `.tsx`** — run `npm run build --workspace @g5000/web` for web changes.
 - Spec: `docs/superpowers/specs/2026-07-06-emporia-vue3-integration-design.md`.
 
@@ -41,11 +41,26 @@
 **Files:** Create `packages/core/src/emporia-state.ts`; Modify `packages/core/src/index.ts` (add `export * from './emporia-state.js';`).
 
 **Interfaces — Produces:**
+
 ```ts
 export type EmporiaScale = '1S' | '1MIN' | '15MIN' | '1H' | '1D' | '1W' | '1MON' | '1Y';
-export interface EmporiaChannel { channelNum: string; name: string; multiplier: number; }
-export interface EmporiaDevice { deviceGid: number; model: string; firmware: string; channels: EmporiaChannel[]; }
-export interface EmporiaCircuit { channelNum: string; name: string; watts: number | null; multiplier: number; }
+export interface EmporiaChannel {
+  channelNum: string;
+  name: string;
+  multiplier: number;
+}
+export interface EmporiaDevice {
+  deviceGid: number;
+  model: string;
+  firmware: string;
+  channels: EmporiaChannel[];
+}
+export interface EmporiaCircuit {
+  channelNum: string;
+  name: string;
+  watts: number | null;
+  multiplier: number;
+}
 export interface EmporiaSnapshot {
   connected: boolean;
   updatedAt: number;
@@ -64,7 +79,11 @@ export interface EmporiaRegistry {
 }
 /** On-demand history provider (live client or sim), set by startEmporia. */
 export type EmporiaHistoryFn = (
-  gid: number, channel: string, scale: EmporiaScale, startIso: string, endIso: string,
+  gid: number,
+  channel: string,
+  scale: EmporiaScale,
+  startIso: string,
+  endIso: string,
 ) => Promise<{ firstUsageInstant: string; usageList: Array<number | null> }>;
 export function getSharedEmporia(): EmporiaRegistry | undefined;
 export function setSharedEmporia(r: EmporiaRegistry): void;
@@ -73,22 +92,37 @@ export function setSharedEmporiaHistory(f: EmporiaHistoryFn): void;
 ```
 
 - [ ] **Step 1: Write the file** (no test — pure types/accessors, mirror `victron-state.ts`).
+
 ```ts
 // packages/core/src/emporia-state.ts  — types above, plus:
 const OFFLINE: EmporiaSnapshot = {
-  connected: false, updatedAt: 0, deviceGid: null, model: null,
-  circuits: [], mainsW: null, balanceW: null,
+  connected: false,
+  updatedAt: 0,
+  deviceGid: null,
+  model: null,
+  circuits: [],
+  mainsW: null,
+  balanceW: null,
 };
 declare const globalThis: {
   __g5000_emporia__?: EmporiaRegistry;
   __g5000_emporiaHistory__?: EmporiaHistoryFn;
 };
-export function getSharedEmporia() { return globalThis.__g5000_emporia__; }
-export function setSharedEmporia(r: EmporiaRegistry) { globalThis.__g5000_emporia__ = r; }
-export function getSharedEmporiaHistory() { return globalThis.__g5000_emporiaHistory__; }
-export function setSharedEmporiaHistory(f: EmporiaHistoryFn) { globalThis.__g5000_emporiaHistory__ = f; }
+export function getSharedEmporia() {
+  return globalThis.__g5000_emporia__;
+}
+export function setSharedEmporia(r: EmporiaRegistry) {
+  globalThis.__g5000_emporia__ = r;
+}
+export function getSharedEmporiaHistory() {
+  return globalThis.__g5000_emporiaHistory__;
+}
+export function setSharedEmporiaHistory(f: EmporiaHistoryFn) {
+  globalThis.__g5000_emporiaHistory__ = f;
+}
 export const EMPORIA_OFFLINE_SNAPSHOT = OFFLINE;
 ```
+
 - [ ] **Step 2:** add the `export * from './emporia-state.js';` line to `packages/core/src/index.ts` (after `./victron-state.js`).
 - [ ] **Step 3:** `npx tsc -b packages/core` → 0 errors.
 - [ ] **Step 4:** `npx prettier --write packages/core/src/emporia-state.ts`; commit `feat(emporia): snapshot/registry types + shared singletons`.
@@ -100,6 +134,7 @@ export const EMPORIA_OFFLINE_SNAPSHOT = OFFLINE;
 **Files:** Create `apps/g5000/src/emporia/transform.ts` + `apps/g5000/src/emporia/transform.test.ts`.
 
 **Interfaces:**
+
 - Consumes: `EmporiaScale`, `EmporiaDevice`, `EmporiaSnapshot`, `EmporiaChannel`, `EmporiaCircuit` from `@g5000/core`.
 - Produces:
   - `scaleSeconds(scale: EmporiaScale): number`
@@ -108,6 +143,7 @@ export const EMPORIA_OFFLINE_SNAPSHOT = OFFLINE;
   - `deriveSnapshot(devices: EmporiaDevice[], usagesRaw: unknown, scale: EmporiaScale, now: number): EmporiaSnapshot` — from `getDeviceListUsages` JSON; splits mains (`"1,2,3"`) → `mainsW`, `"Balance"` → `balanceW`, everything else → `circuits[]`, applying `usageToWatts` with each channel's multiplier (from the device list; default 1).
 
 - [ ] **Step 1: Write the failing test**
+
 ```ts
 // apps/g5000/src/emporia/transform.test.ts
 import { describe, it, expect } from 'vitest';
@@ -133,24 +169,35 @@ describe('usageToWatts', () => {
 
 const DEVICES = {
   customerGid: 1,
-  devices: [{
-    deviceGid: 111, model: 'VUE003', firmware: 'Vue-x',
-    channels: [
-      { channelNum: '1,2,3', channelMultiplier: 1, name: 'Main' },
-      { channelNum: '1', channelMultiplier: 1, name: 'Galley' },
-      { channelNum: '2', channelMultiplier: 2, name: 'AC' }, // 240V paired
-    ],
-  }],
+  devices: [
+    {
+      deviceGid: 111,
+      model: 'VUE003',
+      firmware: 'Vue-x',
+      channels: [
+        { channelNum: '1,2,3', channelMultiplier: 1, name: 'Main' },
+        { channelNum: '1', channelMultiplier: 1, name: 'Galley' },
+        { channelNum: '2', channelMultiplier: 2, name: 'AC' }, // 240V paired
+      ],
+    },
+  ],
 };
 const USAGES = {
   deviceListUsages: {
-    instant: '2026-07-06T12:00:00Z', scale: '1S', energyUnit: 'KilowattHours',
-    devices: [{ deviceGid: 111, channelUsages: [
-      { name: 'Main', usage: 0.05, channelNum: '1,2,3', nestedDevices: [] },
-      { name: 'Galley', usage: 0.001, channelNum: '1', nestedDevices: [] },
-      { name: 'AC', usage: 0.002, channelNum: '2', nestedDevices: [] },
-      { name: 'Balance', usage: 0.047, channelNum: 'Balance', nestedDevices: [] },
-    ] }],
+    instant: '2026-07-06T12:00:00Z',
+    scale: '1S',
+    energyUnit: 'KilowattHours',
+    devices: [
+      {
+        deviceGid: 111,
+        channelUsages: [
+          { name: 'Main', usage: 0.05, channelNum: '1,2,3', nestedDevices: [] },
+          { name: 'Galley', usage: 0.001, channelNum: '1', nestedDevices: [] },
+          { name: 'AC', usage: 0.002, channelNum: '2', nestedDevices: [] },
+          { name: 'Balance', usage: 0.047, channelNum: 'Balance', nestedDevices: [] },
+        ],
+      },
+    ],
   },
 };
 
@@ -181,25 +228,45 @@ describe('parseDevices + deriveSnapshot', () => {
   });
 });
 ```
+
 - [ ] **Step 2:** run `npx vitest run apps/g5000/src/emporia/transform.test.ts` → FAIL (module missing).
 - [ ] **Step 3: Implement `transform.ts`**
+
 ```ts
 import type { EmporiaScale, EmporiaDevice, EmporiaSnapshot, EmporiaCircuit } from '@g5000/core';
 
 const SECONDS: Record<EmporiaScale, number> = {
-  '1S': 1, '1MIN': 60, '15MIN': 900, '1H': 3600, '1D': 86400,
-  '1W': 604800, '1MON': 2592000, '1Y': 31536000,
+  '1S': 1,
+  '1MIN': 60,
+  '15MIN': 900,
+  '1H': 3600,
+  '1D': 86400,
+  '1W': 604800,
+  '1MON': 2592000,
+  '1Y': 31536000,
 };
-export function scaleSeconds(scale: EmporiaScale): number { return SECONDS[scale]; }
+export function scaleSeconds(scale: EmporiaScale): number {
+  return SECONDS[scale];
+}
 
-export function usageToWatts(usageKwh: number | null, scale: EmporiaScale, multiplier: number): number | null {
+export function usageToWatts(
+  usageKwh: number | null,
+  scale: EmporiaScale,
+  multiplier: number,
+): number | null {
   if (usageKwh === null || !Number.isFinite(usageKwh)) return null;
   return usageKwh * (3600 / scaleSeconds(scale)) * 1000 * multiplier;
 }
 
 export function parseDevices(raw: unknown): EmporiaDevice[] {
-  const r = raw as { devices?: Array<{ deviceGid: number; model?: string; firmware?: string;
-    channels?: Array<{ channelNum: string; channelMultiplier?: number; name?: string }> }> };
+  const r = raw as {
+    devices?: Array<{
+      deviceGid: number;
+      model?: string;
+      firmware?: string;
+      channels?: Array<{ channelNum: string; channelMultiplier?: number; name?: string }>;
+    }>;
+  };
   return (r.devices ?? []).map((d) => ({
     deviceGid: d.deviceGid,
     model: d.model ?? '',
@@ -213,14 +280,30 @@ export function parseDevices(raw: unknown): EmporiaDevice[] {
 }
 
 export function deriveSnapshot(
-  devices: EmporiaDevice[], usagesRaw: unknown, scale: EmporiaScale, now: number,
+  devices: EmporiaDevice[],
+  usagesRaw: unknown,
+  scale: EmporiaScale,
+  now: number,
 ): EmporiaSnapshot {
-  const usages = usagesRaw as { deviceListUsages?: { devices?: Array<{ deviceGid: number;
-    channelUsages?: Array<{ name?: string; usage: number | null; channelNum: string }> }> } };
+  const usages = usagesRaw as {
+    deviceListUsages?: {
+      devices?: Array<{
+        deviceGid: number;
+        channelUsages?: Array<{ name?: string; usage: number | null; channelNum: string }>;
+      }>;
+    };
+  };
   const dev = usages.deviceListUsages?.devices?.[0];
   if (!dev) {
-    return { connected: true, updatedAt: now, deviceGid: null, model: null,
-      circuits: [], mainsW: null, balanceW: null };
+    return {
+      connected: true,
+      updatedAt: now,
+      deviceGid: null,
+      model: null,
+      circuits: [],
+      mainsW: null,
+      balanceW: null,
+    };
   }
   const meta = devices.find((d) => d.deviceGid === dev.deviceGid);
   const multOf = (channelNum: string): number =>
@@ -234,14 +317,33 @@ export function deriveSnapshot(
   for (const cu of dev.channelUsages ?? []) {
     const mult = multOf(cu.channelNum);
     const watts = usageToWatts(cu.usage, scale, mult);
-    if (cu.channelNum === '1,2,3') { mainsW = watts; continue; }
-    if (cu.channelNum === 'Balance') { balanceW = watts; continue; }
-    circuits.push({ channelNum: cu.channelNum, name: nameOf(cu.channelNum, cu.name ?? cu.channelNum), watts, multiplier: mult });
+    if (cu.channelNum === '1,2,3') {
+      mainsW = watts;
+      continue;
+    }
+    if (cu.channelNum === 'Balance') {
+      balanceW = watts;
+      continue;
+    }
+    circuits.push({
+      channelNum: cu.channelNum,
+      name: nameOf(cu.channelNum, cu.name ?? cu.channelNum),
+      watts,
+      multiplier: mult,
+    });
   }
-  return { connected: true, updatedAt: now, deviceGid: dev.deviceGid, model: meta?.model ?? null,
-    circuits, mainsW, balanceW };
+  return {
+    connected: true,
+    updatedAt: now,
+    deviceGid: dev.deviceGid,
+    model: meta?.model ?? null,
+    circuits,
+    mainsW,
+    balanceW,
+  };
 }
 ```
+
 - [ ] **Step 4:** run the test → PASS. `npx tsc -b apps/g5000` → 0 errors. Prettier.
 - [ ] **Step 5:** commit `feat(emporia): pure transform (kWh→W, device/usage parsing)`.
 
@@ -252,18 +354,36 @@ export function deriveSnapshot(
 **Files:** Create `apps/g5000/src/emporia/client.ts`; Modify `apps/g5000/package.json` (add `"amazon-cognito-identity-js": "^6"`), then `npm install`.
 
 **Interfaces — Produces:**
+
 ```ts
 export interface EmporiaClient {
-  getDevices(): Promise<unknown>;                                   // raw /customers/devices JSON
+  getDevices(): Promise<unknown>; // raw /customers/devices JSON
   getDeviceListUsages(gids: number[], scale: EmporiaScale): Promise<unknown>;
-  getChartUsage(gid: number, channel: string, scale: EmporiaScale, startIso: string, endIso: string): Promise<{ firstUsageInstant: string; usageList: Array<number|null> }>;
+  getChartUsage(
+    gid: number,
+    channel: string,
+    scale: EmporiaScale,
+    startIso: string,
+    endIso: string,
+  ): Promise<{ firstUsageInstant: string; usageList: Array<number | null> }>;
 }
-export function createEmporiaClient(email: string, password: string, tokenCachePath?: string): EmporiaClient;
+export function createEmporiaClient(
+  email: string,
+  password: string,
+  tokenCachePath?: string,
+): EmporiaClient;
 export function buildUsagesUrl(gids: number[], scale: EmporiaScale, instantIso: string): string; // pure, tested
-export function buildChartUrl(gid: number, channel: string, scale: EmporiaScale, startIso: string, endIso: string): string; // pure, tested
+export function buildChartUrl(
+  gid: number,
+  channel: string,
+  scale: EmporiaScale,
+  startIso: string,
+  endIso: string,
+): string; // pure, tested
 ```
 
 **Design (implement to these — spec §API is authoritative):**
+
 - `POOL = new CognitoUserPool({ UserPoolId: 'us-east-2_ghlOXVLi1', ClientId: '4qte47jbstod8apnfic0bunmrq' })`.
 - `ensureToken()`: if a cached id-token exists and is not within 60 s of `exp`, reuse it; else refresh via `CognitoUser.refreshSession(refreshToken, cb)`; if that fails, full `authenticateUser` SRP with email+password. Persist `{ idToken, refreshToken, expMs }` to `tokenCachePath` (default `~/.g5000-router/emporia-token.json`), best-effort.
 - All API calls: `fetch(url, { headers: { authtoken: idToken } })`; on `401`, force a refresh once and retry.
@@ -282,6 +402,7 @@ export function buildChartUrl(gid: number, channel: string, scale: EmporiaScale,
 **Files:** Create `apps/g5000/src/emporia/registry.ts`, `sim.ts`, `index.ts`; Modify `apps/g5000/src/index.ts`.
 
 **Interfaces:**
+
 - Produces: `createEmporiaRegistry(): EmporiaRegistry` (idempotent shared singleton, mirror `createVictronRegistry`); `simSnapshotAt(tSec): { devices, usages }` (pure, deterministic — NO `Date.now`/`Math.random`); `startEmporia(): () => void`.
 
 - [ ] **Step 1: `registry.ts`** — mirror `apps/g5000`'s Victron registry: get-existing-or-create, holds `snapshot` (default `EMPORIA_OFFLINE_SNAPSHOT`) + `devices`, `markStale()` sets `connected=false`; `setSharedEmporia`.
