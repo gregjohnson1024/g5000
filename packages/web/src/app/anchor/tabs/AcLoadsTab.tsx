@@ -9,6 +9,30 @@ import type { EmporiaSnapshot, EmporiaCircuit, EmporiaDevice } from '@g5000/core
 const POLL_MS = 2_000;
 const FETCH_CAP = 8; // max concurrent history fetches
 
+// ── Emporia config ────────────────────────────────────────────────────────────
+
+type Leg = 'L1' | 'L2' | '240V';
+
+interface EmporiaConfig {
+  legAssignments: Record<string, Leg>;
+  hiddenChannels: string[];
+}
+
+function useEmporiaConfig(): EmporiaConfig {
+  const [cfg, setCfg] = useState<EmporiaConfig>({ legAssignments: {}, hiddenChannels: [] });
+  useEffect(() => {
+    void fetch('/api/settings', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok && j.settings?.emporiaConfig) {
+          setCfg(j.settings.emporiaConfig as EmporiaConfig);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return cfg;
+}
+
 // ── Circuit-palette (for stacked bar segments) ────────────────────────────────
 
 const PALETTE = [
@@ -562,6 +586,7 @@ export function AcLoadsTab(): React.ReactElement {
   const [snapshot, setSnapshot] = useState<(EmporiaSnapshot & { offline?: boolean }) | null>(null);
   const [lastKnownAt, setLastKnownAt] = useState<number | null>(null);
   const [offline, setOffline] = useState(false);
+  const emporiaConfig = useEmporiaConfig();
 
   useEffect(() => {
     let cancelled = false;
@@ -644,20 +669,39 @@ export function AcLoadsTab(): React.ReactElement {
     );
   }
 
-  // Sort circuits by watts desc (nulls last).
-  const sorted: EmporiaCircuit[] = [...snapshot.circuits].sort((a, b) => {
-    if (a.watts == null && b.watts == null) return 0;
-    if (a.watts == null) return 1;
-    if (b.watts == null) return -1;
-    return b.watts - a.watts;
-  });
+  // Apply hidden filter and sort circuits by watts desc (nulls last).
+  const hiddenSet = new Set(emporiaConfig.hiddenChannels);
+  const visible: EmporiaCircuit[] = snapshot.circuits
+    .filter((c) => !hiddenSet.has(c.channelNum))
+    .sort((a, b) => {
+      if (a.watts == null && b.watts == null) return 0;
+      if (a.watts == null) return 1;
+      if (b.watts == null) return -1;
+      return b.watts - a.watts;
+    });
 
-  // Max watts across circuits (used for bar scaling; exclude balance/mains here).
-  const circuitWatts = sorted.map((c) => c.watts ?? 0);
+  const { legAssignments } = emporiaConfig;
+  const hasLegAssignments = Object.keys(legAssignments).length > 0;
+
+  // Max watts across visible circuits (used for bar scaling; exclude balance/mains here).
+  const circuitWatts = visible.map((c) => c.watts ?? 0);
   const maxCircuitW = Math.max(0, ...circuitWatts);
 
   // Also include balanceW in max for consistent bar scale.
   const maxW = Math.max(maxCircuitW, snapshot.balanceW ?? 0);
+
+  // Build leg groups and summary when leg assignments exist.
+  const LEG_ORDER: Leg[] = ['L1', 'L2', '240V'];
+
+  const legSum = (leg: Leg): number =>
+    visible
+      .filter((c) => legAssignments[c.channelNum] === leg)
+      .reduce((s, c) => s + (c.watts ?? 0), 0);
+
+  const circuitsByLeg = (leg: Leg): EmporiaCircuit[] =>
+    visible.filter((c) => legAssignments[c.channelNum] === leg);
+
+  const unassigned: EmporiaCircuit[] = visible.filter((c) => !legAssignments[c.channelNum]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -671,12 +715,65 @@ export function AcLoadsTab(): React.ReactElement {
         <span className="text-xs text-slate-400">W total AC</span>
       </div>
 
+      {/* L1 / L2 / 240V summary cards (only when leg assignments exist) */}
+      {hasLegAssignments && (
+        <div className="flex gap-2">
+          {LEG_ORDER.map((leg) => (
+            <div
+              key={leg}
+              className="flex-1 flex flex-col items-center bg-slate-800 rounded p-2 gap-0.5"
+            >
+              <span className="text-[10px] text-slate-500 uppercase tracking-wide">{leg}</span>
+              <span className="text-sm font-mono font-semibold text-sky-300 tabular-nums">
+                {fmtW(legSum(leg))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Per-circuit rows */}
-      {sorted.length === 0 && (snapshot.balanceW == null || snapshot.balanceW === 0) ? (
+      {visible.length === 0 && (snapshot.balanceW == null || snapshot.balanceW === 0) ? (
         <p className="text-slate-600 text-xs italic">No circuits reported</p>
+      ) : hasLegAssignments ? (
+        // Grouped by leg
+        <div className="flex flex-col gap-3">
+          {LEG_ORDER.map((leg) => {
+            const rows = circuitsByLeg(leg);
+            if (rows.length === 0) return null;
+            return (
+              <div key={leg} className="flex flex-col gap-1">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{leg}</p>
+                <div className="flex flex-col gap-2">
+                  {rows.map((c) => (
+                    <CircuitRow key={c.channelNum} name={c.name} watts={c.watts} maxW={maxW} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Unassigned */}
+          {unassigned.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">Unassigned</p>
+              <div className="flex flex-col gap-2">
+                {unassigned.map((c) => (
+                  <CircuitRow key={c.channelNum} name={c.name} watts={c.watts} maxW={maxW} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Balance row — "Everything else" */}
+          {snapshot.balanceW != null && (
+            <CircuitRow name="Everything else" watts={snapshot.balanceW} maxW={maxW} />
+          )}
+        </div>
       ) : (
+        // Flat sorted list (default — unchanged behavior)
         <div className="flex flex-col gap-2">
-          {sorted.map((c) => (
+          {visible.map((c) => (
             <CircuitRow key={c.channelNum} name={c.name} watts={c.watts} maxW={maxW} />
           ))}
 

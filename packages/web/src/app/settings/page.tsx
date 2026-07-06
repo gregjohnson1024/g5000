@@ -387,6 +387,174 @@ function AnchorDashboardSection() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Emporia AC settings
+// ---------------------------------------------------------------------------
+
+type Leg = 'L1' | 'L2' | '240V';
+
+interface EmporiaConfig {
+  legAssignments: Record<string, Leg>;
+  hiddenChannels: string[];
+}
+
+interface EmporiaChannelInfo {
+  channelNum: string;
+  name: string;
+  multiplier: number;
+}
+
+const SKIP_CHANNEL_NUMS_SETTINGS = new Set(['1,2,3']);
+const SKIP_NAMES_SETTINGS = /^balance$/i;
+
+function EmporiaAcSection() {
+  const [channels, setChannels] = useState<EmporiaChannelInfo[]>([]);
+  const [devicesLoaded, setDevicesLoaded] = useState(false);
+  const [cfg, setCfg] = useState<EmporiaConfig>({ legAssignments: {}, hiddenChannels: [] });
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load existing config from settings
+    void fetch('/api/settings')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok && j.settings?.emporiaConfig) {
+          setCfg(j.settings.emporiaConfig as EmporiaConfig);
+        }
+      })
+      .catch(() => {});
+
+    // Load channels from devices
+    void fetch('/api/emporia/devices', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j: { devices: Array<{ channels: EmporiaChannelInfo[] }> }) => {
+        const all: EmporiaChannelInfo[] = [];
+        for (const dev of j.devices ?? []) {
+          for (const ch of dev.channels) {
+            if (SKIP_CHANNEL_NUMS_SETTINGS.has(ch.channelNum)) continue;
+            if (SKIP_NAMES_SETTINGS.test(ch.name)) continue;
+            all.push(ch);
+          }
+        }
+        setChannels(all);
+        setDevicesLoaded(true);
+      })
+      .catch(() => {
+        setDevicesLoaded(true);
+      });
+  }, []);
+
+  const setLeg = (channelNum: string, leg: Leg | '') => {
+    setCfg((prev) => {
+      const next = { ...prev.legAssignments };
+      if (leg === '') {
+        delete next[channelNum];
+      } else {
+        next[channelNum] = leg;
+      }
+      return { ...prev, legAssignments: next };
+    });
+  };
+
+  const setHidden = (channelNum: string, hidden: boolean) => {
+    setCfg((prev) => {
+      const set = new Set(prev.hiddenChannels);
+      if (hidden) set.add(channelNum);
+      else set.delete(channelNum);
+      return { ...prev, hiddenChannels: [...set] };
+    });
+  };
+
+  const save = async () => {
+    setStatus('Saving…');
+    const cur = await fetch('/api/settings')
+      .then((r) => r.json())
+      .catch(() => ({ settings: {} }));
+    const merged = { ...(cur.settings ?? {}), emporiaConfig: cfg };
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    setStatus(res.ok ? 'Saved' : 'Save failed');
+    setTimeout(() => setStatus(null), 2500);
+  };
+
+  const legs: Array<{ value: Leg | ''; label: string }> = [
+    { value: '', label: '—' },
+    { value: 'L1', label: 'L1' },
+    { value: 'L2', label: 'L2' },
+    { value: '240V', label: '240V' },
+  ];
+
+  return (
+    <section className="space-y-3 border border-slate-800 rounded p-3">
+      <h2 className="text-lg font-semibold">Emporia AC</h2>
+      <p className="text-[11px] text-slate-500">
+        Assign each circuit to a leg (L1 / L2 / 240V) or hide it from the AC Loads view. Requires an
+        Emporia Vue 3 connected or <code>EMPORIA_SIM=1</code>.
+      </p>
+
+      {!devicesLoaded && <p className="text-slate-500 text-xs italic">Loading channels…</p>}
+
+      {devicesLoaded && channels.length === 0 && (
+        <p className="text-slate-500 text-xs italic">
+          No Emporia device found (connect one, or run with EMPORIA_SIM=1).
+        </p>
+      )}
+
+      {devicesLoaded && channels.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center text-[11px] text-slate-500 uppercase tracking-wide">
+            <span>Circuit</span>
+            <span>Leg</span>
+            <span>Hide</span>
+          </div>
+          {channels.map((ch) => (
+            <div
+              key={ch.channelNum}
+              className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center text-sm"
+            >
+              <span className="text-slate-300 truncate">
+                {ch.name}
+                <span className="text-slate-600 ml-1 text-[10px]">#{ch.channelNum}</span>
+              </span>
+              <select
+                value={cfg.legAssignments[ch.channelNum] ?? ''}
+                onChange={(e) => setLeg(ch.channelNum, e.target.value as Leg | '')}
+                className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-sm"
+              >
+                {legs.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="checkbox"
+                checked={cfg.hiddenChannels.includes(ch.channelNum)}
+                onChange={(e) => setHidden(ch.channelNum, e.target.checked)}
+                className="accent-sky-500"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => void save()}
+          className="bg-emerald-700 px-3 py-1 rounded text-sm"
+          disabled={!devicesLoaded || channels.length === 0}
+        >
+          Save Emporia settings
+        </button>
+        {status && <span className="text-sm text-slate-400">{status}</span>}
+      </div>
+    </section>
+  );
+}
+
 export default function SettingsPage() {
   // Source-mode state — separate from the persisted settings above because
   // it's a runtime-only switch (lives in the SourceModeController, not
@@ -661,6 +829,8 @@ export default function SettingsPage() {
       <TideCurrentsSection />
 
       <AnchorDashboardSection />
+
+      <EmporiaAcSection />
     </main>
   );
 }
