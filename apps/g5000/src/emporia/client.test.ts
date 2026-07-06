@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildUsagesUrl, buildChartUrl, createEmporiaClient } from './client.js';
 
 const BASE = 'https://api.emporiaenergy.com';
@@ -59,7 +62,9 @@ describe('buildChartUrl', () => {
 
 describe('createEmporiaClient — Node compat rejection check', () => {
   it('can be constructed and rejects getDevices() with an auth/network error, not a ReferenceError', async () => {
-    const client = createEmporiaClient('x@x.com', 'wrongpass');
+    // Use a throwaway temp dir so no real cached token is picked up.
+    const tmpCachePath = join(mkdtempSync(join(tmpdir(), 'emporia-test-')), 'token.json');
+    const client = createEmporiaClient('x@x.com', 'wrongpass', tmpCachePath);
     let caught: unknown;
     try {
       await client.getDevices();

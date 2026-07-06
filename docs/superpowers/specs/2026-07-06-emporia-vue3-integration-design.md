@@ -1,7 +1,7 @@
 # Emporia Vue 3 → g5000 AC-loads Integration — Design
 
 **Date:** 2026-07-06
-**Status:** Design — approved shape, pending spec review
+**Status:** Implemented (sim-verified + live Cognito auth verified 2026-07-06; live per-circuit data pending Vue 3 registration on the account)
 **Jira:** GJ-198
 **Branch:** `emporia` (off `develop`)
 
@@ -20,13 +20,13 @@ we build now against the documented API + a deterministic simulator and verify o
 
 ## Decisions (locked)
 
-| Decision | Choice |
-| --- | --- |
-| Scope | **AC Loads (live per-circuit W) + AC History (kWh over time)** — full Ingenuity parity |
-| Client | **DIY** — `amazon-cognito-identity-js` (Cognito SRP) + `fetch`; NOT the brand-new `emporia-vue-lib` (v1.0.0, single 2025 release) |
-| Placement | New **"AC" drawer tab** on `/anchor` (Loads + History sub-views); an AC-loads total line on the Systems top-zone panel |
-| Off-hardware build | **`EMPORIA_SIM` mode** — synthetic devices/circuits/history so the UI builds + demos before the hardware/account exist |
-| Leg (L1/L2/240V) grouping | **User-configured** (channel→leg map in ConfigStore) — the API does NOT expose phase; default ungrouped |
+| Decision                  | Choice                                                                                                                            |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                     | **AC Loads (live per-circuit W) + AC History (kWh over time)** — full Ingenuity parity                                            |
+| Client                    | **DIY** — `amazon-cognito-identity-js` (Cognito SRP) + `fetch`; NOT the brand-new `emporia-vue-lib` (v1.0.0, single 2025 release) |
+| Placement                 | New **"AC" drawer tab** on `/anchor` (Loads + History sub-views); an AC-loads total line on the Systems top-zone panel            |
+| Off-hardware build        | **`EMPORIA_SIM` mode** — synthetic devices/circuits/history so the UI builds + demos before the hardware/account exist            |
+| Leg (L1/L2/240V) grouping | **User-configured** (channel→leg map in ConfigStore) — the API does NOT expose phase; default ungrouped                           |
 
 ## Non-goals (this spec)
 
@@ -46,7 +46,7 @@ we build now against the documented API + a deterministic simulator and verify o
     **Cache the token** (disk) and refresh only on expiry — never re-auth per poll (Cognito throttles).
 - **Base:** `https://api.emporiaenergy.com`.
   - **Devices:** `GET /customers/devices` → `{ customerGid, devices:[{ deviceGid, model, firmware,
-    channels:[{ channelNum, channelMultiplier, name }] }] }`. Mains = one channel `channelNum="1,2,3"`
+channels:[{ channelNum, channelMultiplier, name }] }] }`. Mains = one channel `channelNum="1,2,3"`
     (name "Main"); branch circuits are `"1"`,`"2"`,… ; a synthesized `"Balance"` = mains − monitored.
   - **Live:** `GET /AppAPI?apiMethod=getDeviceListUsages&deviceGids={csv}&instant={iso}&scale=1S&energyUnit=KilowattHours`
     → per-channel `usage` (kWh over the interval; may be null). **Convert to Watts:**

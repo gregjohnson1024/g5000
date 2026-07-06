@@ -50,6 +50,9 @@ Common runtime knobs (set on the g5000 app process):
 - `VICTRON_MQTT_PORT=1883` (default) — Cerbo MQTT port; override if non-standard.
 - `VICTRON_SIM=1` — run the deterministic Victron simulator instead of the live MQTT driver (also implied by `DEMO_MODE=1`).
 - `VICTRON_PORTAL_ID=<id>` — optional; normally auto-discovered from the broker's `N/<id>/#` topic prefix.
+- `EMPORIA_EMAIL` / `EMPORIA_PASSWORD` — Emporia Energy account credentials; required for the live Vue 3 AC-loads cloud poller. Unset = Emporia off. A Google-OAuth-only Emporia account has no password → set one in the Emporia app first.
+- `EMPORIA_SIM=1` — run the deterministic Emporia simulator instead of the live cloud poller; also implied by `DEMO_MODE=1`.
+- `EMPORIA_POLL_S=15` — live poll cadence in seconds (default 15).
 
 ## Architecture
 
@@ -181,6 +184,7 @@ Disabled / preserved-but-unmounted (one-line revert):
 - **Radar** — Windy radar embed (requires internet; shows a "no connection" state offline).
 - **Sky** — suncalc sun/moon rise–set, golden hour, and civil-twilight times.
 - **Solar** — per-MPPT solar yield + battery state from the Victron Cerbo GX.
+- **AC** — Loads sub-tab: live per-circuit watts; History sub-tab: kWh DAY/WEEK/MONTH aggregates. Data comes from an **Emporia Vue 3** via its cloud API (AWS Cognito SRP auth, `authtoken` header) — separate from the Victron Cerbo. Simulated under `EMPORIA_SIM=1`; off when `EMPORIA_EMAIL`/`EMPORIA_PASSWORD` are unset.
 
 Victron data flows from `VictronDriver` (live MQTT from the Cerbo) or `VictronSim` (under `VICTRON_SIM=1` or `DEMO_MODE=1`) → bus `electrical.*` channels → `/api/victron` route → `<SolarTab/>`. When `VICTRON_MQTT_HOST` is unset or `none` the driver is off and the Solar tab shows a "Cerbo offline" state; all other tabs are unaffected.
 
