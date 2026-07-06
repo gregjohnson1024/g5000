@@ -12,6 +12,7 @@ export * from './observed-sources.js';
 export * from './channel-history.js';
 export * from './ais-targets.js';
 export * from './victron-state.js';
+export * from './emporia-state.js';
 export * from './alerts.js';
 export * from './alarms.js';
 export * from './autopilot-tx.js';
