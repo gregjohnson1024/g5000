@@ -51,21 +51,25 @@ export function SailRecommendationTile() {
   const shouldChange = rec
     ? id !== null && !sameAsActive && elapsedSec >= rec.stableSeconds
     : false;
-  let border = 'border-slate-700';
-  if (shouldChange) border = 'border-rose-600';
-  else if (id && !sameAsActive) border = 'border-amber-600';
+
+  // Severity-keyed border: danger = change needed, ok = pending, hairline-strong = idle
+  let borderClass = 'border-hairline-strong';
+  if (shouldChange) borderClass = 'border-danger';
+  else if (id && !sameAsActive) borderClass = 'border-accent-ink';
 
   return (
     <Link
       href="/boat/crossover"
-      className={`block rounded border ${border} bg-slate-900 p-3 hover:bg-slate-800`}
+      className={`block [border-radius:var(--r-panel)] border ${borderClass} bg-surface p-3 hover:bg-surface-raised`}
     >
-      <div className="text-xs uppercase tracking-wider text-slate-500">Sail</div>
+      <div className="text-[0.667rem] font-semibold uppercase tracking-[0.08em] text-ink-2">
+        Sail
+      </div>
       <div className="mt-1 flex items-center gap-2">
         <span aria-hidden className="inline-block h-3 w-3 rounded" style={{ background: color }} />
-        <div className="text-sm text-slate-100">{id ?? '—'}</div>
+        <div className="text-sm text-ink">{id ?? '—'}</div>
       </div>
-      {shouldChange && <div className="mt-1 text-xs text-rose-300">Change recommended</div>}
+      {shouldChange && <div className="mt-1 text-xs text-danger">Change recommended</div>}
     </Link>
   );
 }

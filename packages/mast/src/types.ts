@@ -76,4 +76,7 @@ export interface MastRuntime {
   getDayBaseColor(): DayBaseColor;
   readonly theme$: Observable<Theme>;
   getTheme(): Theme;
+  /** Instrument numeral scale multiplier (1.0 / 1.15 / 1.6). */
+  readonly scale$: Observable<number>;
+  getScale(): number;
 }

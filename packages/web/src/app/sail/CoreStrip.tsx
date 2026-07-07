@@ -1,10 +1,10 @@
 'use client';
 
 import type { JsonSafeSample } from '@g5000/core';
-import { HelmTile } from './HelmTile';
+import { CellGrid } from '../../components/ui/CellGrid';
 import { scalar, fmtSpeed, fmtHeading, fmtHeadingRad, sampleTs } from './tile-helpers';
 
-/** The six pinned tiles shown on every helm group. */
+/** The six pinned tiles shown on every helm group — hairline CellGrid instrument wall. */
 export function CoreStrip({
   channels,
 }: {
@@ -44,28 +44,34 @@ export function CoreStrip({
   }
 
   return (
-    <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-3">
-      <HelmTile label="SOG" value={fmtSpeed(sog)} unit="kn" small tMs={sampleTs(sog)} />
-      <HelmTile
-        label="HDG"
-        value={fmtHeadingRad(hdgValueRad)}
-        unit="°"
-        sub={hdgRef ?? undefined}
-        small
-        tMs={sampleTs(hdgSample)}
-      />
-      <HelmTile
-        label="COG"
-        value={fmtHeading(cog)}
-        unit="°"
-        sub={cogRef ?? undefined}
-        small
-        tMs={sampleTs(cog)}
-      />
-      <HelmTile label="Depth" value={fmtDepth(depth)} unit="m" small tMs={sampleTs(depth)} />
-      <HelmTile label="TWS" value={fmtSpeed(tws)} unit="kn" small tMs={sampleTs(tws)} />
-      <HelmTile label="TWD" value={fmtHeading(twd)} unit="°" small tMs={sampleTs(twd)} />
-    </div>
+    <CellGrid
+      label="CORE"
+      cols={{ base: 3, md: 6 }}
+      className="mb-3"
+      data-testid="core-strip"
+      cells={[
+        { label: 'SOG', value: fmtSpeed(sog), unit: 'kn', small: true, tMs: sampleTs(sog) },
+        {
+          label: 'HDG',
+          value: fmtHeadingRad(hdgValueRad),
+          unit: '°',
+          sub: hdgRef ?? undefined,
+          small: true,
+          tMs: sampleTs(hdgSample),
+        },
+        {
+          label: 'COG',
+          value: fmtHeading(cog),
+          unit: '°',
+          sub: cogRef ?? undefined,
+          small: true,
+          tMs: sampleTs(cog),
+        },
+        { label: 'Depth', value: fmtDepth(depth), unit: 'm', small: true, tMs: sampleTs(depth) },
+        { label: 'TWS', value: fmtSpeed(tws), unit: 'kn', small: true, tMs: sampleTs(tws) },
+        { label: 'TWD', value: fmtHeading(twd), unit: '°', small: true, tMs: sampleTs(twd) },
+      ]}
+    />
   );
 }
 

@@ -5,6 +5,7 @@ import { tideSnapshot } from '@g5000/tide';
 import type { TidalEvent } from '@g5000/tide';
 import type { JsonSafeSample } from '@g5000/core';
 import type { WeatherCurrent, HourPoint } from '../../../lib/weather-dto';
+import { Panel } from '../../../components/ui/Panel';
 
 // Default position (Bermuda) — used when no GPS fix is available.
 const DEFAULT_LAT = 32.3;
@@ -132,79 +133,77 @@ export function TodayNowPanel({
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 min-h-[100px]">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-        Today & Now
-      </span>
+    <Panel label="Today &amp; Now">
+      <div className="flex flex-col gap-2">
+        {/* Weather section */}
+        <div className="flex flex-col gap-1">
+          {weatherError ? (
+            <span className="text-xs text-ink-3 italic">Weather unavailable</span>
+          ) : weather === null ? (
+            <span className="text-xs text-ink-3 italic">Loading…</span>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold font-mono text-ink-value">
+                  {Math.round(weather.tempC)}°C
+                </span>
+                <span className="text-xs text-ink-3">{weather.condition}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-mono text-ink-2">
+                <span>
+                  Wind <span className="text-ink-value">{Math.round(weather.windKn)} kn</span>
+                  {weather.gustKn > weather.windKn + 2 && (
+                    <span className="text-ink-3"> G{Math.round(weather.gustKn)}</span>
+                  )}
+                </span>
+                {precipProb !== null && (
+                  <span>
+                    Precip <span className="text-ink-value">{Math.round(precipProb)}%</span>
+                  </span>
+                )}
+                <span>
+                  Feels <span className="text-ink-value">{Math.round(weather.apparentC)}°C</span>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
 
-      {/* Weather section */}
-      <div className="flex flex-col gap-1">
-        {weatherError ? (
-          <span className="text-xs text-slate-600 italic">Weather unavailable</span>
-        ) : weather === null ? (
-          <span className="text-xs text-slate-600 italic">Loading…</span>
-        ) : (
-          <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-semibold font-mono text-slate-100">
-                {Math.round(weather.tempC)}°C
-              </span>
-              <span className="text-xs text-slate-400">{weather.condition}</span>
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-mono text-slate-300">
+        {/* Divider */}
+        <div className="border-t border-hairline" />
+
+        {/* Tide section */}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[0.611rem] uppercase tracking-wide text-ink-4">Tide</span>
+          {tideLoading ? (
+            <span className="text-xs text-ink-3 italic">Loading…</span>
+          ) : snapshot === null || snapshot.heightNowM === null ? (
+            <span className="text-xs text-ink-3 italic">— no station</span>
+          ) : (
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-mono text-ink-2">
               <span>
-                Wind <span className="text-slate-100">{Math.round(weather.windKn)} kn</span>
-                {weather.gustKn > weather.windKn + 2 && (
-                  <span className="text-slate-400"> G{Math.round(weather.gustKn)}</span>
+                <span className="text-info">{snapshot.heightNowM.toFixed(2)} m</span>
+                {snapshot.state && (
+                  <span className="ml-1 text-ink-3 capitalize">{snapshot.state}</span>
                 )}
               </span>
-              {precipProb !== null && (
-                <span>
-                  Precip <span className="text-slate-100">{Math.round(precipProb)}%</span>
+              {snapshot.next && (
+                <span className="text-ink-3">
+                  Next {snapshot.next.type}{' '}
+                  <span className="text-ink-2">{snapshot.next.heightM.toFixed(1)} m</span>
+                  {' @ '}
+                  {new Date(snapshot.next.timeMs).toLocaleTimeString(undefined, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'UTC',
+                    timeZoneName: 'short',
+                  })}
                 </span>
               )}
-              <span>
-                Feels <span className="text-slate-100">{Math.round(weather.apparentC)}°C</span>
-              </span>
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
-
-      {/* Divider */}
-      <div className="border-t border-slate-800" />
-
-      {/* Tide section */}
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wide text-slate-600">Tide</span>
-        {tideLoading ? (
-          <span className="text-xs text-slate-600 italic">Loading…</span>
-        ) : snapshot === null || snapshot.heightNowM === null ? (
-          <span className="text-xs text-slate-600 italic">— no station</span>
-        ) : (
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-mono text-slate-300">
-            <span>
-              <span className="text-sky-300">{snapshot.heightNowM.toFixed(2)} m</span>
-              {snapshot.state && (
-                <span className="ml-1 text-slate-500 capitalize">{snapshot.state}</span>
-              )}
-            </span>
-            {snapshot.next && (
-              <span className="text-slate-400">
-                Next {snapshot.next.type}{' '}
-                <span className="text-slate-200">{snapshot.next.heightM.toFixed(1)} m</span>
-                {' @ '}
-                {new Date(snapshot.next.timeMs).toLocaleTimeString(undefined, {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZone: 'UTC',
-                  timeZoneName: 'short',
-                })}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    </Panel>
   );
 }

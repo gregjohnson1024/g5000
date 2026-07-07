@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { AisTarget, JsonSafeSample } from '@g5000/core';
 import { rankVessels, type RankedVessel } from '../../../lib/nearby-vessels';
+import { Panel } from '../../../components/ui/Panel';
 
 const POLL_MS = 3_000;
 const MAX_ROWS = 6;
@@ -72,16 +73,12 @@ export function NearbyVesselsPanel({
   const rows = vessels.slice(0, MAX_ROWS);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1 min-h-[100px]">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-        Nearby Vessels
-      </span>
-      {rows.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <span className="text-slate-600 text-xs italic">No vessels nearby</span>
-        </div>
-      ) : (
-        <ul className="flex-1 flex flex-col gap-0.5 mt-1">
+    <Panel
+      label="Nearby Vessels"
+      emptyState={rows.length === 0 ? { reason: 'No vessels nearby' } : undefined}
+    >
+      {rows.length > 0 && (
+        <ul className="flex flex-col gap-0.5 mt-1">
           {rows.map((v) => {
             const stale = v.ageMs > STALE_AGE_MS;
             return (
@@ -91,16 +88,16 @@ export function NearbyVesselsPanel({
                   stale ? 'opacity-40' : ''
                 }`}
               >
-                <span className="text-slate-200 truncate min-w-0">{v.name ?? String(v.mmsi)}</span>
+                <span className="text-ink truncate min-w-0">{v.name ?? String(v.mmsi)}</span>
                 <span className="shrink-0 text-right">
-                  <span className="text-slate-300 tabular-nums">{fmtRange(v.rangeM)}</span>
-                  <span className="text-slate-500 ml-1">{fmtAge(v.ageMs)}</span>
+                  <span className="text-ink-2 tabular-nums">{fmtRange(v.rangeM)}</span>
+                  <span className="text-ink-3 ml-1">{fmtAge(v.ageMs)}</span>
                 </span>
               </li>
             );
           })}
         </ul>
       )}
-    </div>
+    </Panel>
   );
 }

@@ -13,6 +13,8 @@ import type {
 } from '@g5000/mast';
 import { MAST_BASE_COLOR_HEX } from '../../../mast/colors';
 import { MastPreview } from './MastPreview';
+import { SegmentedControl } from '../../../../components/ui/SegmentedControl';
+import { useThemeStore, SCALE_PRESETS, type ScalePreset } from '../../../../lib/theme-store';
 
 // ── constants ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,12 @@ function makeDefaultTile(field: string): MastTile {
 
 // ── component ──────────────────────────────────────────────────────────────────
 
+const SCALE_LABELS: Record<string, string> = {
+  '1': 'Phone (1×)',
+  '1.15': 'Pi helm (1.15×)',
+  '1.6': 'Mast (1.6×)',
+};
+
 export default function MastConfigPage() {
   const [layout, setLayout] = useState<MastLayout | null>(null);
   const [channels, setChannels] = useState<string[]>([]);
@@ -73,6 +81,7 @@ export default function MastConfigPage() {
   const [err, setErr] = useState<string | null>(null);
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
   const [ok, setOk] = useState(false);
+  const { scale, setScale } = useThemeStore();
 
   // ── load ────────────────────────────────────────────────────────────────────
 
@@ -328,6 +337,24 @@ export default function MastConfigPage() {
         <p className="text-xs text-slate-400">
           Day-mode colour for cell values (black background). Alarm thresholds still override; night
           mode shows everything in red.
+        </p>
+      </section>
+
+      <section className="border border-slate-700 rounded-md p-4 space-y-2">
+        <div className="text-sm font-medium">Instrument numeral scale</div>
+        <SegmentedControl<string>
+          aria-label="Instrument numeral scale"
+          size="sm"
+          segments={SCALE_PRESETS.map((s) => ({
+            value: String(s),
+            label: SCALE_LABELS[String(s)] ?? `${s}×`,
+          }))}
+          value={String(scale)}
+          onChange={(v) => setScale(Number(v) as ScalePreset)}
+        />
+        <p className="text-xs text-slate-400">
+          Multiplies d1–d4 display numerals only (not labels or units). Phone = 1× / Pi helm = 1.15×
+          / Mast Chipsee = 1.6×. Applied live boat-wide via SSE.
         </p>
       </section>
 

@@ -128,7 +128,7 @@ function Meteogram({
   lon: number;
 }): React.ReactElement {
   if (hours.length < 2) {
-    return <p className="text-xs text-slate-500 italic">No forecast data.</p>;
+    return <p className="text-xs text-ink-3 italic">No forecast data.</p>;
   }
 
   const tMin = hours[0]!.timeMs;
@@ -398,10 +398,10 @@ export function ForecastGraphTab({ lat, lon }: { lat: number; lon: number }): Re
   }, [effectiveLat, effectiveLon]);
 
   if (error) {
-    return <p className="text-xs text-slate-500 italic">Forecast unavailable.</p>;
+    return <p className="text-xs text-ink-3 italic">Forecast unavailable.</p>;
   }
   if (forecast === null) {
-    return <p className="text-xs text-slate-500 italic">Loading forecast…</p>;
+    return <p className="text-xs text-ink-3 italic">Loading forecast…</p>;
   }
 
   const now = Date.now();
@@ -412,20 +412,30 @@ export function ForecastGraphTab({ lat, lon }: { lat: number; lon: number }): Re
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-slate-400 uppercase tracking-wide">
-          72-hour meteogram — UTC
-        </span>
-        <div className="flex items-center gap-3 text-[10px] text-slate-500">
+        <span className="text-xs text-ink-3 uppercase tracking-wide">72-hour meteogram — UTC</span>
+        <div className="flex items-center gap-3 text-[0.611rem] text-ink-3">
           <span>
-            <span className="inline-block w-3 h-0.5 bg-orange-400 mr-1 align-middle" />
+            {/* orange-400 line — temperature legend swatch; raw hex matches SVG render stop */}
+            <span
+              className="inline-block w-3 h-0.5 mr-1 align-middle"
+              style={{ backgroundColor: '#f97316' }}
+            />
             Temp
           </span>
           <span>
-            <span className="inline-block w-3 h-0.5 bg-emerald-400 mr-1 align-middle" />
+            {/* emerald-400 line — wind legend swatch; raw hex matches SVG render stop */}
+            <span
+              className="inline-block w-3 h-0.5 mr-1 align-middle"
+              style={{ backgroundColor: '#34d399' }}
+            />
             Wind
           </span>
           <span>
-            <span className="inline-block w-3 h-0.5 bg-sky-400 mr-1 align-middle" />
+            {/* sky-400 line — precip legend swatch; raw hex matches SVG render stop */}
+            <span
+              className="inline-block w-3 h-0.5 mr-1 align-middle"
+              style={{ backgroundColor: '#38bdf8' }}
+            />
             Precip%
           </span>
         </div>

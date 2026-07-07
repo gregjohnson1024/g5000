@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { AutopilotCommandName, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../../hooks/use-sse';
+import { Dialog } from '../../../components/ui/Dialog';
+import { Button } from '../../../components/ui/Button';
+import { HoldButton } from '../../../components/ui/HoldButton';
 
 interface LogRow {
   id: number;
@@ -153,9 +156,19 @@ export function ControlPanel(): React.ReactElement {
     setCooldownUntil(Date.now() + 500);
   }
 
+  const pendingDef = COMMANDS.find((c) => c.name === pendingCommand);
+  const isEngageDisengage = pendingCommand === 'auto' || pendingCommand === 'standby';
+
   return (
-    <section className="border-t border-amber-800 pt-6 mt-6 space-y-4">
-      <div className="bg-amber-900/30 border border-amber-700 rounded p-3 text-amber-100 text-sm space-y-2">
+    <section className="border-t border-[var(--hairline)] pt-6 mt-6 space-y-4">
+      {/* Warning banner — tokens only */}
+      <div
+        className="[border-radius:var(--r-panel)] border border-[var(--warning-strong,theme(colors.amber.700))] p-3 text-sm space-y-2"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--warning-surface, #78350f) 30%, transparent)',
+          color: 'var(--warning-ink, #fef3c7)',
+        }}
+      >
         <div className="font-semibold">⚠ TEST CONTROLS · MAC ONLY</div>
         <p>
           Sends real PGN 130850 frames to the live autopilot. Confirm each press. Increment buttons
@@ -168,88 +181,107 @@ export function ControlPanel(): React.ReactElement {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        {/* Mode buttons — ENABLE(AUTO) / DISABLE(STBY) as HoldButton */}
         <div className="space-y-2">
-          <h3 className="text-xs uppercase tracking-wider text-slate-400">Mode</h3>
+          <h3 className="text-xs uppercase tracking-wider text-ink-2">Mode</h3>
           <div className="grid grid-cols-2 gap-2">
             {COMMANDS.filter((c) => c.group === 'mode').map((c) => (
-              <button
+              <HoldButton
                 key={c.name}
-                type="button"
+                holdMs={800}
                 disabled={!buttonEnabled(c.name)}
                 title={buttonTooltip(c.name)}
-                onClick={() => setPendingCommand(c.name)}
-                className="px-3 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded font-semibold text-slate-200"
+                onHold={() => setPendingCommand(c.name)}
+                fillColor="bg-accent"
+                className="min-h-[44px] px-3 py-3 font-semibold text-ink-value bg-surface-raised border border-hairline-strong text-[0.833rem]"
               >
                 {c.label}
-              </button>
+              </HoldButton>
             ))}
           </div>
         </div>
+
+        {/* Course adjust buttons */}
         <div className="space-y-2">
-          <h3 className="text-xs uppercase tracking-wider text-slate-400">Course adjust</h3>
+          <h3 className="text-xs uppercase tracking-wider text-ink-2">Course adjust</h3>
           <div className="grid grid-cols-4 gap-2">
             {COMMANDS.filter((c) => c.group === 'course').map((c) => (
-              <button
+              <Button
                 key={c.name}
-                type="button"
+                variant="secondary"
+                size="md"
                 disabled={!buttonEnabled(c.name)}
                 title={buttonTooltip(c.name)}
                 onClick={() => setPendingCommand(c.name)}
-                className="px-2 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded font-mono text-slate-200"
+                className="font-mono"
               >
                 {c.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
       </div>
 
-      {pendingCommand && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded p-6 max-w-md space-y-4">
-            <div className="text-lg font-semibold text-slate-100">Confirm AP command</div>
-            <div className="text-sm text-slate-300">
-              Send{' '}
-              <span className="font-mono font-semibold">
-                {COMMANDS.find((c) => c.name === pendingCommand)?.label}
-              </span>{' '}
-              to the autopilot?
-            </div>
-            <div className="text-xs text-slate-400">
-              {COMMANDS.find((c) => c.name === pendingCommand)?.description}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingCommand(null)}
-                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 text-sm"
+      {/* Confirm dialog — Dialog primitive with focus trap + Escape */}
+      <Dialog
+        open={pendingCommand !== null}
+        onClose={() => setPendingCommand(null)}
+        title="Confirm AP command"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setPendingCommand(null)}>
+              Cancel
+            </Button>
+            {isEngageDisengage ? (
+              /* Engage / disengage require a hold */
+              <HoldButton
+                holdMs={800}
+                disabled={pendingCommand === null}
+                onHold={() => {
+                  if (pendingCommand !== null) void confirmAndSend(pendingCommand);
+                }}
+                confirmedLabel="Sent ✓"
+                fillColor="bg-accent"
+                className="min-h-[44px] px-4 py-2 text-[0.833rem] font-semibold bg-accent text-on-accent border border-accent [border-radius:var(--r-control)] hover:opacity-90"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmAndSend(pendingCommand)}
-                className="px-3 py-1 bg-amber-700 hover:bg-amber-600 rounded text-amber-50 text-sm font-semibold"
+                Hold to send
+              </HoldButton>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => pendingCommand !== null && void confirmAndSend(pendingCommand)}
               >
                 Send
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+            )}
+          </>
+        }
+      >
+        <p className="text-ink">
+          Send <span className="font-mono font-semibold">{pendingDef?.label}</span> to the
+          autopilot?
+        </p>
+        {pendingDef?.description && (
+          <p className="text-[0.833rem] text-ink-3 mt-2">{pendingDef.description}</p>
+        )}
+        {isEngageDisengage && (
+          <p className="text-[0.833rem] text-ink-2 mt-2 font-medium">Hold the button to confirm.</p>
+        )}
+      </Dialog>
 
+      {/* Ack log — UTC timestamps */}
       <div>
-        <h3 className="text-xs uppercase tracking-wider text-slate-400 mb-2">Recent commands</h3>
-        <div className="text-xs font-mono space-y-1 text-slate-300">
-          {log.length === 0 && <div className="text-slate-500 italic">No commands sent yet.</div>}
+        <h3 className="text-xs uppercase tracking-wider text-ink-2 mb-2">Recent commands</h3>
+        <div className="text-xs font-mono space-y-1 text-ink-3">
+          {log.length === 0 && <div className="text-ink-4 italic">No commands sent yet.</div>}
           {log.map((r) => {
             const d = new Date(r.t * 1000);
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            const ss = String(d.getSeconds()).padStart(2, '0');
+            const hh = String(d.getUTCHours()).padStart(2, '0');
+            const mm = String(d.getUTCMinutes()).padStart(2, '0');
+            const ss = String(d.getUTCSeconds()).padStart(2, '0');
             return (
               <div key={r.id} className="flex gap-3">
-                <span className="text-slate-500">{`${hh}:${mm}:${ss}`}</span>
+                <span className="text-ink-4">{`${hh}:${mm}:${ss}Z`}</span>
                 <span className="font-semibold w-32">
                   {COMMANDS.find((c) => c.name === r.command)?.label ?? r.command}
                 </span>

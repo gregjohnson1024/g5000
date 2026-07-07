@@ -52,3 +52,16 @@ export type { InstrumentTileProps, InstrumentSize, InstrumentSeverity } from './
 export { Takeover } from './Takeover';
 
 export { pickCriticalTakeover } from './takeover-trigger';
+
+export { CellGrid } from './CellGrid';
+export type { CellGridProps, CellSpec, ColsSpec } from './CellGrid';
+
+export {
+  cellGridClasses,
+  colsClasses,
+  CELL_GRID_WRAPPER_CLASSES,
+  CELL_GRID_INNER_CLASSES,
+  CELL_CLASSES,
+  CELL_TILE_OVERRIDES,
+  CELL_HIT_TARGET_CLASSES,
+} from './cell-grid-classes';

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSse } from '../../../hooks/use-sse';
+import { fmtLatLonDmm } from '../../../lib/coords';
 
 interface LineEnd {
   lat: number;
@@ -12,16 +13,6 @@ interface LineSnap {
   port?: LineEnd;
   stbd?: LineEnd;
   preStartSide?: 'port' | 'stbd';
-}
-
-function fmtCoord(lat: number, lon: number): string {
-  const fL = (v: number, pos: string, neg: string) => {
-    const a = Math.abs(v);
-    const deg = Math.floor(a);
-    const min = ((a - deg) * 60).toFixed(3);
-    return `${deg} ${min}${v >= 0 ? pos : neg}`;
-  };
-  return `${fL(lat, 'n', 's')}, ${fL(lon, 'e', 'w')}`;
 }
 
 /**
@@ -128,7 +119,7 @@ export function LinePingPanel(): React.ReactElement {
           Ping Port End
           {line.port && (
             <div className="text-xs font-mono font-normal mt-1 opacity-80">
-              {fmtCoord(line.port.lat, line.port.lon)}
+              {fmtLatLonDmm(line.port.lat, line.port.lon)}
             </div>
           )}
         </button>
@@ -146,7 +137,7 @@ export function LinePingPanel(): React.ReactElement {
           Ping Stbd End
           {line.stbd && (
             <div className="text-xs font-mono font-normal mt-1 opacity-80">
-              {fmtCoord(line.stbd.lat, line.stbd.lon)}
+              {fmtLatLonDmm(line.stbd.lat, line.stbd.lon)}
             </div>
           )}
         </button>

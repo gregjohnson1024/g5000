@@ -61,8 +61,8 @@ export default function AnchorPage(): React.ReactElement {
     // pb-24 leaves room for the fixed drawer (tab bar ~44px + content panel up to 224px)
     <main className="p-4 flex-1 overflow-y-auto bg-canvas pb-24">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-slate-300">Anchor</h1>
-        <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
+        <h1 className="text-xl font-semibold text-ink">Anchor</h1>
+        <div className="text-xs text-ink-3">{connected ? 'Live' : 'Reconnecting…'}</div>
       </div>
 
       {/* Top-zone panel grid */}

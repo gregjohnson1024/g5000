@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSse } from '../hooks/use-sse';
+import { Panel } from './ui';
 
 const WINDOW_MS = 30 * 60 * 1000;
 const RAD_TO_DEG = 180 / Math.PI;
@@ -33,9 +34,10 @@ export function WindShiftPlot(): React.ReactElement {
 
   if (points.length < 2) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded p-4 text-xs text-slate-500">
-        Wind shift plot — waiting for samples…
-      </div>
+      <Panel
+        label="Wind shift vs 5-min baseline (last 30 min)"
+        emptyState={{ reason: 'waiting for samples…' }}
+      />
     );
   }
 
@@ -54,10 +56,7 @@ export function WindShiftPlot(): React.ReactElement {
     .join(' ');
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded p-3">
-      <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-        Wind shift vs 5-min baseline (last 30 min)
-      </div>
+    <Panel label="Wind shift vs 5-min baseline (last 30 min)">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-20">
         <line
           x1="0"
@@ -69,9 +68,9 @@ export function WindShiftPlot(): React.ReactElement {
         />
         <polyline points={pts} fill="none" stroke="var(--accent-ink)" strokeWidth="1.5" />
       </svg>
-      <div className="text-[10px] text-slate-500 font-mono mt-1">
+      <div className="text-[10px] text-ink-4 font-mono mt-1">
         ±{degMax.toFixed(0)}° · last {points[points.length - 1]!.deg.toFixed(1)}°
       </div>
-    </div>
+    </Panel>
   );
 }

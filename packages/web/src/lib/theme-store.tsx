@@ -1,16 +1,19 @@
 'use client';
 
 /**
- * theme-store.ts — shared theme state + setTheme exposed via React context.
+ * theme-store.ts — shared theme + instrument-scale state exposed via React context.
  *
  * Motivaton: ThemeController owns the SSE subscription (boat-wide sync via
  * /api/mast/stream). NavShell's ThemeChip needs to reflect SSE-pushed themes
  * without polling independently. This module is the bridge: ThemeController
  * writes into the context; ThemeChip reads from it.
  *
+ * Scale: --instrument-scale on <html> multiplies only d1–d4 display-numeral tiers
+ * in InstrumentTile. Presets: 1.0 (phone) / 1.15 (Pi helm) / 1.6 (mast Chipsee).
+ *
  * Usage:
  *   - Wrap the app with <ThemeStoreProvider> (layout.tsx, outside ThemeController).
- *   - ThemeController calls useThemeStore().setTheme on every SSE push.
+ *   - ThemeController calls useThemeStore().setTheme / .applyScale on SSE pushes.
  *   - ThemeChip (NavShell) calls useThemeStore() to read theme + cycle.
  */
 
@@ -24,6 +27,10 @@ import { storageGet, storageSet } from './storage';
 
 const THEMES: readonly Theme[] = ['day', 'night', 'sun'];
 
+/** Allowed preset scale values (must match route.ts VALID_SCALES). */
+export const SCALE_PRESETS = [1.0, 1.15, 1.6] as const;
+export type ScalePreset = (typeof SCALE_PRESETS)[number];
+
 export function applyTheme(theme: Theme): void {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', theme);
@@ -33,6 +40,23 @@ export function applyTheme(theme: Theme): void {
 export function readStoredTheme(): Theme {
   const stored = storageGet('theme');
   return stored === 'night' || stored === 'sun' ? (stored as Theme) : 'day';
+}
+
+/**
+ * Apply --instrument-scale CSS custom property to <html> so all d1–d4
+ * calc() expressions pick it up without a React re-render.
+ */
+export function applyScale(scale: number): void {
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.setProperty('--instrument-scale', String(scale));
+  }
+}
+
+export function readStoredScale(): ScalePreset {
+  const raw = storageGet('instrument-scale');
+  const v = raw !== null ? Number(raw) : NaN;
+  // Snap to nearest preset; default 1.0.
+  return (SCALE_PRESETS as readonly number[]).includes(v) ? (v as ScalePreset) : 1.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,6 +69,9 @@ interface ThemeStore {
   setTheme: (t: Theme) => void;
   /** Cycle DAY → NIGHT → SUN → DAY. */
   cycleTheme: () => void;
+  scale: ScalePreset;
+  /** Apply scale locally + persist + POST /api/mast/scale for boat-wide sync. */
+  setScale: (s: ScalePreset) => void;
 }
 
 const ThemeContext = createContext<ThemeStore | null>(null);
@@ -60,6 +87,13 @@ export function ThemeStoreProvider({ children }: { children: ReactNode }) {
     // script already set on <html data-theme>.
     applyTheme(t);
     return t;
+  });
+
+  const [scale, setScaleState] = useState<ScalePreset>(() => {
+    const s = readStoredScale();
+    // Apply immediately so --instrument-scale is set before hydration completes.
+    applyScale(s);
+    return s;
   });
 
   const setTheme = useCallback((t: Theme) => {
@@ -87,8 +121,19 @@ export function ThemeStoreProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setScale = useCallback((s: ScalePreset) => {
+    applyScale(s);
+    storageSet('instrument-scale', String(s));
+    setScaleState(s);
+    fetch('/api/mast/scale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scale: s }),
+    }).catch(() => {});
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, cycleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, cycleTheme, scale, setScale }}>
       {children}
     </ThemeContext.Provider>
   );

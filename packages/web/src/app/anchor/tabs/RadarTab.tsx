@@ -21,8 +21,11 @@ export function RadarTab({ lat, lon }: { lat: number; lon: number }): React.Reac
 
   if (!online) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[80px] text-slate-500 text-xs italic">
-        No connection — weather radar needs internet
+      <div className="flex flex-col items-center justify-center min-h-[80px] gap-1">
+        <span className="text-ink-4 text-lg font-medium select-none">—</span>
+        <span className="text-[0.722rem] text-ink-4 italic">
+          No connection — weather radar needs internet
+        </span>
       </div>
     );
   }

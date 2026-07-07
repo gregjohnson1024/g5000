@@ -288,7 +288,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
 
   if (featureEnabled !== true) {
     return (
-      <div className="text-sm text-slate-400">
+      <div className="text-sm text-ink-3">
         {featureEnabled === null
           ? 'Loading…'
           : 'Canadian Tide/Currents is disabled — enable it in Settings.'}
@@ -298,11 +298,11 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
 
   if (stationsLoaded && pickerList.length === 0) {
     return (
-      <div className="p-3 bg-amber-900/40 border border-amber-700 rounded text-amber-200 text-xs">
+      <div className="p-3 bg-warn/20 border border-warn-strong [border-radius:var(--r-panel)] text-ink text-xs">
         <p className="font-medium">No tide source available yet</p>
-        <p className="mt-0.5 text-amber-300">
+        <p className="mt-0.5 text-ink-2">
           Waiting for position, or set{' '}
-          <code className="font-mono bg-amber-900/60 px-1 rounded">ADMIRALTY_TIDAL_API_KEY</code>{' '}
+          <code className="font-mono bg-surface-raised px-1 rounded">ADMIRALTY_TIDAL_API_KEY</code>{' '}
           for UK waters.
         </p>
       </div>
@@ -310,13 +310,13 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
   }
 
   return (
-    <div className="flex flex-col gap-2 text-slate-100">
+    <div className="flex flex-col gap-2 text-ink-value">
       {/* Station picker */}
       <div className="flex flex-wrap gap-2 items-center">
         <select
           value={selectedKey ?? ''}
           onChange={(e) => setSelectedKey(e.target.value || null)}
-          className="flex-1 min-w-0 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-100 focus:outline-none focus:border-slate-400"
+          className="flex-1 min-w-0 px-2 py-1 bg-surface-raised border border-hairline-strong rounded text-xs text-ink-value focus:outline-none focus:border-accent-hi"
           disabled={pickerList.length === 0}
         >
           {pickerList.length === 0 && !stationsLoaded && (
@@ -343,8 +343,8 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
             onClick={() => void handlePin()}
             className={`shrink-0 px-2 py-1 rounded text-xs font-medium disabled:opacity-40 ${
               isPinned
-                ? 'bg-amber-700 hover:bg-amber-600 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
+                ? 'bg-accent-strong hover:bg-accent text-on-accent'
+                : 'bg-surface-raised hover:bg-hairline-strong text-ink'
             }`}
           >
             {pinning ? '…' : isPinned ? 'Un-pin' : 'Pin'}
@@ -352,13 +352,13 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
         )}
 
         {selectedEntry && tideSource && (
-          <span className="text-[10px] text-slate-500 uppercase">{tideSource}</span>
+          <span className="text-[0.611rem] text-ink-3 uppercase">{tideSource}</span>
         )}
       </div>
 
       {/* Compact height curve */}
       {!loadingEvents && curvePts.length > 0 && (
-        <div className="bg-slate-900 border border-slate-700 rounded p-2">
+        <div className="bg-surface border border-hairline [border-radius:var(--r-panel)] p-2">
           <svg
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
             className="w-full"
@@ -396,33 +396,33 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
             )}
           </svg>
 
-          <div className="mt-1 text-xs font-mono text-slate-300">
+          <div className="mt-1 text-xs font-mono text-ink-2">
             {snapshot?.heightNowM != null ? (
               <>
-                Now: <span className="text-sky-300">{snapshot.heightNowM.toFixed(2)} m</span>
-                {snapshot.state && <span className="ml-2 text-slate-400">{snapshot.state}</span>}
+                Now: <span className="text-info">{snapshot.heightNowM.toFixed(2)} m</span>
+                {snapshot.state && <span className="ml-2 text-ink-3">{snapshot.state}</span>}
                 {snapshot.next && (
-                  <span className="ml-2 text-slate-400">
+                  <span className="ml-2 text-ink-3">
                     → {snapshot.next.type} {snapshot.next.heightM.toFixed(2)} m at{' '}
                     {fmtTime(snapshot.next.timeMs)}
                   </span>
                 )}
               </>
             ) : (
-              <span className="text-slate-500">— outside forecast window</span>
+              <span className="text-ink-3">— outside forecast window</span>
             )}
           </div>
         </div>
       )}
 
-      {loadingEvents && <div className="text-xs text-slate-500">Loading tide events…</div>}
+      {loadingEvents && <div className="text-xs text-ink-3">Loading tide events…</div>}
 
       {/* Compact tide table — next few events only */}
       {!loadingEvents && events.length > 0 && (
         <div className="overflow-y-auto max-h-24">
           <table className="w-full text-xs font-mono border-collapse">
             <thead>
-              <tr className="text-slate-500 border-b border-slate-700">
+              <tr className="text-ink-3 border-b border-hairline">
                 <th className="text-left py-1 pr-3">Time (UTC)</th>
                 <th className="text-left py-1 pr-3">Type</th>
                 <th className="text-right py-1">Height</th>
@@ -436,14 +436,14 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
                     <tr>
                       <td
                         colSpan={3}
-                        className="pt-2 pb-0.5 text-[10px] uppercase tracking-wide text-slate-600"
+                        className="pt-2 pb-0.5 text-[0.611rem] uppercase tracking-wide text-ink-4"
                       >
                         {day}
                       </td>
                     </tr>
                     {dayEvents.map((ev) => (
-                      <tr key={ev.timeMs} className="border-b border-slate-800">
-                        <td className="py-0.5 pr-3 text-slate-300">
+                      <tr key={ev.timeMs} className="border-b border-hairline">
+                        <td className="py-0.5 pr-3 text-ink-2">
                           {new Date(ev.timeMs).toLocaleString(undefined, {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -452,7 +452,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
                         </td>
                         <td
                           className={`py-0.5 pr-3 font-semibold ${
-                            ev.type === 'HW' ? 'text-sky-300' : 'text-slate-400'
+                            ev.type === 'HW' ? 'text-info' : 'text-ink-3'
                           }`}
                         >
                           {ev.type}
@@ -468,10 +468,10 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
       )}
 
       {!loadingEvents && events.length === 0 && selectedKey && (
-        <div className="text-xs text-slate-500">No events available for this station.</div>
+        <div className="text-xs text-ink-3">No events available for this station.</div>
       )}
 
-      <p className="text-[10px] text-slate-600">
+      <p className="text-[0.611rem] text-ink-4">
         Heights in metres above Chart Datum. Approximate.
       </p>
     </div>

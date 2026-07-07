@@ -222,31 +222,31 @@ export function ForecastTableTab({ lat, lon }: { lat: number; lon: number }): Re
   }, [effectiveLat, effectiveLon]);
 
   if (error) {
-    return <p className="text-xs text-slate-500 italic">Forecast unavailable.</p>;
+    return <p className="text-xs text-ink-3 italic">Forecast unavailable.</p>;
   }
   if (forecast === null) {
-    return <p className="text-xs text-slate-500 italic">Loading forecast…</p>;
+    return <p className="text-xs text-ink-3 italic">Loading forecast…</p>;
   }
 
   const now = Date.now();
   const hours = forecast.hourly.filter((h) => h.timeMs >= now - 30 * 60_000).slice(0, TABLE_HOURS);
 
   if (hours.length === 0) {
-    return <p className="text-xs text-slate-500 italic">No hourly data.</p>;
+    return <p className="text-xs text-ink-3 italic">No hourly data.</p>;
   }
 
   const rows = makeRows(hours);
 
   return (
     <div className="overflow-x-auto">
-      <p className="text-[10px] text-slate-600 mb-1 uppercase tracking-wide">
+      <p className="text-[0.611rem] text-ink-4 mb-1 uppercase tracking-wide">
         Hourly heatmap — UTC
       </p>
-      <table className="text-[10px] font-mono border-collapse min-w-max">
+      <table className="text-[0.611rem] font-mono border-collapse min-w-max">
         <thead>
           <tr>
             {/* Row label column */}
-            <th className="sticky left-0 z-10 bg-slate-950 text-slate-500 text-left pr-2 py-0.5 font-normal whitespace-nowrap">
+            <th className="sticky left-0 z-10 bg-surface-sunken text-ink-3 text-left pr-2 py-0.5 font-normal whitespace-nowrap">
               {' '}
             </th>
             {hours.map((h) => {
@@ -265,7 +265,7 @@ export function ForecastTableTab({ lat, lon }: { lat: number; lon: number }): Re
                 <th
                   key={h.timeMs}
                   className={`py-0.5 px-0 text-center font-normal ${
-                    label ? 'text-slate-400' : 'text-slate-700'
+                    label ? 'text-ink-3' : 'text-ink-4'
                   }`}
                   style={{ minWidth: '22px' }}
                 >
@@ -279,9 +279,9 @@ export function ForecastTableTab({ lat, lon }: { lat: number; lon: number }): Re
           {rows.map((row) => (
             <tr key={row.label}>
               {/* Label cell */}
-              <td className="sticky left-0 z-10 bg-slate-950 text-slate-400 pr-2 py-px whitespace-nowrap">
+              <td className="sticky left-0 z-10 bg-surface-sunken text-ink-3 pr-2 py-px whitespace-nowrap">
                 {row.label}
-                {row.unit ? <span className="text-slate-600 ml-0.5">{row.unit}</span> : null}
+                {row.unit ? <span className="text-ink-4 ml-0.5">{row.unit}</span> : null}
               </td>
               {/* Data cells */}
               {hours.map((h) => {

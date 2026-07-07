@@ -163,7 +163,7 @@ function StackedBarChart({
   bucketMs: number;
 }): React.ReactElement {
   if (bucketCount === 0 || series.length === 0) {
-    return <p className="text-slate-500 text-xs italic">No data in range.</p>;
+    return <p className="text-ink-3 text-xs italic">No data in range.</p>;
   }
 
   // Compute per-bucket totals (sum across circuits) for y-scale.
@@ -259,12 +259,12 @@ function CircuitRow({
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400 truncate">{name}</span>
-        <span className="text-slate-200 tabular-nums font-mono ml-2">{fmtW(watts)}</span>
+        <span className="text-ink-3 truncate">{name}</span>
+        <span className="text-ink tabular-nums font-mono ml-2">{fmtW(watts)}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
         <div
-          className="h-full rounded-full bg-sky-500 transition-all duration-500"
+          className="h-full rounded-full bg-info transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -521,10 +521,10 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
           <button
             key={s}
             onClick={() => setSelected(s)}
-            className={`px-2 py-0.5 text-[10px] rounded font-mono uppercase tracking-wide transition-colors ${
+            className={`px-2 py-0.5 text-[0.611rem] rounded font-mono uppercase tracking-wide transition-colors ${
               selected === s
-                ? 'bg-sky-700 text-sky-100'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                ? 'bg-info/20 border border-info text-info'
+                : 'bg-surface-raised text-ink-3 hover:bg-hairline-strong'
             }`}
           >
             {s}
@@ -533,32 +533,30 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
       </div>
 
       {/* States */}
-      {hist.status === 'loading' && (
-        <p className="text-slate-500 text-xs italic">Loading history…</p>
-      )}
+      {hist.status === 'loading' && <p className="text-ink-3 text-xs italic">Loading history…</p>}
       {(hist.status === 'error' || hist.status === 'offline') && (
-        <p className="text-slate-500 text-xs italic">AC history unavailable / offline.</p>
+        <p className="text-ink-3 text-xs italic">AC history unavailable / offline.</p>
       )}
 
       {hist.status === 'loaded' && hist.series.length > 0 && (
         <>
           {/* Total */}
           <div className="flex items-baseline gap-2">
-            <span className="text-xl font-semibold font-mono text-sky-300 tabular-nums">
+            <span className="text-xl font-semibold font-mono text-info tabular-nums">
               {fmtKwh(hist.totalKwh)}
             </span>
-            <span className="text-xs text-slate-400">total — {selected.toLowerCase()}</span>
+            <span className="text-xs text-ink-3">total — {selected.toLowerCase()}</span>
           </div>
 
           {hist.capped && (
-            <p className="text-[10px] text-amber-500/80 italic">
+            <p className="text-[0.611rem] text-warn italic">
               Showing first {FETCH_CAP} of {hist.totalChannels} circuits (fetch cap).
             </p>
           )}
 
           {/* Stacked bar chart */}
           <div className="overflow-x-auto">
-            <p className="text-[10px] text-slate-600 mb-1 uppercase tracking-wide">
+            <p className="text-[0.611rem] text-ink-4 mb-1 uppercase tracking-wide">
               kWh per bucket — UTC
             </p>
             <StackedBarChart
@@ -571,7 +569,7 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
 
           {/* Top consumers legend */}
           <div className="flex flex-col gap-1">
-            <p className="text-[10px] text-slate-600 uppercase tracking-wide">Top consumers</p>
+            <p className="text-[0.611rem] text-ink-4 uppercase tracking-wide">Top consumers</p>
             {hist.series.map((c) => {
               const pct = hist.totalKwh > 0 ? Math.round((c.total / hist.totalKwh) * 100) : 0;
               return (
@@ -580,13 +578,11 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
                     className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
                     style={{ backgroundColor: c.color }}
                   />
-                  <span className="text-slate-400 truncate flex-1">{c.name}</span>
-                  <span className="text-slate-200 font-mono tabular-nums ml-auto whitespace-nowrap">
+                  <span className="text-ink-3 truncate flex-1">{c.name}</span>
+                  <span className="text-ink font-mono tabular-nums ml-auto whitespace-nowrap">
                     {fmtKwh(c.total)}
                   </span>
-                  <span className="text-slate-500 font-mono tabular-nums w-8 text-right">
-                    {pct}%
-                  </span>
+                  <span className="text-ink-3 font-mono tabular-nums w-8 text-right">{pct}%</span>
                 </div>
               );
             })}
@@ -595,7 +591,7 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
       )}
 
       {hist.status === 'loaded' && hist.series.length === 0 && (
-        <p className="text-slate-500 text-xs italic">No circuit data in range.</p>
+        <p className="text-ink-3 text-xs italic">No circuit data in range.</p>
       )}
     </div>
   );
@@ -656,10 +652,10 @@ export function AcLoadsTab(): React.ReactElement {
         <button
           key={v.id}
           onClick={() => setView(v.id)}
-          className={`px-2 py-0.5 text-[10px] rounded font-mono uppercase tracking-wide transition-colors ${
+          className={`px-2 py-0.5 text-[0.611rem] rounded font-mono uppercase tracking-wide transition-colors ${
             view === v.id
-              ? 'bg-slate-700 text-slate-100'
-              : 'bg-slate-900 text-slate-500 hover:bg-slate-800'
+              ? 'bg-surface-raised text-ink'
+              : 'bg-surface-sunken text-ink-3 hover:bg-surface-raised'
           }`}
         >
           {v.label}
@@ -685,9 +681,14 @@ export function AcLoadsTab(): React.ReactElement {
     return (
       <div className="flex flex-col gap-1">
         {toggle}
-        <p className="text-slate-500 text-xs italic">Emporia not configured / offline</p>
+        <div className="flex flex-col items-center justify-center min-h-[48px] gap-1">
+          <span className="text-ink-4 text-lg font-medium select-none">—</span>
+          <span className="text-[0.722rem] text-ink-4 italic">
+            Emporia not configured / offline
+          </span>
+        </div>
         {lastKnownAt != null && lastKnownAt > 0 && (
-          <p className="text-slate-600 text-[10px]">Last known: {fmtTime(lastKnownAt)}</p>
+          <p className="text-ink-4 text-[0.611rem]">Last known: {fmtTime(lastKnownAt)}</p>
         )}
       </div>
     );
@@ -733,10 +734,10 @@ export function AcLoadsTab(): React.ReactElement {
 
       {/* Total mains header */}
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold font-mono text-sky-300 tabular-nums">
+        <span className="text-2xl font-semibold font-mono text-info tabular-nums">
           {snapshot.mainsW != null ? Math.round(snapshot.mainsW) : '—'}
         </span>
-        <span className="text-xs text-slate-400">W total AC</span>
+        <span className="text-xs text-ink-3">W total AC</span>
       </div>
 
       {/* L1 / L2 / 240V summary cards (only when leg assignments exist) */}
@@ -745,10 +746,10 @@ export function AcLoadsTab(): React.ReactElement {
           {LEG_ORDER.map((leg) => (
             <div
               key={leg}
-              className="flex-1 flex flex-col items-center bg-slate-800 rounded p-2 gap-0.5"
+              className="flex-1 flex flex-col items-center bg-surface-raised [border-radius:var(--r-panel)] p-2 gap-0.5"
             >
-              <span className="text-[10px] text-slate-500 uppercase tracking-wide">{leg}</span>
-              <span className="text-sm font-mono font-semibold text-sky-300 tabular-nums">
+              <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">{leg}</span>
+              <span className="text-sm font-mono font-semibold text-info tabular-nums">
                 {fmtW(legSum(leg))}
               </span>
             </div>
@@ -758,7 +759,7 @@ export function AcLoadsTab(): React.ReactElement {
 
       {/* Per-circuit rows */}
       {visible.length === 0 && (snapshot.balanceW == null || snapshot.balanceW === 0) ? (
-        <p className="text-slate-600 text-xs italic">No circuits reported</p>
+        <p className="text-ink-4 text-xs italic">No circuits reported</p>
       ) : hasLegAssignments ? (
         // Grouped by leg
         <div className="flex flex-col gap-3">
@@ -767,7 +768,7 @@ export function AcLoadsTab(): React.ReactElement {
             if (rows.length === 0) return null;
             return (
               <div key={leg} className="flex flex-col gap-1">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{leg}</p>
+                <p className="text-[0.611rem] text-ink-3 uppercase tracking-wide">{leg}</p>
                 <div className="flex flex-col gap-2">
                   {rows.map((c) => (
                     <CircuitRow key={c.channelNum} name={c.name} watts={c.watts} maxW={maxW} />
@@ -780,7 +781,7 @@ export function AcLoadsTab(): React.ReactElement {
           {/* Unassigned */}
           {unassigned.length > 0 && (
             <div className="flex flex-col gap-1">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wide">Unassigned</p>
+              <p className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Unassigned</p>
               <div className="flex flex-col gap-2">
                 {unassigned.map((c) => (
                   <CircuitRow key={c.channelNum} name={c.name} watts={c.watts} maxW={maxW} />

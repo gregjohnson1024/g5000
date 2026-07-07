@@ -1,36 +1,60 @@
+/*
+ * mast.css — Mast-display override layer.
+ *
+ * .mast-root inherits the app theme tokens (canvas/ink/ink-3/ok/accent/danger)
+ * so the physical display re-themes with data-theme without any JS changes.
+ *
+ * .mast-root.mast-night is the strict physical-nightMode override: collapses
+ * ALL semantic colours to a single red family to preserve night vision.
+ * This is intentional and must NOT be folded into the data-theme system —
+ * it is a hardware-brightness / crew-vision concern, not a UI theme.
+ *
+ * Tile layout uses container-type:size + cqmin so the JS ResizeObserver
+ * fit in Tile.tsx works correctly (and stays independent of --instrument-scale).
+ */
 .mast-root {
-  --mast-bg: #000000;
-  --mast-fg: #ffffff;
-  --mast-muted: #9ca3af;
-  --mast-green: #4ade80;
-  --mast-amber: #f59e0b;
-  --mast-red: #ef4444;
   position: fixed;
   inset: 0;
   z-index: 51;
-  background: var(--mast-bg);
-  color: var(--mast-fg);
+  /* Fall back to absolute black/white only when no theme token is present
+     (i.e., outside the app shell — shouldn't happen in prod). */
+  background: var(--canvas, #000000);
+  color: var(--ink-value, #ffffff);
   overflow: hidden;
 }
-/* Night mode collapses all semantic colors to a single red to preserve night vision;
-   threshold color-coding is intentionally sacrificed after dark. */
+
+/* Night mode collapses all semantic colors to a single red to preserve night
+   vision; threshold color-coding is intentionally sacrificed after dark.
+   DO NOT merge this into data-theme='night' — it is a physical hardware
+   override, not a browser/app theme selection. */
 .mast-root.mast-night {
-  --mast-bg: #000000;
-  --mast-fg: #ff4d4d;
-  --mast-muted: #7a1f1f;
-  --mast-green: #ff4d4d;
-  --mast-amber: #ff4d4d;
-  --mast-red: #ff4d4d;
+  --canvas: #000000;
+  --ink-value: #ff4d4d;
+  --ink-3: #7a1f1f;
+  --ok: #ff4d4d;
+  --accent-ink: #ff4d4d;
+  --danger: #ff4d4d;
+  background: #000000;
+  color: #ff4d4d;
 }
+
 .mast-tile {
   container-type: size;
 }
+
+/* Label and units use cqmin so they scale with tile container size.
+   These are NOT multiplied by --instrument-scale — Tile.tsx's JS ResizeObserver
+   drives the numeral independently; labels/units use cqmin fit. */
 .mast-tile-label {
   font-size: 6cqmin;
+  color: var(--ink-3, #64748b);
 }
+
 .mast-tile-units {
   font-size: 6cqmin;
+  color: var(--ink-3, #64748b);
 }
+
 .mast-tile-value.mast-stale {
-  color: var(--mast-muted);
+  color: var(--ink-3, #64748b);
 }

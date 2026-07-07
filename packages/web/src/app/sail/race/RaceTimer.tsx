@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ConfirmDialog } from '../../../components/ui';
+import { Button, ConfirmDialog, HoldButton, InstrumentTile, Panel } from '../../../components/ui';
 
 interface TimerSnap {
   startMs: number | null;
@@ -60,100 +60,99 @@ export function RaceTimer(): React.ReactElement {
   const secsToGun = timer.startMs === null ? null : Math.round((timer.startMs - nowMs) / 1000);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded p-6 flex flex-col items-center gap-4">
-      <div className="text-xs uppercase tracking-wider text-slate-400">
-        Race timer · {timer.state}
-      </div>
-      <div className="text-7xl font-mono text-slate-100 leading-none tabular-nums">
-        {secsToGun === null ? '--:--' : fmt(secsToGun)}
-      </div>
-      <div className="flex gap-2 flex-wrap justify-center">
-        {timer.state === 'idle' && (
-          <>
-            <button
-              type="button"
-              onClick={() => void post({ action: 'start', offsetSec: 300 })}
-              className="px-4 py-2 rounded bg-emerald-700 hover:bg-emerald-600 text-white"
-            >
-              Start 5:00
-            </button>
-            <button
-              type="button"
-              onClick={() => void post({ action: 'start', offsetSec: 600 })}
-              className="px-4 py-2 rounded bg-emerald-800 hover:bg-emerald-700 text-white"
-            >
-              Start 10:00
-            </button>
-          </>
-        )}
-        {timer.state !== 'idle' && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                if (timer.startMs === null) return;
-                // Snap startMs so that the displayed time becomes the
-                // nearest whole-minute value. Used to align the timer with
-                // the warning gun ("sync to gun"): if the gun fires while
-                // the clock shows 4:32, press Sync and the display jumps
-                // to 5:00 (28 s adjustment) so subsequent minute beeps
-                // land on the right boundaries.
-                const startMs = timer.startMs;
-                const secsToGun = (startMs - Date.now()) / 1000;
-                const nearestMinSecs = Math.round(secsToGun / 60) * 60;
-                const adjustSec = nearestMinSecs - secsToGun;
-                if (Math.abs(adjustSec) < 0.5) return; // already aligned
-                // Optimistic local snap so the next 100ms render shows
-                // the new whole-minute value — without this, the display
-                // keeps counting down off the stale startMs until the
-                // next 1s /api/race/state poll, by which point the value
-                // has ticked past 5:00 and lands on 4:59. The poll-and-
-                // overwrite a moment later confirms the server agrees.
-                setTimer((t) => ({ ...t, startMs: startMs + adjustSec * 1000 }));
-                void post({ action: 'sync', adjustSec });
-              }}
-              className="px-3 py-2 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-semibold"
-              title="Snap countdown to nearest whole minute (sync to gun)"
-            >
-              Sync
-            </button>
-            <button
-              type="button"
-              onClick={() => void post({ action: 'sync', adjustSec: 60 })}
-              className="px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 text-slate-100"
-            >
-              +1 min
-            </button>
-            <button
-              type="button"
-              onClick={() => void post({ action: 'sync', adjustSec: -60 })}
-              className="px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 text-slate-100"
-            >
-              -1 min
-            </button>
-            <button
-              type="button"
-              onClick={() => void post({ action: 'sync', adjustSec: 10 })}
-              className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
-            >
-              +10 s
-            </button>
-            <button
-              type="button"
-              onClick={() => void post({ action: 'sync', adjustSec: -10 })}
-              className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
-            >
-              -10 s
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmReset(true)}
-              className="px-3 py-2 rounded-[var(--r-control)] bg-danger-surface border border-danger-strong text-danger hover:bg-danger/20"
-            >
-              Reset
-            </button>
-          </>
-        )}
+    <Panel label={`Race timer · ${timer.state}`}>
+      {/* d1 InstrumentTile for the timer numeral */}
+      <div className="flex flex-col items-center gap-4 py-2">
+        <InstrumentTile
+          label="countdown"
+          value={secsToGun === null ? '--:--' : fmt(secsToGun)}
+          size="d1"
+          className="w-full border-0 bg-transparent p-0 items-center"
+        />
+
+        <div className="flex gap-2 flex-wrap justify-center">
+          {timer.state === 'idle' && (
+            <>
+              <Button
+                variant="primary"
+                onClick={() => void post({ action: 'start', offsetSec: 300 })}
+              >
+                Start 5:00
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void post({ action: 'start', offsetSec: 600 })}
+              >
+                Start 10:00
+              </Button>
+            </>
+          )}
+          {timer.state !== 'idle' && (
+            <>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (timer.startMs === null) return;
+                  // Snap startMs so that the displayed time becomes the
+                  // nearest whole-minute value. Used to align the timer with
+                  // the warning gun ("sync to gun"): if the gun fires while
+                  // the clock shows 4:32, press Sync and the display jumps
+                  // to 5:00 (28 s adjustment) so subsequent minute beeps
+                  // land on the right boundaries.
+                  const startMs = timer.startMs;
+                  const secsToGun = (startMs - Date.now()) / 1000;
+                  const nearestMinSecs = Math.round(secsToGun / 60) * 60;
+                  const adjustSec = nearestMinSecs - secsToGun;
+                  if (Math.abs(adjustSec) < 0.5) return; // already aligned
+                  // Optimistic local snap so the next 100ms render shows
+                  // the new whole-minute value — without this, the display
+                  // keeps counting down off the stale startMs until the
+                  // next 1s /api/race/state poll, by which point the value
+                  // has ticked past 5:00 and lands on 4:59. The poll-and-
+                  // overwrite a moment later confirms the server agrees.
+                  setTimer((t) => ({ ...t, startMs: startMs + adjustSec * 1000 }));
+                  void post({ action: 'sync', adjustSec });
+                }}
+                title="Snap countdown to nearest whole minute (sync to gun)"
+              >
+                Sync
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void post({ action: 'sync', adjustSec: 60 })}
+              >
+                +1 min
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void post({ action: 'sync', adjustSec: -60 })}
+              >
+                −1 min
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void post({ action: 'sync', adjustSec: 10 })}
+              >
+                +10 s
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void post({ action: 'sync', adjustSec: -10 })}
+              >
+                −10 s
+              </Button>
+              {/* Reset: HoldButton to start the hold, then ConfirmDialog for final guard */}
+              <HoldButton
+                holdMs={800}
+                onHold={() => setConfirmReset(true)}
+                fillColor="bg-danger-strong"
+                className="min-h-[44px] px-4 py-2 text-[0.833rem] font-semibold bg-danger-surface border border-danger-strong text-danger hover:opacity-90"
+              >
+                Reset
+              </HoldButton>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Guard the destructive Reset behind a confirm dialog */}
@@ -168,6 +167,6 @@ export function RaceTimer(): React.ReactElement {
         message="This will clear the countdown and return the timer to idle. The action cannot be undone."
         confirmLabel="Reset"
       />
-    </div>
+    </Panel>
   );
 }

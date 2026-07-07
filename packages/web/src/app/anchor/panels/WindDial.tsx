@@ -155,13 +155,13 @@ export function WindDial({
   const ringRotDeg = hdgRad !== null ? -hdgDeg : 0;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1">
+    <div className="bg-surface border border-hairline [border-radius:var(--r-panel)] p-3 flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
+        <span className="text-[0.667rem] font-semibold uppercase tracking-[0.08em] text-ink-2">
           Apparent Wind
         </span>
         {hdgRad !== null && (
-          <span className="text-xs text-slate-600 font-mono">
+          <span className="text-xs text-ink-4 font-mono">
             HDG {String(Math.round(wrap360(hdgDeg))).padStart(3, '0')}°
           </span>
         )}
@@ -268,16 +268,16 @@ export function WindDial({
       </div>
 
       {/* Gust footers */}
-      <div className="flex justify-between text-xs text-slate-400 font-mono px-1 pt-0 pb-1">
+      <div className="flex justify-between text-xs text-ink-3 font-mono px-1 pt-0 pb-1">
         <div className="flex flex-col items-start">
-          <span className="text-slate-600 text-[10px] uppercase tracking-wide">
+          <span className="text-ink-4 text-[0.611rem] uppercase tracking-wide">
             Max Gust 10 min
           </span>
-          <span className="text-slate-200">{fmtKn(gust10Ms)} kts</span>
+          <span className="text-ink-2">{fmtKn(gust10Ms)} kts</span>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-slate-600 text-[10px] uppercase tracking-wide">Max Gust 1 hr</span>
-          <span className="text-slate-200">{fmtKn(gust60Ms)} kts</span>
+          <span className="text-ink-4 text-[0.611rem] uppercase tracking-wide">Max Gust 1 hr</span>
+          <span className="text-ink-2">{fmtKn(gust60Ms)} kts</span>
         </div>
       </div>
     </div>

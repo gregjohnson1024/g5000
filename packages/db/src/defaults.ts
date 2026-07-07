@@ -420,6 +420,13 @@ export interface DisplayConfig {
   dayBaseColor: DayBaseColor;
   /** App-wide UI theme for connected browsers. Default 'day'. */
   theme: Theme;
+  /**
+   * Per-station instrument numeral scale multiplier.  Multiplies only the d1–d4
+   * display-numeral tiers via the --instrument-scale CSS custom property.
+   * Recommended presets: phone 1.0 / Pi helm 1.15 / mast Chipsee 1.6.
+   * Default 1.0 (no scaling).
+   */
+  scale: number;
 }
 
 export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
@@ -427,6 +434,7 @@ export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   nightMode: false,
   dayBaseColor: 'white',
   theme: 'day',
+  scale: 1.0,
 };
 
 export const DEFAULT_WARDROBE: SailWardrobe = {

@@ -1,6 +1,7 @@
 import type { JsonSafeSample } from '@g5000/core';
 import { fmtLatLonDmm } from '../../../lib/coords';
 import { RAD_TO_DEG, wrap360, cardinal16 } from '../../../lib/units';
+import { Panel } from '../../../components/ui/Panel';
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
@@ -33,23 +34,22 @@ export function PositionPanel({
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1 min-h-[100px]">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">Position</span>
-      <div className="flex-1 flex flex-col justify-center gap-1">
+    <Panel label="Position">
+      <div className="flex flex-col justify-center gap-1">
         {posStr !== null ? (
-          <span className="text-sm font-mono text-slate-100 break-all">{posStr}</span>
+          <span className="text-sm font-mono text-ink-value break-all">{posStr}</span>
         ) : (
-          <span className="text-slate-700 text-xs italic">—</span>
+          <span className="text-ink-4 text-xs italic">—</span>
         )}
         {hdgStr !== null ? (
           <div className="flex items-baseline gap-1">
-            <span className="text-sm font-semibold text-slate-200">{hdgStr}</span>
-            {cardinalStr && <span className="text-xs text-slate-400">{cardinalStr}</span>}
+            <span className="text-sm font-semibold text-ink">{hdgStr}</span>
+            {cardinalStr && <span className="text-xs text-ink-3">{cardinalStr}</span>}
           </div>
         ) : (
-          <span className="text-slate-700 text-xs italic">—</span>
+          <span className="text-ink-4 text-xs italic">—</span>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }

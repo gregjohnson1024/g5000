@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Panel } from '../../../components/ui';
 
 interface Waypoint {
   id: string;
@@ -45,12 +46,11 @@ export function ActiveMarkSelector(): React.ReactElement {
   }, []);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded p-4 flex flex-col gap-2">
-      <div className="text-xs uppercase tracking-wider text-slate-400">Active mark (for VMC)</div>
+    <Panel label="Active mark (for VMC)">
       <select
         value={activeId ?? ''}
         onChange={(e) => void setActive(e.target.value === '' ? null : e.target.value)}
-        className="bg-slate-900 border border-slate-700 rounded text-slate-200 px-2 py-2 text-sm"
+        className="w-full bg-canvas border border-hairline [border-radius:var(--r-control)] text-ink px-2 py-2 text-sm"
       >
         <option value="">— none —</option>
         {waypoints.map((w) => (
@@ -59,6 +59,6 @@ export function ActiveMarkSelector(): React.ReactElement {
           </option>
         ))}
       </select>
-    </div>
+    </Panel>
   );
 }

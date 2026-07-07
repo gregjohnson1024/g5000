@@ -1,9 +1,8 @@
 'use client';
 
 import { useSse } from '../../../hooks/use-sse';
-import { InstrumentTile } from '../../../components/ui/InstrumentTile';
-
-const RAD_TO_DEG = 180 / Math.PI;
+import { CellGrid } from '../../../components/ui/CellGrid';
+import { RAD_TO_DEG } from '../../../lib/units';
 
 function fmtAngle(v: number): string {
   // Normalize to [0, 360) for displayed headings.
@@ -76,78 +75,73 @@ export function ReadonlyView({ apTxEnabled }: { apTxEnabled: boolean }) {
         <div className="text-xs text-ink-3">{connected ? 'Connected' : 'Reconnecting…'}</div>
       </div>
 
-      {/* Mode tile — amber when active, muted in standby */}
-      <section>
-        <InstrumentTile
-          label="Mode"
-          value={modeValue ?? 'Unknown'}
-          size="d3"
-          severity={modeIsActive ? 'ok' : 'neutral'}
-          tMs={modeTMs}
-        />
-      </section>
-
-      <section className="grid grid-cols-2 gap-6">
-        <div className="space-y-3">
-          <h2 className="text-sm uppercase tracking-wider text-ink-2 mb-2">Targets</h2>
-          <InstrumentTile
-            label="Target heading"
-            value={targetHdgValue !== null ? fmtAngle(targetHdgValue) : null}
-            unit="°"
-            size="d3"
-            tMs={targetHdgTMs}
-          />
-          <InstrumentTile
-            label="Target track"
-            value={targetTrackValue !== null ? fmtAngle(targetTrackValue) : null}
-            unit="°"
-            size="d4"
-            tMs={targetTrackTMs}
-          />
-        </div>
-        <div className="space-y-3">
-          <h2 className="text-sm uppercase tracking-wider text-ink-2 mb-2">Actual</h2>
-          <InstrumentTile
-            label="Vessel heading (mag)"
-            value={vesselHdgValue !== null ? fmtAngle(vesselHdgValue) : null}
-            unit="°"
-            size="d3"
-            tMs={vesselHdgTMs}
-          />
-          <InstrumentTile
-            label="Heading error (target − actual)"
-            value={
+      {/* 6-cell CellGrid: Mode | Target heading | Target track | Vessel heading | Heading error | Rudder */}
+      <CellGrid
+        cols={{ base: 2, md: 3 }}
+        cells={[
+          {
+            key: 'mode',
+            label: 'Mode',
+            value: modeValue ?? 'Unknown',
+            size: 'd3',
+            severity: modeIsActive ? 'ok' : 'neutral',
+            tMs: modeTMs,
+          },
+          {
+            key: 'target-hdg',
+            label: 'Target heading',
+            value: targetHdgValue !== null ? fmtAngle(targetHdgValue) : null,
+            unit: '°',
+            size: 'd3',
+            tMs: targetHdgTMs,
+          },
+          {
+            key: 'target-track',
+            label: 'Target track',
+            value: targetTrackValue !== null ? fmtAngle(targetTrackValue) : null,
+            unit: '°',
+            size: 'd3',
+            tMs: targetTrackTMs,
+          },
+          {
+            key: 'vessel-hdg',
+            label: 'Vessel heading',
+            value: vesselHdgValue !== null ? fmtAngle(vesselHdgValue) : null,
+            unit: '°',
+            size: 'd3',
+            tMs: vesselHdgTMs,
+          },
+          {
+            key: 'hdg-error',
+            label: 'Heading error',
+            value:
               headingError !== null
                 ? `${headingError >= 0 ? '+' : ''}${(headingError * RAD_TO_DEG).toFixed(1)}`
-                : null
-            }
-            unit="°"
-            size="d4"
-            severity={
-              headingError !== null && Math.abs(headingError * RAD_TO_DEG) > 5 ? 'ok' : 'neutral'
-            }
-            tMs={headingErrorTMs}
-          />
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-sm uppercase tracking-wider text-ink-2 mb-2">Commanded rudder</h2>
-        <InstrumentTile
-          label="Rudder"
-          value={rudderValue !== null ? fmtRudder(rudderValue) : null}
-          unit="°"
-          size="d3"
-          tMs={rudderTMs}
-        />
-      </section>
+                : null,
+            unit: '°',
+            size: 'd3',
+            severity:
+              headingError !== null && Math.abs(headingError * RAD_TO_DEG) > 5 ? 'ok' : 'neutral',
+            tMs: headingErrorTMs,
+          },
+          {
+            key: 'rudder',
+            label: 'Commanded rudder',
+            value: rudderValue !== null ? fmtRudder(rudderValue) : null,
+            unit: '°',
+            size: 'd3',
+            tMs: rudderTMs,
+          },
+        ]}
+      />
 
       {!apTxEnabled && (
         <section className="text-xs text-ink-3 pt-4 border-t border-hairline max-w-xl">
           Listen-only. The G5000 does not transmit any autopilot commands. All values above come
           from PGN 127237 broadcast by your H5000 (or other autopilot computer) on the N2K bus. If
-          "Unknown" / "—" persists, your autopilot may use B&G-proprietary PGNs instead of (or in
-          addition to) standard 127237 — those are decoded in a later plan.
+          &ldquo;Unknown&rdquo; / &ldquo;—&rdquo; persists, your autopilot may use
+          B&amp;G-proprietary PGNs instead of (or in addition to) standard 127237 — those are
+          decoded in a later plan.
         </section>
       )}
     </>

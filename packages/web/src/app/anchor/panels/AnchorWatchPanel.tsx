@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { JsonSafeSample } from '@g5000/core';
 import { haversineM, bearingDeg } from '../../../lib/geo';
 import { computeScope } from '../../../lib/rode-scope';
+import { Panel } from '../../../components/ui/Panel';
+import { StatusChip } from '../../../components/ui/StatusChip';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,8 +88,10 @@ function PlanView({ anchorPoint, boatPos, radiusM, breached }: PlanViewProps): R
     by = byRaw;
   }
 
-  const ringColor = breached ? '#ef4444' : '#22d3ee';
-  const fillColor = breached ? 'rgba(239,68,68,0.12)' : 'rgba(34,211,238,0.08)';
+  // Use token hex equivalents; SVG can't use CSS custom properties in fill/stroke
+  // breached: danger (#f87171 day), armed ring: info (#38bdf8 day)
+  const ringColor = breached ? '#f87171' : '#38bdf8';
+  const fillColor = breached ? 'rgba(248,113,113,0.12)' : 'rgba(56,189,248,0.08)';
 
   return (
     <svg width={SVG_SIZE} height={SVG_SIZE} viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}>
@@ -104,17 +108,17 @@ function PlanView({ anchorPoint, boatPos, radiusM, breached }: PlanViewProps): R
         y1={cy}
         x2={bx}
         y2={by}
-        stroke="#94a3b8"
+        stroke="#64748b"
         strokeWidth={1.5}
         strokeDasharray="3 2"
       />
       {/* Anchor marker (cross + circle) */}
-      <circle cx={cx} cy={cy} r={5} fill="#0f172a" stroke="#22d3ee" strokeWidth={1.5} />
-      <text x={cx} y={cy - 8} fill="#22d3ee" fontSize={7} textAnchor="middle">
+      <circle cx={cx} cy={cy} r={5} fill="#0f172a" stroke="#38bdf8" strokeWidth={1.5} />
+      <text x={cx} y={cy - 8} fill="#38bdf8" fontSize={7} textAnchor="middle">
         ⚓
       </text>
       {/* Boat dot */}
-      <circle cx={bx} cy={by} r={4} fill={breached ? '#ef4444' : '#f8fafc'} />
+      <circle cx={bx} cy={by} r={4} fill={breached ? '#f87171' : '#f1f5f9'} />
     </svg>
   );
 }
@@ -162,21 +166,21 @@ function RodeScopeCalc({
       : null;
 
   return (
-    <div className="border-t border-slate-800 mt-3 pt-3 flex flex-col gap-2">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
+    <div className="border-t border-hairline mt-3 pt-3 flex flex-col gap-2">
+      <span className="text-[0.667rem] font-semibold uppercase tracking-[0.08em] text-ink-2">
         Rode &amp; Scope
       </span>
 
       {/* Chain counter input */}
       <div className="flex items-center gap-2">
-        <label className="text-xs text-slate-400 w-24">Chain out (m)</label>
+        <label className="text-xs text-ink-3 w-24">Chain out (m)</label>
         <input
           type="number"
           min={0}
           step={1}
           value={loaded ? chainCounter : ''}
           onChange={handleChainChange}
-          className="w-20 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-sm text-slate-100 text-right focus:outline-none focus:border-cyan-500"
+          className="w-20 bg-surface-raised border border-hairline-strong rounded px-2 py-0.5 text-sm text-ink-value text-right focus:outline-none focus:border-accent-hi"
         />
       </div>
 
@@ -184,29 +188,29 @@ function RodeScopeCalc({
       {result !== null ? (
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-slate-100">
+            <span className="text-lg font-bold text-ink-value">
               {result.rode.toFixed(0)}
-              <span className="text-xs text-slate-400 ml-0.5">m</span>
+              <span className="text-xs text-ink-3 ml-0.5">m</span>
             </span>
-            <span className="text-xs text-slate-500 uppercase tracking-wide">Rode</span>
+            <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Rode</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-slate-100">
+            <span className="text-lg font-bold text-ink-value">
               {result.totalPlusBow.toFixed(1)}
-              <span className="text-xs text-slate-400 ml-0.5">m</span>
+              <span className="text-xs text-ink-3 ml-0.5">m</span>
             </span>
-            <span className="text-xs text-slate-500 uppercase tracking-wide">Depth+Bow</span>
+            <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Depth+Bow</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-slate-100">
+            <span className="text-lg font-bold text-ink-value">
               {result.scope !== null ? result.scope.toFixed(1) : '—'}
-              <span className="text-xs text-slate-400 ml-0.5">:1</span>
+              <span className="text-xs text-ink-3 ml-0.5">:1</span>
             </span>
-            <span className="text-xs text-slate-500 uppercase tracking-wide">Scope</span>
+            <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Scope</span>
           </div>
         </div>
       ) : (
-        <span className="text-slate-700 text-xs italic">
+        <span className="text-ink-4 text-xs italic">
           {depthM === null ? 'No depth data' : 'Loading…'}
         </span>
       )}
@@ -307,39 +311,37 @@ export function AnchorWatchPanel({
     }
   }
 
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 col-span-2">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-        Anchor Watch
-      </span>
+  // StatusChip kind: armed = 'armed' (pulse), disarmed = 'neutral'
+  const chipKind = armed ? (breached ? 'alarm' : 'armed') : 'neutral';
+  const chipLabel = armed ? (breached ? 'DRAG' : 'ARMED') : 'DISARMED';
 
+  return (
+    <Panel label="Anchor Watch" chip={chipKind} chipLabel={chipLabel} className="col-span-2">
       {armed && anchorPoint && boatPos ? (
         // ── ARMED STATE ──────────────────────────────────────────────────────
         <>
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 mb-2">
             <div className="flex flex-col items-center">
-              <span
-                className={`text-2xl font-bold ${breached ? 'text-red-400' : 'text-slate-100'}`}
-              >
+              <span className={`text-2xl font-bold ${breached ? 'text-danger' : 'text-ink-value'}`}>
                 {distM !== null ? Math.round(distM) : '—'}
-                <span className="text-xs text-slate-400 ml-0.5">m</span>
+                <span className="text-xs text-ink-3 ml-0.5">m</span>
               </span>
-              <span className="text-xs text-slate-500 uppercase tracking-wide">Distance</span>
+              <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Distance</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-2xl font-bold text-slate-100">
+              <span className="text-2xl font-bold text-ink-value">
                 {bearingT !== null ? Math.round(bearingT) : '—'}
-                <span className="text-xs text-slate-400 ml-0.5">°T</span>
+                <span className="text-xs text-ink-3 ml-0.5">°T</span>
               </span>
-              <span className="text-xs text-slate-500 uppercase tracking-wide">Bearing</span>
+              <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Bearing</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-2xl font-bold text-slate-100">
+              <span className="text-2xl font-bold text-ink-value">
                 {anchor?.radiusM ?? '—'}
-                <span className="text-xs text-slate-400 ml-0.5">m</span>
+                <span className="text-xs text-ink-3 ml-0.5">m</span>
               </span>
-              <span className="text-xs text-slate-500 uppercase tracking-wide">Radius</span>
+              <span className="text-[0.611rem] text-ink-3 uppercase tracking-wide">Radius</span>
             </div>
           </div>
 
@@ -354,7 +356,7 @@ export function AnchorWatchPanel({
           </div>
 
           {breached && (
-            <div className="text-xs text-red-400 text-center font-semibold animate-pulse">
+            <div className="text-xs text-danger text-center font-semibold animate-pulse mt-1">
               ANCHOR DRAG ALERT
             </div>
           )}
@@ -363,7 +365,7 @@ export function AnchorWatchPanel({
           <button
             onClick={handleWeigh}
             disabled={posting}
-            className="mt-1 w-full rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm py-1.5 disabled:opacity-50"
+            className="mt-2 w-full rounded bg-surface-raised hover:bg-hairline-strong text-ink text-sm py-1.5 disabled:opacity-50"
           >
             Clear (Weigh Anchor)
           </button>
@@ -372,32 +374,32 @@ export function AnchorWatchPanel({
         // ── NOT ARMED STATE ───────────────────────────────────────────────────
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-400 w-24">Radius (m)</label>
+            <label className="text-xs text-ink-3 w-24">Radius (m)</label>
             <input
               type="number"
               min={10}
               step={5}
               value={radiusInput}
               onChange={(e) => setRadiusInput(Math.max(10, parseFloat(e.target.value) || 50))}
-              className="w-20 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-sm text-slate-100 text-right focus:outline-none focus:border-cyan-500"
+              className="w-20 bg-surface-raised border border-hairline-strong rounded px-2 py-0.5 text-sm text-ink-value text-right focus:outline-none focus:border-accent-hi"
             />
           </div>
           {boatPos ? (
             <button
               onClick={handleDrop}
               disabled={posting}
-              className="w-full rounded bg-cyan-700 hover:bg-cyan-600 text-white text-sm py-1.5 font-semibold disabled:opacity-50"
+              className="w-full rounded bg-info/20 border border-info text-ink-value hover:bg-info/30 text-sm py-1.5 font-semibold disabled:opacity-50"
             >
               Drop here (use GPS)
             </button>
           ) : (
-            <div className="text-xs text-slate-600 italic text-center">Waiting for GPS fix…</div>
+            <div className="text-xs text-ink-4 italic text-center">Waiting for GPS fix…</div>
           )}
         </div>
       )}
 
       {/* Rode & Scope calculator always shown */}
       <RodeScopeCalc channels={channels} droopDeduct={droopDeduct} bowHeightM={bowHeightM} />
-    </div>
+    </Panel>
   );
 }

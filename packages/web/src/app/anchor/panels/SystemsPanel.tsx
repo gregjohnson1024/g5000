@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { VictronSnapshot, EmporiaSnapshot } from '@g5000/core';
+import { Panel } from '../../../components/ui/Panel';
 
 const POLL_MS = 2_000;
 
@@ -32,33 +33,33 @@ function fmtW(v: number | null | undefined): string {
 
 type TankInfo = VictronSnapshot['tanks'][number];
 
-/** Colour by fluid type. */
-function tankBarColour(fluidType: string): string {
+/** Token class by fluid type. */
+function tankBarClass(fluidType: string): string {
   const t = fluidType.toLowerCase();
-  if (t.includes('fuel') || t.includes('diesel')) return 'bg-amber-500';
-  if (t.includes('waste') || t.includes('black') || t.includes('grey')) return 'bg-slate-500';
-  if (t.includes('gas') || t.includes('lpg')) return 'bg-orange-400';
+  if (t.includes('fuel') || t.includes('diesel')) return 'bg-accent-hi';
+  if (t.includes('waste') || t.includes('black') || t.includes('grey')) return 'bg-surface-raised';
+  if (t.includes('gas') || t.includes('lpg')) return 'bg-warn';
   // Fresh water (default)
-  return 'bg-sky-500';
+  return 'bg-info';
 }
 
 function TankCard({ tank }: { tank: TankInfo }): React.ReactElement {
   const pct = Math.round(tank.level * 100);
-  const bar = tankBarColour(tank.fluidType);
+  const bar = tankBarClass(tank.fluidType);
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400 truncate">{tank.fluidType}</span>
-        <span className="text-slate-200 tabular-nums font-mono ml-2">{pct}%</span>
+        <span className="text-ink-3 truncate">{tank.fluidType}</span>
+        <span className="text-ink tabular-nums font-mono ml-2">{pct}%</span>
       </div>
-      <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+      <div className="h-2 rounded-full bg-surface-raised overflow-hidden">
         <div
           className={`h-full rounded-full ${bar} transition-all duration-500`}
           style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
         />
       </div>
       {tank.capacityL != null && (
-        <span className="text-[10px] text-slate-600 tabular-nums">
+        <span className="text-[0.611rem] text-ink-4 tabular-nums">
           {Math.round(tank.level * tank.capacityL)} / {Math.round(tank.capacityL)} L
         </span>
       )}
@@ -134,26 +135,23 @@ export function SystemsPanel(): React.ReactElement {
 
   if (offline || snapshot === null) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 min-h-[100px]">
-        <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-          Battery &amp; Power
-        </span>
-        <div className="flex-1 flex items-center justify-center">
-          <span className="text-slate-600 text-xs italic">Cerbo offline</span>
+      <Panel label="Battery &amp; Power">
+        <div className="flex-1 flex items-center justify-center min-h-[48px]">
+          <span className="text-ink-4 text-xs italic">Cerbo offline</span>
         </div>
         {/* AC-loads row visible even when Victron is offline */}
         {emporiaMainsW !== null && (
           <>
-            <div className="border-t border-slate-800" />
+            <div className="border-t border-hairline my-2" />
             <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs font-mono">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">AC loads</span>
-                <span className="text-slate-200 tabular-nums">{fmtW(emporiaMainsW)}</span>
+                <span className="text-ink-3">AC loads</span>
+                <span className="text-ink tabular-nums">{fmtW(emporiaMainsW)}</span>
               </div>
             </div>
           </>
         )}
-      </div>
+      </Panel>
     );
   }
 
@@ -161,107 +159,105 @@ export function SystemsPanel(): React.ReactElement {
   const isCharging = (bat.current ?? 0) >= 0;
   const signPrefix = isCharging ? '+' : '';
   const chargeLabel = isCharging ? 'CHARGING' : 'DISCHARGING';
-  const chargeColour = isCharging ? 'text-emerald-400' : 'text-rose-400';
+  // ok token for charging; danger token for discharging
+  const chargeClass = isCharging ? 'text-ok' : 'text-danger';
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-2 min-h-[100px]">
-      {/* Header */}
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-        Battery &amp; Power
-      </span>
-
-      {/* SoC */}
-      <div className="flex items-baseline gap-1">
-        <span className="text-3xl font-semibold text-slate-100 tabular-nums font-mono">
-          {fmtNum(bat.soc, 0)}
-        </span>
-        <span className="text-xs text-slate-400">% SoC</span>
-        {bat.timeToGoS != null && (
-          <span className="ml-auto text-xs text-slate-400 tabular-nums">
-            {fmtTimeToGo(bat.timeToGoS)} left
+    <Panel label="Battery &amp; Power">
+      <div className="flex flex-col gap-2">
+        {/* SoC */}
+        <div className="flex items-baseline gap-1">
+          <span className="text-3xl font-semibold text-ink-value tabular-nums font-mono">
+            {fmtNum(bat.soc, 0)}
           </span>
-        )}
-      </div>
+          <span className="text-xs text-ink-3">% SoC</span>
+          {bat.timeToGoS != null && (
+            <span className="ml-auto text-xs text-ink-3 tabular-nums">
+              {fmtTimeToGo(bat.timeToGoS)} left
+            </span>
+          )}
+        </div>
 
-      {/* Charge / discharge row */}
-      <div className={`flex items-center gap-1.5 text-xs font-mono font-semibold ${chargeColour}`}>
-        <span>{chargeLabel}</span>
-        <span>
-          {signPrefix}
-          {fmtNum(bat.current, 1)} A
-        </span>
-        <span>
-          {signPrefix}
-          {fmtNum(bat.power, 0)} W
-        </span>
-      </div>
+        {/* Charge / discharge row */}
+        <div className={`flex items-center gap-1.5 text-xs font-mono font-semibold ${chargeClass}`}>
+          <span>{chargeLabel}</span>
+          <span>
+            {signPrefix}
+            {fmtNum(bat.current, 1)} A
+          </span>
+          <span>
+            {signPrefix}
+            {fmtNum(bat.power, 0)} W
+          </span>
+        </div>
 
-      {/* Divider */}
-      <div className="border-t border-slate-800" />
+        {/* Divider */}
+        <div className="border-t border-hairline" />
 
-      {/* Quick power metrics */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs font-mono">
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">Solar</span>
-          <span className="text-amber-300 tabular-nums">{fmtW(snapshot.solar.totalPower)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">AC OUT</span>
-          <span className="text-slate-200 tabular-nums">{fmtW(snapshot.ac.outputPower)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">AC IN</span>
-          <span className="text-slate-200 tabular-nums">{fmtW(snapshot.ac.inputPower)}</span>
-        </div>
-        {/* AC loads row: always visible regardless of Victron state */}
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">AC loads</span>
-          <span className="text-slate-200 tabular-nums">{fmtW(emporiaMainsW)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">DC</span>
-          <span className="text-slate-200 tabular-nums">{fmtW(snapshot.dc.power)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-slate-500">Batt</span>
-          <span className="text-slate-200 tabular-nums">{fmtNum(bat.voltage, 1)} V</span>
-        </div>
-        {bat.temperatureC != null && (
+        {/* Quick power metrics */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs font-mono">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">Bat °C</span>
-            <span className="text-slate-200 tabular-nums">{fmtNum(bat.temperatureC, 1)} °C</span>
+            <span className="text-ink-3">Solar</span>
+            <span className="text-accent-ink tabular-nums">{fmtW(snapshot.solar.totalPower)}</span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-3">AC OUT</span>
+            <span className="text-ink tabular-nums">{fmtW(snapshot.ac.outputPower)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-3">AC IN</span>
+            <span className="text-ink tabular-nums">{fmtW(snapshot.ac.inputPower)}</span>
+          </div>
+          {/* AC loads row: always visible regardless of Victron state */}
+          <div className="flex items-center justify-between">
+            <span className="text-ink-3">AC loads</span>
+            <span className="text-ink tabular-nums">{fmtW(emporiaMainsW)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-3">DC</span>
+            <span className="text-ink tabular-nums">{fmtW(snapshot.dc.power)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-3">Batt</span>
+            <span className="text-ink tabular-nums">{fmtNum(bat.voltage, 1)} V</span>
+          </div>
+          {bat.temperatureC != null && (
+            <div className="flex items-center justify-between">
+              <span className="text-ink-3">Bat °C</span>
+              <span className="text-ink tabular-nums">{fmtNum(bat.temperatureC, 1)} °C</span>
+            </div>
+          )}
+        </div>
+
+        {/* Tanks ─────────────────────────────────────────────────────────────── */}
+        {snapshot.tanks.length > 0 && (
+          <>
+            <div className="border-t border-hairline" />
+            <span className="text-[0.611rem] uppercase tracking-wide text-ink-4">Tanks</span>
+            <div className="flex flex-col gap-2">
+              {snapshot.tanks.map((tank) => (
+                <TankCard key={tank.id} tank={tank} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Temperatures ────────────────────────────────────────────────────── */}
+        {snapshot.temperatures.length > 0 && (
+          <>
+            <div className="border-t border-hairline" />
+            <span className="text-[0.611rem] uppercase tracking-wide text-ink-4">Temperatures</span>
+            <div className="flex flex-col gap-0.5">
+              {snapshot.temperatures.map((t) => (
+                <div key={t.id} className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-ink-3 truncate">{t.name}</span>
+                  <span className="text-ink tabular-nums ml-2">{fmtNum(t.celsius, 1)} °C</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
-
-      {/* Tanks ─────────────────────────────────────────────────────────────── */}
-      {snapshot.tanks.length > 0 && (
-        <>
-          <div className="border-t border-slate-800" />
-          <span className="text-[10px] uppercase tracking-wide text-slate-600">Tanks</span>
-          <div className="flex flex-col gap-2">
-            {snapshot.tanks.map((tank) => (
-              <TankCard key={tank.id} tank={tank} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Temperatures ────────────────────────────────────────────────────── */}
-      {snapshot.temperatures.length > 0 && (
-        <>
-          <div className="border-t border-slate-800" />
-          <span className="text-[10px] uppercase tracking-wide text-slate-600">Temperatures</span>
-          <div className="flex flex-col gap-0.5">
-            {snapshot.temperatures.map((t) => (
-              <div key={t.id} className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400 truncate">{t.name}</span>
-                <span className="text-slate-200 tabular-nums ml-2">{fmtNum(t.celsius, 1)} °C</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    </Panel>
   );
 }

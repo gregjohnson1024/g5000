@@ -29,46 +29,46 @@ function ChargerCard({ charger }: { charger: VictronCharger }): React.ReactEleme
   const pct = Math.min(100, Math.round((Math.max(0, charger.power) / maxW) * 100));
 
   return (
-    <div className="bg-slate-800 rounded-md p-2.5 flex flex-col gap-1.5">
+    <div className="bg-surface-raised [border-radius:var(--r-panel)] p-2.5 flex flex-col gap-1.5">
       {/* Name + state */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-slate-300 font-medium truncate">{charger.name}</span>
-        <span className="text-[10px] text-amber-400 uppercase tracking-wide shrink-0">
+        <span className="text-xs text-ink font-medium truncate">{charger.name}</span>
+        <span className="text-[0.611rem] text-accent-ink uppercase tracking-wide shrink-0">
           {charger.state}
         </span>
       </div>
 
       {/* Power bar */}
-      <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-surface overflow-hidden">
         <div
-          className="h-full rounded-full bg-amber-400 transition-all duration-500"
+          className="h-full rounded-full bg-accent-hi transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
 
       {/* Metrics row */}
-      <div className="grid grid-cols-3 gap-1 text-[11px] font-mono">
+      <div className="grid grid-cols-3 gap-1 text-[0.611rem] font-mono">
         <div className="flex flex-col items-center">
-          <span className="text-amber-300 font-semibold tabular-nums">{fmtW(charger.power)}</span>
-          <span className="text-slate-600 text-[9px] uppercase">Now</span>
+          <span className="text-accent-ink font-semibold tabular-nums">{fmtW(charger.power)}</span>
+          <span className="text-ink-4 text-[0.556rem] uppercase">Now</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-slate-300 tabular-nums">{fmtNum(charger.voltage, 1)} V</span>
-          <span className="text-slate-600 text-[9px] uppercase">Volt</span>
+          <span className="text-ink-2 tabular-nums">{fmtNum(charger.voltage, 1)} V</span>
+          <span className="text-ink-4 text-[0.556rem] uppercase">Volt</span>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-slate-300 tabular-nums">{fmtNum(charger.current, 1)} A</span>
-          <span className="text-slate-600 text-[9px] uppercase">Amp</span>
+          <span className="text-ink-2 tabular-nums">{fmtNum(charger.current, 1)} A</span>
+          <span className="text-ink-4 text-[0.556rem] uppercase">Amp</span>
         </div>
       </div>
 
       {/* Day stats */}
-      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+      <div className="flex items-center justify-between text-[0.611rem] font-mono text-ink-3">
         <span>
-          Day max <span className="text-slate-400">{fmtW(charger.dayMaxPower)}</span>
+          Day max <span className="text-ink-2">{fmtW(charger.dayMaxPower)}</span>
         </span>
         <span>
-          Today <span className="text-slate-400">{fmtNum(charger.yieldTodayKwh, 3)} kWh</span>
+          Today <span className="text-ink-2">{fmtNum(charger.yieldTodayKwh, 3)} kWh</span>
         </span>
       </div>
     </div>
@@ -112,9 +112,7 @@ export function SolarTab(): React.ReactElement {
   }, []);
 
   if (offline || snapshot === null) {
-    return (
-      <p className="text-slate-600 text-xs italic">{offline ? 'Cerbo offline' : 'Loading…'}</p>
-    );
+    return <p className="text-ink-4 text-xs italic">{offline ? 'Cerbo offline' : 'Loading…'}</p>;
   }
 
   const { solar } = snapshot;
@@ -124,15 +122,15 @@ export function SolarTab(): React.ReactElement {
     <div className="flex flex-col gap-3">
       {/* System total */}
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold font-mono text-amber-300 tabular-nums">
+        <span className="text-2xl font-semibold font-mono text-accent-ink tabular-nums">
           {solar.totalPower != null ? Math.round(solar.totalPower) : '—'}
         </span>
-        <span className="text-xs text-slate-400">W total solar</span>
+        <span className="text-xs text-ink-3">W total solar</span>
       </div>
 
       {/* Per-charger cards */}
       {chargers.length === 0 ? (
-        <p className="text-slate-600 text-xs italic">No MPPT chargers reported</p>
+        <p className="text-ink-4 text-xs italic">No MPPT chargers reported</p>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {chargers.map((c) => (

@@ -37,10 +37,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
          * eliminates the default-day flash on subsequent page loads when a
          * non-day theme is persisted. The script is intentionally tiny and
          * inlined — no external file, no React dependency.
+         *
+         * Also reads g5000:instrument-scale and applies --instrument-scale on
+         * <html> to prevent cold-load shift in d1–d4 numerals when a non-1.0
+         * scale is persisted.
          */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('g5000:theme');if(t==='night'||t==='sun')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('g5000:theme');if(t==='night'||t==='sun')document.documentElement.setAttribute('data-theme',t);}catch(e){}try{var s=localStorage.getItem('g5000:instrument-scale');var v=s!==null?parseFloat(s):NaN;if([1,1.15,1.6].indexOf(v)!==-1)document.documentElement.style.setProperty('--instrument-scale',String(v));}catch(e){}})();`,
           }}
         />
       </head>

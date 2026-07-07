@@ -1,5 +1,7 @@
 import type { JsonSafeSample } from '@g5000/core';
 import { deriveDepths, type DepthOffsets } from '../../../lib/depth-offset';
+import { Panel } from '../../../components/ui/Panel';
+import { InstrumentTile } from '../../../components/ui/InstrumentTile';
 
 function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
@@ -17,45 +19,40 @@ export function DepthPanel({
   const hasOffsets = offsets.keelBelowTransducerM != null || offsets.transducerToWaterlineM != null;
 
   if (sounderM === null) {
-    return (
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1 min-h-[100px]">
-        <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">Depth</span>
-        <div className="flex-1 flex items-center justify-center">
-          <span className="text-slate-700 text-xs italic">—</span>
-        </div>
-      </div>
-    );
+    return <Panel label="Depth" emptyState={{ reason: 'No depth data' }} />;
   }
 
   const depths = deriveDepths(sounderM, offsets);
 
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-col gap-1 min-h-[100px]">
-      <span className="text-xs uppercase tracking-wide text-slate-500 font-medium">Depth</span>
-      {hasOffsets && depths.underKeelM !== null ? (
-        <div className="flex-1 flex flex-col justify-center gap-0.5">
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-semibold text-slate-100 tabular-nums">
-              {depths.underKeelM.toFixed(1)}
-            </span>
-            <span className="text-xs text-slate-400">m</span>
-          </div>
-          <span className="text-xs text-slate-500 uppercase tracking-wide">Under keel</span>
+  if (hasOffsets && depths.underKeelM !== null) {
+    return (
+      <Panel label="Depth">
+        <InstrumentTile
+          label="Under Keel"
+          value={depths.underKeelM.toFixed(1)}
+          unit="m"
+          size="d3"
+          className="border-0 rounded-none p-0 bg-transparent"
+        >
           {depths.totalM !== null && (
-            <span className="text-xs text-slate-400">{depths.totalM.toFixed(1)} m total depth</span>
-          )}
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col justify-center gap-0.5">
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-semibold text-slate-100 tabular-nums">
-              {depths.sounderM.toFixed(1)}
+            <span className="text-[0.722rem] text-ink-3">
+              {depths.totalM.toFixed(1)} m total depth
             </span>
-            <span className="text-xs text-slate-400">m</span>
-          </div>
-          <span className="text-xs text-slate-500 uppercase tracking-wide">Depth</span>
-        </div>
-      )}
-    </div>
+          )}
+        </InstrumentTile>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel label="Depth">
+      <InstrumentTile
+        label="Depth"
+        value={depths.sounderM.toFixed(1)}
+        unit="m"
+        size="d3"
+        className="border-0 rounded-none p-0 bg-transparent"
+      />
+    </Panel>
   );
 }

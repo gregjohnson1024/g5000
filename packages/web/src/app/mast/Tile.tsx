@@ -2,11 +2,32 @@
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import type { FormattedTile } from './format';
 
+/**
+ * Tile — mast-display number cell.
+ *
+ * Uses app theme tokens for colors so the display re-themes with data-theme.
+ * When .mast-night is active, the CSS overrides collapse all tokens to red —
+ * the JS here never needs to know about night mode.
+ *
+ * The JS ResizeObserver fit drives ONLY the numeral fontSize via inline style.
+ * It is completely independent of --instrument-scale (mast tiles fill their
+ * container physically; --instrument-scale applies to UI InstrumentTile only).
+ */
+
+/**
+ * Maps FormattedTile color to app theme tokens.
+ *   green   → --ok        (ok / emerald)
+ *   amber   → --accent-ink (selected / amber)
+ *   red     → --danger    (danger / rose)
+ *   default → --ink-value (default numeral colour)
+ * In mast-night mode the CSS collapses all of these to the same red, so the
+ * mapping is purely a day/sun/day-UI concern.
+ */
 const COLOR_VAR: Record<FormattedTile['color'], string> = {
-  green: 'var(--mast-green)',
-  amber: 'var(--mast-amber)',
-  red: 'var(--mast-red)',
-  default: 'var(--mast-fg)',
+  green: 'var(--ok)',
+  amber: 'var(--accent-ink)',
+  red: 'var(--danger)',
+  default: 'var(--ink-value)',
 };
 
 /** Number fills ~82% of cell width, capped at ~60% of cell height (room for label/units). */
@@ -53,12 +74,7 @@ export function Tile({ label, units, fmt }: { label: string; units: string; fmt:
       ref={cellRef}
       className="mast-tile flex flex-col items-center justify-center h-full w-full"
     >
-      <div
-        className="mast-tile-label uppercase tracking-widest"
-        style={{ color: 'var(--mast-muted)' }}
-      >
-        {label}
-      </div>
+      <div className="mast-tile-label uppercase tracking-widest">{label}</div>
       <span
         ref={valRef}
         className={`mast-tile-value font-bold leading-none tabular-nums${fmt.stale ? ' mast-stale' : ''}`}
@@ -66,9 +82,7 @@ export function Tile({ label, units, fmt }: { label: string; units: string; fmt:
       >
         {fmt.text}
       </span>
-      <div className="mast-tile-units" style={{ color: 'var(--mast-muted)' }}>
-        {units}
-      </div>
+      <div className="mast-tile-units">{units}</div>
     </div>
   );
 }

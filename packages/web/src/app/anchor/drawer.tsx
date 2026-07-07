@@ -105,7 +105,7 @@ export function AnchorDrawer({
         return <AcLoadsTab />;
       default:
         return (
-          <p className="text-slate-500 text-sm italic">
+          <p className="text-ink-3 text-sm italic">
             {activeTab} content — placeholder (task fills this in)
           </p>
         );
@@ -113,17 +113,17 @@ export function AnchorDrawer({
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 bg-slate-950 border-t border-slate-800">
+    <div className="fixed bottom-0 left-0 right-0 z-30 bg-surface-sunken border-t border-hairline">
       {/* Slide-up content panel */}
       {isOpen && (
-        <div className="border-b border-slate-800 bg-slate-900 px-4 py-4 h-56 overflow-y-auto">
+        <div className="border-b border-hairline bg-surface px-4 py-4 h-56 overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-slate-200 capitalize">{activeTab}</span>
+            <span className="text-sm font-medium text-ink capitalize">{activeTab}</span>
             <button
               type="button"
               aria-label="Collapse drawer"
               onClick={() => handleTabClick(activeTab!)}
-              className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800"
+              className="text-ink-3 hover:text-ink p-1 rounded hover:bg-surface-raised"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -156,8 +156,8 @@ export function AnchorDrawer({
               onClick={() => handleTabClick(tab.id)}
               className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
                 isActive
-                  ? 'text-amber-400 bg-slate-900 border-t-2 border-amber-500'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border-t-2 border-transparent'
+                  ? 'text-accent-ink bg-surface border-t-2 border-accent'
+                  : 'text-ink-3 hover:text-ink hover:bg-surface border-t-2 border-transparent'
               }`}
             >
               {tab.label}

@@ -41,6 +41,12 @@ export interface InstrumentTileProps {
   /** Label rendered in the label voice (uppercase, ink-2). */
   label: string;
   /**
+   * Additional className applied to the outermost wrapper div.
+   * Used by CellGrid to override border/radius for interior cells
+   * (e.g. `rounded-none border-0`).
+   */
+  className?: string;
+  /**
    * Formatted value string. When undefined or null, renders '—' in a
    * reserved slot (slot-stable — the tile never collapses).
    */
@@ -78,18 +84,28 @@ export interface InstrumentTileProps {
 
 // --- internal helpers -------------------------------------------------------
 
+/**
+ * d1–d4 numeral sizes use calc(base * var(--instrument-scale, 1)) so a single
+ * CSS custom property on <html> (set by ThemeController on SSE + pre-hydration
+ * inline script) scales every InstrumentTile on the page without a React
+ * re-render. Labels, sub-labels, and the inline unit suffix in the label row
+ * are NOT scaled — only the numeral and its proportional unit suffix.
+ *
+ * Tailwind 4 accepts arbitrary calc() values in bracket notation, so these
+ * are safe to use directly as className strings.
+ */
 const SIZE_CLASS: Record<InstrumentSize, string> = {
-  d1: 'text-[4.5rem] leading-none font-semibold font-mono',
-  d2: 'text-[3.5rem] leading-none font-semibold font-mono',
-  d3: 'text-[2.25rem] leading-none font-semibold font-mono',
-  d4: 'text-[1.5rem] leading-none font-semibold font-mono',
+  d1: 'text-[calc(4.5rem*var(--instrument-scale,1))] leading-none font-semibold font-mono',
+  d2: 'text-[calc(3.5rem*var(--instrument-scale,1))] leading-none font-semibold font-mono',
+  d3: 'text-[calc(2.25rem*var(--instrument-scale,1))] leading-none font-semibold font-mono',
+  d4: 'text-[calc(1.5rem*var(--instrument-scale,1))] leading-none font-semibold font-mono',
 };
 
 const UNIT_SIZE_CLASS: Record<InstrumentSize, string> = {
-  d1: 'text-[1.8rem]', // ~0.4× of 4.5rem
-  d2: 'text-[1.4rem]', // ~0.4× of 3.5rem
-  d3: 'text-[0.9rem]', // ~0.4× of 2.25rem
-  d4: 'text-[0.6rem]', // ~0.4× of 1.5rem
+  d1: 'text-[calc(1.8rem*var(--instrument-scale,1))]', // ~0.4× of 4.5rem
+  d2: 'text-[calc(1.4rem*var(--instrument-scale,1))]', // ~0.4× of 3.5rem
+  d3: 'text-[calc(0.9rem*var(--instrument-scale,1))]', // ~0.4× of 2.25rem
+  d4: 'text-[calc(0.6rem*var(--instrument-scale,1))]', // ~0.4× of 1.5rem
 };
 
 const SEVERITY_TEXT: Record<InstrumentSeverity, string> = {
@@ -118,6 +134,7 @@ export function InstrumentTile({
   severity = 'neutral',
   sub,
   tMs,
+  className,
   children,
 }: InstrumentTileProps): React.ReactElement {
   // Resolve effective size: explicit size → small shim → default d2
@@ -142,6 +159,10 @@ export function InstrumentTile({
       className={[
         'bg-surface border border-hairline [border-radius:var(--r-panel)]',
         'p-3 flex flex-col gap-1 min-w-0',
+        // className before edgeClass so CellGrid's border-0/rounded-none
+        // base overrides are superseded by the severity left-edge (border-l-[3px]).
+        // Tailwind last-wins within a class list, so edge must come last.
+        className,
         edgeClass,
       ]
         .filter(Boolean)

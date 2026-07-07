@@ -111,10 +111,8 @@ function Row({
 }): React.ReactElement {
   return (
     <div className="flex justify-between items-baseline gap-2">
-      <span className="text-slate-500 text-[10px] uppercase tracking-wide shrink-0">{label}</span>
-      <span
-        className={`font-mono text-xs tabular-nums ${dim ? 'text-slate-500' : 'text-slate-200'}`}
-      >
+      <span className="text-ink-3 text-[0.611rem] uppercase tracking-wide shrink-0">{label}</span>
+      <span className={`font-mono text-xs tabular-nums ${dim ? 'text-ink-3' : 'text-ink-2'}`}>
         {value}
       </span>
     </div>
@@ -133,16 +131,16 @@ export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactE
   const moonPct = Math.round(sky.moon.illumination * 100);
 
   return (
-    <div className="grid grid-cols-1 gap-3 text-slate-100 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 text-ink-value sm:grid-cols-2">
       {/* Sun column */}
       <div className="flex flex-col gap-1">
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">
+        <div className="text-[0.611rem] uppercase tracking-wider text-ink-2 font-medium mb-0.5">
           ☀ Sun
         </div>
         <Row label="Rise" value={fmtUtc(sky.sunrise)} />
         <Row label="Set" value={fmtUtc(sky.sunset)} />
         <Row label="Day length" value={fmtDuration(sky.dayLengthMs)} />
-        <div className="mt-1 text-[10px] uppercase tracking-wider text-slate-500 font-medium">
+        <div className="mt-1 text-[0.611rem] uppercase tracking-wider text-ink-3 font-medium">
           Twilight
         </div>
         <Row label="Civil dawn" value={fmtUtc(sky.civilDawn)} dim />
@@ -155,7 +153,7 @@ export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactE
 
       {/* Moon column */}
       <div className="flex flex-col gap-1">
-        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-medium mb-0.5">
+        <div className="text-[0.611rem] uppercase tracking-wider text-ink-2 font-medium mb-0.5">
           {phaseEmoji(sky.moon.phase)} Moon
         </div>
         <Row label="Phase" value={phaseName(sky.moon.phase)} />
@@ -166,7 +164,7 @@ export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactE
         {/* Upcoming phases */}
         {upcomingPhases.length > 0 && (
           <>
-            <div className="mt-1 text-[10px] uppercase tracking-wider text-slate-500 font-medium">
+            <div className="mt-1 text-[0.611rem] uppercase tracking-wider text-ink-3 font-medium">
               Upcoming
             </div>
             {upcomingPhases.map((p) => (

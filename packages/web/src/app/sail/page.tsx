@@ -35,33 +35,32 @@ export default function HelmPage(): React.ReactElement {
 
   return (
     <main className="p-4 flex-1 overflow-y-auto bg-canvas relative">
+      {/* Page header — tokens only, no slate-* */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
+        <h1 className="text-xl font-semibold text-ink">Helm</h1>
         <div className="flex items-center gap-3">
           <RaceMiniTimer />
-          <div className="text-xs text-slate-500">{connected ? 'Live' : 'Reconnecting…'}</div>
+          <div className="text-xs text-ink-3">{connected ? 'Live' : 'Reconnecting…'}</div>
         </div>
       </div>
 
       <AlertsPanel />
 
+      {/* Sails wardrobe strip — tokens only */}
       {wardrobe && (
-        <div className="flex items-center gap-3 mb-3 text-sm bg-slate-900 border border-slate-800 rounded px-3 py-2">
-          <span className="text-slate-400">Sails:</span>
+        <div className="flex items-center gap-3 mb-3 text-sm bg-surface border border-hairline rounded px-3 py-2">
+          <span className="text-ink-2">Sails:</span>
           {(['headsail', 'main', 'downwind'] as const).map((cat) => {
             const activeId = wardrobe.active[cat];
             const sail = activeId ? wardrobe.sails.find((s) => s.id === activeId) : undefined;
             return (
-              <span key={cat} className="text-xs text-slate-300">
-                <span className="text-slate-500">{cat}:</span>{' '}
-                <span className="text-slate-200">{sail?.name ?? '—'}</span>
+              <span key={cat} className="text-xs text-ink">
+                <span className="text-ink-3">{cat}:</span>{' '}
+                <span className="text-ink-value">{sail?.name ?? '—'}</span>
               </span>
             );
           })}
-          <Link
-            href="/boat/sails"
-            className="text-xs text-slate-500 hover:text-slate-300 underline"
-          >
+          <Link href="/boat/sails" className="text-xs text-ink-3 hover:text-ink underline">
             manage
           </Link>
         </div>

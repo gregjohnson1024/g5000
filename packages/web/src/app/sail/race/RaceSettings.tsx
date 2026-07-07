@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Button, Panel } from '../../../components/ui';
 import {
   NUMBER_FIELDS,
   isModified,
@@ -73,38 +74,42 @@ export function RaceSettings(): React.ReactElement {
   }, [saved]);
 
   if (draft === null) {
-    return (
-      <div className="bg-slate-900 border border-slate-800 rounded p-3 text-xs text-slate-500">
-        Settings — loading…
-      </div>
-    );
+    return <Panel label="Settings" emptyState={{ reason: 'loading…' }} />;
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded">
+    <Panel
+      label="Settings"
+      chip={modified ? 'warn' : undefined}
+      chipLabel={modified ? 'unsaved' : undefined}
+      action={
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="text-ink-3 font-mono text-sm hover:text-ink focus-visible:outline-none"
+          aria-expanded={open}
+          aria-label={open ? 'Collapse settings' : 'Expand settings'}
+        >
+          {open ? '▾' : '▸'}
+        </button>
+      }
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-3 py-2 flex items-center justify-between text-left"
+        className="w-full text-left py-1 focus-visible:outline-none"
+        aria-expanded={open}
       >
-        <span className="text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          Settings
-          {modified && (
-            <span className="text-amber-400" title="unsaved changes">
-              ●
-            </span>
-          )}
-        </span>
-        <span className="text-slate-500 font-mono text-sm">{open ? '▾' : '▸'}</span>
+        <span className="sr-only">{open ? 'Collapse' : 'Expand'} race settings</span>
       </button>
 
       {open && (
-        <div className="border-t border-slate-800 p-3 flex flex-col gap-3">
+        <div className="border-t border-hairline pt-3 mt-1 flex flex-col gap-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {NUMBER_FIELDS.map((f) => (
-              <label key={f.key} className="flex flex-col gap-1 text-sm text-slate-300">
-                <span className="text-xs text-slate-400">
-                  {f.label} <span className="text-slate-500">(default {f.defaultValue})</span>
+              <label key={f.key} className="flex flex-col gap-1 text-sm text-ink">
+                <span className="text-xs text-ink-2">
+                  {f.label} <span className="text-ink-4">(default {f.defaultValue})</span>
                 </span>
                 <div className="flex items-center gap-2">
                   <input
@@ -120,15 +125,15 @@ export function RaceSettings(): React.ReactElement {
                           : { ...d, [f.key]: e.target.value === '' ? NaN : Number(e.target.value) },
                       )
                     }
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-100 font-mono w-24"
+                    className="bg-canvas border border-hairline [border-radius:var(--r-control)] px-2 py-1 text-ink font-mono w-24"
                   />
-                  <span className="text-xs text-slate-500">{f.unit}</span>
+                  <span className="text-xs text-ink-4">{f.unit}</span>
                 </div>
               </label>
             ))}
-            <label className="flex flex-col gap-1 text-sm text-slate-300">
-              <span className="text-xs text-slate-400">
-                Integrate current in laylines <span className="text-slate-500">(default on)</span>
+            <label className="flex flex-col gap-1 text-sm text-ink">
+              <span className="text-xs text-ink-2">
+                Integrate current in laylines <span className="text-ink-4">(default on)</span>
               </span>
               <div className="flex items-center gap-2 pt-1">
                 <input
@@ -137,42 +142,30 @@ export function RaceSettings(): React.ReactElement {
                   onChange={(e) =>
                     setDraft((d) => (d === null ? d : { ...d, integrateCurrent: e.target.checked }))
                   }
-                  className="w-4 h-4 accent-emerald-600"
+                  className="w-4 h-4 accent-[var(--accent)]"
                 />
-                <span className="text-xs text-slate-500">
-                  {draft.integrateCurrent ? 'on' : 'off'}
-                </span>
+                <span className="text-xs text-ink-4">{draft.integrateCurrent ? 'on' : 'off'}</span>
               </div>
             </label>
           </div>
 
           {validationErrors.length > 0 && (
-            <div className="text-xs text-red-400">{validationErrors.join(' · ')}</div>
+            <div className="text-xs text-danger">{validationErrors.join(' · ')}</div>
           )}
-          {error && <div className="text-xs text-red-400">{error}</div>}
+          {error && <div className="text-xs text-danger">{error}</div>}
 
           <div className="flex items-center gap-2 justify-end">
             {modified && (
-              <button
-                type="button"
-                onClick={revert}
-                disabled={busy}
-                className="px-3 py-1.5 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-100 disabled:opacity-40"
-              >
+              <Button variant="secondary" size="sm" onClick={revert} disabled={busy}>
                 Revert
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={!canSave}
-              className="px-3 py-1.5 text-xs rounded bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 disabled:bg-slate-700"
-            >
+            <Button variant="primary" size="sm" onClick={() => void save()} disabled={!canSave}>
               {busy ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

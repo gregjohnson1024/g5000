@@ -121,6 +121,14 @@ export class MastService implements MastRuntime {
     return this.configStore.getDisplayConfig().theme;
   }
 
+  get scale$(): Observable<number> {
+    return this.configStore.displayConfig$.pipe(map((c) => c.scale ?? 1.0));
+  }
+
+  getScale(): number {
+    return this.configStore.getDisplayConfig().scale ?? 1.0;
+  }
+
   async stop(): Promise<void> {
     this.overrideSubject.complete();
     // ConfigStore's subjects are owned by ConfigStore; we do not complete them here.

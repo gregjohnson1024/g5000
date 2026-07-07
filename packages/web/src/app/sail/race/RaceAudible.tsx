@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '../../../components/ui';
 
 const MUTE_KEY = 'g5000.race-audible.muted';
 
@@ -120,14 +121,13 @@ export function RaceAudible(): React.ReactElement {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant={muted ? 'danger' : 'secondary'}
       onClick={toggleMute}
-      className={`px-3 py-2 rounded text-sm font-mono ${muted ? 'bg-danger-strong text-ink-value' : 'bg-surface-raised text-ink'}`}
       title={muted ? 'Race countdown beeps MUTED' : 'Race countdown beeps on'}
     >
       {muted ? '🔇 Race muted' : '🔊 Race audio'}
-    </button>
+    </Button>
   );
 }
 
