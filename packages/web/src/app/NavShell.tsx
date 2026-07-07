@@ -30,8 +30,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bell, Wifi, WifiOff, Sun, Moon, Zap } from 'lucide-react';
 
-import { useSseConnected } from '../hooks/use-sse-store';
+import { useSseConnected, useSseChannel } from '../hooks/use-sse-store';
 import { MobButton } from '../components/MobButton';
+import type { LivePos } from '../components/LiveBoatMarker';
+import { geo } from './sail/tile-helpers';
 import { useAlarms, type AlarmRow, SEVERITY_RANK } from '../components/AlarmStore';
 import { useThemeStore } from '../lib/theme-store';
 import type { Theme } from '@g5000/mast';
@@ -199,6 +201,23 @@ function AlertsBell({ alarmCount, topSeverity, activeHref }: AlertsBellProps) {
 // LinkLED — reads connected state from SseStoreContext
 // ---------------------------------------------------------------------------
 
+/**
+ * ShellMobButton — supplies the live GPS fix to the shell's MOB button so a
+ * MOB fired from the AppBar captures a position (previously livePos was
+ * hardcoded null, so the Takeover showed no lat/lon and no marker pinned).
+ * Subscribes to only the position channel, so position updates re-render this
+ * small leaf, not the whole shell. MobButton reads the fix at fire-time via a
+ * ref, and HoldButton reads onHold at call-time, so an in-hold re-render is safe.
+ */
+function ShellMobButton({ className }: { className?: string }) {
+  const { sample } = useSseChannel('nav.gps.position');
+  const g = geo(sample ?? undefined);
+  const livePos: LivePos | null = g
+    ? { lat: g.lat, lon: g.lon, cog: null, sog: null, hdg: null, t: sample!.t_ms }
+    : null;
+  return <MobButton livePos={livePos} className={className} />;
+}
+
 function LinkLED() {
   // Connectivity-only selector: re-renders only when the link opens/closes,
   // NOT on every SSE data message (which would re-render the whole shell).
@@ -344,7 +363,7 @@ export function NavShell({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
           )}
 
           {/* MOB cell — hold-with-progress preserved from keep-list */}
-          <MobButton livePos={null} className="shrink-0" />
+          <ShellMobButton className="shrink-0" />
         </div>
       </header>
 

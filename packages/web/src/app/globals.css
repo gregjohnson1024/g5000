@@ -705,6 +705,18 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Map night-shift: apply the per-theme --map-filter to the MapLibre GL canvas
+   so the raster basemap (OSM/NOAA/satellite) + vector layers red-shift under
+   [data-theme='night']. --map-filter is `none` in DAY/SUN, so this rule is a
+   no-op outside night. HTML chrome (markers, controls, corner slots) lives in
+   separate DOM and keeps its token colours. Do not target the map container
+   itself (would filter the chrome too) — only the GL canvas.
+   -------------------------------------------------------------------------- */
+.maplibregl-canvas {
+  filter: var(--map-filter);
+}
+
+/* --------------------------------------------------------------------------
    Forecast timeline slider: transparent native track so the two-band track
    rendered behind it (darker = available, lighter = still fetching) shows
    through, plus a small custom thumb.

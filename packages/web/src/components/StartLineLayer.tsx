@@ -17,9 +17,9 @@ const LINE_LAYER = 'race-start-line-layer';
 const POINTS_LAYER = `${LINE_LAYER}-points`;
 
 /**
- * Renders the race start line as a dashed amber segment between port (green
- * dot) and starboard (red dot) ends. Polls /api/race/state every 2 s and
- * tears itself down when neither end is set.
+ * Renders the race start line as a dashed amber segment between the port (red
+ * dot) and starboard (green dot) ends — marine convention, matching WindDial.
+ * Polls /api/race/state every 2 s and tears itself down when neither end is set.
  *
  * Returns null — pure side-effect component that writes MapLibre layers.
  */
@@ -138,9 +138,9 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
               'match',
               ['get', 'end'],
               'port',
-              'var(--stbd)',
-              'stbd',
               'var(--port)',
+              'stbd',
+              'var(--stbd)',
               'var(--ink-value)',
             ],
             'circle-stroke-color': 'var(--canvas)',
