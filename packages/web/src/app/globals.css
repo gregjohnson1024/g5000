@@ -440,6 +440,12 @@
    ========================================================================== */
 
 @theme inline {
+  /* ---- Type scale ----
+     Tailwind utility text-caption → font-size: 0.722rem (13px at 18px root).
+     Per proposal §4.3: caption = hints, badges, table meta. Floor is 12px.
+     Add further tiers (title, body, body-sm, label) here as screens migrate. */
+  --text-caption: 0.722rem;
+
   /* ---- Semantic color utilities ---- */
 
   /* Canvas */
@@ -523,10 +529,15 @@
   --color-ais-normal: var(--ais-normal);
   --color-scrim: var(--scrim);
 
-  /* ---- COMPAT BRIDGE (Phase 1 — deleted in Phase 7) ----
+  /* ---- COMPAT BRIDGE (Phase 1 — KEPT, not deleted; see P7-3 audit) ----
      Repoints the Tailwind color vars the app already uses onto semantic
      tokens so every screen re-themes with data-theme, before any component
      is migrated. DAY values reproduce exact current defaults (zero regression).
+
+     P7-3 per-shade audit: 28 shades with 0 tsx/ts utility matches were
+     replaced with comment tombstones. Active shades (≥1 match) were retained.
+     The bridge block itself is KEPT until all raw palette-utility usages
+     across un-migrated components are tokenized.
 
      Shades that would drift from their Tailwind default in DAY use
      --compat-* vars defined per theme block (exact hex in DAY, themed in NIGHT/SUN).
@@ -571,11 +582,11 @@
   --color-slate-100: var(--ink-value);
 
   /* zinc family → same roles (kills the zinc fork) */
-  --color-zinc-950: var(--surface-sunken);
+  /* zinc-950: 0 tsx/ts matches (trimmed P7-3) */
   --color-zinc-900: var(--surface);
   --color-zinc-800: var(--surface-raised);
   --color-zinc-700: var(--hairline-strong);
-  --color-zinc-600: var(--compat-slate-600); /* ink-4 in DAY (#475569) */
+  /* zinc-600: 0 tsx/ts matches (trimmed P7-3) */
   --color-zinc-500: var(--ink-3);
   --color-zinc-400: var(--ink-2);
   --color-zinc-300: var(--compat-slate-300); /* exact label shade in DAY */
@@ -596,18 +607,16 @@
   --color-amber-100: var(--compat-amber-100); /* exact #fef3c7 in DAY; red-family at night */
   --color-amber-50: var(--compat-amber-50); /* exact #fffbeb in DAY; red-family at night */
 
-  /* gray family → surface/ink roles (light-theme fossils will be handled in Task 3) */
-  --color-gray-900: var(--surface);
-  --color-gray-800: var(--surface-raised);
-  --color-gray-700: var(--hairline-strong);
+  /* gray family → surface/ink roles (light-theme fossils; zero-match shades trimmed P7-3) */
+  /* gray-900/800/700: 0 tsx/ts matches (trimmed P7-3) */
   --color-gray-600: var(--ink-4);
   --color-gray-500: var(--compat-gray-500); /* exact #6b7280 in DAY; red-family at night */
-  --color-gray-400: var(--ink-2);
-  --color-gray-200: var(--surface-raised);
+  /* gray-400: 0 tsx/ts matches (trimmed P7-3) */
+  /* gray-200: 0 tsx/ts matches (trimmed P7-3) */
   --color-gray-100: var(--surface-raised);
 
   /* emerald / green → ok / stbd */
-  --color-emerald-950: var(--ok-strong);
+  /* emerald-950: 0 tsx/ts matches (trimmed P7-3) */
   --color-emerald-900: var(--ok-strong);
   --color-emerald-800: var(--ok-strong);
   --color-emerald-700: var(--ok-strong);
@@ -617,18 +626,17 @@
   --color-emerald-300: var(--ok);
   --color-emerald-100: var(--ok);
   --color-green-400: var(--stbd);
-  --color-green-300: var(--stbd);
+  /* green-300: 0 tsx/ts matches (trimmed P7-3) */
 
   /* rose / red → port / danger */
   --color-rose-950: var(--danger-surface);
   --color-rose-900: var(--danger-surface);
   --color-rose-800: var(--danger-strong);
-  --color-rose-700: var(--danger-strong);
-  --color-rose-600: var(--danger-strong);
-  --color-rose-500: var(--danger);
+  /* rose-700/600: 0 tsx/ts matches (trimmed P7-3) */
+  --color-rose-500: var(--danger); /* bg-rose-500 in SensorCard — retained P7-5 */
   --color-rose-400: var(--compat-rose-400); /* error text → danger; hue-locks at night */
   --color-rose-300: var(--danger);
-  --color-red-900: var(--danger-surface);
+  --color-red-900: var(--danger-surface); /* bg/border-red-900 in AlertsPanel etc — retained P7-5 */
   --color-red-800: var(--danger-strong);
   --color-red-700: var(--danger-strong);
   --color-red-600: var(--danger-strong);
@@ -640,23 +648,19 @@
   --color-red-50: var(--danger-surface);
 
   /* sky / cyan / blue → info */
-  --color-sky-900: var(--info-strong);
-  --color-sky-800: var(--info-strong);
+  /* sky-900/800: 0 tsx/ts matches (trimmed P7-3) */
   --color-sky-700: var(--info-strong);
   --color-sky-600: var(--info-strong);
   --color-sky-500: var(--info);
   --color-sky-400: var(--info);
   --color-sky-300: var(--info);
   --color-sky-200: var(--info);
-  --color-sky-100: var(--info);
-  --color-cyan-700: var(--info-strong);
-  --color-cyan-600: var(--info-strong);
-  --color-cyan-500: var(--info);
-  --color-cyan-400: var(--info);
+  /* sky-100: 0 tsx/ts matches (trimmed P7-3) */
+  /* cyan-700/600/500/400: 0 tsx/ts matches (trimmed P7-3) */
   --color-cyan-200: var(--info);
   --color-blue-500: var(--info);
   --color-blue-300: var(--info);
-  --color-blue-100: var(--info);
+  /* blue-100: 0 tsx/ts matches (trimmed P7-3) */
 
   /* yellow → warn */
   --color-yellow-900: var(--accent-dim-bg);
@@ -668,14 +672,9 @@
   --color-yellow-200: var(--warn);
   --color-yellow-50: var(--danger-surface);
 
-  /* violet / purple → replay / series-5 */
-  --color-violet-900: var(--danger-surface);
-  --color-violet-600: var(--replay);
-  --color-violet-500: var(--replay);
-  --color-violet-300: var(--replay);
-  --color-purple-900: var(--danger-surface);
-  --color-purple-800: var(--danger-surface);
-  --color-purple-100: var(--ink-value);
+  /* violet / purple → replay / series-5 (all shades 0 tsx/ts matches; trimmed P7-3) */
+  /* violet-900/600/500/300: 0 tsx/ts matches (trimmed P7-3) */
+  /* purple-900/800/100: 0 tsx/ts matches (trimmed P7-3) */
 
   /* orange → flow-ebb */
   --color-orange-500: var(--compat-orange-500); /* now-ring / flow accent; red-family at night */

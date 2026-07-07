@@ -49,7 +49,10 @@ export function CategoryRecommendation({ wardrobe }: { wardrobe: SailWardrobe })
         const valid = rec?.valid[cat] ?? [];
         const change = rec?.changeNeeded[cat] ?? false;
         return (
-          <div key={cat} className="border border-hairline [border-radius:var(--r-control)] p-2 bg-surface-raised">
+          <div
+            key={cat}
+            className="border border-hairline [border-radius:var(--r-control)] p-2 bg-surface-raised"
+          >
             <div className="text-sm font-medium flex items-center gap-2">
               {labels[cat]}
               {change && (

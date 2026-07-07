@@ -144,7 +144,14 @@ export function WindDial({
   // Port / Starboard label
   const side = awsDeg !== null ? (awsDeg >= 0 ? 'STARBOARD' : 'PORT') : null;
   const absDeg = awsDeg !== null ? Math.abs(awsDeg) : null;
-  const sideColor = side === 'STARBOARD' ? '#34d399' : side === 'PORT' ? '#f87171' : '#64748b';
+  // Use CSS variables so NIGHT mode collapses both to red-family (shape/glyph = text label
+  // provides the port/stbd distinction; hue only distinguishes in DAY/SUN).
+  const sideColor =
+    side === 'STARBOARD'
+      ? 'var(--color-ok)'
+      : side === 'PORT'
+        ? 'var(--color-danger)'
+        : 'var(--color-ink-3)';
 
   // AWA badge (0–360, bow = 0, starboard = 0–180)
   const awaBadgeDeg = awsDeg !== null ? wrap360(awsDeg) : null;

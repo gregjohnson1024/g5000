@@ -137,13 +137,12 @@ export function CaptureWizard<T>({
     setState(captureIdle<T>());
   }, []);
 
-  const fraction =
-    state.kind === 'capturing' ? captureFraction(state, durationMs) : 0;
+  const fraction = state.kind === 'capturing' ? captureFraction(state, durationMs) : 0;
   const pct = Math.round(fraction * 100);
 
   return (
     <section className="border border-[var(--hairline-strong)] [border-radius:var(--r-panel)] p-4 space-y-3">
-      <h2 className="text-[1rem] font-semibold text-ink">{title}</h2>
+      <h2 className="text-base font-semibold text-ink">{title}</h2>
       <p className="text-xs text-ink-3 max-w-xl">{instructions}</p>
 
       {/* ---- IDLE ---- */}
@@ -163,13 +162,9 @@ export function CaptureWizard<T>({
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="text-xs font-mono text-ink-2 tabular-nums w-8 text-right">
-              {pct}%
-            </span>
+            <span className="text-xs font-mono text-ink-2 tabular-nums w-8 text-right">{pct}%</span>
           </div>
-          <p className="text-xs text-ink-2">
-            Capturing… ({(durationMs / 1000).toFixed(0)} s)
-          </p>
+          <p className="text-xs text-ink-2">Capturing… ({(durationMs / 1000).toFixed(0)} s)</p>
         </div>
       )}
 
@@ -185,12 +180,7 @@ export function CaptureWizard<T>({
             ))}
           </dl>
           <div className="flex gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => void handleApply()}
-              disabled={busy}
-            >
+            <Button variant="primary" size="sm" onClick={() => void handleApply()} disabled={busy}>
               {busy ? 'Applying…' : 'Apply'}
             </Button>
             <Button variant="secondary" size="sm" onClick={handleDiscard} disabled={busy}>

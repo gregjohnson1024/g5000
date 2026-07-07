@@ -61,9 +61,7 @@ export function captureStarted<T>(startedAt: number): CaptureState<T> {
  * Returns `null` when the compute function signals a failure (by returning
  * null) — callers should return to idle and display an error.
  */
-export function captureFinished<T>(
-  result: CaptureResult<T> | null,
-): CaptureState<T> | null {
+export function captureFinished<T>(result: CaptureResult<T> | null): CaptureState<T> | null {
   if (result === null) return null;
   return { kind: 'reviewing', result };
 }

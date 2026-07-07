@@ -1,6 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseCoordinate, parseLatLon, formatCoordinate } from '../../../lib/coords';
+import { parseCoordinate, parseLatLon, fmtLatDmm, fmtLonDmm } from '../../../lib/coords';
+
+/** Compact marine DMM for a single axis: `41 45.898n` / `71 07.710w`. */
+function compactDmm(val: number, axis: 'lat' | 'lon'): string {
+  const p = axis === 'lat' ? fmtLatDmm(val) : fmtLonDmm(val);
+  return `${p.deg} ${p.min}${p.hemi.toLowerCase()}`;
+}
 import { greatCircleNm, bearingDeg } from '../../../lib/geo';
 import {
   Button,
@@ -201,8 +207,8 @@ export default function WaypointsPage() {
     setEditing({
       id: w.id,
       name: w.name,
-      latRaw: formatCoordinate(w.lat, 'lat', { format: 'dmm' }),
-      lonRaw: formatCoordinate(w.lon, 'lon', { format: 'dmm' }),
+      latRaw: compactDmm(w.lat, 'lat'),
+      lonRaw: compactDmm(w.lon, 'lon'),
       notes: w.notes ?? '',
     });
     setEditError(null);
@@ -277,7 +283,7 @@ export default function WaypointsPage() {
             className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 font-mono text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
           />
         ) : (
-          <span className="font-mono">{formatCoordinate(w.lat, 'lat', { format: 'dmm' })}</span>
+          <span className="font-mono">{compactDmm(w.lat, 'lat')}</span>
         ),
     },
     {
@@ -296,7 +302,7 @@ export default function WaypointsPage() {
             className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 font-mono text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
           />
         ) : (
-          <span className="font-mono">{formatCoordinate(w.lon, 'lon', { format: 'dmm' })}</span>
+          <span className="font-mono">{compactDmm(w.lon, 'lon')}</span>
         ),
     },
     {

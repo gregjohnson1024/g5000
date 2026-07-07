@@ -134,7 +134,11 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
   // Cell edit
   // ---------------------------------------------------------------------------
 
-  const commitCellEdit = async (twsIdx: number, twaIdx: number, rawKnots: string): Promise<void> => {
+  const commitCellEdit = async (
+    twsIdx: number,
+    twaIdx: number,
+    rawKnots: string,
+  ): Promise<void> => {
     setDialog({ kind: 'none' });
     const parsed = Number(rawKnots);
     if (!Number.isFinite(parsed)) return;
@@ -266,8 +270,8 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
           </tbody>
         </table>
         <p className="text-caption text-ink-3 mt-1">
-          Blue rows = upwind targets · Orange rows = downwind targets (read-only).
-          Click a cell to select it, then use &ldquo;Edit cell&rdquo; to change its value.
+          Blue rows = upwind targets · Orange rows = downwind targets (read-only). Click a cell to
+          select it, then use &ldquo;Edit cell&rdquo; to change its value.
         </p>
       </div>
 

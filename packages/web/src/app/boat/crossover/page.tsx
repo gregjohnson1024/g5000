@@ -92,7 +92,10 @@ export default function CrossoverPage() {
           <Panel label={mode === 'view' ? 'All sails overlay' : 'Sail region editor'}>
             {mode === 'view' && <SailOverlayChart wardrobe={wardrobe} filterCategory={filter} />}
             {mode === 'edit' && editSail && (
-              <SailRegionEditor sail={editSail} onSave={(cells) => saveRegion(editSail.id, cells)} />
+              <SailRegionEditor
+                sail={editSail}
+                onSave={(cells) => saveRegion(editSail.id, cells)}
+              />
             )}
             {mode === 'edit' && !editSail && (
               <p className="text-sm text-ink-3 py-4">Pick a sail to edit from the list →</p>
@@ -135,9 +138,7 @@ export default function CrossoverPage() {
                               className={[
                                 'block w-full text-left px-2 py-1 text-sm [border-radius:var(--r-control)]',
                                 'hover:bg-surface-raised transition-colors',
-                                s.id === editSailId
-                                  ? 'bg-surface-raised text-ink'
-                                  : 'text-ink-2',
+                                s.id === editSailId ? 'bg-surface-raised text-ink' : 'text-ink-2',
                               ]
                                 .filter(Boolean)
                                 .join(' ')}

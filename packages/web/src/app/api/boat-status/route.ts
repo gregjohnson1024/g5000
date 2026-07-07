@@ -35,9 +35,10 @@ function allEqual2D(arr: number[][], target: number): boolean {
  * Detect whether a cal table differs from its identity default.
  * Returns true if the user has made any non-trivial change.
  */
-function awsAwaCalCustomized(
-  cal: { angleCorrection: number[][]; speedMultiplier: number[][] },
-): boolean {
+function awsAwaCalCustomized(cal: {
+  angleCorrection: number[][];
+  speedMultiplier: number[][];
+}): boolean {
   return !allEqual2D(cal.angleCorrection, 0) || !allEqual2D(cal.speedMultiplier, 1);
 }
 
@@ -199,9 +200,7 @@ export async function GET(): Promise<Response> {
 
   // Sessions today
   const today = todayUtc();
-  const todaySessions = sessions.filter(
-    (s) => (s.startedAt ?? s.mtime).startsWith(today),
-  ).length;
+  const todaySessions = sessions.filter((s) => (s.startedAt ?? s.mtime).startsWith(today)).length;
   const sessionStatus =
     sessions === null
       ? '—'

@@ -37,7 +37,13 @@ interface SailGridAxesProps {
 /**
  * Grid lines group (render inside the main grid <g transform="translate(MARGIN_L,0)">).
  */
-export function SailGridLines({ CELL_W, CELL_H, W, H, TWA_STEP_DEG }: Omit<SailGridAxesProps, 'MARGIN_L' | 'MARGIN_B'>): React.JSX.Element {
+export function SailGridLines({
+  CELL_W,
+  CELL_H,
+  W,
+  H,
+  TWA_STEP_DEG,
+}: Omit<SailGridAxesProps, 'MARGIN_L' | 'MARGIN_B'>): React.JSX.Element {
   return (
     <>
       {TWS_TICKS.map((kn) => (
@@ -72,7 +78,10 @@ export function SailGridLines({ CELL_W, CELL_H, W, H, TWA_STEP_DEG }: Omit<SailG
 /**
  * TWS tick labels at the bottom (render inside the main grid <g transform="translate(MARGIN_L,0)">).
  */
-export function SailGridTwsTicks({ CELL_W, H }: Pick<SailGridAxesProps, 'CELL_W' | 'H'>): React.JSX.Element {
+export function SailGridTwsTicks({
+  CELL_W,
+  H,
+}: Pick<SailGridAxesProps, 'CELL_W' | 'H'>): React.JSX.Element {
   return (
     <>
       {TWS_TICKS.map((kn) => (

@@ -43,8 +43,7 @@ export function SailRegionEditor({ sail, onSave }: Props) {
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm text-ink">
-          Editing: <b>{sail.name}</b>{' '}
-          <span className="text-ink-3">({cells.size} cells)</span>
+          Editing: <b>{sail.name}</b> <span className="text-ink-3">({cells.size} cells)</span>
         </span>
         <Button
           size="sm"

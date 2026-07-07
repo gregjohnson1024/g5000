@@ -52,7 +52,9 @@ function HubCard({ card }: { card: BoatStatusCard }) {
       <div className="font-medium text-ink leading-snug">{card.label}</div>
       <div className="text-[0.722rem] text-ink-3 mt-0.5 leading-snug">{card.desc}</div>
       {card.statusLine ? (
-        <div className={['text-[0.722rem] mt-1.5 tabular-nums leading-none', statusInkClass].join(' ')}>
+        <div
+          className={['text-[0.722rem] mt-1.5 tabular-nums leading-none', statusInkClass].join(' ')}
+        >
           {card.statusLine}
         </div>
       ) : null}
@@ -64,13 +66,7 @@ function HubCard({ card }: { card: BoatStatusCard }) {
 // Group section
 // ---------------------------------------------------------------------------
 
-function CardGroup({
-  label,
-  cards,
-}: {
-  label: string;
-  cards: BoatStatusCard[];
-}) {
+function CardGroup({ label, cards }: { label: string; cards: BoatStatusCard[] }) {
   return (
     <section className="space-y-2">
       <h2 className="text-[0.667rem] font-semibold uppercase tracking-[0.08em] text-ink-2 px-0.5">
@@ -96,21 +92,81 @@ const STATIC_CARDS: {
   desc: string;
 }[] = [
   // Performance
-  { group: 'performance', href: '/boat/polars', label: 'Polars', desc: 'Boat speed targets vs TWS/TWA grid' },
-  { group: 'performance', href: '/boat/sails', label: 'Sails', desc: 'Sail wardrobe — add, remove, set active' },
-  { group: 'performance', href: '/boat/crossover', label: 'Crossover', desc: 'TWS/TWA region editor per sail' },
+  {
+    group: 'performance',
+    href: '/boat/polars',
+    label: 'Polars',
+    desc: 'Boat speed targets vs TWS/TWA grid',
+  },
+  {
+    group: 'performance',
+    href: '/boat/sails',
+    label: 'Sails',
+    desc: 'Sail wardrobe — add, remove, set active',
+  },
+  {
+    group: 'performance',
+    href: '/boat/crossover',
+    label: 'Crossover',
+    desc: 'TWS/TWA region editor per sail',
+  },
   // Setup
-  { group: 'setup', href: '/boat/setup', label: 'Setup', desc: 'App settings, satellite cache, source mode' },
-  { group: 'setup', href: '/boat/setup/profile', label: 'Profile', desc: 'Mast geometry, magnetic variation, MMSI' },
-  { group: 'setup', href: '/boat/setup/displays', label: 'Displays', desc: 'Mast display layout, night mode, brightness' },
-  { group: 'setup', href: '/boat/setup/damping', label: 'Damping', desc: 'Per-channel EMA filter time constants' },
-  { group: 'setup', href: '/boat/setup/cal/wind', label: 'Wind cal', desc: 'AWS/AWA calibration table' },
+  {
+    group: 'setup',
+    href: '/boat/setup',
+    label: 'Setup',
+    desc: 'App settings, satellite cache, source mode',
+  },
+  {
+    group: 'setup',
+    href: '/boat/setup/profile',
+    label: 'Profile',
+    desc: 'Mast geometry, magnetic variation, MMSI',
+  },
+  {
+    group: 'setup',
+    href: '/boat/setup/displays',
+    label: 'Displays',
+    desc: 'Mast display layout, night mode, brightness',
+  },
+  {
+    group: 'setup',
+    href: '/boat/setup/damping',
+    label: 'Damping',
+    desc: 'Per-channel EMA filter time constants',
+  },
+  {
+    group: 'setup',
+    href: '/boat/setup/cal/wind',
+    label: 'Wind cal',
+    desc: 'AWS/AWA calibration table',
+  },
   { group: 'setup', href: '/boat/setup/cal/bsp', label: 'BSP cal', desc: 'Boat speed calibration' },
-  { group: 'setup', href: '/boat/setup/cal/compass', label: 'Compass', desc: 'Compass deviation table' },
+  {
+    group: 'setup',
+    href: '/boat/setup/cal/compass',
+    label: 'Compass',
+    desc: 'Compass deviation table',
+  },
   // Diagnostics
-  { group: 'diagnostics', href: '/boat/diag', label: 'Diagnostics', desc: 'N2K bus inspection, session replay, and server logs' },
-  { group: 'diagnostics', href: '/boat/diag/sensors', label: 'Sensors', desc: 'Per-channel source freshness and priority' },
-  { group: 'diagnostics', href: '/boat/diag/sessions', label: 'Sessions', desc: 'Recorded sessions — replay, download, delete' },
+  {
+    group: 'diagnostics',
+    href: '/boat/diag',
+    label: 'Diagnostics',
+    desc: 'N2K bus inspection, session replay, and server logs',
+  },
+  {
+    group: 'diagnostics',
+    href: '/boat/diag/sensors',
+    label: 'Sensors',
+    desc: 'Per-channel source freshness and priority',
+  },
+  {
+    group: 'diagnostics',
+    href: '/boat/diag/sessions',
+    label: 'Sessions',
+    desc: 'Recorded sessions — replay, download, delete',
+  },
 ];
 
 function staticToCard(s: (typeof STATIC_CARDS)[number]): BoatStatusCard {
@@ -130,10 +186,7 @@ const STATIC_FALLBACK = {
 export default function BoatHubPage() {
   const statusState = useBoatStatus();
 
-  const groups =
-    statusState.status === 'ok'
-      ? statusState.data
-      : STATIC_FALLBACK;
+  const groups = statusState.status === 'ok' ? statusState.data : STATIC_FALLBACK;
 
   return (
     <main className="p-6 space-y-6 max-w-3xl">

@@ -117,17 +117,11 @@ export function AnchorCard({ livePos }: { livePos: LivePos | null }): React.Reac
   const distM = anchor.armed && anchorPoint && livePos ? haversineM(livePos, anchorPoint) : null;
 
   return (
-    <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2 text-xs">
+    <div className="space-y-2 bg-surface/60 border border-hairline rounded p-2 text-xs">
       <div className="flex items-center justify-between">
-        <span className="text-slate-300 font-semibold uppercase tracking-wide text-[11px]">
-          Anchor
-        </span>
+        <span className="text-ink font-semibold uppercase tracking-wide text-xs">Anchor</span>
         {anchor.armed && (
-          <span
-            className={
-              'text-[11px] font-semibold ' + (breached ? 'text-rose-400' : 'text-emerald-400')
-            }
-          >
+          <span className={`text-xs font-semibold ${breached ? 'text-danger' : 'text-ok'}`}>
             {breached ? 'DRAGGING' : 'watching'}
           </span>
         )}
@@ -135,17 +129,17 @@ export function AnchorCard({ livePos }: { livePos: LivePos | null }): React.Reac
 
       {anchor.armed ? (
         <>
-          <div className="flex items-center justify-between text-slate-300">
-            <span className="text-slate-400">Radius</span>
+          <div className="flex items-center justify-between text-ink">
+            <span className="text-ink-3">Radius</span>
             <span className="font-mono">{Math.round(anchor.radiusM)} m</span>
           </div>
-          <div className="flex items-center justify-between text-slate-300">
-            <span className="text-slate-400">From anchor</span>
+          <div className="flex items-center justify-between text-ink">
+            <span className="text-ink-3">From anchor</span>
             <span className="font-mono">{distM === null ? '—' : `${Math.round(distM)} m`}</span>
           </div>
           {anchor.coneDeg !== undefined && anchor.coneDeg < 360 && (
-            <div className="flex items-center justify-between text-slate-300">
-              <span className="text-slate-400">Sector</span>
+            <div className="flex items-center justify-between text-ink">
+              <span className="text-ink-3">Sector</span>
               <span className="font-mono">
                 {Math.round(anchor.coneDeg)}° @ {Math.round(anchor.coneCenterDeg ?? 0)}°
               </span>
@@ -155,25 +149,26 @@ export function AnchorCard({ livePos }: { livePos: LivePos | null }): React.Reac
             type="button"
             disabled={busy}
             onClick={() => void weigh()}
-            className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-40"
+            className="w-full rounded border border-hairline bg-surface-raised px-2 py-1 font-semibold text-ink hover:brightness-95 disabled:opacity-40"
           >
             Weigh
           </button>
         </>
       ) : (
         <>
+          {/* Primary action: amber accent per one-accent rule */}
           <button
             type="button"
             disabled={busy || !livePos}
             onClick={() => void drop()}
-            className="w-full rounded border border-sky-600 bg-sky-700 px-2 py-1 font-semibold text-white hover:bg-sky-600 disabled:opacity-40"
+            className="w-full rounded border border-accent bg-accent px-2 py-1 font-semibold text-on-accent hover:bg-accent-hi disabled:opacity-40"
           >
             Drop anchor here
           </button>
           <button
             type="button"
             onClick={() => setShowAdv((v) => !v)}
-            className="text-slate-400 hover:text-slate-200"
+            className="text-ink-3 hover:text-ink"
           >
             {showAdv ? '▾ advanced' : '▸ advanced'}
           </button>
@@ -215,13 +210,13 @@ function AdvRow({
 }): React.ReactElement {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-slate-400 w-16 shrink-0">{label}</span>
+      <span className="text-ink-3 w-16 shrink-0">{label}</span>
       <input
         type="number"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 font-mono text-slate-200 placeholder:text-slate-600"
+        className="w-full rounded border border-hairline bg-surface-raised px-1.5 py-0.5 font-mono text-ink placeholder:text-ink-4"
         aria-label={label}
       />
     </div>

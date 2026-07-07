@@ -103,7 +103,12 @@ describe('/api/settings PATCH', () => {
     // anchorDashboard untouched
     expect(getBody.settings.anchorDashboard).toEqual({ bowHeightM: 1.5 });
     // forecastBbox untouched
-    expect(getBody.settings.forecastBbox).toEqual({ latMin: 41, latMax: 45, lonMin: -72, lonMax: -65 });
+    expect(getBody.settings.forecastBbox).toEqual({
+      latMin: 41,
+      latMax: 45,
+      lonMin: -72,
+      lonMax: -65,
+    });
   });
 
   it('PATCH response includes the full merged settings', async () => {

@@ -18,7 +18,10 @@ function slug(s: string): string {
     .replace(/[^a-z0-9-]/g, '');
 }
 
-type AlertState = { kind: 'none' } | { kind: 'alert'; message: string } | { kind: 'confirm-delete'; sailId: string };
+type AlertState =
+  | { kind: 'none' }
+  | { kind: 'alert'; message: string }
+  | { kind: 'confirm-delete'; sailId: string };
 
 export default function SailsPage() {
   const [wardrobe, setWardrobe] = useState<SailWardrobe | null>(null);
@@ -91,9 +94,8 @@ export default function SailsPage() {
     await reload();
   }
 
-  const deletingSail = dlg.kind === 'confirm-delete'
-    ? wardrobe.sails.find((s) => s.id === dlg.sailId)
-    : undefined;
+  const deletingSail =
+    dlg.kind === 'confirm-delete' ? wardrobe.sails.find((s) => s.id === dlg.sailId) : undefined;
 
   return (
     <main className="p-4 space-y-6">

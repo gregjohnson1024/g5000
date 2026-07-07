@@ -53,7 +53,15 @@ export function RampLegend({
   return (
     <div className={`text-caption text-ink-3 leading-tight ${className}`}>
       {unit && <div className="mb-0.5 text-ink-2">{unit}</div>}
-      {/* Colour bar: one swatch per stop, flex-1 each */}
+      {/* Colour bar: one swatch per stop, flex-1 each.
+           NOTE — flex-1 distributes equal width regardless of the stop's
+           position value. This is correct for SEQUENTIAL ramps where stops are
+           evenly spaced (0, 0.2, 0.4, 0.6, 0.8, 1.0). It would misrepresent
+           a DIVERGING ramp with unevenly spaced stops (e.g. 0, 0.2, 0.4, 0.5,
+           0.6, 0.8, 1.0 — the midpoint slack would appear equal to the outer
+           bands). Both live consumers (wind overlay, current overlay) are
+           sequential, so this latent constraint is acceptable. If a diverging
+           ramp is ever added, weight each swatch by the gap to the next stop. */}
       <div className="flex w-full overflow-hidden rounded-sm">
         {stops.map(([pos, colour], i) => (
           <div
@@ -64,12 +72,12 @@ export function RampLegend({
           />
         ))}
       </div>
-      {/* Label row: one label per stop, left-aligned under each swatch */}
+      {/* Label row: one label per stop, inherits text-caption from parent wrapper */}
       <div className="flex w-full">
         {stops.map(([pos], i) => {
           const v = stopToValue(pos, domain);
           return (
-            <div key={i} className="flex-1 text-left tabular-nums" style={{ fontSize: '11px' }}>
+            <div key={i} className="flex-1 text-left tabular-nums">
               {formatLabel(v)}
             </div>
           );

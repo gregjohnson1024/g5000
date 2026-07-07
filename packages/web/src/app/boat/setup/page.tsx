@@ -146,9 +146,7 @@ function PlanningSection() {
             label="Motor below"
             unit="kn"
             value={draft.autoMotor.minSailKt}
-            onChange={(v) =>
-              setDraftKey('autoMotor', { ...draft.autoMotor, minSailKt: v })
-            }
+            onChange={(v) => setDraftKey('autoMotor', { ...draft.autoMotor, minSailKt: v })}
             step={0.5}
             min={0}
             caption="Motor when sailing speed falls below this. 0 = never motor."
@@ -157,9 +155,7 @@ function PlanningSection() {
             label="Motor speed"
             unit="kn"
             value={draft.autoMotor.motorKt}
-            onChange={(v) =>
-              setDraftKey('autoMotor', { ...draft.autoMotor, motorKt: v })
-            }
+            onChange={(v) => setDraftKey('autoMotor', { ...draft.autoMotor, motorKt: v })}
             step={0.5}
             min={0}
             caption="Engine speed used during motor segments."
@@ -515,13 +511,11 @@ function EmporiaAcSection() {
     <section>
       <Panel label="Emporia AC">
         <p className="text-caption text-ink-3 mb-3">
-          Assign each circuit to a leg (L1 / L2 / 240V) or hide it from the AC Loads view.
-          Requires an Emporia Vue 3 connected or <code>EMPORIA_SIM=1</code>.
+          Assign each circuit to a leg (L1 / L2 / 240V) or hide it from the AC Loads view. Requires
+          an Emporia Vue 3 connected or <code>EMPORIA_SIM=1</code>.
         </p>
 
-        {!devicesLoaded && (
-          <p className="text-ink-3 text-body-sm italic">Loading channels…</p>
-        )}
+        {!devicesLoaded && <p className="text-ink-3 text-body-sm italic">Loading channels…</p>}
 
         {devicesLoaded && channels.length === 0 && (
           <p className="text-ink-3 text-body-sm italic">
@@ -767,13 +761,11 @@ export default function SettingsPage() {
               : 'border-hairline'
         }`}
       >
-        <legend className="px-2 text-body-sm text-ink-2">
-          Live ingest — SocketCAN (PiCAN-M)
-        </legend>
+        <legend className="px-2 text-body-sm text-ink-2">Live ingest — SocketCAN (PiCAN-M)</legend>
         <p className="text-caption text-ink-3">
           Reads N2K frames directly from a Linux SocketCAN interface (e.g. the PiCAN-M HAT on the
-          boat Pi). Runs <em>alongside</em> YDWG-02 and NGT-1 — the bridge dedupes by source
-          address + PGN, so toggling this on while YDWG stays connected is safe for verification.
+          boat Pi). Runs <em>alongside</em> YDWG-02 and NGT-1 — the bridge dedupes by source address
+          + PGN, so toggling this on while YDWG stays connected is safe for verification.
         </p>
         <label className="flex items-center gap-2 text-body-sm">
           <input
