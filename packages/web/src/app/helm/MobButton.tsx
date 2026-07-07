@@ -33,15 +33,15 @@ export function MobButton() {
       </button>
       {confirming && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg max-w-sm w-full">
-            <h2 className="text-xl font-bold mb-4">Confirm MOB?</h2>
-            <p className="mb-4 text-sm text-gray-600">
+          <div className="bg-surface-raised p-6 rounded-lg max-w-sm w-full">
+            <h2 className="text-xl font-bold mb-4 text-ink">Confirm MOB?</h2>
+            <p className="mb-4 text-sm text-ink-2">
               This will fire a CRITICAL alarm and drop a waypoint at the current position.
             </p>
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirming(false)}
-                className="px-4 py-2 bg-gray-200 rounded"
+                className="px-4 py-2 bg-surface text-ink rounded"
               >
                 Cancel
               </button>

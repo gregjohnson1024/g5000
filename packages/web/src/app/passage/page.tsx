@@ -112,14 +112,14 @@ function Sparkline({
         height={height}
         className="bg-slate-900 border border-slate-800 rounded"
       >
-        <path d={path} fill="none" stroke="#fbbf24" strokeWidth="1.5" />
+        <path d={path} fill="none" stroke="var(--accent-ink)" strokeWidth="1.5" />
         {series.map((d, i) => (
           <circle
             key={d.endingAt}
             cx={px(d.endingAt)}
             cy={py(d.d24hM * M_TO_NM)}
             r={i === series.length - 1 ? 2.5 : 1}
-            fill="#fbbf24"
+            fill="var(--accent-ink)"
           />
         ))}
       </svg>
@@ -219,7 +219,7 @@ export default function PassagePage() {
   }, []);
 
   return (
-    <main className="p-4 flex-1 overflow-y-auto bg-black space-y-4">
+    <main className="p-4 flex-1 overflow-y-auto bg-canvas space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-xl font-semibold text-slate-300">Passage</h1>
         <div className="flex items-center gap-3">
@@ -494,8 +494,8 @@ function CumulativeSparkline({
         height={height}
         className="bg-slate-950 border border-slate-800 rounded"
       >
-        <path d={path} fill="none" stroke="#34d399" strokeWidth="1.5" />
-        <circle cx={px(xMax)} cy={py(ys[ys.length - 1]!)} r={2.5} fill="#34d399" />
+        <path d={path} fill="none" stroke="var(--ok)" strokeWidth="1.5" />
+        <circle cx={px(xMax)} cy={py(ys[ys.length - 1]!)} r={2.5} fill="var(--ok)" />
       </svg>
       <div className="flex justify-between text-[10px] text-slate-500 font-mono px-1">
         <span>{fmtHourLabel(xMin, tz)}</span>

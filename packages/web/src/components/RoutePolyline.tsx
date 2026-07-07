@@ -13,25 +13,25 @@ function colorExpr(
 ): maplibregl.ExpressionSpecification | string {
   switch (mode) {
     case 'tack':
-      return ['match', ['get', 'tack'], 'port', '#ef4444', 'starboard', '#22c55e', base];
+      return ['match', ['get', 'tack'], 'port', 'var(--port)', 'starboard', 'var(--stbd)', base];
     case 'sog':
       // Through-water/over-ground speed in m/s (~0–20 kn): slow blue → fast red.
       // interpolate-hcl blends in perceptual colour space — no muddy RGB midpoints.
       return SOG_COLOR_EXPR as maplibregl.ExpressionSpecification;
     case 'twa':
-      // |TWA| radians: upwind blue → reach green/amber → run red.
+      // |TWA| radians: upwind info-blue → reach stbd-green/accent → run port-red.
       return [
         'interpolate-hcl',
         ['linear'],
         ['get', 'twa'],
         0,
-        '#3b82f6',
+        'var(--info)',
         1.0472,
-        '#22c55e',
+        'var(--stbd)',
         2.0944,
-        '#f59e0b',
+        'var(--accent-hi)',
         Math.PI,
-        '#ef4444',
+        'var(--port)',
       ];
     default:
       return base;
@@ -76,7 +76,7 @@ export function attachRoute(
   map: maplibregl.Map,
   id: string,
   route: Route,
-  color = '#000000',
+  color = 'var(--canvas)',
   mode: RouteColorMode = 'none',
 ): void {
   const data = segments(route);

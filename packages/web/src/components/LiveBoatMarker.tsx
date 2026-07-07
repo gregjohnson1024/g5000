@@ -49,7 +49,7 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true, onUpdate }: LiveBo
     el.style.cursor = 'default';
     el.innerHTML = `
       <svg viewBox="0 0 20 20" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="10,2 16,18 10,14 4,18" fill="#fbbf24" stroke="#0b0e14" stroke-width="1.2"/>
+        <polygon points="10,2 16,18 10,14 4,18" fill="var(--own-boat)" stroke="var(--canvas)" stroke-width="1.2"/>
       </svg>
     `;
     const marker = new maplibregl.Marker({ element: el, rotationAlignment: 'map' });
@@ -71,7 +71,7 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true, onUpdate }: LiveBo
         source: TRAIL_SOURCE_ID,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#22c55e',
+          'line-color': 'var(--ok)',
           'line-width': 2,
           'line-opacity': 0.85,
         },

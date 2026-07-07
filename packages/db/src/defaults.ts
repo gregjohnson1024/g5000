@@ -11,7 +11,7 @@
 import type { SourcePriorityRule, SourcePriorityConfig } from '@g5000/core';
 export type { SourcePriorityRule, SourcePriorityConfig };
 import type { Station } from '@g5000/tide';
-import type { DayBaseColor } from '@g5000/mast';
+import type { DayBaseColor, Theme } from '@g5000/mast';
 
 export interface BoatConfig {
   /** Mast height above the masthead unit's measurement reference, meters. */
@@ -406,6 +406,10 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = {
   stationsCacheBySource: {},
 };
 
+// Theme is defined in @g5000/mast and re-exported here so consumers can
+// import it from either package without creating a circular dependency.
+export type { Theme };
+
 /** Per-boat mast-display panel settings. Applied by the appliance brightness agent. */
 export interface DisplayConfig {
   /** Panel backlight brightness, 0–100 % (UI-friendly; the unit maps to hardware). */
@@ -414,12 +418,15 @@ export interface DisplayConfig {
   nightMode: boolean;
   /** Day-mode base colour for cell values (one of @g5000/mast DAY_BASE_COLORS). */
   dayBaseColor: DayBaseColor;
+  /** App-wide UI theme for connected browsers. Default 'day'. */
+  theme: Theme;
 }
 
 export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   brightnessPct: 80,
   nightMode: false,
   dayBaseColor: 'white',
+  theme: 'day',
 };
 
 export const DEFAULT_WARDROBE: SailWardrobe = {

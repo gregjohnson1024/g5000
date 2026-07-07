@@ -49,7 +49,7 @@ export function SailRegionEditor({ sail, onSave }: Props) {
             void onSave(Array.from(cells).sort());
             setDirty(false);
           }}
-          className="px-2 py-1 bg-blue-500 text-white text-sm rounded disabled:opacity-50"
+          className="px-2 py-1 bg-accent text-on-accent text-sm rounded disabled:opacity-50"
         >
           Save
         </button>

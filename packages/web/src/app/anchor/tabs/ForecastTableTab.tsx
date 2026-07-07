@@ -124,7 +124,7 @@ function makeRows(hours: HourPoint[]): RowDef[] {
       unit: '°',
       value: (h) => h.dirDeg,
       fmt: (v) => `${Math.round(v)}`,
-      color: (_v) => '#334155',
+      color: (_v) => 'var(--hairline-strong)',
       render: (h) => `${dirArrow(h.dirDeg)}${Math.round(h.dirDeg)}°`,
     },
     {
@@ -165,15 +165,26 @@ function makeRows(hours: HourPoint[]): RowDef[] {
   ];
 }
 
-/** Choose a readable text colour against a background. */
+/** Read a CSS custom property from the root element at call time. */
+function cssVar(name: string): string {
+  if (typeof document === 'undefined') return '';
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/** Choose a readable text colour against a background. Uses theme tokens where possible. */
 function textColor(bg: string): string {
+  if (!bg.startsWith('#') || bg.length < 7) {
+    // CSS variable reference — can't parse luminance; use ink-value as safe default.
+    return cssVar('--ink-value') || '#f1f5f9';
+  }
   // Parse the background hex and compute luminance
   const r = parseInt(bg.slice(1, 3), 16) / 255;
   const g = parseInt(bg.slice(3, 5), 16) / 255;
   const b = parseInt(bg.slice(5, 7), 16) / 255;
   // Approx relative luminance (gamma-linearised)
   const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-  return lum > 0.45 ? '#0f172a' : '#e2e8f0';
+  // Use token-derived text colors so themes flip automatically.
+  return lum > 0.45 ? cssVar('--surface-sunken') || '#020617' : cssVar('--ink-value') || '#f1f5f9';
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

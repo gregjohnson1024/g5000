@@ -25,15 +25,19 @@ const MS_TO_KN = 1 / 0.514444;
 
 // Speed bin (knots) → fill color w/ alpha. Faster = more opaque so Gulf
 // Stream core stands out clearly against the OSM basemap.
+// NOTE: MapLibre paint expressions don't support CSS var() — hex+alpha literals required.
+// Color choices approximate the sequential ramp tokens with progressive alpha:
+//   #1e3a8a ≈ --seq-1 (navy), #3b82f6 ≈ --info-strong, #0891b2 ≈ --info-strong,
+//   #10b981 ≈ --ok, lime+yellow ≈ --seq-4, #f97316 ≈ --flow-ebb, #dc2626 ≈ --danger-strong.
 const FILL_STOPS: Array<[number, string]> = [
-  [0.0, '#1e3a8a40'], // <0.25 kn: indigo, mostly transparent
-  [0.25, '#3b82f680'], // 0.25-0.5: blue
-  [0.5, '#0891b290'], // 0.5-1: cyan
-  [1.0, '#10b981a0'], // 1-1.5: emerald
-  [1.5, '#84cc16b0'], // 1.5-2: lime
-  [2.0, '#eab308c0'], // 2-3: yellow
-  [3.0, '#f97316d0'], // 3-4: orange
-  [4.0, '#dc2626e0'], // 4+: red (Gulf Stream core)
+  [0.0, '#1e3a8a40'], // <0.25 kn: navy (≈seq-1), mostly transparent
+  [0.25, '#3b82f680'], // 0.25-0.5: blue (≈info-strong)
+  [0.5, '#0891b290'], // 0.5-1: cyan (≈info-strong)
+  [1.0, '#10b981a0'], // 1-1.5: emerald (≈ok)
+  [1.5, '#84cc16b0'], // 1.5-2: lime (≈seq-4 area)
+  [2.0, '#eab308c0'], // 2-3: yellow (≈warn)
+  [3.0, '#f97316d0'], // 3-4: orange (≈flow-ebb)
+  [4.0, '#dc2626e0'], // 4+: red (≈danger-strong) — Gulf Stream core
 ];
 
 /**
@@ -209,7 +213,7 @@ export function CurrentOverlay({
             id: LAYER_ARROWS,
             type: 'line',
             source: SRC_ARROWS,
-            paint: { 'line-color': '#000000', 'line-width': 1.5 },
+            paint: { 'line-color': 'var(--canvas)', 'line-width': 1.5 },
           },
           beforeId(),
         );

@@ -116,7 +116,7 @@ export default function SailsPage() {
                       />
                     </td>
                     <td>
-                      <button onClick={() => deleteSail(sail.id)} className="text-red-500">
+                      <button onClick={() => deleteSail(sail.id)} className="text-danger">
                         delete
                       </button>
                     </td>
@@ -128,7 +128,7 @@ export default function SailsPage() {
                       value={draftName[key]}
                       onChange={(e) => setDraftName({ ...draftName, [key]: e.target.value })}
                       placeholder="new sail name"
-                      className="border px-1"
+                      className="border border-hairline bg-surface-sunken px-1 text-ink"
                     />
                   </td>
                   <td>
@@ -136,11 +136,11 @@ export default function SailsPage() {
                       value={draftArea[key]}
                       onChange={(e) => setDraftArea({ ...draftArea, [key]: e.target.value })}
                       placeholder="m²"
-                      className="border px-1 w-20"
+                      className="border border-hairline bg-surface-sunken px-1 w-20 text-ink"
                     />
                   </td>
                   <td colSpan={3}>
-                    <button onClick={() => addSail(key)} className="text-blue-500">
+                    <button onClick={() => addSail(key)} className="text-accent-ink">
                       add
                     </button>
                   </td>
@@ -150,7 +150,7 @@ export default function SailsPage() {
           </section>
         );
       })}
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-ink-3">
         Paint each sail&apos;s TWS/TWA region on the{' '}
         <Link href="/sails/crossover" className="underline">
           crossover page

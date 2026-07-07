@@ -11,20 +11,28 @@ export interface CalHeatmapProps {
 
 const RAD_TO_DEG = 180 / Math.PI;
 
+/** Read a CSS custom property from the root element at call time. */
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 export function CalHeatmap({ cal, selected, onSelect }: CalHeatmapProps) {
   const maxAbs = Math.max(1e-6, ...cal.angleCorrection.flat().map(Math.abs));
 
   // Inline style for the cell color since Tailwind v4's JIT may not pick up
   // dynamic arbitrary classnames at every value.
   const cellStyle = (v: number): React.CSSProperties => {
-    if (Math.abs(v) < 1e-9) return { backgroundColor: '#1e293b', color: '#e2e8f0' };
+    if (Math.abs(v) < 1e-9)
+      return { backgroundColor: 'var(--surface-raised)', color: 'var(--ink-value)' };
     const intensity = Math.min(1, Math.abs(v) / maxAbs);
     const channel = Math.floor(intensity * 200 + 30);
     const r = v < 0 ? channel : 24;
     const g = 24;
     const b = v < 0 ? 24 : channel;
     const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    const color = luma > 0.55 ? '#0f172a' : '#e2e8f0';
+    // Use token-derived text color for legibility; cssVar() is cheap (one reflow-free read).
+    const color =
+      luma > 0.55 ? cssVar('--surface-sunken') || '#0f172a' : cssVar('--ink-value') || '#e2e8f0';
     return { backgroundColor: `rgb(${r},${g},${b})`, color };
   };
 

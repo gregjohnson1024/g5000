@@ -52,13 +52,23 @@ export function PolarPlot({
   for (let v = ringStepMs; v <= ringMaxMs; v += ringStepMs) rings.push(v);
 
   // TWS curves (one per TWS bin).
+  // Colour ramp: info (calm/light) → danger (strong/heavy), matching the legend gradient.
+  // Steps across the --series-* tokens so the ramp inherits the active theme.
+  const SERIES_TOKENS = [
+    'var(--series-1)', // sky/blue in DAY
+    'var(--series-3)', // emerald/green in DAY
+    'var(--series-8)', // yellow in DAY
+    'var(--series-6)', // rose in DAY
+    'var(--danger)', // red in DAY
+  ] as const;
   const tsColor = (twsIdx: number): string => {
-    const t = polar.twsBins.length > 1 ? twsIdx / (polar.twsBins.length - 1) : 0;
-    // Cool blue at light air → warm orange at heavy air.
-    const r = Math.floor(80 + 160 * t);
-    const g = Math.floor(180 - 80 * t);
-    const b = Math.floor(220 - 120 * t);
-    return `rgb(${r},${g},${b})`;
+    if (polar.twsBins.length <= 1) return SERIES_TOKENS[0]!;
+    const t = twsIdx / (polar.twsBins.length - 1);
+    const idx = Math.min(
+      SERIES_TOKENS.length - 1,
+      Math.floor(t * (SERIES_TOKENS.length - 1) + 0.5),
+    );
+    return SERIES_TOKENS[idx]!;
   };
 
   return (
@@ -76,13 +86,13 @@ export function PolarPlot({
             cy={cy}
             r={v * scale}
             fill="none"
-            stroke="rgb(50,55,70)"
+            stroke="var(--hairline-strong)"
             strokeWidth="1"
           />
           <text
             x={cx + 4}
             y={cy - v * scale + 4}
-            fill="rgb(100,110,130)"
+            fill="var(--ink-3)"
             fontSize="15"
             fontFamily="monospace"
           >
@@ -102,13 +112,13 @@ export function PolarPlot({
               y1={cy - r * Math.cos(rad)}
               x2={cx - r * Math.sin(rad)}
               y2={cy - r * Math.cos(rad)}
-              stroke="rgb(40,45,55)"
+              stroke="var(--hairline)"
               strokeWidth="1"
             />
             <text
               x={cx + (r + 12) * Math.sin(rad)}
               y={cy - (r + 12) * Math.cos(rad)}
-              fill="rgb(100,110,130)"
+              fill="var(--ink-3)"
               fontSize="15"
               fontFamily="monospace"
               textAnchor="middle"
@@ -121,8 +131,22 @@ export function PolarPlot({
       })}
 
       {/* Vertical and horizontal axes */}
-      <line x1={cx} y1={margin} x2={cx} y2={size - margin} stroke="rgb(60,70,90)" strokeWidth="1" />
-      <line x1={margin} y1={cy} x2={size - margin} y2={cy} stroke="rgb(60,70,90)" strokeWidth="1" />
+      <line
+        x1={cx}
+        y1={margin}
+        x2={cx}
+        y2={size - margin}
+        stroke="var(--hairline-strong)"
+        strokeWidth="1"
+      />
+      <line
+        x1={margin}
+        y1={cy}
+        x2={size - margin}
+        y2={cy}
+        stroke="var(--hairline-strong)"
+        strokeWidth="1"
+      />
 
       {/* TWS curves */}
       {polar.boatSpeed.map((row, twsIdx) => {
@@ -160,8 +184,8 @@ export function PolarPlot({
           cx={polarToCartesian(Math.abs(targetTwa), targetBsp, targetTwa >= 0 ? 1 : -1).x}
           cy={polarToCartesian(Math.abs(targetTwa), targetBsp, targetTwa >= 0 ? 1 : -1).y}
           r={5}
-          fill="rgb(255,180,80)"
-          stroke="rgb(40,30,10)"
+          fill="var(--accent-ink)"
+          stroke="var(--surface-sunken)"
           strokeWidth="1"
         />
       )}
@@ -172,18 +196,18 @@ export function PolarPlot({
           cx={polarToCartesian(Math.abs(currentTwa), currentBsp, currentTwa >= 0 ? 1 : -1).x}
           cy={polarToCartesian(Math.abs(currentTwa), currentBsp, currentTwa >= 0 ? 1 : -1).y}
           r={8}
-          fill="rgb(120,255,180)"
-          stroke="rgb(20,40,30)"
+          fill="var(--stbd)"
+          stroke="var(--surface-sunken)"
           strokeWidth="2"
         />
       )}
 
       {/* Current numbers (bottom-left) */}
       <g transform={`translate(${margin / 2},${size - margin / 2})`}>
-        <text fill="rgb(200,210,230)" fontSize="16" fontFamily="monospace">
+        <text fill="var(--ink)" fontSize="16" fontFamily="monospace">
           {currentTws !== undefined ? `TWS ${(currentTws * MS_TO_KNOTS).toFixed(1)}kn` : 'TWS —'}
         </text>
-        <text fill="rgb(200,210,230)" fontSize="16" fontFamily="monospace" dy="20">
+        <text fill="var(--ink)" fontSize="16" fontFamily="monospace" dy="20">
           {currentTwa !== undefined ? `TWA ${(currentTwa * RAD_TO_DEG).toFixed(0)}°` : 'TWA —'}
           {currentBsp !== undefined ? `  BSP ${(currentBsp * MS_TO_KNOTS).toFixed(2)}kn` : ''}
         </text>
@@ -198,20 +222,20 @@ export function PolarPlot({
           width="160"
           height="110"
           rx="4"
-          fill="rgb(15,20,32)"
-          fillOpacity="0.75"
-          stroke="rgb(50,55,70)"
+          fill="var(--surface)"
+          fillOpacity="0.85"
+          stroke="var(--hairline-strong)"
         />
         {/* Current operating-point dot */}
         <circle
           cx="0"
           cy="0"
           r="7"
-          fill="rgb(120,255,180)"
-          stroke="rgb(20,40,30)"
+          fill="var(--stbd)"
+          stroke="var(--surface-sunken)"
           strokeWidth="1.5"
         />
-        <text x="16" y="5" fill="rgb(200,210,230)" fontSize="15" fontFamily="monospace">
+        <text x="16" y="5" fill="var(--ink)" fontSize="15" fontFamily="monospace">
           Current
         </text>
         {/* Target operating-point dot */}
@@ -219,29 +243,29 @@ export function PolarPlot({
           cx="0"
           cy="24"
           r="5"
-          fill="rgb(255,180,80)"
-          stroke="rgb(40,30,10)"
+          fill="var(--accent-ink)"
+          stroke="var(--surface-sunken)"
           strokeWidth="1"
         />
-        <text x="16" y="29" fill="rgb(200,210,230)" fontSize="15" fontFamily="monospace">
+        <text x="16" y="29" fill="var(--ink)" fontSize="15" fontFamily="monospace">
           Target
         </text>
-        {/* TWS curve colour ramp */}
+        {/* TWS curve colour ramp — info (light/calm) → danger (heavy/strong) */}
         <defs>
           <linearGradient id="twsLegendGrad" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0%" stopColor="rgb(80,180,220)" />
-            <stop offset="100%" stopColor="rgb(240,100,100)" />
+            <stop offset="0%" stopColor="var(--info)" />
+            <stop offset="100%" stopColor="var(--danger)" />
           </linearGradient>
         </defs>
         <rect x="-4" y="48" width="140" height="8" fill="url(#twsLegendGrad)" rx="1" />
-        <text x="-4" y="76" fill="rgb(150,160,180)" fontSize="13" fontFamily="monospace">
+        <text x="-4" y="76" fill="var(--ink-2)" fontSize="13" fontFamily="monospace">
           light
         </text>
         <text
           x="136"
           y="76"
           textAnchor="end"
-          fill="rgb(150,160,180)"
+          fill="var(--ink-2)"
           fontSize="13"
           fontFamily="monospace"
         >
@@ -251,7 +275,7 @@ export function PolarPlot({
           x="66"
           y="76"
           textAnchor="middle"
-          fill="rgb(150,160,180)"
+          fill="var(--ink-2)"
           fontSize="13"
           fontFamily="monospace"
         >

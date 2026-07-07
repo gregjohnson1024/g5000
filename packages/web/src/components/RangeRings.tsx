@@ -50,7 +50,7 @@ export interface RangeRingsProps {
    * and layer so multiple instances on the same map don't collide.
    */
   id: string;
-  /** Line color (hex). Default `#94a3b8` (slate-400). */
+  /** Line color. Default `var(--track)` (≈ --ink-2 in DAY). Accepts CSS var() or hex. */
   color?: string;
   /** Optional prefix shown in each label, e.g. "Sula" or "WF". */
   labelPrefix?: string;
@@ -70,7 +70,7 @@ export function RangeRings({
   origin,
   radiiNm,
   id,
-  color = '#94a3b8',
+  color = 'var(--track)',
   labelPrefix,
   hidden = false,
 }: RangeRingsProps) {
@@ -148,7 +148,7 @@ export function RangeRings({
           const el = document.createElement('div');
           el.style.cssText =
             'font: 10px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-            `color: ${color}; background: rgba(11,14,20,0.7);` +
+            `color: ${color}; background: var(--scrim);` +
             'padding: 1px 4px; border-radius: 2px;' +
             'transform: translateY(-50%); white-space: nowrap;' +
             'pointer-events: none;';

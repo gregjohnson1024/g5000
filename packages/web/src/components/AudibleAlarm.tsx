@@ -104,7 +104,7 @@ export function AudibleAlarm() {
   return (
     <button
       onClick={toggleMute}
-      className={`fixed bottom-4 left-4 px-3 py-2 rounded text-sm font-mono z-40 ${muted ? 'bg-red-700 text-white' : 'bg-gray-200 text-gray-800'}`}
+      className={`fixed bottom-4 left-4 px-3 py-2 rounded text-sm font-mono z-40 ${muted ? 'bg-danger-strong text-ink-value' : 'bg-surface-raised text-ink'}`}
       title={muted ? 'Audible alarms MUTED — click to unmute' : 'Audible alarms on — click to mute'}
     >
       {muted ? '🔇 MUTED' : '🔊 Audio'}

@@ -64,7 +64,7 @@ export default function CrossoverPage() {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as SailCategory | 'all')}
-              className="border ml-4"
+              className="border border-hairline bg-surface-sunken text-ink ml-4"
             >
               <option value="all">All categories</option>
               <option value="headsail">Headsails only</option>
@@ -78,13 +78,13 @@ export default function CrossoverPage() {
           <SailRegionEditor sail={editSail} onSave={(cells) => saveRegion(editSail.id, cells)} />
         )}
         {mode === 'edit' && !editSail && (
-          <div className="text-sm text-gray-500">Pick a sail to edit →</div>
+          <div className="text-sm text-ink-3">Pick a sail to edit →</div>
         )}
       </main>
       <aside className="min-w-0">
         <h3 className="text-sm font-medium">Sails</h3>
         {wardrobe.sails.length === 0 && (
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-ink-3">
             No sails yet. Add them on the{' '}
             <Link href="/sails" className="underline">
               Wardrobe page
@@ -96,9 +96,9 @@ export default function CrossoverPage() {
           const sailsInCat = wardrobe.sails.filter((s) => s.category === cat);
           return (
             <div key={cat} className="mt-2">
-              <div className="text-xs uppercase tracking-wide text-gray-500">{cat}</div>
+              <div className="text-xs uppercase tracking-wide text-ink-3">{cat}</div>
               {sailsInCat.length === 0 ? (
-                <div className="text-xs text-gray-400 italic">—</div>
+                <div className="text-xs text-ink-2 italic">—</div>
               ) : (
                 sailsInCat.map((s) => (
                   <button
@@ -108,11 +108,10 @@ export default function CrossoverPage() {
                       setEditSailId(s.id);
                     }}
                     className={`block w-full text-left px-1 ${
-                      s.id === editSailId ? 'bg-blue-100' : ''
+                      s.id === editSailId ? 'bg-surface-raised text-ink' : ''
                     }`}
                   >
-                    {s.name}{' '}
-                    <span className="text-xs text-gray-400">({s.region.cells.length})</span>
+                    {s.name} <span className="text-xs text-ink-2">({s.region.cells.length})</span>
                   </button>
                 ))
               )}

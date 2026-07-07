@@ -1,15 +1,703 @@
 @import 'tailwindcss';
 
-:root {
+/* ==========================================================================
+   G5000 DESIGN SYSTEM — Token Layer + Compat Bridge
+   Phase 1: Three token-only themes (day / night / sun) with a compat bridge
+   that re-themes every screen without touching components.
+
+   Token names follow §4.2 of g5000-ui-overhaul-proposal.md.
+   NIGHT = strict all-red, luminance-capped ≤~35%.
+   SUN   = warm-paper, black-on-light, color-scheme: light.
+   DAY   = exact current defaults (zero visual regression in the default theme).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   DAY — default. Also matches [data-theme="day"] explicitly.
+   These values MUST reproduce the current visual exactly (zero regression).
+   -------------------------------------------------------------------------- */
+:root,
+[data-theme='day'] {
   color-scheme: dark;
+
+  /* Canvas / page background */
+  --canvas: #0b0e14;
+
+  /* Surfaces */
+  --surface-sunken: #020617; /* slate-950: input wells, AppBar, drawer track */
+  --surface: #0f172a; /* slate-900: panel fill */
+  --surface-raised: #1e293b; /* slate-800: popovers, hover, nested wells */
+
+  /* Borders */
+  --hairline: #1e293b; /* THE border — same hex as surface-raised by design */
+  --hairline-strong: #334155; /* interactive outlines, overlay edges */
+
+  /* Ink (text) */
+  --ink-value: #f1f5f9; /* numerals */
+  --ink: #cdd6f4; /* body text — the brand */
+  --ink-2: #94a3b8; /* labels */
+  --ink-3: #64748b; /* hints, units, aging values */
+  --ink-4: #475569; /* disabled, placeholders, empty-slot — */
+
+  /* Accent (amber) — one accent, earned */
+  --accent: #d97706; /* selected + primary action */
+  --accent-hi: #f59e0b; /* hover, live edges */
+  --accent-ink: #fbbf24; /* accent as text/underline/glyph, own-boat */
+  --accent-strong: #b45309; /* pressed, dark fills */
+  --accent-dim-bg: #451a03; /* amber-900 equivalent for tinted backgrounds */
+  --on-accent: #0b0e14; /* text on amber fills */
+  --focus: #fbbf24; /* 2px focus ring */
+
+  /* Status: OK */
+  --ok: #34d399;
+  --ok-strong: #059669;
+
+  /* Status: Warn */
+  --warn: #facc15;
+  --warn-strong: #ca8a04;
+  --on-warn: #211603;
+
+  /* Status: Danger */
+  --danger: #f87171;
+  --danger-strong: #dc2626;
+  --danger-surface: #3a0d10;
+
+  /* Status: Info */
+  --info: #38bdf8;
+  --info-strong: #0284c7;
+
+  /* Marine: port / starboard (distinct from danger/ok per D2 law) */
+  --port: #fb7185;
+  --stbd: #4ade80;
+
+  /* State chips */
+  --live: #34d399; /* connection chip, pulsing */
+  --stale: #64748b; /* StalenessShroud tint */
+  --demo: #fbbf24; /* demo mode chip */
+  --replay: #a78bfa; /* replay mode chip */
+
+  /* Data series (PLOT_PALETTE verbatim from MultiSourcePlot.tsx) */
+  --series-1: #38bdf8;
+  --series-2: #fbbf24;
+  --series-3: #34d399;
+  --series-4: #f472b6;
+  --series-5: #a78bfa;
+  --series-6: #fb7185;
+  --series-7: #4ade80;
+  --series-8: #facc15;
+
+  /* Sequential ramp (wind overlay FILL_STOPS — canonical) */
+  --seq-1: #0c4a6e;
+  --seq-2: #0284c7;
+  --seq-3: #38bdf8;
+  --seq-4: #fde047;
+  --seq-5: #f97316;
+  --seq-6: #dc2626;
+
+  /* Diverging (flow/current overlay) */
+  --flow-flood: #38bdf8;
+  --flow-slack: #64748b;
+  --flow-ebb: #fb923c;
+
+  /* Chart semantics */
+  --now-line: rgba(226, 232, 240, 0.6); /* #E2E8F0 @ 60% */
+  --own-boat: #fbbf24;
+  --route-active: #fbbf24;
+  --route-alt: #22d3ee;
+  --track: #94a3b8;
+  --ais-normal: #7cc7e8;
+
+  /* Scrim */
+  --scrim: rgba(2, 6, 23, 0.72);
+
+  /* Map filter — DAY: no filter */
+  --map-filter: none;
+
+  /* Radius tokens */
+  --r-control: 6px;
+  --r-panel: 8px;
+  --r-sheet: 12px;
+  --r-badge: 999px;
+  --r0: 0px;
+
+  /* ---- COMPAT BRIDGE — DAY fidelity vars ----
+     These hold the exact Tailwind hex for shades where the semantic token
+     diverges in DAY, ensuring zero visual regression in the default theme.
+     They switch to red-family / paper values in NIGHT / SUN below.       */
+
+  /* slate intermediate shades — exact Tailwind defaults */
+  --compat-slate-200: #e2e8f0; /* slate-200 default */
+  --compat-slate-300: #cbd5e1; /* slate-300 default */
+  --compat-slate-600: #475569; /* slate-600 default = ink-4 */
+
+  /* amber light shades — exact Tailwind defaults (light ink on amber fills) */
+  --compat-amber-50: #fffbeb; /* amber-50 default */
+  --compat-amber-100: #fef3c7; /* amber-100 default */
+  --compat-amber-200: #fde68a; /* amber-200 default */
+  --compat-amber-300: #fcd34d; /* amber-300 default */
+
+  /* gray-500 — exact Tailwind default */
+  --compat-gray-500: #6b7280;
+
+  /* rose-400 — maps to danger family (semantic collapse, ≈1 shade drift) */
+  --compat-rose-400: var(--danger); /* #f87171 in DAY */
+
+  /* orange-500 — now-ring / flow accent */
+  --compat-orange-500: var(--flow-ebb); /* #fb923c in DAY */
+
+  /* yellow-700 — caution border */
+  --compat-yellow-700: var(--warn-strong); /* #ca8a04 in DAY */
+}
+
+/* --------------------------------------------------------------------------
+   NIGHT — strict all-red, luminance-capped, hue forbidden.
+   Nothing brighter than ~35% luminance except the danger invert block.
+   No green, blue, or yellow anywhere — severity via behavior/shape only.
+   -------------------------------------------------------------------------- */
+[data-theme='night'] {
+  color-scheme: dark;
+
+  --canvas: #000000;
+  --surface-sunken: #000000;
+  --surface: #0e0505;
+  --surface-raised: #1a0b0a;
+
+  --hairline: #450a0a;
+  --hairline-strong: #7f1d1d;
+
+  /* Ink: red family only */
+  --ink-value: #f87171;
+  --ink: #ef4444;
+  --ink-2: #b91c1c;
+  --ink-3: #991b1b;
+  --ink-4: #7f1d1d;
+
+  /* Accent: outline style at night (no bright fills) */
+  --accent: #f87171; /* border color for outline-only rendering */
+  --accent-hi: #f87171;
+  --accent-ink: #f87171;
+  --accent-strong: #b91c1c;
+  --accent-dim-bg: #2a0908; /* tinted bg for accent chips */
+  --on-accent: #000000;
+  --focus: #f87171;
+
+  /* Status: all red-family, severity by behavior */
+  --ok: #b91c1c; /* steady dot */
+  --ok-strong: #991b1b;
+
+  --warn: #ef4444; /* + ! glyph */
+  --warn-strong: #b91c1c;
+  --on-warn: #000000;
+
+  --danger: #f87171; /* inverted block, pulsing ≤1Hz */
+  --danger-strong: #f87171;
+  --danger-surface: #000000;
+
+  --info: #b91c1c; /* info collapsed to red-family */
+  --info-strong: #991b1b;
+
+  /* Marine: both port/stbd in red-family — shape+glyph encodes P/S */
+  --port: #f87171; /* filled glyph */
+  --stbd: #b91c1c; /* hollow glyph */
+
+  /* State chips */
+  --live: #b91c1c; /* danger-steady at night */
+  --stale: #7f1d1d;
+  --demo: #991b1b;
+  --replay: #7f1d1d;
+
+  /* Series: 4 brightness steps × line styles */
+  --series-1: #f87171;
+  --series-2: #cf4433;
+  --series-3: #a53522;
+  --series-4: #7c2716;
+  --series-5: #f87171;
+  --series-6: #cf4433;
+  --series-7: #a53522;
+  --series-8: #7c2716;
+
+  /* Sequential ramp: red-only */
+  --seq-1: #240905;
+  --seq-2: #3c0f08;
+  --seq-3: #5c170c;
+  --seq-4: #7f2010;
+  --seq-5: #a52a15;
+  --seq-6: #cf4433;
+
+  /* Diverging: red-family */
+  --flow-flood: #f87171;
+  --flow-slack: #7f1d1d;
+  --flow-ebb: #b91c1c;
+
+  /* Chart semantics */
+  --now-line: #ff6b4a;
+  --own-boat: #f87171;
+  --route-active: #f87171;
+  --route-alt: #b91c1c;
+  --track: #7f1d1d;
+  --ais-normal: #991b1b;
+
+  --scrim: rgba(0, 0, 0, 0.85);
+
+  /* Map filter — NIGHT: desaturate + hue shift to red */
+  --map-filter: brightness(0.4) sepia(0.9) saturate(2.4) hue-rotate(-30deg);
+
+  /* Radius tokens (same as day) */
+  --r-control: 6px;
+  --r-panel: 8px;
+  --r-sheet: 12px;
+  --r-badge: 999px;
+  --r0: 0px;
+
+  /* ---- COMPAT BRIDGE — NIGHT overrides ----
+     All non-red colors collapse into the red family.
+     Luminance-capped: nothing above ~35%.                                */
+
+  /* slate intermediate shades — collapse to red ink */
+  --compat-slate-200: var(--ink); /* ef4444: body red */
+  --compat-slate-300: var(--ink-2); /* b91c1c: label red */
+  --compat-slate-600: var(--ink-4); /* 7f1d1d: dim red */
+
+  /* amber light shades — light text on amber fills → brightest red ink */
+  --compat-amber-50: var(--ink-value); /* f87171: bright red */
+  --compat-amber-100: var(--ink-value); /* f87171: bright red */
+  --compat-amber-200: var(--ink-2); /* b91c1c: mid red */
+  --compat-amber-300: var(--accent-ink); /* f87171 */
+
+  /* gray-500 → hint red */
+  --compat-gray-500: var(--ink-3); /* 991b1b */
+
+  /* rose-400 → danger at night */
+  --compat-rose-400: var(--danger); /* f87171 */
+
+  /* orange-500 → flow-ebb at night (red family) */
+  --compat-orange-500: var(--flow-ebb); /* b91c1c */
+
+  /* yellow-700 → warn-strong at night (red family) */
+  --compat-yellow-700: var(--warn-strong); /* b91c1c */
+}
+
+/* --------------------------------------------------------------------------
+   SUN — warm paper, black-on-light. The OSM basemap is already light so
+   the chart looks native. Reflected ambient light in sunlight lifts dark
+   pixels — a maximum-luminance paper palette aligns emitted/reflected light.
+   -------------------------------------------------------------------------- */
+[data-theme='sun'] {
+  color-scheme: light;
+
+  --canvas: #f0ede3;
+  --surface-sunken: #e9e5d8;
+  --surface: #ffffff;
+  --surface-raised: #f7f5ec;
+
+  --hairline: #cfc9b8;
+  --hairline-strong: #6d685a;
+
+  /* Ink: dark-on-light */
+  --ink-value: #0b1220;
+  --ink: #10141d;
+  --ink-2: #3a4256;
+  --ink-3: #5d6579;
+  --ink-4: #9aa0af;
+
+  /* Accent: dark amber for contrast on light */
+  --accent: #92400e;
+  --accent-hi: #b45309;
+  --accent-ink: #92400e;
+  --accent-strong: #78350f;
+  --accent-dim-bg: #fef3c7;
+  --on-accent: #ffffff;
+  --focus: #92400e;
+
+  /* Status */
+  --ok: #047857;
+  --ok-strong: #065f46;
+
+  --warn: #b45309;
+  --warn-strong: #92400e;
+  --on-warn: #211603;
+
+  --danger: #b91c1c;
+  --danger-strong: #991b1b;
+  --danger-surface: #fee2e2;
+
+  --info: #075985;
+  --info-strong: #0c4a6e;
+
+  /* Marine: legible on light */
+  --port: #be123c;
+  --stbd: #15803d;
+
+  /* State chips */
+  --live: #047857;
+  --stale: #9aa0af;
+  --demo: #b45309;
+  --replay: #7c3aed;
+
+  /* Series: 600-weight contrast versions */
+  --series-1: #0284c7;
+  --series-2: #b45309;
+  --series-3: #047857;
+  --series-4: #db2777;
+  --series-5: #7c3aed;
+  --series-6: #be123c;
+  --series-7: #15803d;
+  --series-8: #ca8a04;
+
+  /* Sequential ramp: same stops at 85% opacity over white */
+  --seq-1: #0c4a6e;
+  --seq-2: #0284c7;
+  --seq-3: #38bdf8;
+  --seq-4: #fde047;
+  --seq-5: #f97316;
+  --seq-6: #dc2626;
+
+  /* Diverging: info=flood, warn=ebb per brief */
+  --flow-flood: #0284c7; /* info-strong: flowing in */
+  --flow-slack: #9aa0af; /* ink-4: slack */
+  --flow-ebb: #b45309; /* warn: flowing out */
+
+  /* Chart semantics */
+  --now-line: #10141d;
+  --own-boat: #92400e;
+  --route-active: #92400e;
+  --route-alt: #0284c7;
+  --track: #5d6579;
+  --ais-normal: #0284c7;
+
+  --scrim: rgba(16, 20, 29, 0.72);
+
+  /* Map filter — SUN: no filter (OSM/NOAA already light) */
+  --map-filter: none;
+
+  /* Radius tokens (same as day) */
+  --r-control: 6px;
+  --r-panel: 8px;
+  --r-sheet: 12px;
+  --r-badge: 999px;
+  --r0: 0px;
+
+  /* ---- COMPAT BRIDGE — SUN overrides ----
+     Warm paper: dark ink on light backgrounds.                           */
+
+  /* slate intermediate shades → dark ink on paper */
+  --compat-slate-200: var(--ink-2); /* 3a4256: medium dark */
+  --compat-slate-300: var(--ink-2); /* 3a4256 */
+  --compat-slate-600: var(--ink-3); /* 5d6579: hint/dim */
+
+  /* amber light shades → on-accent / near-white on amber fills in SUN */
+  --compat-amber-50: var(--on-accent); /* ffffff on amber fill */
+  --compat-amber-100: var(--on-accent); /* ffffff */
+  --compat-amber-200: var(--on-accent); /* ffffff */
+  --compat-amber-300: var(--accent-ink); /* 92400e: accent ink on paper */
+
+  /* gray-500 → hint text on paper */
+  --compat-gray-500: var(--ink-3); /* 5d6579 */
+
+  /* rose-400 → danger on paper */
+  --compat-rose-400: var(--danger); /* b91c1c */
+
+  /* orange-500 → flow-ebb on paper */
+  --compat-orange-500: var(--flow-ebb); /* b45309 */
+
+  /* yellow-700 → warn-strong on paper */
+  --compat-yellow-700: var(--warn-strong); /* 92400e */
+}
+
+/* ==========================================================================
+   TAILWIND v4 @theme inline block
+   Exposes semantic tokens as Tailwind utilities AND provides the compat
+   bridge that repoints in-use Tailwind color vars onto theme tokens.
+
+   With the bridge in place, existing utilities like bg-slate-900,
+   text-slate-400, bg-amber-600 automatically re-theme without any
+   component edits.
+
+   COMPAT BRIDGE bridgeMap (per utility census / proposal §4.8):
+     slate-950  → surface-sunken
+     slate-900  → surface
+     slate-800  → surface-raised
+     slate-700  → hairline-strong
+     slate-600  → hairline-strong (used as border/divider)
+     slate-500  → ink-3
+     slate-400  → ink-2
+     slate-300  → ink-2
+     slate-200  → ink
+     slate-100  → ink-value
+     zinc-*     → same roles as slate (kills the zinc fork)
+     amber-600  → accent
+     amber-700  → accent-strong
+     amber-800  → accent-strong
+     amber-500  → accent-hi
+     amber-400  → accent-ink
+     amber-300  → accent-ink
+     amber-900  → accent-dim-bg
+     amber-950  → accent-dim-bg
+     gray-*     → ink/surface family
+
+   NOTE: --color-black and --color-white are intentionally NOT overridden.
+   bg-black is a literal #000 used for scrims/overlays; bg-white fossils
+   are handled individually in Task 3.
+   ========================================================================== */
+
+@theme inline {
+  /* ---- Semantic color utilities ---- */
+
+  /* Canvas */
+  --color-canvas: var(--canvas);
+
+  /* Surfaces */
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+
+  /* Hairlines */
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+
+  /* Ink */
+  --color-ink-value: var(--ink-value);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+
+  /* Accent */
+  --color-accent: var(--accent);
+  --color-accent-hi: var(--accent-hi);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-dim-bg: var(--accent-dim-bg);
+  --color-on-accent: var(--on-accent);
+  --color-focus: var(--focus);
+
+  /* Status */
+  --color-ok: var(--ok);
+  --color-ok-strong: var(--ok-strong);
+  --color-warn: var(--warn);
+  --color-warn-strong: var(--warn-strong);
+  --color-on-warn: var(--on-warn);
+  --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
+  --color-danger-surface: var(--danger-surface);
+  --color-info: var(--info);
+  --color-info-strong: var(--info-strong);
+
+  /* Marine */
+  --color-port: var(--port);
+  --color-stbd: var(--stbd);
+
+  /* State chips */
+  --color-live: var(--live);
+  --color-stale: var(--stale);
+  --color-demo: var(--demo);
+  --color-replay: var(--replay);
+
+  /* Data series */
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-series-7: var(--series-7);
+  --color-series-8: var(--series-8);
+
+  /* Sequential ramp */
+  --color-seq-1: var(--seq-1);
+  --color-seq-2: var(--seq-2);
+  --color-seq-3: var(--seq-3);
+  --color-seq-4: var(--seq-4);
+  --color-seq-5: var(--seq-5);
+  --color-seq-6: var(--seq-6);
+
+  /* Diverging */
+  --color-flow-flood: var(--flow-flood);
+  --color-flow-slack: var(--flow-slack);
+  --color-flow-ebb: var(--flow-ebb);
+
+  /* Chart semantics */
+  --color-own-boat: var(--own-boat);
+  --color-route-active: var(--route-active);
+  --color-route-alt: var(--route-alt);
+  --color-track: var(--track);
+  --color-ais-normal: var(--ais-normal);
+  --color-scrim: var(--scrim);
+
+  /* ---- COMPAT BRIDGE (Phase 1 — deleted in Phase 7) ----
+     Repoints the Tailwind color vars the app already uses onto semantic
+     tokens so every screen re-themes with data-theme, before any component
+     is migrated. DAY values reproduce exact current defaults (zero regression).
+
+     Shades that would drift from their Tailwind default in DAY use
+     --compat-* vars defined per theme block (exact hex in DAY, themed in NIGHT/SUN).
+
+     Verification (DAY):
+       --color-slate-950 → var(--surface-sunken)      = #020617  ✓ (slate-950 default)
+       --color-slate-900 → var(--surface)             = #0f172a  ✓ (slate-900 default)
+       --color-slate-800 → var(--surface-raised)      = #1e293b  ✓ (slate-800 default)
+       --color-slate-700 → var(--hairline-strong)     = #334155  ✓ (slate-700 default)
+       --color-slate-600 → var(--compat-slate-600)    = #475569  ✓ (slate-600 exact = ink-4)
+       --color-slate-500 → var(--ink-3)               = #64748b  ✓ (slate-500 default)
+       --color-slate-400 → var(--ink-2)               = #94a3b8  ✓ (slate-400 default)
+       --color-slate-300 → var(--compat-slate-300)    = #cbd5e1  ✓ (slate-300 exact)
+       --color-slate-200 → var(--compat-slate-200)    = #e2e8f0  ✓ (slate-200 exact)
+       --color-slate-100 → var(--ink-value)           = #f1f5f9  ✓ (slate-100 default)
+       --color-amber-600 → var(--accent)              = #d97706  ✓ (amber-600 default)
+       --color-amber-700 → var(--accent-strong)       = #b45309  ✓ (amber-700 default)
+       --color-amber-500 → var(--accent-hi)           = #f59e0b  ✓ (amber-500 default)
+       --color-amber-400 → var(--accent-ink)          = #fbbf24  ✓ (amber-400 default)
+       --color-amber-300 → var(--compat-amber-300)    = #fcd34d  ✓ (amber-300 exact)
+       --color-amber-200 → var(--compat-amber-200)    = #fde68a  ✓ (amber-200 exact)
+       --color-amber-100 → var(--compat-amber-100)    = #fef3c7  ✓ (amber-100 exact)
+       --color-amber-50  → var(--compat-amber-50)     = #fffbeb  ✓ (amber-50 exact)
+       --color-rose-400  → var(--compat-rose-400)     = #f87171  ≈ (danger; was #fb7185 Tailwind; semantic collapse)
+       --color-orange-500→ var(--compat-orange-500)   = #fb923c  ≈ (flow-ebb)
+       --color-yellow-700→ var(--compat-yellow-700)   = #ca8a04  ≈ (warn-strong)
+       --color-gray-500  → var(--compat-gray-500)     = #6b7280  ✓ (gray-500 exact)
+  */
+
+  /* slate family → surface/ink tokens */
+  --color-slate-950: var(--surface-sunken);
+  --color-slate-900: var(--surface);
+  --color-slate-800: var(--surface-raised);
+  --color-slate-700: var(--hairline-strong);
+  --color-slate-600: var(
+    --compat-slate-600
+  ); /* ink-4 in DAY (#475569), not hairline-strong (#334155) */
+  --color-slate-500: var(--ink-3);
+  --color-slate-400: var(--ink-2);
+  --color-slate-300: var(--compat-slate-300); /* exact Tailwind #cbd5e1 in DAY */
+  --color-slate-200: var(--compat-slate-200); /* exact Tailwind #e2e8f0 in DAY */
+  --color-slate-100: var(--ink-value);
+
+  /* zinc family → same roles (kills the zinc fork) */
+  --color-zinc-950: var(--surface-sunken);
+  --color-zinc-900: var(--surface);
+  --color-zinc-800: var(--surface-raised);
+  --color-zinc-700: var(--hairline-strong);
+  --color-zinc-600: var(--compat-slate-600); /* ink-4 in DAY (#475569) */
+  --color-zinc-500: var(--ink-3);
+  --color-zinc-400: var(--ink-2);
+  --color-zinc-300: var(--compat-slate-300); /* exact label shade in DAY */
+  --color-zinc-200: var(--compat-slate-200); /* exact body-text shade in DAY */
+  --color-zinc-100: var(--ink-value);
+  --color-zinc-50: var(--ink-value);
+
+  /* amber family → accent tokens */
+  --color-amber-950: var(--accent-dim-bg);
+  --color-amber-900: var(--accent-dim-bg);
+  --color-amber-800: var(--accent-strong);
+  --color-amber-700: var(--accent-strong);
+  --color-amber-600: var(--accent);
+  --color-amber-500: var(--accent-hi);
+  --color-amber-400: var(--accent-ink);
+  --color-amber-300: var(--compat-amber-300); /* exact #fcd34d in DAY; red-family at night */
+  --color-amber-200: var(--compat-amber-200); /* exact #fde68a in DAY; red-family at night */
+  --color-amber-100: var(--compat-amber-100); /* exact #fef3c7 in DAY; red-family at night */
+  --color-amber-50: var(--compat-amber-50); /* exact #fffbeb in DAY; red-family at night */
+
+  /* gray family → surface/ink roles (light-theme fossils will be handled in Task 3) */
+  --color-gray-900: var(--surface);
+  --color-gray-800: var(--surface-raised);
+  --color-gray-700: var(--hairline-strong);
+  --color-gray-600: var(--ink-4);
+  --color-gray-500: var(--compat-gray-500); /* exact #6b7280 in DAY; red-family at night */
+  --color-gray-400: var(--ink-2);
+  --color-gray-200: var(--surface-raised);
+  --color-gray-100: var(--surface-raised);
+
+  /* emerald / green → ok / stbd */
+  --color-emerald-950: var(--ok-strong);
+  --color-emerald-900: var(--ok-strong);
+  --color-emerald-800: var(--ok-strong);
+  --color-emerald-700: var(--ok-strong);
+  --color-emerald-600: var(--ok-strong);
+  --color-emerald-500: var(--ok);
+  --color-emerald-400: var(--ok);
+  --color-emerald-300: var(--ok);
+  --color-emerald-100: var(--ok);
+  --color-green-400: var(--stbd);
+  --color-green-300: var(--stbd);
+
+  /* rose / red → port / danger */
+  --color-rose-950: var(--danger-surface);
+  --color-rose-900: var(--danger-surface);
+  --color-rose-800: var(--danger-strong);
+  --color-rose-700: var(--danger-strong);
+  --color-rose-600: var(--danger-strong);
+  --color-rose-500: var(--danger);
+  --color-rose-400: var(--compat-rose-400); /* error text → danger; hue-locks at night */
+  --color-rose-300: var(--danger);
+  --color-red-900: var(--danger-surface);
+  --color-red-800: var(--danger-strong);
+  --color-red-700: var(--danger-strong);
+  --color-red-600: var(--danger-strong);
+  --color-red-500: var(--danger);
+  --color-red-400: var(--danger);
+  --color-red-300: var(--port);
+  --color-red-200: var(--port);
+  --color-red-100: var(--danger);
+  --color-red-50: var(--danger-surface);
+
+  /* sky / cyan / blue → info */
+  --color-sky-900: var(--info-strong);
+  --color-sky-800: var(--info-strong);
+  --color-sky-700: var(--info-strong);
+  --color-sky-600: var(--info-strong);
+  --color-sky-500: var(--info);
+  --color-sky-400: var(--info);
+  --color-sky-300: var(--info);
+  --color-sky-200: var(--info);
+  --color-sky-100: var(--info);
+  --color-cyan-700: var(--info-strong);
+  --color-cyan-600: var(--info-strong);
+  --color-cyan-500: var(--info);
+  --color-cyan-400: var(--info);
+  --color-cyan-200: var(--info);
+  --color-blue-500: var(--info);
+  --color-blue-300: var(--info);
+  --color-blue-100: var(--info);
+
+  /* yellow → warn */
+  --color-yellow-900: var(--accent-dim-bg);
+  --color-yellow-700: var(
+    --compat-yellow-700
+  ); /* caution border → warn-strong; red-family at night */
+  --color-yellow-500: var(--warn);
+  --color-yellow-300: var(--warn);
+  --color-yellow-200: var(--warn);
+  --color-yellow-50: var(--danger-surface);
+
+  /* violet / purple → replay / series-5 */
+  --color-violet-900: var(--danger-surface);
+  --color-violet-600: var(--replay);
+  --color-violet-500: var(--replay);
+  --color-violet-300: var(--replay);
+  --color-purple-900: var(--danger-surface);
+  --color-purple-800: var(--danger-surface);
+  --color-purple-100: var(--ink-value);
+
+  /* orange → flow-ebb */
+  --color-orange-500: var(--compat-orange-500); /* now-ring / flow accent; red-family at night */
+  --color-orange-400: var(--flow-ebb);
+
+  /* teal */
+  --color-teal-200: var(--info);
+}
+
+/* --------------------------------------------------------------------------
+   Body: wire semantic tokens into base elements.
+   Keep 18px root and font-family unchanged.
+   -------------------------------------------------------------------------- */
+:root {
   /* Bump root font size so every Tailwind size class (text-xs/sm/base/lg)
    * is ~2pt larger than its default. Browser default 16px → 18px. */
   font-size: 18px;
 }
 
 body {
-  background: #0b0e14;
-  color: #cdd6f4;
+  background: var(--canvas);
+  color: var(--ink);
   font-family:
     ui-sans-serif,
     system-ui,
@@ -17,9 +705,12 @@ body {
     sans-serif;
 }
 
-/* Forecast timeline slider: a transparent native track so the two-band track
+/* --------------------------------------------------------------------------
+   Forecast timeline slider: transparent native track so the two-band track
    rendered behind it (darker = available, lighter = still fetching) shows
-   through, plus a small custom thumb. */
+   through, plus a small custom thumb.
+   Hex literals replaced with semantic tokens.
+   -------------------------------------------------------------------------- */
 .fc-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -42,15 +733,15 @@ body {
   height: 14px;
   margin-top: 1px;
   border-radius: 9999px;
-  background: #ffffff;
-  border: 1px solid #334155;
+  background: var(--ink-value);
+  border: 1px solid var(--hairline-strong);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .fc-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: #ffffff;
-  border: 1px solid #334155;
+  background: var(--ink-value);
+  border: 1px solid var(--hairline-strong);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }

@@ -49,6 +49,13 @@ export function EncBuoyLayer({
         // 5=blue, 6=yellow, 7=grey, 8=brown, 9=amber, 10=violet,
         // 11=orange, 12=magenta, 13=pink. Anything else falls
         // through to a neutral grey.
+        //
+        // INTENTIONAL EXCEPTION (overhaul Phase 1, Task 4): these are the
+        // 12 IALA/IHO nautical-chart-standard buoy colours. They are NOT
+        // theme tokens and MUST stay literal — a buoy's charted colour is
+        // a fixed marine-safety fact, not a UI palette. They do not
+        // participate in day/night/sun retheming and are the accepted
+        // lint:overhaul hex floor. Do NOT tokenize.
         'circle-color': [
           'match',
           ['get', 'colourCode'],

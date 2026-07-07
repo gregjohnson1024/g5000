@@ -16,6 +16,13 @@ const VISIBLE_OPACITY: ExpressionSpecification = ['case', ['>=', ['get', 'depth'
 // MapLibre's closest analogue to HSL; naive HSL/HSV would band unevenly in
 // luminance). Shallow cyan → royal blue → navy → near-black at the deepest
 // abyssal (~10,000 m).
+// NOTE: MapLibre paint expressions don't support CSS var() — these must be resolved
+// hex values. They derive from info/seq tokens in DAY; see token map below:
+//   0m  → #7dd3fc  (sky-300, near --info)
+//   200m → #38bdf8  (--info / --seq-3)
+//   1000m→ #2563eb  (blue-600, near --info-strong)
+//   5000m→ #1e3a8a  (--seq-1)
+//   10000m→#050a1a  (near --canvas / --surface-sunken)
 const HCL_RAMP: ExpressionSpecification = [
   'interpolate-hcl',
   ['linear'],
@@ -35,15 +42,23 @@ const HCL_RAMP: ExpressionSpecification = [
 // Major isobaths (>=200 m) thicker than the shallow set.
 const BASE_WIDTH: ExpressionSpecification = ['case', ['>=', ['get', 'depth'], 200], 1.6, 0.8];
 
+/** Read a CSS custom property from the root element (for MapLibre paint resolution). */
+function resolveToken(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 /** Paint set for a given safety depth. 0/off reproduces the classic ramp
  *  byte-for-byte; >0 flags contours at or shallower than the safety depth in
- *  red-orange, slightly wider and fully opaque, leaving deeper contours on
- *  the HCL ramp. */
+ *  the danger token color (red), slightly wider and fully opaque, leaving deeper
+ *  contours on the HCL ramp. */
 function paintFor(safetyDepthM: number, visible: boolean) {
   const shallow: ExpressionSpecification = ['<=', ['get', 'depth'], safetyDepthM];
+  // Resolve --danger token at call time so theme changes are reflected.
+  const dangerColor = resolveToken('--danger', '#f87171');
   return safetyDepthM > 0
     ? {
-        color: ['case', shallow, '#f87171', HCL_RAMP] as ExpressionSpecification,
+        color: ['case', shallow, dangerColor, HCL_RAMP] as ExpressionSpecification,
         width: [
           'case',
           shallow,

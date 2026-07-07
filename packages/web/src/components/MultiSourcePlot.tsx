@@ -10,15 +10,16 @@ const PAD = { top: 6, right: 8, bottom: 6, left: 8 };
 // Stable per-source colour palette. Callers assign by sorting their source set
 // and indexing into this array, so a given source keeps the same colour across
 // every panel (and across re-renders) even as series come and go.
+// Mapped to --series-1..8 tokens; getComputedStyle resolves the live theme value.
 export const PLOT_PALETTE: readonly string[] = [
-  '#38bdf8', // sky-400
-  '#fbbf24', // amber-400
-  '#34d399', // emerald-400
-  '#f472b6', // pink-400
-  '#a78bfa', // violet-400
-  '#fb7185', // rose-400
-  '#4ade80', // green-400
-  '#facc15', // yellow-400
+  'var(--series-1)', // #38bdf8 sky-400   in DAY
+  'var(--series-2)', // #fbbf24 amber-400 in DAY
+  'var(--series-3)', // #34d399 emerald-400 in DAY
+  'var(--series-4)', // #f472b6 pink-400  in DAY
+  'var(--series-5)', // #a78bfa violet-400 in DAY
+  'var(--series-6)', // #fb7185 rose-400  in DAY
+  'var(--series-7)', // #4ade80 green-400 in DAY
+  'var(--series-8)', // #facc15 yellow-400 in DAY
 ];
 
 export interface PlotSeries {
@@ -96,7 +97,7 @@ export function MultiSourcePlot({
           y1={yMid}
           x2={WIDTH - PAD.right}
           y2={yMid}
-          stroke="#475569"
+          stroke="var(--ink-4)"
           strokeDasharray="2 2"
         />
         {series.map((s) => {

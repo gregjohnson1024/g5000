@@ -217,7 +217,7 @@ export function WindOverlay({
             type: 'line',
             source: SRC_BARBS,
             filter: ['in', ['get', 'kind'], ['literal', ['shaft', 'barb']]],
-            paint: { 'line-color': '#000000', 'line-width': 1.4 },
+            paint: { 'line-color': 'var(--canvas)', 'line-width': 1.4 },
           },
           beforeId(),
         );
@@ -227,7 +227,7 @@ export function WindOverlay({
             type: 'fill',
             source: SRC_BARBS,
             filter: ['==', ['get', 'kind'], 'pennant'],
-            paint: { 'fill-color': '#000000' },
+            paint: { 'fill-color': 'var(--canvas)' },
           },
           beforeId(),
         );
@@ -243,7 +243,7 @@ export function WindOverlay({
             type: 'line',
             source: SRC_ISOBARS,
             paint: {
-              'line-color': '#1f2937', // slate-800
+              'line-color': 'var(--surface-raised)', // hairline-strength divider
               'line-width': [
                 'case',
                 // Bold every 10 hPa

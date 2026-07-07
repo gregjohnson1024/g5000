@@ -1,6 +1,9 @@
 import type { Observable } from 'rxjs';
 import type { DayBaseColor } from './colors.js';
 
+/** App-wide UI theme. Drives <html data-theme> on every connected browser. */
+export type Theme = 'day' | 'night' | 'sun';
+
 /** Number-tile grids for v1. 'fields+graph' is intentionally deferred. */
 export type GridKind = '1' | '2' | '3' | '4' | '6';
 
@@ -71,4 +74,6 @@ export interface MastRuntime {
   getNightMode(): boolean;
   readonly dayBaseColor$: Observable<DayBaseColor>;
   getDayBaseColor(): DayBaseColor;
+  readonly theme$: Observable<Theme>;
+  getTheme(): Theme;
 }

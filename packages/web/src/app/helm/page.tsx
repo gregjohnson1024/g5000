@@ -35,7 +35,7 @@ export default function HelmPage(): React.ReactElement {
   }, [reloadWardrobe]);
 
   return (
-    <main className="p-4 flex-1 overflow-y-auto bg-black relative">
+    <main className="p-4 flex-1 overflow-y-auto bg-canvas relative">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-slate-300">Helm</h1>
         <div className="flex items-center gap-3">

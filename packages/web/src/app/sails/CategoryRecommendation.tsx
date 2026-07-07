@@ -38,11 +38,11 @@ export function CategoryRecommendation({ wardrobe }: { wardrobe: SailWardrobe })
     <div className="space-y-2">
       <h3 className="text-base font-medium">Recommendation</h3>
       {rec ? (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-3">
           {rec.cellTwsKn} kn / {rec.cellTwaDeg}°
         </p>
       ) : (
-        <p className="text-xs text-gray-500">waiting for wind…</p>
+        <p className="text-xs text-ink-3">waiting for wind…</p>
       )}
       {(['headsail', 'main', 'downwind'] as SailCategory[]).map((cat) => {
         const active = rec?.active[cat];
@@ -55,13 +55,13 @@ export function CategoryRecommendation({ wardrobe }: { wardrobe: SailWardrobe })
               {change && <span className="bg-red-500 text-white text-xs px-1 rounded">change</span>}
             </div>
             <div className="text-sm">
-              <span className="text-gray-600">active:</span>{' '}
+              <span className="text-ink-4">active:</span>{' '}
               {active ? (byId.get(active)?.name ?? active) : '—'}
             </div>
-            <div className="text-xs text-gray-600 flex flex-wrap gap-1 mt-1">
+            <div className="text-xs text-ink-4 flex flex-wrap gap-1 mt-1">
               {valid.length ? (
                 valid.map((id) => (
-                  <span key={id} className="bg-gray-100 px-1 rounded">
+                  <span key={id} className="bg-surface-raised px-1 rounded">
                     {byId.get(id)?.name ?? id}
                   </span>
                 ))

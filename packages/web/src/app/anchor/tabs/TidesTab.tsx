@@ -369,10 +369,10 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
               y1={SVG_H - PAD.bottom}
               x2={SVG_W - PAD.right}
               y2={SVG_H - PAD.bottom}
-              stroke="#475569"
+              stroke="var(--ink-4)"
               strokeDasharray="2 2"
             />
-            <polyline points={polyline} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+            <polyline points={polyline} fill="none" stroke="var(--info)" strokeWidth="1.5" />
             {nowX !== null && (
               <>
                 <line
@@ -380,13 +380,13 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
                   y1={PAD.top}
                   x2={nowX}
                   y2={SVG_H - PAD.bottom}
-                  stroke="#f97316"
+                  stroke="var(--flow-ebb)"
                   strokeWidth="1.5"
                 />
                 <text
                   x={nowX + 3}
                   y={PAD.top + 8}
-                  fill="#f97316"
+                  fill="var(--flow-ebb)"
                   fontSize="8"
                   fontFamily="monospace"
                 >

@@ -7,6 +7,7 @@ import {
   type DayBaseColor,
   type MastLayout,
   type MastRuntime,
+  type Theme,
 } from '@g5000/mast';
 import type { ConfigStore } from '@g5000/db';
 
@@ -110,6 +111,14 @@ export class MastService implements MastRuntime {
 
   getDayBaseColor(): DayBaseColor {
     return this.configStore.getDisplayConfig().dayBaseColor;
+  }
+
+  get theme$(): Observable<Theme> {
+    return this.configStore.displayConfig$.pipe(map((c) => c.theme));
+  }
+
+  getTheme(): Theme {
+    return this.configStore.getDisplayConfig().theme;
   }
 
   async stop(): Promise<void> {

@@ -179,7 +179,7 @@ export function AnchorWatchLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'zone'],
             paint: {
-              'fill-color': ['case', ['get', 'breached'], '#ef4444', '#22d3ee'],
+              'fill-color': ['case', ['get', 'breached'], 'var(--danger)', 'var(--info)'],
               'fill-opacity': ['case', ['get', 'breached'], 0.25, 0.1],
             },
           });
@@ -191,7 +191,7 @@ export function AnchorWatchLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'zone'],
             paint: {
-              'line-color': ['case', ['get', 'breached'], '#ef4444', '#22d3ee'],
+              'line-color': ['case', ['get', 'breached'], 'var(--danger)', 'var(--info)'],
               'line-width': 1.5,
             },
           });
@@ -203,7 +203,7 @@ export function AnchorWatchLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'rode'],
             paint: {
-              'line-color': '#94a3b8',
+              'line-color': 'var(--ink-2)',
               'line-width': 1.5,
               'line-dasharray': [2, 2],
             },
@@ -217,8 +217,8 @@ export function AnchorWatchLayer({
             filter: ['==', ['get', 'kind'], 'anchor'],
             paint: {
               'circle-radius': 5,
-              'circle-color': '#0f172a',
-              'circle-stroke-color': '#22d3ee',
+              'circle-color': 'var(--surface)',
+              'circle-stroke-color': 'var(--info)',
               'circle-stroke-width': 2,
             },
           });
@@ -236,8 +236,8 @@ export function AnchorWatchLayer({
               'text-allow-overlap': true,
             },
             paint: {
-              'text-color': '#22d3ee',
-              'text-halo-color': '#0f172a',
+              'text-color': 'var(--info)',
+              'text-halo-color': 'var(--surface)',
               'text-halo-width': 1.2,
             },
           });

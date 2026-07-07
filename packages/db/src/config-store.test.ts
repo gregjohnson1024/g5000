@@ -479,6 +479,7 @@ describe('ConfigStore', () => {
       brightnessPct: 35,
       nightMode: true,
       dayBaseColor: 'green' as const,
+      theme: 'night' as const,
     };
     await store.setDisplayConfig(next);
     await store.close();

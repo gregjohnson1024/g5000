@@ -121,7 +121,7 @@ export function MobLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'return'],
             paint: {
-              'line-color': '#ef4444',
+              'line-color': 'var(--danger)',
               'line-width': 2.5,
               'line-dasharray': [2, 1.5],
             },
@@ -135,8 +135,8 @@ export function MobLayer({
             filter: ['==', ['get', 'kind'], 'mob'],
             paint: {
               'circle-radius': 8,
-              'circle-color': '#dc2626',
-              'circle-stroke-color': '#ffffff',
+              'circle-color': 'var(--danger-strong)',
+              'circle-stroke-color': 'var(--ink-value)',
               'circle-stroke-width': 3,
             },
           });
@@ -154,8 +154,8 @@ export function MobLayer({
               'text-allow-overlap': true,
             },
             paint: {
-              'text-color': '#ef4444',
-              'text-halo-color': '#ffffff',
+              'text-color': 'var(--danger)',
+              'text-halo-color': 'var(--ink-value)',
               'text-halo-width': 1.5,
             },
           });

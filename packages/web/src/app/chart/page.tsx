@@ -371,7 +371,10 @@ function ChartPageInner() {
   // Shared playback clock (unix s), lifted so the scrubber and the
   // route-weather panel stay in sync. Null until the scrubber initialises.
   const [playT, setPlayT] = useState<number | null>(null);
-  const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
+  const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = {
+    GFS: 'var(--accent-hi)',
+    ECMWF: 'var(--route-alt)',
+  };
   const ROUTE_LAYER: Record<'GFS' | 'ECMWF', string> = { GFS: 'route-gfs', ECMWF: 'route-ecmwf' };
   // Route line-colour mode (display only). Persisted; hydrated after mount.
   const [routeColorMode, setRouteColorMode] = useState<RouteColorMode>('none');

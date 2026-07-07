@@ -59,8 +59,15 @@ export function WindShiftPlot(): React.ReactElement {
         Wind shift vs 5-min baseline (last 30 min)
       </div>
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-20">
-        <line x1="0" y1={yMid} x2={WIDTH} y2={yMid} stroke="#475569" strokeDasharray="2 2" />
-        <polyline points={pts} fill="none" stroke="#fbbf24" strokeWidth="1.5" />
+        <line
+          x1="0"
+          y1={yMid}
+          x2={WIDTH}
+          y2={yMid}
+          stroke="var(--hairline-strong)"
+          strokeDasharray="2 2"
+        />
+        <polyline points={pts} fill="none" stroke="var(--accent-ink)" strokeWidth="1.5" />
       </svg>
       <div className="text-[10px] text-slate-500 font-mono mt-1">
         ±{degMax.toFixed(0)}° · last {points[points.length - 1]!.deg.toFixed(1)}°

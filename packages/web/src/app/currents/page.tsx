@@ -61,10 +61,11 @@ function eventToY(speedKn: number, yMax: number): number {
   return PAD.top + (1 - speed / yMax) * plotH;
 }
 
+// Token references — resolved via CSS custom properties at render time.
 const EVENT_COLOURS: Record<string, string> = {
-  slack: '#94a3b8', // slate-400
-  flood: '#38bdf8', // sky-400
-  ebb: '#f97316', // orange-500
+  slack: 'var(--flow-slack)',
+  flood: 'var(--flow-flood)',
+  ebb: 'var(--flow-ebb)',
 };
 
 const EVENT_LETTERS: Record<string, string> = {
@@ -346,17 +347,17 @@ export default function CurrentsPage() {
               y1={SVG_H - PAD.bottom}
               x2={SVG_W - PAD.right}
               y2={SVG_H - PAD.bottom}
-              stroke="#475569"
+              stroke="var(--ink-4)"
               strokeDasharray="2 2"
             />
             {/* Speed polyline */}
-            <polyline points={polyline} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+            <polyline points={polyline} fill="none" stroke="var(--flow-flood)" strokeWidth="1.5" />
             {/* Event markers — clamp x to plot area so out-of-span events stay at the edge */}
             {events.map((ev) => {
               const rawX = eventToX(ev.timeMs, tMin, tMax);
               const ex = Math.max(PAD.left, Math.min(SVG_W - PAD.right, rawX));
               const ey = eventToY(ev.speedKn, yMax);
-              const colour = EVENT_COLOURS[ev.kind] ?? '#94a3b8';
+              const colour = EVENT_COLOURS[ev.kind] ?? 'var(--ink-2)';
               const letter = EVENT_LETTERS[ev.kind] ?? '?';
               return (
                 <Fragment key={`${ev.kind}-${ev.timeMs}`}>
@@ -365,7 +366,7 @@ export default function CurrentsPage() {
                     x={ex}
                     y={ey + 4}
                     textAnchor="middle"
-                    fill="#0f172a"
+                    fill="var(--surface)"
                     fontSize="7"
                     fontFamily="monospace"
                     fontWeight="bold"
@@ -383,13 +384,13 @@ export default function CurrentsPage() {
                   y1={PAD.top}
                   x2={nowX}
                   y2={SVG_H - PAD.bottom}
-                  stroke="#f97316"
+                  stroke="var(--flow-ebb)"
                   strokeWidth="1.5"
                 />
                 <text
                   x={nowX + 3}
                   y={PAD.top + 10}
-                  fill="#f97316"
+                  fill="var(--flow-ebb)"
                   fontSize="9"
                   fontFamily="monospace"
                 >
@@ -401,7 +402,7 @@ export default function CurrentsPage() {
             <text
               x={PAD.left - 4}
               y={SVG_H - PAD.bottom}
-              fill="#64748b"
+              fill="var(--ink-3)"
               fontSize="8"
               textAnchor="end"
             >

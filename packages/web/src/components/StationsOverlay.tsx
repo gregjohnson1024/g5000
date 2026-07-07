@@ -28,6 +28,11 @@ function fmtClock(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Read a CSS custom property from the document root (resolved value). */
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 /** Cyan teardrop (tide) / magenta double-chevron (current) drawn to a canvas.
  *  Returns ImageData for map.addImage — no glyphs/sprite dependency. */
 function makeStationIcon(kind: Kind): { data: ImageData; pixelRatio: number } | null {
@@ -48,13 +53,13 @@ function makeStationIcon(kind: Kind): { data: ImageData; pixelRatio: number } | 
     ctx.bezierCurveTo(cx + w, 8, cx + w, 13, cx, 16);
     ctx.bezierCurveTo(cx - w, 13, cx - w, 8, cx, 2);
     ctx.closePath();
-    ctx.fillStyle = '#22d3ee'; // cyan-400
+    ctx.fillStyle = cssVar('--info');
     ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#0b0e14';
+    ctx.strokeStyle = cssVar('--canvas');
     ctx.stroke();
   } else {
-    ctx.strokeStyle = '#e879f9'; // fuchsia-400
+    ctx.strokeStyle = cssVar('--series-4'); // fuchsia/pink series color
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -138,7 +143,8 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
     const clusterLayerId = `stations-${kind}-cluster`;
     const stationLayerId = `stations-${kind}-point`;
     const iconId = `station-icon-${kind}`;
-    const clusterColor = kind === 'tide' ? '#0e7490' : '#a21caf';
+    // Cluster fill: tide uses info-strong (cyan), current uses series-4 (fuchsia).
+    const clusterColor = kind === 'tide' ? 'var(--info-strong)' : 'var(--series-4)';
 
     const ensureIcon = (): void => {
       if (map.hasImage(iconId)) return;
@@ -166,7 +172,7 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
           paint: {
             'circle-color': clusterColor,
             'circle-opacity': 0.85,
-            'circle-stroke-color': '#0b0e14',
+            'circle-stroke-color': 'var(--canvas)',
             'circle-stroke-width': 1.5,
             'circle-radius': ['step', ['get', 'point_count'], 12, 25, 16, 100, 22],
           },
@@ -225,13 +231,13 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
       title.style.marginBottom = '2px';
       const line = document.createElement('div');
       line.textContent = 'Loading…';
-      line.style.color = '#94a3b8';
+      line.style.color = 'var(--ink-2)';
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = 'Open';
       btn.style.cssText =
         'margin-top:6px;padding:2px 10px;border-radius:4px;border:none;' +
-        'background:#0284c7;color:#fff;cursor:pointer;font:inherit;';
+        'background:var(--info-strong);color:var(--ink-value);cursor:pointer;font:inherit;';
       btn.addEventListener('click', () => {
         popupRef.current?.remove();
         routerRef.current.push(deepLink(kind, props));

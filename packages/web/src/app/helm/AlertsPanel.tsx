@@ -105,7 +105,7 @@ export function AlertsPanel(): ReactElement | null {
               type="button"
               disabled={busyKey === a.key || a.acknowledgeSupport === false}
               onClick={() => void acknowledge(a.key)}
-              className="px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-900 rounded hover:bg-white disabled:opacity-40"
+              className="px-3 py-1.5 text-xs font-medium bg-accent text-on-accent rounded hover:bg-accent-hi disabled:opacity-40"
               title={
                 a.acknowledgeSupport === false
                   ? "Issuer doesn't support Acknowledge for this alert"

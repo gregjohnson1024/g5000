@@ -91,14 +91,14 @@ export function DriftArrow({ map, p, scaleNmPerKt = 5 }: DriftArrowProps) {
         type: 'line',
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'shaft'],
-        paint: { 'line-color': '#06b6d4', 'line-width': 3, 'line-opacity': 0.9 },
+        paint: { 'line-color': 'var(--info)', 'line-width': 3, 'line-opacity': 0.9 },
       });
       map.addLayer({
         id: LAYER_HEAD,
         type: 'fill',
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'head'],
-        paint: { 'fill-color': '#06b6d4', 'fill-opacity': 0.9 },
+        paint: { 'fill-color': 'var(--info)', 'fill-opacity': 0.9 },
       });
       // No text-symbol layer — the raster-only style has no glyphs URL,
       // and the magnitude is already shown in the sidebar panel.

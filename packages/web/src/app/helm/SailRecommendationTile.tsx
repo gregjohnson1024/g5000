@@ -44,7 +44,8 @@ export function SailRecommendationTile() {
   const rec = useRecommendation();
   useTick(5_000);
   const id = rec?.recommendedConfigId ?? null;
-  const color = id ? getConfigColor(id) : '#475569';
+  // When no recommendation id: fall back to ink-4 token via CSS variable.
+  const color = id ? getConfigColor(id) : 'var(--ink-4)';
   const sameAsActive = rec ? id === rec.activeConfigId : true;
   const elapsedSec = rec ? Math.floor(Date.now() / 1000) - rec.enteredAt : 0;
   const shouldChange = rec

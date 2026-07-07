@@ -53,7 +53,7 @@ export function CogExtension({
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'shaft'],
         paint: {
-          'line-color': '#a78bfa', // violet-400 — distinct from drift cyan
+          'line-color': 'var(--replay)', // violet — distinct from drift cyan
           'line-width': 2,
           'line-dasharray': [3, 2],
         },
@@ -65,8 +65,8 @@ export function CogExtension({
         filter: ['==', ['get', 'kind'], 'tip'],
         paint: {
           'circle-radius': 5,
-          'circle-color': '#a78bfa',
-          'circle-stroke-color': '#0b0e14',
+          'circle-color': 'var(--replay)',
+          'circle-stroke-color': 'var(--canvas)',
           'circle-stroke-width': 1.5,
         },
       });

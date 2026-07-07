@@ -7,7 +7,8 @@ import { fmtHourLabel, type TzMode } from '../../lib/tz';
 
 const MODELS = ['GFS', 'ECMWF'] as const;
 type Model = (typeof MODELS)[number];
-const COLOR: Record<Model, string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
+// CSS variable strings — resolved at render time via the active data-theme.
+const COLOR: Record<Model, string> = { GFS: 'var(--accent-hi)', ECMWF: 'var(--route-alt)' };
 const SPEEDS = [1, 4, 16];
 
 function toPlayback(r: Route): PlaybackRoute {
@@ -106,7 +107,7 @@ export function PlaybackScrubber(props: {
         let mk = markers.current[m];
         if (!mk) {
           const el = document.createElement('div');
-          el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${COLOR[m]};border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,.5)`;
+          el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${COLOR[m]};border:2px solid var(--canvas);box-shadow:0 0 4px rgba(0,0,0,.5)`;
           mk = new maplibregl.Marker({ element: el });
           markers.current[m] = mk;
         }

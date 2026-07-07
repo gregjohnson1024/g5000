@@ -123,7 +123,7 @@ export function RaceAudible(): React.ReactElement {
     <button
       type="button"
       onClick={toggleMute}
-      className={`px-3 py-2 rounded text-sm font-mono ${muted ? 'bg-red-700 text-white' : 'bg-gray-200 text-gray-800'}`}
+      className={`px-3 py-2 rounded text-sm font-mono ${muted ? 'bg-danger-strong text-ink-value' : 'bg-surface-raised text-ink'}`}
       title={muted ? 'Race countdown beeps MUTED' : 'Race countdown beeps on'}
     >
       {muted ? '🔇 Race muted' : '🔊 Race audio'}

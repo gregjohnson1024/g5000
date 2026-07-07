@@ -422,11 +422,11 @@ export default function TidePage() {
               y1={SVG_H - PAD.bottom}
               x2={SVG_W - PAD.right}
               y2={SVG_H - PAD.bottom}
-              stroke="#475569"
+              stroke="var(--ink-4)"
               strokeDasharray="2 2"
             />
             {/* Curve */}
-            <polyline points={polyline} fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+            <polyline points={polyline} fill="none" stroke="var(--info)" strokeWidth="1.5" />
             {/* "Now" line */}
             {nowX !== null && (
               <>
@@ -435,13 +435,13 @@ export default function TidePage() {
                   y1={PAD.top}
                   x2={nowX}
                   y2={SVG_H - PAD.bottom}
-                  stroke="#f97316"
+                  stroke="var(--flow-ebb)"
                   strokeWidth="1.5"
                 />
                 <text
                   x={nowX + 3}
                   y={PAD.top + 10}
-                  fill="#f97316"
+                  fill="var(--flow-ebb)"
                   fontSize="9"
                   fontFamily="monospace"
                 >
@@ -453,7 +453,7 @@ export default function TidePage() {
             <text
               x={PAD.left - 4}
               y={SVG_H - PAD.bottom}
-              fill="#64748b"
+              fill="var(--ink-3)"
               fontSize="8"
               textAnchor="end"
             >

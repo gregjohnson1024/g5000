@@ -104,7 +104,7 @@ export function AisTargets({
           el.className = 'ais-name-label';
           el.style.cssText =
             'font: 11px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-            'background: rgba(11,14,20,0.7);' +
+            'background: var(--scrim);' +
             'padding: 1px 4px; border-radius: 2px;' +
             'transform: translateY(8px); white-space: nowrap;' +
             'pointer-events: none;';
@@ -117,7 +117,7 @@ export function AisTargets({
           m.setLngLat([t.lon!, t.lat!]);
         }
         const el = m.getElement();
-        el.style.color = stale ? '#64748b' : '#cbd5e1';
+        el.style.color = stale ? 'var(--stale)' : 'var(--ink-2)';
         el.style.fontStyle = stale ? 'italic' : 'normal';
         el.style.opacity = stale ? '0.7' : '1';
       }
@@ -151,7 +151,7 @@ export function AisTargets({
           id: COG_LAYER_ID,
           type: 'line',
           source: COG_SOURCE_ID,
-          paint: { 'line-color': '#64748b', 'line-width': 1, 'line-opacity': 0.7 },
+          paint: { 'line-color': 'var(--ink-3)', 'line-width': 1, 'line-opacity': 0.7 },
         });
       }
       if (!map.getLayer(TARGET_CIRCLE_ID)) {
@@ -162,8 +162,8 @@ export function AisTargets({
           paint: {
             'circle-radius': 5,
             // Stale targets render hollow + dim; fresh ones solid grey.
-            'circle-color': ['case', ['get', 'stale'], 'rgba(0,0,0,0)', '#94a3b8'],
-            'circle-stroke-color': ['case', ['get', 'stale'], '#64748b', '#0f172a'],
+            'circle-color': ['case', ['get', 'stale'], 'rgba(0,0,0,0)', 'var(--ais-normal)'],
+            'circle-stroke-color': ['case', ['get', 'stale'], 'var(--ink-3)', 'var(--surface)'],
             'circle-stroke-width': 1.2,
             'circle-opacity': ['case', ['get', 'stale'], 0.6, 1],
           },
@@ -276,7 +276,7 @@ export function AisTargets({
       for (const [label, value] of aisDetailRows(target, cpa)) {
         const l = document.createElement('div');
         l.textContent = label;
-        l.style.color = '#94a3b8';
+        l.style.color = 'var(--ink-2)';
         const v = document.createElement('div');
         v.textContent = value;
         grid.append(l, v);

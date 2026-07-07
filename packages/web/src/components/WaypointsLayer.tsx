@@ -97,10 +97,10 @@ export function WaypointsLayer({
               'match',
               ['get', 'badge'],
               'S',
-              '#22c55e',
+              'var(--stbd)',
               'E',
-              '#ef4444',
-              '#fbbf24',
+              'var(--danger)',
+              'var(--accent-ink)',
             ],
           },
         });
@@ -112,9 +112,17 @@ export function WaypointsLayer({
           source: SOURCE_ID,
           paint: {
             'circle-radius': 5,
-            // Start = green, End = red (route endpoints), else default amber.
-            'circle-color': ['match', ['get', 'badge'], 'S', '#22c55e', 'E', '#ef4444', '#fbbf24'],
-            'circle-stroke-color': '#0f172a',
+            // Start = stbd green, End = danger red (route endpoints), else default amber.
+            'circle-color': [
+              'match',
+              ['get', 'badge'],
+              'S',
+              'var(--stbd)',
+              'E',
+              'var(--danger)',
+              'var(--accent-ink)',
+            ],
+            'circle-stroke-color': 'var(--surface)',
             'circle-stroke-width': 1.2,
           },
         });
@@ -165,7 +173,7 @@ export function WaypointsLayer({
           const el = document.createElement('div');
           el.style.cssText =
             'font: 11px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-            'color: #cbd5e1; background: rgba(11,14,20,0.7);' +
+            'color: var(--ink-2); background: var(--scrim);' +
             'padding: 1px 4px; border-radius: 2px;' +
             'transform: translateY(10px); white-space: nowrap;' +
             'pointer-events: none;';

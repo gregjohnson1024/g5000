@@ -88,7 +88,7 @@ function buildDayNightBands(
             y={yTop}
             width={x2 - x1}
             height={yBot - yTop}
-            fill="#1e293b"
+            fill="var(--surface-raised)"
             opacity={0.5}
           />,
         );
@@ -107,7 +107,7 @@ function buildDayNightBands(
             y={yTop}
             width={x2 - x1}
             height={yBot - yTop}
-            fill="#1e293b"
+            fill="var(--surface-raised)"
             opacity={0.5}
           />,
         );
@@ -199,7 +199,7 @@ function Meteogram({
         y1={PRECIP_Y}
         x2={SVG_W - PAD_R}
         y2={PRECIP_Y}
-        stroke="#1e293b"
+        stroke="var(--hairline)"
         strokeWidth={1}
       />
       <line
@@ -207,7 +207,7 @@ function Meteogram({
         y1={WIND_Y}
         x2={SVG_W - PAD_R}
         y2={WIND_Y}
-        stroke="#1e293b"
+        stroke="var(--hairline)"
         strokeWidth={1}
       />
 
@@ -216,7 +216,7 @@ function Meteogram({
       <text
         x={PAD_L - 4}
         y={TEMP_Y + TEMP_H / 2}
-        fill="#64748b"
+        fill="var(--ink-3)"
         fontSize={8}
         textAnchor="end"
         dominantBaseline="central"
@@ -227,7 +227,7 @@ function Meteogram({
       <text
         x={PAD_L - 4}
         y={TEMP_Y + 4}
-        fill="#64748b"
+        fill="var(--ink-3)"
         fontSize={7}
         textAnchor="end"
         dominantBaseline="hanging"
@@ -237,20 +237,20 @@ function Meteogram({
       <text
         x={PAD_L - 4}
         y={TEMP_Y + TEMP_H - 4}
-        fill="#64748b"
+        fill="var(--ink-3)"
         fontSize={7}
         textAnchor="end"
         dominantBaseline="auto"
       >
         {Math.round(tLo)}
       </text>
-      <polyline points={polyline(tempPts)} fill="none" stroke="#f97316" strokeWidth={1.5} />
+      <polyline points={polyline(tempPts)} fill="none" stroke="var(--flow-ebb)" strokeWidth={1.5} />
 
       {/* ── Precip bars ── */}
       <text
         x={PAD_L - 4}
         y={PRECIP_Y + PRECIP_H / 2}
-        fill="#64748b"
+        fill="var(--ink-3)"
         fontSize={8}
         textAnchor="end"
         dominantBaseline="central"
@@ -268,7 +268,7 @@ function Meteogram({
             y={PRECIP_Y + PRECIP_H - 4 - barH}
             width={barW}
             height={barH}
-            fill="#38bdf8"
+            fill="var(--info)"
             opacity={0.6}
           />
         );
@@ -278,7 +278,7 @@ function Meteogram({
       <text
         x={PAD_L - 4}
         y={WIND_Y + WIND_H / 2}
-        fill="#64748b"
+        fill="var(--ink-3)"
         fontSize={8}
         textAnchor="end"
         dominantBaseline="central"
@@ -288,7 +288,7 @@ function Meteogram({
       <text
         x={PAD_L - 4}
         y={WIND_Y + 4}
-        fill="#64748b"
+        fill="var(--ink-3)"
         fontSize={7}
         textAnchor="end"
         dominantBaseline="hanging"
@@ -296,21 +296,21 @@ function Meteogram({
         {Math.round(wHi)}
       </text>
       {/* Gust line (lighter, behind) */}
-      <polyline points={polyline(gustPts)} fill="none" stroke="#94a3b8" strokeWidth={1} />
+      <polyline points={polyline(gustPts)} fill="none" stroke="var(--ink-2)" strokeWidth={1} />
       {/* Wind line */}
-      <polyline points={polyline(windPts)} fill="none" stroke="#34d399" strokeWidth={1.5} />
+      <polyline points={polyline(windPts)} fill="none" stroke="var(--ok)" strokeWidth={1.5} />
 
       {/* ── Time axis ── */}
       {tickMs.map(({ ms, label }) => {
         const x = xMap(ms, tMin, tSpan);
         return (
           <g key={ms}>
-            <line x1={x} y1={AXIS_Y} x2={x} y2={AXIS_Y + 4} stroke="#475569" strokeWidth={1} />
+            <line x1={x} y1={AXIS_Y} x2={x} y2={AXIS_Y + 4} stroke="var(--ink-4)" strokeWidth={1} />
             {label && (
               <text
                 x={x}
                 y={AXIS_Y + 6}
-                fill="#64748b"
+                fill="var(--ink-3)"
                 fontSize={7}
                 textAnchor="middle"
                 dominantBaseline="hanging"
@@ -330,14 +330,14 @@ function Meteogram({
             y1={0}
             x2={xMap(Date.now(), tMin, tSpan)}
             y2={AXIS_Y}
-            stroke="#f97316"
+            stroke="var(--flow-ebb)"
             strokeWidth={1}
             strokeDasharray="3 2"
           />
           <text
             x={xMap(Date.now(), tMin, tSpan) + 2}
             y={4}
-            fill="#f97316"
+            fill="var(--flow-ebb)"
             fontSize={7}
             dominantBaseline="hanging"
           >
@@ -348,16 +348,16 @@ function Meteogram({
 
       {/* Legend */}
       <g transform={`translate(${SVG_W - PAD_R - 120}, ${TEMP_Y + 4})`}>
-        <line x1={0} y1={5} x2={14} y2={5} stroke="#f97316" strokeWidth={1.5} />
-        <text x={16} y={5} fill="#94a3b8" fontSize={7} dominantBaseline="central">
+        <line x1={0} y1={5} x2={14} y2={5} stroke="var(--flow-ebb)" strokeWidth={1.5} />
+        <text x={16} y={5} fill="var(--ink-2)" fontSize={7} dominantBaseline="central">
           Temp
         </text>
-        <line x1={50} y1={5} x2={64} y2={5} stroke="#34d399" strokeWidth={1.5} />
-        <text x={66} y={5} fill="#94a3b8" fontSize={7} dominantBaseline="central">
+        <line x1={50} y1={5} x2={64} y2={5} stroke="var(--ok)" strokeWidth={1.5} />
+        <text x={66} y={5} fill="var(--ink-2)" fontSize={7} dominantBaseline="central">
           Wind
         </text>
-        <line x1={98} y1={5} x2={112} y2={5} stroke="#94a3b8" strokeWidth={1} />
-        <text x={114} y={5} fill="#94a3b8" fontSize={7} dominantBaseline="central">
+        <line x1={98} y1={5} x2={112} y2={5} stroke="var(--ink-2)" strokeWidth={1} />
+        <text x={114} y={5} fill="var(--ink-2)" fontSize={7} dominantBaseline="central">
           Gust
         </text>
       </g>

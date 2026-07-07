@@ -11,9 +11,9 @@ export type TrackColorMode = 'none' | 'sog';
  *  interpolate-hcl keeps the midpoints vibrant (no muddy RGB blends). */
 const SOG_EXPR = SOG_COLOR_EXPR as maplibregl.ExpressionSpecification;
 
-/** Solid colour for `none` mode. Violet so an ended track is visually distinct
+/** Solid colour for `none` mode. Replay/violet so an ended track is visually distinct
  *  from the live recording's green trail (LiveBoatMarker). */
-const PLAIN_COLOR = '#a855f7';
+const PLAIN_COLOR = 'var(--replay)';
 
 /** One LineString feature per consecutive pair, carrying the leading point's
  *  SOG so the `sog` colour mode can shade each segment. */

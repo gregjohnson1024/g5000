@@ -6,8 +6,8 @@ import { MS_TO_KN } from '../lib/units';
 
 const MODELS = ['GFS', 'ECMWF'] as const;
 type Model = (typeof MODELS)[number];
-const COLOR: Record<Model, string> = { GFS: '#f59e0b', ECMWF: '#22d3ee' };
-const SOG_COLOR = '#94a3b8';
+const COLOR: Record<Model, string> = { GFS: 'var(--accent-hi)', ECMWF: 'var(--route-alt)' };
+const SOG_COLOR = 'var(--ink-2)';
 
 // SVG viewBox geometry. Rendered at width:100% so it fills the sidebar.
 const W = 300;
@@ -129,7 +129,7 @@ export function RouteWeatherPanel(props: {
             y={M.top}
             width={Math.max(xOf(r.b) - xOf(r.a), 1)}
             height={PLOT_H}
-            fill="#64748b"
+            fill="var(--ink-3)"
             opacity={0.22}
           />
         ))}
@@ -141,10 +141,16 @@ export function RouteWeatherPanel(props: {
               x2={W - M.right}
               y1={yOf(kn)}
               y2={yOf(kn)}
-              stroke="#334155"
+              stroke="var(--hairline-strong)"
               strokeWidth={0.5}
             />
-            <text x={M.left - 3} y={yOf(kn) + 2.5} fontSize={7} fill="#94a3b8" textAnchor="end">
+            <text
+              x={M.left - 3}
+              y={yOf(kn) + 2.5}
+              fontSize={7}
+              fill="var(--ink-2)"
+              textAnchor="end"
+            >
               {kn}
             </text>
           </g>
@@ -157,10 +163,10 @@ export function RouteWeatherPanel(props: {
               x2={xOf(t)}
               y1={M.top + PLOT_H}
               y2={M.top + PLOT_H + 3}
-              stroke="#64748b"
+              stroke="var(--ink-3)"
               strokeWidth={0.5}
             />
-            <text x={xOf(t)} y={H - 4} fontSize={7} fill="#94a3b8" textAnchor="middle">
+            <text x={xOf(t)} y={H - 4} fontSize={7} fill="var(--ink-2)" textAnchor="middle">
               {fmtUtcHm(t)}
             </text>
           </g>
@@ -175,7 +181,7 @@ export function RouteWeatherPanel(props: {
               >
                 <path
                   d="M0,4 L0,-4 M0,-4 l-2.5,3 M0,-4 l2.5,3"
-                  stroke="#94a3b8"
+                  stroke="var(--ink-2)"
                   strokeWidth={1}
                   fill="none"
                 />
@@ -202,7 +208,7 @@ export function RouteWeatherPanel(props: {
             x2={xOf(cursorT)}
             y1={M.top}
             y2={M.top + PLOT_H}
-            stroke="#f8fafc"
+            stroke="var(--ink-value)"
             strokeWidth={1}
             opacity={0.8}
           />

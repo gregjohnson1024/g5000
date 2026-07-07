@@ -22,12 +22,14 @@ export async function GET(req: Request): Promise<Response> {
       send('brightness', mastRuntime.getBrightness());
       send('nightmode', mastRuntime.getNightMode());
       send('daybasecolor', mastRuntime.getDayBaseColor());
+      send('theme', mastRuntime.getTheme());
 
       const layoutSub = mastRuntime.layout$.subscribe((l) => send('layout', l));
       const overrideSub = mastRuntime.override$.subscribe((o) => send('override', o));
       const brightnessSub = mastRuntime.brightness$.subscribe((b) => send('brightness', b));
       const nightModeSub = mastRuntime.nightMode$.subscribe((n) => send('nightmode', n));
       const dayBaseColorSub = mastRuntime.dayBaseColor$.subscribe((c) => send('daybasecolor', c));
+      const themeSub = mastRuntime.theme$.subscribe((t) => send('theme', t));
       const heartbeat = setInterval(() => controller.enqueue(encoder.encode(': ping\n\n')), 15_000);
 
       req.signal.addEventListener('abort', () => {
@@ -36,6 +38,7 @@ export async function GET(req: Request): Promise<Response> {
         brightnessSub.unsubscribe();
         nightModeSub.unsubscribe();
         dayBaseColorSub.unsubscribe();
+        themeSub.unsubscribe();
         clearInterval(heartbeat);
         try {
           controller.close();

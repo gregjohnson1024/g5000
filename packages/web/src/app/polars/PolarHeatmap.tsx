@@ -42,7 +42,7 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
   }, [polar.twsBins.length, polar.twaBins.length]);
 
   const cellStyle = (v: number): CSSProperties => {
-    if (v <= 0) return { backgroundColor: '#1e293b', color: '#e2e8f0' };
+    if (v <= 0) return { backgroundColor: 'var(--surface-raised)', color: 'var(--ink-value)' };
     const intensity = Math.min(1, v / maxBsp);
     // Cool teal → bright cyan as speed rises.
     const r = Math.floor(24 + intensity * 80);
@@ -50,7 +50,12 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
     const b = Math.floor(160 + intensity * 60);
     // Switch text colour by perceived luminance so cells stay legible at the bright end.
     const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    const color = luma > 0.55 ? '#0f172a' : '#e2e8f0';
+    // Read token-derived text colors at call time for theme-awareness.
+    const root = typeof document !== 'undefined' ? document.documentElement : null;
+    const cs = root ? getComputedStyle(root) : null;
+    const darkText = cs?.getPropertyValue('--surface-sunken').trim() || '#0f172a';
+    const lightText = cs?.getPropertyValue('--ink-value').trim() || '#e2e8f0';
+    const color = luma > 0.55 ? darkText : lightText;
     return { backgroundColor: `rgb(${r},${g},${b})`, color };
   };
 

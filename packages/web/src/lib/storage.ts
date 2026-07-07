@@ -65,6 +65,8 @@ export const LEGACY_KEY_MAP: ReadonlyArray<readonly [string, string]> = [
   ['g5000.race-audible.muted', `${NS}g5000.race-audible.muted`],
   // audible alarm
   ['g5000.audible-alarm.muted', `${NS}g5000.audible-alarm.muted`],
+  // theme (no legacy raw key — placeholder keeps LEGACY_KEY_MAP census honest)
+  ['theme', `${NS}theme`],
 ] as const;
 
 // ---------------------------------------------------------------------------
