@@ -8,6 +8,7 @@ import { StorageMigrationGate } from '../components/StorageMigrationGate';
 import { SseStoreProvider } from '../components/SseStoreProvider';
 import { ThemeController } from '../components/ThemeController';
 import { ThemeStoreProvider } from '../lib/theme-store';
+import { Takeover } from '../components/ui/Takeover';
 
 export const metadata: Metadata = {
   title: 'G5000',
@@ -69,6 +70,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <AlarmAudio />
               <NavShell hiddenHrefs={hiddenHrefs} />
               {children}
+              {/*
+               * Takeover mounts as a sibling of NavShell and children so it
+               * can consume useAlarms() from the enclosing <AlarmStore>.
+               * z-[200] places it above all page content, NavShell (z-50),
+               * and Dialogs (z-50). Renders null when no CRITICAL qualifier
+               * alarm is active — zero overhead during normal operation.
+               */}
+              <Takeover />
             </AlarmStore>
           </ThemeStoreProvider>
         </SseStoreProvider>

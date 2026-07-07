@@ -2,6 +2,19 @@ import type { JsonSafeSample } from '@g5000/core';
 import { MS_TO_KN, RAD_TO_DEG, wrap360 } from '../../lib/units';
 import { fmtLatDmm, fmtLonDmm } from '../../lib/coords';
 
+/**
+ * Returns the raw Unix-ms timestamp of a sample (s.t_ms).
+ * Returns undefined when the sample is absent so StalenessShroud renders '—'.
+ *
+ * Prefer this over computing Date.now() - s.t_ms at the call site: the shroud
+ * computes age internally on its own 1 s tick, so it stays accurate even when
+ * the parent component is frozen (e.g. SSE stream has stopped).
+ */
+export function sampleTs(s: JsonSafeSample | undefined): number | undefined {
+  if (!s) return undefined;
+  return s.t_ms;
+}
+
 export function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;
   return s.value.value;

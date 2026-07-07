@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { SailWardrobe } from '@g5000/db';
 import { useSse } from '../../hooks/use-sse';
-import { MobButton } from './MobButton';
 import { AudibleAlarm } from '../../components/AudibleAlarm';
 import { AnnotationDropper } from '../../components/AnnotationDropper';
 import { RaceMiniTimer } from './RaceMiniTimer';
@@ -75,7 +74,6 @@ export default function HelmPage(): React.ReactElement {
       {group === 'navigating' && <NavigatingGroup channels={channels} />}
       {group === 'performance' && <PerformanceGroup channels={channels} />}
 
-      <MobButton />
       <AudibleAlarm />
       <div className="absolute top-2 right-2 z-20">
         <AnnotationDropper variant="icon" />

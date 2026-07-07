@@ -4,7 +4,7 @@ import type { JsonSafeSample } from '@g5000/core';
 import { HelmTile } from '../HelmTile';
 import { PositionTile } from '../PositionTile';
 import { useRollingStats } from '../use-rolling-stats';
-import { scalar, enumVal, geo, fmtHeadingRad, fmtLat, fmtLon } from '../tile-helpers';
+import { scalar, enumVal, geo, fmtHeadingRad, fmtLat, fmtLon, sampleTs } from '../tile-helpers';
 import { MS_TO_KN } from '../../../lib/units';
 
 /** Navigating tab: position, made-good, course averages, drift, sea-state. */
@@ -14,15 +14,19 @@ export function NavigatingGroup({
   channels: ReadonlyMap<string, JsonSafeSample>;
 }): React.ReactElement {
   const { avgSog, avgCog, avgHdg, motion } = useRollingStats();
-  const vmcMs = scalar(channels.get('race.vmc'));
-  const position = geo(channels.get('nav.gps.position'));
+  const vmcSample = channels.get('race.vmc');
+  const vmcMs = scalar(vmcSample);
+  const positionSample = channels.get('nav.gps.position');
+  const position = geo(positionSample);
 
-  const tideHeightNow = scalar(channels.get('tide.heightNow'));
+  const tideHeightSample = channels.get('tide.heightNow');
+  const tideHeightNow = scalar(tideHeightSample);
   const tideState = enumVal(channels.get('tide.state'));
   const tideStation = enumVal(channels.get('tide.station'));
   const tideSource = enumVal(channels.get('tide.source'));
+  const tideNextSample = channels.get('tide.nextEventInSec');
   const tideNextType = enumVal(channels.get('tide.nextEventType'));
-  const tideNextInSec = scalar(channels.get('tide.nextEventInSec'));
+  const tideNextInSec = scalar(tideNextSample);
   const tideNextHeight = scalar(channels.get('tide.nextEventHeight'));
 
   const fmtCountdown = (s: number): string => {
@@ -50,12 +54,17 @@ export function NavigatingGroup({
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      <PositionTile positionLat={positionLat} positionLon={positionLon} />
+      <PositionTile
+        positionLat={positionLat}
+        positionLon={positionLon}
+        tMs={sampleTs(positionSample)}
+      />
       <HelmTile
         label="VMC"
         value={vmcMs === null ? '—' : (vmcMs * MS_TO_KN).toFixed(1)}
         unit="kn"
         sub={vmcMs === null ? 'no mark' : vmcMs >= 0 ? 'closing' : 'opening'}
+        tMs={sampleTs(vmcSample)}
       />
       <HelmTile
         label="Avg SOG"
@@ -113,6 +122,7 @@ export function NavigatingGroup({
             : (tideStation ?? tideSource ?? tideState ?? undefined)
         }
         small
+        tMs={sampleTs(tideHeightSample)}
       />
       <HelmTile
         label="Next tide"
@@ -124,6 +134,7 @@ export function NavigatingGroup({
         unit=""
         sub={tideNextHeight !== null ? `${tideNextHeight.toFixed(1)} m` : undefined}
         small
+        tMs={sampleTs(tideNextSample)}
       />
     </div>
   );

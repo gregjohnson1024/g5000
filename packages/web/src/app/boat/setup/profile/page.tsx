@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { BoatConfig } from '@g5000/db';
+import { ConfirmDialog } from '../../../../components/ui';
 
 const FIELDS: Array<{
   key: keyof BoatConfig;
@@ -146,14 +147,10 @@ export default function BoatConfigPage() {
 function ResetCalibrationsButton() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const handle = async (): Promise<void> => {
-    if (
-      !window.confirm(
-        'Reset all sensor calibrations (wind, BSP, compass) to defaults? This cannot be undone.',
-      )
-    ) {
-      return;
-    }
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const handleConfirm = async (): Promise<void> => {
+    setConfirmOpen(false);
     setBusy(true);
     setMsg(null);
     try {
@@ -167,10 +164,11 @@ function ResetCalibrationsButton() {
       setTimeout(() => setMsg(null), 3000);
     }
   };
+
   return (
     <div className="space-y-1">
       <button
-        onClick={handle}
+        onClick={() => setConfirmOpen(true)}
         disabled={busy}
         className="px-3 py-1 bg-red-900 hover:bg-red-800 text-red-100 rounded text-sm disabled:opacity-50"
       >
@@ -181,6 +179,15 @@ function ResetCalibrationsButton() {
         config, polars, or sail wardrobe.
       </p>
       {msg && <p className="text-xs text-emerald-300">{msg}</p>}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void handleConfirm()}
+        title="Reset all calibrations?"
+        message="Reset all sensor calibrations (wind, BSP, compass) to defaults? This cannot be undone."
+        confirmLabel="Reset"
+      />
     </div>
   );
 }

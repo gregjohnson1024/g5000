@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ConfirmDialog } from '../../../components/ui';
 
 interface TimerSnap {
   startMs: number | null;
@@ -18,6 +19,7 @@ function fmt(secs: number): string {
 export function RaceTimer(): React.ReactElement {
   const [timer, setTimer] = useState<TimerSnap>({ startMs: null, state: 'idle' });
   const [nowMs, setNowMs] = useState<number>(Date.now());
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // Pull RaceState every 1 s.
   useEffect(() => {
@@ -145,14 +147,27 @@ export function RaceTimer(): React.ReactElement {
             </button>
             <button
               type="button"
-              onClick={() => void post({ action: 'reset' })}
-              className="px-3 py-2 rounded bg-red-800 hover:bg-red-700 text-white"
+              onClick={() => setConfirmReset(true)}
+              className="px-3 py-2 rounded-[var(--r-control)] bg-danger-surface border border-danger-strong text-danger hover:bg-danger/20"
             >
               Reset
             </button>
           </>
         )}
       </div>
+
+      {/* Guard the destructive Reset behind a confirm dialog */}
+      <ConfirmDialog
+        open={confirmReset}
+        onClose={() => setConfirmReset(false)}
+        onConfirm={async () => {
+          await post({ action: 'reset' });
+          setConfirmReset(false);
+        }}
+        title="Reset race timer?"
+        message="This will clear the countdown and return the timer to idle. The action cannot be undone."
+        confirmLabel="Reset"
+      />
     </div>
   );
 }

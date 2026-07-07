@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fmtLatLonDmm } from '../../../lib/coords';
 import { formatDuration, fmtUtcMinute } from '../../../lib/tz';
+import { ConfirmDialog } from '../../../components/ui';
 
 const M_PER_NM = 1852;
 const PAGE_SIZE = 50;
@@ -111,6 +112,9 @@ export function TripsClientView() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [current, setCurrent] = useState<CurrentSnapshot | null>(null);
+
+  // Delete confirmation: null = no dialog; otherwise the trip pending deletion
+  const [pendingDeleteTrip, setPendingDeleteTrip] = useState<Trip | null>(null);
 
   // Restore persisted filters once, client-side only.
   useEffect(() => {
@@ -229,8 +233,14 @@ export function TripsClientView() {
     void loadStats();
   };
 
-  const deleteTrip = async (id: number): Promise<void> => {
-    if (!window.confirm('Delete this trip? This cannot be undone.')) return;
+  const requestDeleteTrip = (trip: Trip): void => {
+    setPendingDeleteTrip(trip);
+  };
+
+  const confirmDeleteTrip = async (): Promise<void> => {
+    if (!pendingDeleteTrip) return;
+    const { id } = pendingDeleteTrip;
+    setPendingDeleteTrip(null);
     const r = await fetch(`/api/trips/${id}`, { method: 'DELETE' });
     const j = (await r.json()) as { ok: boolean; error?: { message: string } };
     if (!j.ok) {
@@ -339,7 +349,7 @@ export function TripsClientView() {
                   key={t.id}
                   trip={t}
                   onPatch={(patch) => patchTrip(t.id, patch)}
-                  onDelete={() => void deleteTrip(t.id)}
+                  onDelete={() => requestDeleteTrip(t)}
                 />
               ))}
             </div>
@@ -357,6 +367,23 @@ export function TripsClientView() {
           {loading ? 'Loading…' : 'Load more'}
         </button>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteTrip !== null}
+        onClose={() => setPendingDeleteTrip(null)}
+        onConfirm={() => void confirmDeleteTrip()}
+        title="Delete trip?"
+        message={
+          pendingDeleteTrip
+            ? (() => {
+                const { ymd, hm } = fmtUtc(pendingDeleteTrip.startMs);
+                const nm = (pendingDeleteTrip.distanceM / M_PER_NM).toFixed(1);
+                return `Delete trip ${ymd} ${hm} UTC — ${nm} NM? This cannot be undone.`;
+              })()
+            : ''
+        }
+        confirmLabel="Delete"
+      />
     </main>
   );
 }

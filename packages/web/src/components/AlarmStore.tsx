@@ -23,6 +23,8 @@ export interface AlarmRow {
   id: string;
   severity: 'CRITICAL' | 'WARN' | 'INFO';
   label: string;
+  /** Free-form context from the registry snapshot (e.g. { lat, lon, t } for MOB). */
+  context?: Record<string, unknown>;
 }
 
 export const SEVERITY_RANK: Record<string, number> = { CRITICAL: 3, WARN: 2, INFO: 1 };

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseCoordinate, parseLatLon, formatCoordinate } from '../../../lib/coords';
 import { greatCircleNm, bearingDeg } from '../../../lib/geo';
+import { ConfirmDialog } from '../../../components/ui';
 
 interface Waypoint {
   id: string;
@@ -45,6 +46,9 @@ export default function WaypointsPage() {
   // GPX import state
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+
+  // Delete confirmation state: null = no dialog; otherwise the waypoint pending deletion
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -125,8 +129,14 @@ export default function WaypointsPage() {
     }
   };
 
-  const handleDelete = async (id: string): Promise<void> => {
-    if (!window.confirm(`Delete waypoint ${id}?`)) return;
+  const handleDeleteRequest = (w: Waypoint): void => {
+    setPendingDelete({ id: w.id, name: w.name });
+  };
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    if (!pendingDelete) return;
+    const { id } = pendingDelete;
+    setPendingDelete(null);
     setBusy(true);
     try {
       const res = await fetch(`/api/waypoints/${id}`, { method: 'DELETE' });
@@ -415,7 +425,7 @@ export default function WaypointsPage() {
                       Edit
                     </button>
                     <button
-                      onClick={() => void handleDelete(w.id)}
+                      onClick={() => handleDeleteRequest(w)}
                       disabled={busy}
                       className="px-2 py-1 text-xs bg-red-900 hover:bg-red-800 text-red-100 rounded disabled:opacity-50"
                     >
@@ -428,6 +438,17 @@ export default function WaypointsPage() {
           </tbody>
         </table>
       </section>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void handleDeleteConfirm()}
+        title="Delete waypoint?"
+        message={
+          pendingDelete ? `Delete waypoint "${pendingDelete.name}"? This cannot be undone.` : ''
+        }
+        confirmLabel="Delete"
+      />
     </main>
   );
 }

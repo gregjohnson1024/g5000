@@ -24,9 +24,28 @@ function fmtCoord(lat: number, lon: number): string {
   return `${fL(lat, 'n', 's')}, ${fL(lon, 'e', 'w')}`;
 }
 
+/**
+ * Returns Tailwind token class strings for a start-line end button.
+ *
+ * Marine-correct assignment:
+ *   port  → red  (--color-port)
+ *   stbd  → green (--color-stbd)
+ *
+ * Night theme: both resolve to red-family values; P/S encoded by
+ * the word label glyph ("Port" / "Stbd"), not hue.
+ */
+export function portStbdToken(end: 'port' | 'stbd'): { bg: string; hover: string; text: string } {
+  if (end === 'port') {
+    return { bg: 'bg-port/30', hover: 'hover:bg-port/50', text: 'text-port' };
+  }
+  return { bg: 'bg-stbd/30', hover: 'hover:bg-stbd/50', text: 'text-stbd' };
+}
+
 export function LinePingPanel(): React.ReactElement {
   const [line, setLine] = useState<LineSnap>({});
   const [confirming, setConfirming] = useState(false);
+  /** Inline error state — replaces window.alert for the no-GPS path. */
+  const [noGpsEnd, setNoGpsEnd] = useState<'port' | 'stbd' | null>(null);
   const { channels } = useSse();
 
   useEffect(() => {
@@ -53,9 +72,13 @@ export function LinePingPanel(): React.ReactElement {
     async (end: 'port' | 'stbd') => {
       const pos = channels.get('nav.gps.position');
       if (!pos || pos.value.kind !== 'geo') {
-        alert('No GPS position available');
+        // Show an inline error chip instead of window.alert
+        setNoGpsEnd(end);
+        // Auto-clear after 4 s so it doesn't linger on glance surface
+        setTimeout(() => setNoGpsEnd(null), 4000);
         return;
       }
+      setNoGpsEnd(null);
       const position = pos.value.value;
       // Boat position at ping time matches the ping position itself for the
       // common case (you're standing at the end). The /api/race/line handler
@@ -84,14 +107,23 @@ export function LinePingPanel(): React.ReactElement {
     setLine({});
   }, []);
 
+  const portTok = portStbdToken('port');
+  const stbdTok = portStbdToken('stbd');
+
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded p-4 flex flex-col gap-3">
-      <div className="text-xs uppercase tracking-wider text-slate-400">Start line</div>
+    <div className="bg-surface border border-hairline rounded-[var(--r-panel)] p-4 flex flex-col gap-3">
+      <div className="text-xs uppercase tracking-wider text-ink-2">Start line</div>
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => void ping('port')}
-          className="bg-emerald-700 hover:bg-emerald-600 text-white rounded p-4 text-lg font-semibold"
+          className={[
+            portTok.bg,
+            portTok.hover,
+            portTok.text,
+            'border border-port/60',
+            'rounded-[var(--r-control)] p-4 text-lg font-semibold',
+          ].join(' ')}
         >
           Ping Port End
           {line.port && (
@@ -103,7 +135,13 @@ export function LinePingPanel(): React.ReactElement {
         <button
           type="button"
           onClick={() => void ping('stbd')}
-          className="bg-rose-700 hover:bg-rose-600 text-white rounded p-4 text-lg font-semibold"
+          className={[
+            stbdTok.bg,
+            stbdTok.hover,
+            stbdTok.text,
+            'border border-stbd/60',
+            'rounded-[var(--r-control)] p-4 text-lg font-semibold',
+          ].join(' ')}
         >
           Ping Stbd End
           {line.stbd && (
@@ -113,13 +151,24 @@ export function LinePingPanel(): React.ReactElement {
           )}
         </button>
       </div>
+
+      {/* Inline no-GPS error — replaces window.alert on a glance surface */}
+      {noGpsEnd !== null && (
+        <div
+          role="alert"
+          className="text-xs font-mono text-danger bg-danger-surface border border-danger-strong rounded-[var(--r-badge)] px-3 py-1.5"
+        >
+          No GPS position — cannot ping {noGpsEnd} end
+        </div>
+      )}
+
       {line.port && line.stbd && !line.preStartSide && (
-        <div className="text-xs text-amber-400 font-mono">
+        <div className="text-xs text-accent font-mono">
           motor off the line — pre-start side will set automatically
         </div>
       )}
       {line.preStartSide && (
-        <div className="text-xs text-slate-400 font-mono">pre-start side: {line.preStartSide}</div>
+        <div className="text-xs text-ink-2 font-mono">pre-start side: {line.preStartSide}</div>
       )}
       {(line.port || line.stbd) && (
         <>
@@ -127,24 +176,24 @@ export function LinePingPanel(): React.ReactElement {
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="self-end text-xs text-red-400 underline"
+              className="self-end text-xs text-danger underline"
             >
               Clear line
             </button>
           ) : (
             <div className="flex items-center justify-end gap-2">
-              <span className="text-xs text-red-400">Clear both ends?</span>
+              <span className="text-xs text-danger">Clear both ends?</span>
               <button
                 type="button"
                 onClick={() => void clear()}
-                className="text-xs px-2 py-1 bg-red-700 text-white rounded"
+                className="text-xs px-2 py-1 bg-danger-strong text-ink-value rounded-[var(--r-control)]"
               >
                 Yes
               </button>
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="text-xs px-2 py-1 bg-slate-700 text-slate-200 rounded"
+                className="text-xs px-2 py-1 bg-surface-raised text-ink rounded-[var(--r-control)]"
               >
                 Cancel
               </button>

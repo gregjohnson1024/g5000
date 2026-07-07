@@ -1,129 +1,149 @@
 'use client';
 
-import type { JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../../hooks/use-sse';
+import { InstrumentTile } from '../../../components/ui/InstrumentTile';
 
 const RAD_TO_DEG = 180 / Math.PI;
 
-function fmtAngle(s: JsonSafeSample | undefined): string {
-  if (!s || s.value.kind !== 'scalar') return '—';
+function fmtAngle(v: number): string {
   // Normalize to [0, 360) for displayed headings.
-  let deg = s.value.value * RAD_TO_DEG;
+  let deg = v * RAD_TO_DEG;
   while (deg < 0) deg += 360;
   while (deg >= 360) deg -= 360;
-  return `${deg.toFixed(1)}°`;
+  return `${deg.toFixed(1)}`;
 }
 
-function fmtRudder(s: JsonSafeSample | undefined): string {
-  if (!s || s.value.kind !== 'scalar') return '—';
-  const deg = s.value.value * RAD_TO_DEG;
+function fmtRudder(v: number): string {
+  const deg = v * RAD_TO_DEG;
   const sign = deg >= 0 ? '+' : '';
-  return `${sign}${deg.toFixed(1)}°`;
-}
-
-function fmtMode(s: JsonSafeSample | undefined): string {
-  if (!s) return 'Unknown';
-  if (s.value.kind === 'enum') return s.value.value;
-  return 'Unknown';
-}
-
-function age(s: JsonSafeSample | undefined): string {
-  if (!s) return '—';
-  const sec = (Date.now() - s.t_ms) / 1000;
-  return `${sec.toFixed(1)}s ago`;
+  return `${sign}${deg.toFixed(1)}`;
 }
 
 export function ReadonlyView({ apTxEnabled }: { apTxEnabled: boolean }) {
   const { channels, connected } = useSse();
 
-  const mode = channels.get('autopilot.mode');
-  const targetHdg = channels.get('autopilot.target.heading');
-  const targetTrack = channels.get('autopilot.target.track');
-  const rudder = channels.get('autopilot.commandedRudder');
-  const actualHdg = channels.get('autopilot.actual.heading');
-  const vesselHdg = channels.get('boat.heading.magnetic');
+  const modeSample = channels.get('autopilot.mode');
+  const targetHdgSample = channels.get('autopilot.target.heading');
+  const targetTrackSample = channels.get('autopilot.target.track');
+  const rudderSample = channels.get('autopilot.commandedRudder');
+  const actualHdgSample = channels.get('autopilot.actual.heading');
+  const vesselHdgSample = channels.get('boat.heading.magnetic');
+
+  // Extract typed values
+  const modeValue = modeSample?.value.kind === 'enum' ? modeSample.value.value : null;
+  const targetHdgValue =
+    targetHdgSample?.value.kind === 'scalar' ? targetHdgSample.value.value : null;
+  const targetTrackValue =
+    targetTrackSample?.value.kind === 'scalar' ? targetTrackSample.value.value : null;
+  const rudderValue = rudderSample?.value.kind === 'scalar' ? rudderSample.value.value : null;
+  const actualHdgValue =
+    actualHdgSample?.value.kind === 'scalar' ? actualHdgSample.value.value : null;
+  const vesselHdgValue =
+    vesselHdgSample?.value.kind === 'scalar' ? vesselHdgSample.value.value : null;
 
   // Compute heading error (target − actual), normalized into [-π, π].
   let headingError: number | null = null;
-  if (targetHdg?.value.kind === 'scalar') {
-    const tgt = targetHdg.value.value;
-    let act: number | null = null;
-    if (actualHdg?.value.kind === 'scalar') act = actualHdg.value.value;
-    else if (vesselHdg?.value.kind === 'scalar') act = vesselHdg.value.value;
+  if (targetHdgValue !== null) {
+    const act = actualHdgValue ?? vesselHdgValue;
     if (act !== null) {
-      let diff = tgt - act;
+      let diff = targetHdgValue - act;
       while (diff > Math.PI) diff -= 2 * Math.PI;
       while (diff < -Math.PI) diff += 2 * Math.PI;
       headingError = diff;
     }
   }
 
-  const modeIsActive = mode?.value.kind === 'enum' && mode.value.value !== 'Standby';
+  const modeIsActive = modeValue !== null && modeValue !== 'Standby';
+
+  // Raw sample timestamps for StalenessShroud (computes age internally on its
+  // own 1 s tick — correct even when the parent is frozen after SSE stops).
+  const modeTMs = modeSample?.t_ms;
+  const targetHdgTMs = targetHdgSample?.t_ms;
+  const targetTrackTMs = targetTrackSample?.t_ms;
+  const rudderTMs = rudderSample?.t_ms;
+  // heading error derives from two samples; use the older of the two as the age
+  const headingErrorTMs =
+    targetHdgSample?.t_ms !== undefined &&
+    (actualHdgSample?.t_ms ?? vesselHdgSample?.t_ms) !== undefined
+      ? Math.min(targetHdgSample.t_ms, actualHdgSample?.t_ms ?? targetHdgSample.t_ms)
+      : undefined;
+  const vesselHdgTMs = vesselHdgSample?.t_ms;
 
   return (
     <>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Autopilot</h1>
-        <div className="text-xs text-slate-500">{connected ? 'Connected' : 'Reconnecting…'}</div>
+        <div className="text-xs text-ink-3">{connected ? 'Connected' : 'Reconnecting…'}</div>
       </div>
 
+      {/* Mode tile — amber when active, muted in standby */}
       <section>
-        <div
-          className={`inline-block px-4 py-2 rounded text-2xl font-mono font-semibold ${
-            modeIsActive ? 'bg-amber-600 text-slate-900' : 'bg-slate-700 text-slate-300'
-          }`}
-        >
-          {fmtMode(mode)}
-        </div>
-        <div className="text-xs text-slate-500 mt-1">{age(mode)}</div>
+        <InstrumentTile
+          label="Mode"
+          value={modeValue ?? 'Unknown'}
+          size="d3"
+          severity={modeIsActive ? 'ok' : 'neutral'}
+          tMs={modeTMs}
+        />
       </section>
 
       <section className="grid grid-cols-2 gap-6">
         <div className="space-y-3">
-          <h2 className="text-sm uppercase tracking-wider text-slate-400">Targets</h2>
-          <div>
-            <div className="text-xs text-slate-500">Target heading</div>
-            <div className="text-3xl font-mono">{fmtAngle(targetHdg)}</div>
-            <div className="text-xs text-slate-500">{age(targetHdg)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500">Target track</div>
-            <div className="text-2xl font-mono">{fmtAngle(targetTrack)}</div>
-            <div className="text-xs text-slate-500">{age(targetTrack)}</div>
-          </div>
+          <h2 className="text-sm uppercase tracking-wider text-ink-2 mb-2">Targets</h2>
+          <InstrumentTile
+            label="Target heading"
+            value={targetHdgValue !== null ? fmtAngle(targetHdgValue) : null}
+            unit="°"
+            size="d3"
+            tMs={targetHdgTMs}
+          />
+          <InstrumentTile
+            label="Target track"
+            value={targetTrackValue !== null ? fmtAngle(targetTrackValue) : null}
+            unit="°"
+            size="d4"
+            tMs={targetTrackTMs}
+          />
         </div>
         <div className="space-y-3">
-          <h2 className="text-sm uppercase tracking-wider text-slate-400">Actual</h2>
-          <div>
-            <div className="text-xs text-slate-500">Vessel heading (mag)</div>
-            <div className="text-3xl font-mono">{fmtAngle(vesselHdg)}</div>
-            <div className="text-xs text-slate-500">{age(vesselHdg)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-500">Heading error (target − actual)</div>
-            <div
-              className={`text-2xl font-mono ${
-                headingError !== null && Math.abs(headingError * RAD_TO_DEG) > 5
-                  ? 'text-amber-400'
-                  : 'text-slate-200'
-              }`}
-            >
-              {headingError !== null
-                ? `${headingError >= 0 ? '+' : ''}${(headingError * RAD_TO_DEG).toFixed(1)}°`
-                : '—'}
-            </div>
-          </div>
+          <h2 className="text-sm uppercase tracking-wider text-ink-2 mb-2">Actual</h2>
+          <InstrumentTile
+            label="Vessel heading (mag)"
+            value={vesselHdgValue !== null ? fmtAngle(vesselHdgValue) : null}
+            unit="°"
+            size="d3"
+            tMs={vesselHdgTMs}
+          />
+          <InstrumentTile
+            label="Heading error (target − actual)"
+            value={
+              headingError !== null
+                ? `${headingError >= 0 ? '+' : ''}${(headingError * RAD_TO_DEG).toFixed(1)}`
+                : null
+            }
+            unit="°"
+            size="d4"
+            severity={
+              headingError !== null && Math.abs(headingError * RAD_TO_DEG) > 5 ? 'ok' : 'neutral'
+            }
+            tMs={headingErrorTMs}
+          />
         </div>
       </section>
 
       <section>
-        <h2 className="text-sm uppercase tracking-wider text-slate-400 mb-2">Commanded rudder</h2>
-        <div className="text-3xl font-mono">{fmtRudder(rudder)}</div>
-        <div className="text-xs text-slate-500">{age(rudder)}</div>
+        <h2 className="text-sm uppercase tracking-wider text-ink-2 mb-2">Commanded rudder</h2>
+        <InstrumentTile
+          label="Rudder"
+          value={rudderValue !== null ? fmtRudder(rudderValue) : null}
+          unit="°"
+          size="d3"
+          tMs={rudderTMs}
+        />
       </section>
 
       {!apTxEnabled && (
-        <section className="text-xs text-slate-500 pt-4 border-t border-slate-800 max-w-xl">
+        <section className="text-xs text-ink-3 pt-4 border-t border-hairline max-w-xl">
           Listen-only. The G5000 does not transmit any autopilot commands. All values above come
           from PGN 127237 broadcast by your H5000 (or other autopilot computer) on the N2K bus. If
           "Unknown" / "—" persists, your autopilot may use B&G-proprietary PGNs instead of (or in
