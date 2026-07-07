@@ -27,9 +27,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSseStore } from '../hooks/use-sse-store';
+import { useSseChannel } from '../hooks/use-sse-store';
 import { usePoll } from '../hooks/use-poll';
-import type { JsonSafeSample } from '@g5000/core';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -110,12 +109,13 @@ function readVoyageFlag(): boolean {
  */
 export function useBoatState(): BoatStateFlags {
   // ── SAIL (SOG leg) ───────────────────────────────────────────────────────
-  const { channels } = useSseStore();
+  // Narrow selector: this hook (and therefore the always-mounted NavShell) now
+  // re-renders only when the SOG sample updates — NOT on every SSE message.
+  const { sample: sog } = useSseChannel('nav.gps.sog');
   const sogTicksRef = useRef(0);
   const [sogSail, setSogSail] = useState(false);
 
   useEffect(() => {
-    const sog: JsonSafeSample | undefined = channels.get('nav.gps.sog');
     if (!sog || sog.value.kind !== 'scalar') return;
     const sogMs = sog.value.value;
     if (sogMs > SOG_THRESHOLD_MS) {
@@ -127,7 +127,7 @@ export function useBoatState(): BoatStateFlags {
       sogTicksRef.current = 0;
       setSogSail(false);
     }
-  }, [channels]);
+  }, [sog]);
 
   // ── SAIL (race timer leg) ─────────────────────────────────────────────────
   const { data: raceData } = usePoll<RaceStateResponse>('/api/race/state', RACE_POLL_MS);

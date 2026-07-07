@@ -30,7 +30,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Bell, Wifi, WifiOff, Sun, Moon, Zap } from 'lucide-react';
 
-import { useSseStore } from '../hooks/use-sse-store';
+import { useSseConnected } from '../hooks/use-sse-store';
 import { MobButton } from '../components/MobButton';
 import { useAlarms, type AlarmRow, SEVERITY_RANK } from '../components/AlarmStore';
 import { useThemeStore } from '../lib/theme-store';
@@ -200,7 +200,9 @@ function AlertsBell({ alarmCount, topSeverity, activeHref }: AlertsBellProps) {
 // ---------------------------------------------------------------------------
 
 function LinkLED() {
-  const { connected } = useSseStore();
+  // Connectivity-only selector: re-renders only when the link opens/closes,
+  // NOT on every SSE data message (which would re-render the whole shell).
+  const connected = useSseConnected();
   return (
     <div
       className={`flex items-center gap-1 text-xs font-mono shrink-0 ${connected ? 'text-live' : 'text-ink-4'}`}

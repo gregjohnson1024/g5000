@@ -1,76 +1,100 @@
 'use client';
 
 /**
- * use-sse-store — client hook for consuming the single shared SSE connection.
+ * use-sse-store — client hooks for the single shared SSE connection.
  *
- * Exposes the full store (all channels) or, via the channel-selector
- * overload, a single channel's latest sample + connected state.
+ * Backed by the module-level store in `lib/sse-store.ts` via
+ * `useSyncExternalStore`, so a consumer re-renders ONLY when the slice it
+ * selects actually changes:
  *
- * Usage:
+ *   - useSseConnected()      → re-renders only when connectivity flips.
+ *   - useSseChannel(channel) → re-renders only when THAT channel updates.
+ *   - useSseStore()          → re-renders on every message (full store); avoid
+ *                              in always-mounted components (e.g. NavShell).
  *
- *   // Full store — caller can read any channel.
- *   const { channels, connected, lastSampleAt } = useSseStore();
- *   const sample = channels.get('wind.true.angle');
- *
- *   // Channel selector — re-renders only when the selected channel updates.
- *   const { sample, connected } = useSseChannel('wind.true.angle');
- *
- * Phase-0 note: only the provider is mounted in Phase 0. Existing useSse()
- * consumers are NOT cut over yet — that happens when each screen is rebuilt.
+ * This replaced a React-Context provider whose value object changed on every
+ * SSE message, which re-rendered every consumer (and the always-mounted shell)
+ * at the full sample rate and made the UI unresponsive. See lib/sse-store.ts.
  */
 
-import { useContext } from 'react';
+import { useSyncExternalStore } from 'react';
 import type { JsonSafeSample } from '@g5000/core';
-import { SseStoreContext } from '../components/SseStoreProvider';
+import {
+  subscribe,
+  getVersion,
+  getConnected,
+  getSample,
+  getLastSampleAt,
+  getChannels,
+  getLastSampleAtMap,
+} from '../lib/sse-store';
 
 // ---------------------------------------------------------------------------
-// Full-store hook
+// Types
 // ---------------------------------------------------------------------------
 
-export { type SseStoreContextValue } from '../components/SseStoreProvider';
-
-/**
- * Returns the full SSE store value: all channels, connected state, and per-
- * channel lastSampleAt timestamps. Use when a component needs multiple channels
- * or needs to iterate over available channels.
- */
-export function useSseStore() {
-  return useContext(SseStoreContext);
+export interface SseStoreContextValue {
+  /** Latest sample per channel, keyed by channel name. */
+  channels: ReadonlyMap<string, JsonSafeSample>;
+  /** True while the EventSource connection is open. */
+  connected: boolean;
+  /** Per-channel Unix-ms of the most recent received sample. */
+  lastSampleAt: ReadonlyMap<string, number>;
 }
-
-// ---------------------------------------------------------------------------
-// Per-channel selector hook
-// ---------------------------------------------------------------------------
 
 export interface UseSseChannelResult {
   /** Latest sample for this channel, or null if none received yet. */
   sample: JsonSafeSample | null;
   /** True while the underlying EventSource connection is open. */
   connected: boolean;
-  /**
-   * Unix-ms timestamp of the last received sample for this channel, or null
-   * if no sample has been received. Useful for staleness checks.
-   */
+  /** Unix-ms of the last received sample for this channel, or null. */
   lastSampleAt: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
 /**
- * Select a single channel from the shared SSE store.
- *
- * Re-renders the consumer whenever the selected channel's sample updates
- * (React re-renders the whole context on any channel change, so this hook
- * does NOT add extra filtering — it is a convenience wrapper that extracts
- * the channel-specific values for the caller).
- *
- * For a future optimisation (channel-level selectors that skip re-renders when
- * unrelated channels update), replace the useContext call with useMemo or
- * migrate to Zustand / Jotai in a later phase.
+ * Connection state only. Re-renders the caller ONLY when the link opens or
+ * closes — never on a data message. Use this for link LEDs / "LIVE·LOST"
+ * indicators in always-mounted chrome.
+ */
+export function useSseConnected(): boolean {
+  return useSyncExternalStore(subscribe, getConnected, () => false);
+}
+
+/**
+ * Select a single channel from the shared SSE store. Re-renders the caller ONLY
+ * when the selected channel's sample updates (or connectivity flips), because
+ * each slice is its own `useSyncExternalStore` with an Object.is bail-out.
  */
 export function useSseChannel(channel: string): UseSseChannelResult {
-  const { channels, connected, lastSampleAt } = useContext(SseStoreContext);
+  const sample = useSyncExternalStore(
+    subscribe,
+    () => getSample(channel),
+    () => null,
+  );
+  const connected = useSseConnected();
+  const lastSampleAt = useSyncExternalStore(
+    subscribe,
+    () => getLastSampleAt(channel),
+    () => null,
+  );
+  return { sample, connected, lastSampleAt };
+}
+
+/**
+ * Full-store hook: all channels, connected state, and lastSampleAt. Re-renders
+ * on EVERY message (subscribes to the version counter). Prefer useSseChannel /
+ * useSseConnected; only use this when a component genuinely needs to iterate all
+ * channels, and never in an always-mounted tree.
+ */
+export function useSseStore(): SseStoreContextValue {
+  useSyncExternalStore(subscribe, getVersion, () => 0);
   return {
-    sample: channels.get(channel) ?? null,
-    connected,
-    lastSampleAt: lastSampleAt.get(channel) ?? null,
+    channels: getChannels(),
+    connected: getConnected(),
+    lastSampleAt: getLastSampleAtMap(),
   };
 }
