@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 function fmt(secs: number): string {
   const sign = secs < 0 ? '-' : '';
@@ -44,12 +45,12 @@ export function RaceMiniTimer(): React.ReactElement | null {
   const secs = Math.round((startMs - nowMs) / 1000);
   const danger = secs <= 10 && secs >= 0;
   return (
-    <a
+    <Link
       href="/race"
       className={`text-xs font-mono px-2 py-1 rounded ${danger ? 'bg-red-700 text-white' : 'bg-slate-800 text-slate-300'}`}
       title="Race countdown — open /race"
     >
       ⏱ {fmt(secs)}
-    </a>
+    </Link>
   );
 }

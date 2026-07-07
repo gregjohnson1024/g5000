@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { AutopilotCommandName, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../hooks/use-sse';
 
@@ -159,9 +160,9 @@ export function ControlPanel(): React.ReactElement {
         <p>
           Sends real PGN 130850 frames to the live autopilot. Confirm each press. Increment buttons
           (±1°, ±10°) are disabled until the Triton keypad values are captured at{' '}
-          <a href="/sniff" className="underline">
+          <Link href="/sniff" className="underline">
             /sniff
-          </a>{' '}
+          </Link>{' '}
           and added to <code>~/.g5000-router/ap-tx-codes.json</code>.
         </p>
       </div>

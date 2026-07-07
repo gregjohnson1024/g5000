@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState, type MouseEvent } from 'react';
+import Link from 'next/link';
 import { AUDIO_ENABLED_KEY, AUDIO_TOGGLE_EVENT } from './AlarmAudio';
+import { usePoll } from '../hooks/use-poll';
 
 interface AlarmRow {
   id: string;
@@ -12,8 +14,6 @@ interface AlarmRow {
 const SEVERITY_RANK: Record<string, number> = { CRITICAL: 3, WARN: 2, INFO: 1 };
 
 export function AlarmBanner() {
-  const [topAlarm, setTopAlarm] = useState<AlarmRow | null>(null);
-  const [extraCount, setExtraCount] = useState(0);
   const [audioOn, setAudioOn] = useState(true);
 
   // Mirror the audible-alarm preference owned by AlarmAudio (default on).
@@ -21,28 +21,11 @@ export function AlarmBanner() {
     setAudioOn(localStorage.getItem(AUDIO_ENABLED_KEY) !== '0');
   }, []);
 
-  useEffect(() => {
-    let stopped = false;
-    async function poll() {
-      try {
-        const r = await fetch('/api/alarms');
-        if (stopped) return;
-        const body = await r.json();
-        const active = (body.active ?? []) as AlarmRow[];
-        active.sort((a, b) => (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0));
-        setTopAlarm(active[0] ?? null);
-        setExtraCount(Math.max(0, active.length - 1));
-      } catch {
-        // transient
-      }
-    }
-    poll();
-    const t = setInterval(poll, 2000);
-    return () => {
-      stopped = true;
-      clearInterval(t);
-    };
-  }, []);
+  const { data: alarmsData } = usePoll<{ active?: AlarmRow[] }>('/api/alarms', 2000);
+  const active = [...(alarmsData?.active ?? [])];
+  active.sort((a, b) => (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0));
+  const topAlarm = active[0] ?? null;
+  const extraCount = Math.max(0, active.length - 1);
 
   if (!topAlarm) return null;
 
@@ -65,7 +48,7 @@ export function AlarmBanner() {
   };
 
   return (
-    <a
+    <Link
       href="/alerts"
       className={`flex w-full items-center ${bg} text-white px-4 py-2 text-sm font-semibold sticky top-0 z-50`}
     >
@@ -82,6 +65,6 @@ export function AlarmBanner() {
       >
         {audioOn ? '🔊' : '🔇'}
       </button>
-    </a>
+    </Link>
   );
 }

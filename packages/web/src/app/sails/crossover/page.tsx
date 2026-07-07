@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { Sail, SailCategory, SailWardrobe } from '@g5000/db';
 import { CategoryRecommendation } from '../CategoryRecommendation';
 import { SailOverlayChart } from '../SailOverlayChart';
@@ -85,9 +86,9 @@ export default function CrossoverPage() {
         {wardrobe.sails.length === 0 && (
           <p className="mt-2 text-xs text-gray-500">
             No sails yet. Add them on the{' '}
-            <a href="/sails" className="underline">
+            <Link href="/sails" className="underline">
               Wardrobe page
-            </a>{' '}
+            </Link>{' '}
             first.
           </p>
         )}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fmtLatLonDmm } from '../../lib/format-coords';
+import { fmtLatLonDmm } from '../../lib/coords';
 import { formatDuration, fmtUtcMinute } from '../../lib/tz';
 
 const M_PER_NM = 1852;

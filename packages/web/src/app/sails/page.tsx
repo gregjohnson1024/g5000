@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { Sail, SailCategory, SailWardrobe } from '@g5000/db';
 
 const CATEGORIES: { key: SailCategory; label: string }[] = [
@@ -151,9 +152,9 @@ export default function SailsPage() {
       })}
       <p className="text-sm text-gray-500">
         Paint each sail&apos;s TWS/TWA region on the{' '}
-        <a href="/sails/crossover" className="underline">
+        <Link href="/sails/crossover" className="underline">
           crossover page
-        </a>
+        </Link>
         .
       </p>
     </div>

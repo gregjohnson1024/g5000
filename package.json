@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "prettier --check .",
+    "lint:overhaul": "node scripts/lint-overhaul.mjs",
     "format": "prettier --write .",
     "typecheck": "tsc -b"
   },

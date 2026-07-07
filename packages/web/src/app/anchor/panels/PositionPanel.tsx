@@ -1,5 +1,5 @@
 import type { JsonSafeSample } from '@g5000/core';
-import { fmtLatLonDmm } from '../../../lib/format-coords';
+import { fmtLatLonDmm } from '../../../lib/coords';
 import { RAD_TO_DEG, wrap360, cardinal16 } from '../../../lib/units';
 
 function scalar(s: JsonSafeSample | undefined): number | null {

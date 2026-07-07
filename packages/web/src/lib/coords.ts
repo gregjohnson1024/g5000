@@ -1,5 +1,7 @@
 /**
- * Coordinate string parsing. Accepts any of:
+ * Coordinate parsing and formatting.
+ *
+ * Parsing accepts any of:
  *   - DMS:        `41°45'53.9"N`, `71°07'42.6"W` (with or without spaces, ° or d)
  *   - DM.M:       `41° 45.898' N`, `71 45.9 W`
  *   - Decimal:    `41.76497 N`, `-71.12850`, `41.76497, -71.12850`
@@ -14,6 +16,11 @@
  *
  * All parsers return signed decimal degrees. Latitudes are positive North,
  * longitudes positive East (standard nautical sign convention).
+ *
+ * Formatting:
+ *   - `formatCoordinate` → `41° 45.898' N` (DMM with symbols, for chart labels)
+ *   - `fmtLatLonDmm`     → `33 42.232n 66 25.240w` (compact marine DMM for UI display)
+ *   - `fmtLatDmm` / `fmtLonDmm` → `DmmParts` struct for individual axis formatting
  */
 
 /** Result of parsing one coordinate token. Signed decimal degrees. */
@@ -129,6 +136,46 @@ export interface FormatOptions {
   format: 'dms' | 'dmm' | 'dec';
   /** Decimal places. Default depends on format. */
   precision?: number;
+}
+
+/**
+ * Marine-style lat/lon formatting in degrees, decimal-minutes (DMM).
+ * Produces parts for compact display: `{ deg: 33, min: '42.232', hemi: 'N' }`.
+ * Used by `fmtLatDmm`, `fmtLonDmm`, and `fmtLatLonDmm`.
+ */
+export interface DmmParts {
+  deg: number;
+  min: string;
+  hemi: 'N' | 'S' | 'E' | 'W';
+}
+
+function dmmParts(value: number, posHemi: 'N' | 'E', negHemi: 'S' | 'W'): DmmParts {
+  const hemi: 'N' | 'S' | 'E' | 'W' = value >= 0 ? posHemi : negHemi;
+  const abs = Math.abs(value);
+  const deg = Math.floor(abs);
+  const min = ((abs - deg) * 60).toFixed(3);
+  return { deg, min, hemi };
+}
+
+/** Returns DMM parts for a latitude value. */
+export function fmtLatDmm(lat: number): DmmParts {
+  return dmmParts(lat, 'N', 'S');
+}
+
+/** Returns DMM parts for a longitude value. */
+export function fmtLonDmm(lon: number): DmmParts {
+  return dmmParts(lon, 'E', 'W');
+}
+
+/**
+ * Compact marine DMM format: `33 42.232n 66 25.240w`
+ * No degree/prime symbols, lowercase hemisphere, single space between coords.
+ * This is the canonical g5000 display format for lat/lon pairs.
+ */
+export function fmtLatLonDmm(lat: number, lon: number): string {
+  const a = fmtLatDmm(lat);
+  const b = fmtLonDmm(lon);
+  return `${a.deg} ${a.min}${a.hemi.toLowerCase()} ${b.deg} ${b.min}${b.hemi.toLowerCase()}`;
 }
 
 /** Format a signed decimal degree value to the requested string format. */

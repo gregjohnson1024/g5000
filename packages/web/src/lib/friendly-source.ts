@@ -3,7 +3,7 @@
  * bridge (e.g. `n2k:127250@0x11` → "Heading · 0x11"). Used on the /sensors
  * page so users don't have to memorize PGN numbers.
  */
-import { fmtLatLonDmm } from './format-coords';
+import { fmtLatLonDmm } from './coords';
 
 /** Canonical N2K PGN → friendly label. Add entries here as channels land. */
 const PGN_LABELS: Record<number, string> = {

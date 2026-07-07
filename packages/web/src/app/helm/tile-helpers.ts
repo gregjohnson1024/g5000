@@ -1,6 +1,6 @@
 import type { JsonSafeSample } from '@g5000/core';
 import { MS_TO_KN, RAD_TO_DEG, wrap360 } from '../../lib/units';
-import { fmtLatDmm, fmtLonDmm } from '../../lib/format-coords';
+import { fmtLatDmm, fmtLonDmm } from '../../lib/coords';
 
 export function scalar(s: JsonSafeSample | undefined): number | null {
   if (!s || s.value.kind !== 'scalar') return null;

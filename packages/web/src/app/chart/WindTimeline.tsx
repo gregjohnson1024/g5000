@@ -1,6 +1,7 @@
 'use client';
 
 import { type Dispatch, type SetStateAction } from 'react';
+import Link from 'next/link';
 import { hrrrHorizonHours, pickHrrrRun } from '../../lib/hrrr-helpers';
 import { fmtHourLabel, type TzMode } from '../../lib/tz';
 
@@ -52,9 +53,9 @@ export function WindTimeline({
     return (
       <div className="text-xs text-amber-300">
         No {activeWindModel.toUpperCase()} forecast cached. Visit{' '}
-        <a href="/forecast" className="underline">
+        <Link href="/forecast" className="underline">
           Forecast
-        </a>
+        </Link>
         .
       </div>
     );
@@ -73,9 +74,9 @@ export function WindTimeline({
       <div className="text-xs text-amber-300">
         {activeWindModel.toUpperCase()} forecast cache is stale (all valid times in the past).
         Refresh on{' '}
-        <a href="/forecast" className="underline">
+        <Link href="/forecast" className="underline">
           Forecast
-        </a>
+        </Link>
         .
       </div>
     );

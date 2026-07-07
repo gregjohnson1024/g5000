@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import type { SailWardrobe } from '@g5000/db';
 import { useSse } from '../../hooks/use-sse';
 import { MobButton } from './MobButton';
@@ -58,9 +59,9 @@ export default function HelmPage(): React.ReactElement {
               </span>
             );
           })}
-          <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
+          <Link href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
             manage
-          </a>
+          </Link>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, Fragment } from 'react';
+import Link from 'next/link';
 import { currentNow, nextCurrentEvent } from '@g5000/tide';
 import type { CurrentPrediction, CurrentEvent } from '@g5000/tide';
 import { fetchBoatFix } from '../../lib/boat-fix';
@@ -266,9 +267,9 @@ export default function CurrentsPage() {
         {featureEnabled === false && (
           <p className="text-sm text-slate-400">
             Canadian Tide/Currents is disabled — enable it in{' '}
-            <a href="/settings" className="text-sky-400 underline">
+            <Link href="/settings" className="text-sky-400 underline">
               Settings
-            </a>
+            </Link>
             .
           </p>
         )}

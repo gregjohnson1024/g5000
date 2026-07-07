@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { LivePos } from './LiveBoatMarker';
-import { fmtLatLonDmm } from '../lib/format-coords';
+import { fmtLatLonDmm } from '../lib/coords';
 import { haversineM, initialBearingDeg } from '../lib/mob';
 
 const SRC = 'mob';

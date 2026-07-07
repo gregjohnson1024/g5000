@@ -513,7 +513,7 @@ One section answering one question. Tides + Currents share the single StripChart
 
 ### 7.9 Waypoints / Routes / Tracks / Trips / Log → VOYAGE ▸ Plan + Logbook
 
-**Plan** = waypoints + routes as one workspace (the /marks-and-routes redirect proved the intent): shared toolbar (search, import/export, add), DataTable, CoordField everywhere, chart handoff via the existing `chart:planState`. **Logbook** = tracks + trips + log as one day-grouped feed with a kind filter; trips' StatCard grammar wins; MODE_BADGE/KIND_BG maps merge into StatusChip; delete confirms name the record ("Delete track _Bermuda leg 3_?"), never internal ids; destructive rows get 44px targets separated from Edit.
+**Plan** = waypoints + routes as one workspace (the /marks-and-routes redirect proved the intent): shared toolbar (search, import/export, add), DataTable, CoordField everywhere, chart handoff via the existing `chart:planState`. **Logbook** = tracks + trips + log as one day-grouped feed with a kind filter; trips' StatCard grammar wins; MODE*BADGE/KIND_BG maps merge into StatusChip; delete confirms name the record ("Delete track \_Bermuda leg 3*?"), never internal ids; destructive rows get 44px targets separated from Edit.
 
 ### 7.10 Polars / Sails / Crossover → BOAT ▸ Performance
 

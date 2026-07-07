@@ -15,7 +15,7 @@ import { TrackOverlay, type TrackColorMode } from '../../components/TrackOverlay
 import { IsochroneLayer } from '../../components/IsochroneLayer';
 import { RouteWindLayer } from '../../components/RouteWindLayer';
 import { WaypointEditPopup } from '../../components/WaypointEditPopup';
-import { fmtLatDmm, fmtLonDmm, fmtLatLonDmm } from '../../lib/format-coords';
+import { fmtLatDmm, fmtLonDmm, fmtLatLonDmm } from '../../lib/coords';
 import { greatCircleNm, bearingDeg } from '../../lib/geo';
 import { MS_TO_KN, RAD_TO_DEG, wrap360, cardinal16 } from '../../lib/units';
 // DriftArrow removed at user's request; computation kept on /helm via the
@@ -1314,7 +1314,7 @@ function LiveValues({ p }: { p: LivePos | null }) {
   if (!p) {
     return <div className="text-xs text-slate-500">Waiting for live fix…</div>;
   }
-  // Compact marine DMM matching the shared format-coords helper:
+  // Compact marine DMM matching the shared coords helper:
   // `33 42.232n` (no °/′ symbols, lowercase hemisphere).
   const lat = fmtLatDmm(p.lat);
   const lon = fmtLonDmm(p.lon);

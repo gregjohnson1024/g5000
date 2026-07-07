@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { PolarTable } from '@g5000/db';
 import { PolarHeatmap } from './PolarHeatmap';
 import { PolarPlot } from '../../components/PolarPlot';
@@ -84,9 +85,9 @@ export default function PolarsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold">Polars</h1>
         <div className="flex items-center gap-2">
-          <a href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
+          <Link href="/sails" className="text-xs text-slate-500 hover:text-slate-300 underline">
             manage sails →
-          </a>
+          </Link>
           <input
             ref={fileInputRef}
             type="file"

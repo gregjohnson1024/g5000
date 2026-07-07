@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { Navbar } from './Navbar';
 import { AlarmBanner } from '../components/AlarmBanner';
 import { AlarmAudio } from '../components/AlarmAudio';
+import { StorageMigrationGate } from '../components/StorageMigrationGate';
+import { SseStoreProvider } from '../components/SseStoreProvider';
 
 export const metadata: Metadata = {
   title: 'G5000',
@@ -26,10 +28,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className="h-screen flex flex-col">
-        <AlarmBanner />
-        <AlarmAudio />
-        <Navbar hiddenHrefs={hiddenHrefs} />
-        {children}
+        <SseStoreProvider>
+          <StorageMigrationGate />
+          <AlarmBanner />
+          <AlarmAudio />
+          <Navbar hiddenHrefs={hiddenHrefs} />
+          {children}
+        </SseStoreProvider>
       </body>
     </html>
   );

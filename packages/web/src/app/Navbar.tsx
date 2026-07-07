@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { usePoll } from '../hooks/use-poll';
 
 interface NavItem {
   href: string;
@@ -141,35 +143,18 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [alarmCount, setAlarmCount] = useState(0);
-  const [topSeverity, setTopSeverity] = useState<'CRITICAL' | 'WARN' | 'INFO' | null>(null);
 
-  useEffect(() => {
-    let stopped = false;
-    async function poll() {
-      try {
-        const r = await fetch('/api/alarms');
-        if (stopped) return;
-        const body = (await r.json()) as { active?: { severity: 'CRITICAL' | 'WARN' | 'INFO' }[] };
-        const active = body.active ?? [];
-        const rank = { CRITICAL: 3, WARN: 2, INFO: 1 } as const;
-        const top = active.reduce<keyof typeof rank | null>(
-          (best, a) => (best === null || rank[a.severity] > rank[best] ? a.severity : best),
-          null,
-        );
-        setAlarmCount(active.length);
-        setTopSeverity(top);
-      } catch {
-        // transient
-      }
-    }
-    poll();
-    const t = setInterval(poll, 2000);
-    return () => {
-      stopped = true;
-      clearInterval(t);
-    };
-  }, []);
+  const { data: alarmsData } = usePoll<{ active?: { severity: 'CRITICAL' | 'WARN' | 'INFO' }[] }>(
+    '/api/alarms',
+    2000,
+  );
+  const active = alarmsData?.active ?? [];
+  const rank = { CRITICAL: 3, WARN: 2, INFO: 1 } as const;
+  const alarmCount = active.length;
+  const topSeverity = active.reduce<'CRITICAL' | 'WARN' | 'INFO' | null>(
+    (best, a) => (best === null || rank[a.severity] > rank[best] ? a.severity : best),
+    null,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -193,13 +178,13 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
 
   return (
     <nav className="bg-slate-950 border-b border-slate-800 px-4 py-2 flex items-center gap-1 flex-wrap text-sm">
-      <a href="/" className="font-semibold text-slate-100 mr-3">
+      <Link href="/" className="font-semibold text-slate-100 mr-3">
         G5000
-      </a>
+      </Link>
       {topItems.map((it) => {
         const active = activeHref === it.href;
         return (
-          <a
+          <Link
             key={it.href}
             href={it.href}
             className={`px-2 py-1 rounded ${
@@ -209,7 +194,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
             }`}
           >
             {it.label}
-          </a>
+          </Link>
         );
       })}
 
@@ -247,7 +232,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
                       const active = activeHref === it.href;
                       return (
                         <li key={it.href}>
-                          <a
+                          <Link
                             href={it.href}
                             onClick={() => setOpen(false)}
                             className={`block px-2 py-1 rounded text-sm ${
@@ -257,7 +242,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
                             }`}
                           >
                             {it.label}
-                          </a>
+                          </Link>
                         </li>
                       );
                     })}
@@ -270,7 +255,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
       )}
 
       {!hidden.has(ALERTS_HREF) && (
-        <a
+        <Link
           href={ALERTS_HREF}
           aria-label={alarmCount > 0 ? `Alerts (${alarmCount} active)` : 'Alerts'}
           title={
@@ -315,7 +300,7 @@ export function Navbar({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
               {alarmCount > 9 ? '9+' : alarmCount}
             </span>
           )}
-        </a>
+        </Link>
       )}
     </nav>
   );

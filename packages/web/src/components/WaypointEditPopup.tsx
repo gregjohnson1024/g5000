@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
-import { fmtLatLonDmm } from '../lib/format-coords';
+import { fmtLatLonDmm } from '../lib/coords';
 import { parseWaypointForm } from './waypoint-form';
 
 export interface EditableWaypoint {

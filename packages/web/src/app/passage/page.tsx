@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   fmtHourLabel,
   fmtTimestamp,
@@ -10,7 +11,7 @@ import {
 } from '../../lib/tz';
 import { bearingDeg, greatCircleNm } from '../../lib/geo';
 import { TzToggle } from '../../components/TzToggle';
-import { fmtLatLonDmm } from '../../lib/format-coords';
+import { fmtLatLonDmm } from '../../lib/coords';
 import { EnginePanel } from './EnginePanel';
 
 interface EtaSnapshot {
@@ -242,9 +243,9 @@ export default function PassagePage() {
       {!stats?.trackId && !error && (
         <div className="text-slate-400 text-sm">
           No active track. Start one on{' '}
-          <a href="/tracks" className="underline hover:text-slate-200">
+          <Link href="/tracks" className="underline hover:text-slate-200">
             /tracks
-          </a>
+          </Link>
           .
         </div>
       )}
