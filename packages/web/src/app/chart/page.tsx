@@ -3,7 +3,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useSearchParams } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
 import { Map } from '../../components/Map';
-import { StatusBadge } from '../../components/StatusBadge';
 import { attachRoute, detachRoute, type RouteColorMode } from '../../components/RoutePolyline';
 import { attachRouteConnector } from '../../components/RouteConnector';
 import { LiveBoatMarker, type LivePos } from '../../components/LiveBoatMarker';
@@ -15,14 +14,13 @@ import { TrackOverlay, type TrackColorMode } from '../../components/TrackOverlay
 import { IsochroneLayer } from '../../components/IsochroneLayer';
 import { RouteWindLayer } from '../../components/RouteWindLayer';
 import { WaypointEditPopup } from '../../components/WaypointEditPopup';
-import { fmtLatDmm, fmtLonDmm, fmtLatLonDmm } from '../../lib/coords';
+import { fmtLatLonDmm } from '../../lib/coords';
 import { greatCircleNm, bearingDeg } from '../../lib/geo';
-import { MS_TO_KN, RAD_TO_DEG, wrap360, cardinal16 } from '../../lib/units';
+import { MS_TO_KN, cardinal16 } from '../../lib/units';
 // DriftArrow removed at user's request; computation kept on /helm via the
 // shared @g5000/compute helper. If the chart needs set+drift back, prefer
 // pulling it from /api/position rather than re-deriving here.
 import { WindOverlay, type WindGrid } from '../../components/WindOverlay';
-import { WindLegend } from '../../components/WindLegend';
 import { CurrentOverlay, type CurrentGrid } from '../../components/CurrentOverlay';
 import { sampleUV, type UvGrid } from '../../lib/grid-sample';
 import { StartLineLayer } from '../../components/StartLineLayer';
@@ -35,30 +33,27 @@ import { TileLoadingIndicator } from '../../components/TileLoadingIndicator';
 import { CogExtension } from '../../components/CogExtension';
 import { MapLoadingIndicator } from '../../components/MapLoadingIndicator';
 import { RadarOverlay } from '../../components/RadarOverlay';
-import { RadarControls } from './RadarControls';
 import { MobButton } from '../../components/MobButton';
 import { MobLayer } from '../../components/MobLayer';
 import { AnchorWatchLayer } from '../../components/AnchorWatchLayer';
-import { AnchorCard } from './AnchorCard';
-import { type LayersState } from './LayersControl';
+import { type LayersState, type LayerToggleKey } from './LayersControl';
+import {
+  type PresetName,
+  CHART_PRESETS,
+  applyPresetPatch,
+  resetLayers,
+} from './presets';
 import { modelLayerView, type ChartModel } from './model-layer';
-import { WindTimeline } from './WindTimeline';
-import { inHrrrDomain } from '../../lib/hrrr-helpers';
-import { ChartToolbar } from './ChartToolbar';
+import { LayerDock } from './LayerDock';
 import { ChartFollowControl } from './ChartFollowControl';
-import { RoutePlanPanel } from './RoutePlanPanel';
 import { useRoutePlan } from './use-route-plan';
 import { startOf, endOf } from '../../lib/route-plan';
 import { ChartContextMenu } from './ChartContextMenu';
 import { resolveTarget, type ContextTarget, type HitWaypoint } from '../../lib/route-hit-test';
-import { PlaybackScrubber } from './PlaybackScrubber';
-import { RouteWeatherPanel } from '../../components/RouteWeatherPanel';
-import { RouteDetailsBox } from './RouteDetailsBox';
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
 import { nextWaypointName } from './waypoint-name';
-import { TzToggle } from '../../components/TzToggle';
-import { fmtHourLabel, readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
+import { readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
 import { nearestForecastHour, type PlaybackState } from '../../lib/route-playback';
 import type { Route } from '@g5000/routing';
 import type { Track } from '../../lib/tracks';
@@ -213,6 +208,28 @@ function ChartPageInner() {
   // Single source of truth for which overlay(s) are visible, derived from
   // the mutually-exclusive layers.model choice.
   const mv = modelLayerView(layers.model);
+
+  // Derive the active preset pill from the current layers: a named preset is
+  // "active" when every key it patches already matches the current state.
+  // 'custom' means the user has diverged from all named presets.
+  const activePreset: PresetName = useMemo(() => {
+    for (const name of Object.keys(CHART_PRESETS) as Array<Exclude<PresetName, 'custom'>>) {
+      const patch = CHART_PRESETS[name];
+      const matches = (Object.keys(patch) as Array<keyof LayersState>).every(
+        (k) => layers[k] === patch[k],
+      );
+      if (matches) return name;
+    }
+    return 'custom';
+  }, [layers]);
+
+  const handleApplyPreset = useCallback((name: Exclude<PresetName, 'custom'>): void => {
+    setLayers((prev) => applyPresetPatch(prev, name));
+  }, []);
+
+  const handleResetToDefault = useCallback((): void => {
+    setLayers(resetLayers());
+  }, []);
 
   // Restore the camera (center + zoom + bearing) from the last time the
   // user was on /chart. Synchronous useState initializer so the Map's
@@ -936,8 +953,12 @@ function ChartPageInner() {
     })();
   }, [planIdFromUrl]);
 
+  // Layer toggle handler — extracted so LayerDock can use the same typed key
+  const handleToggleLayer = (key: LayerToggleKey): void =>
+    setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+
   return (
-    <main className="grid grid-cols-[1fr_360px] flex-1 min-h-0 [&>div:first-child]:relative">
+    <main className="grid grid-cols-1 lg:grid-cols-[1fr_360px] flex-1 min-h-0 [&>div:first-child]:relative">
       <div className="relative">
         <Map
           center={{ lat: initialCamera.lat, lon: initialCamera.lon }}
@@ -1135,16 +1156,41 @@ function ChartPageInner() {
             />
           );
         })()}
-        <ChartToolbar
-          layers={layers}
-          onToggleLayer={(key) => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
-          onSelectModel={(model) => setLayers((prev) => ({ ...prev, model }))}
-          safetyDepthM={safetyDepthM}
-          onSafetyDepthM={setSafetyDepthM}
-          waypointDropActive={waypointDropActive}
-          onToggleWaypointDrop={() => setWaypointDropActive((v) => !v)}
-          showTideCurrents={canadianTideCurrents}
-        />
+        {/* TR tool rail — waypoint-drop toggle (AnnotationDropper moved here in T4) */}
+        <div className="absolute top-2 right-2 z-10 flex flex-col gap-2 items-end">
+          <button
+            type="button"
+            aria-pressed={waypointDropActive}
+            aria-label={waypointDropActive ? 'Cancel waypoint drop' : 'Drop a waypoint'}
+            title={
+              waypointDropActive
+                ? 'Click the map to drop a waypoint (Esc to cancel)'
+                : 'Drop a waypoint on the chart'
+            }
+            onClick={() => setWaypointDropActive((v) => !v)}
+            className={
+              'w-9 h-9 rounded border flex items-center justify-center ' +
+              (waypointDropActive
+                ? 'bg-accent text-on-accent border-accent-strong hover:bg-accent-hi'
+                : 'bg-surface/85 text-ink border-hairline-strong hover:bg-surface-raised')
+            }
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" />
+              <circle cx="12" cy="11" r="2" />
+            </svg>
+          </button>
+        </div>
         <MobLayer map={mapInstance} livePos={livePos} />
         <AnchorWatchLayer map={mapInstance} livePos={livePos} />
         <MapLoadingIndicator map={mapInstance} />
@@ -1172,185 +1218,61 @@ function ChartPageInner() {
         />
         <TileLoadingIndicator map={mapInstance} />
       </div>
-      <aside className="p-4 border-l border-slate-800 space-y-4 overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <StatusBadge />
-          <TzToggle tz={tz} setTz={setTz} />
-        </div>
-        <LiveValues p={livePos} />
-        {layers.radar && mayaraWsBase && (
-          <RadarControls
-            baseUrl="/api/radar"
-            wsBase={mayaraWsBase}
-            opacity={radarUi.opacity}
-            onOpacity={(v) => setRadarUi((s) => ({ ...s, opacity: v }))}
-            rangeM={radarUi.rangeM}
-            onRange={(m) => setRadarUi((s) => ({ ...s, rangeM: m }))}
-          />
-        )}
-        <AnchorCard livePos={livePos} />
-        <RoutePlanPanel
-          waypoints={waypoints}
-          tz={tz}
-          hasRoute={Object.keys(routes).length > 0}
-          ids={routePlan.ids}
-          onIdsChange={routePlan.setIds}
-          colorMode={routeColorMode}
-          onColorMode={setRouteColorMode}
-          colorTwaDisabled={hasMotoring}
-          onRouted={handleRouted}
-          onClear={handleClearRoute}
-          showIsochrones={showIsochrones}
-          onShowIsochrones={setShowIsochrones}
-          showRouteWind={showRouteWind}
-          onShowRouteWind={setShowRouteWind}
-        />
-        {Object.keys(routes).length > 0 && (
-          <>
-            <PlaybackScrubber
-              map={mapInstance}
-              routes={routes}
-              tz={tz}
-              onStates={setPlaybackStates}
-              onWindHour={onWindHour}
-              t={playT ?? undefined}
-              onTChange={setPlayT}
-            />
-            <RouteWeatherPanel routes={routes} t={playT} onTChange={setPlayT} />
-            {(['GFS', 'ECMWF'] as const)
-              .filter((m) => routes[m])
-              .map((m) => (
-                <RouteDetailsBox
-                  key={m}
-                  model={m}
-                  color={ROUTE_COLOR[m]}
-                  state={playbackStates[m] ?? null}
-                />
-              ))}
-          </>
-        )}
-        <div className="space-y-2 bg-slate-900/60 border border-slate-800 rounded p-2">
-          {mv.isCurrent && (
-            <div className="text-xs space-y-1 pt-1 border-t border-slate-800 mt-1">
-              <p className="text-slate-400">
-                Surface currents from Copernicus Marine (CMEMS) daily-mean global analysis (1/12°,
-                surface depth). Colour = speed in knots; arrows = direction. Refreshed
-                automatically; trigger a manual pull from the Forecast page.
-              </p>
-              {currentStatus && <p className="text-slate-400">{currentStatus}</p>}
-            </div>
-          )}
-          {/* Wind-forecast timeline (run, valid time, hour stepper). Only
-              shown when a wind model (GFS/ECMWF) is active — CMEMS is a
-              daily mean without an hour-stepped slider. */}
-          {mv.isWindModel && (
-            <WindTimeline
-              availableHours={availableHours}
-              latestRunAt={latestRunAt}
-              windHours={windHours}
-              windLockNow={windLockNow}
-              tz={tz}
-              model={mv.windModel}
-              setWindHours={setWindHours}
-              setWindLockNow={setWindLockNow}
-            />
-          )}
-          {mv.isWindModel && windGrid && (
-            <div className="text-xs text-slate-400 leading-tight">
-              <div>
-                Showing:{' '}
-                <span className="text-slate-200 font-mono">{windGrid.model.toUpperCase()}</span>
-              </div>
-              <div>
-                Run:{' '}
-                <span className="text-slate-200 font-mono">{fmtHourLabel(windGrid.runAt, tz)}</span>
-              </div>
-              <div>
-                Valid:{' '}
-                <span className="text-slate-200 font-mono">
-                  {fmtHourLabel(windGrid.validAt, tz)}
-                </span>{' '}
-                (+{windGrid.forecastHour}h)
-              </div>
-            </div>
-          )}
-          {layers.model === 'hrrr' && forecastBbox && !inHrrrDomain(forecastBbox) && (
-            <div className="text-xs text-amber-300">
-              HRRR covers US waters only — no data for this area. Move the forecast region inside
-              the continental US, or pick GFS/ECMWF for offshore.
-            </div>
-          )}
-          {mv.isWindModel && windStatus && (
-            <div className="text-xs text-emerald-300">{windStatus}</div>
-          )}
-          {mv.isWindModel && forecastBbox && mapInstance && (
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  mapInstance.fitBounds(
-                    [
-                      [forecastBbox.lonMin, forecastBbox.latMin],
-                      [forecastBbox.lonMax, forecastBbox.latMax],
-                    ],
-                    { padding: 40, duration: 600 },
-                  );
-                } catch {
-                  /* style not ready */
-                }
-              }}
-              className="w-full px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
-              title="Zoom to the forecast region to see and drag the corner handles"
-            >
-              Fit to forecast region
-            </button>
-          )}
-          {mv.isWindModel && <WindLegend />}
-        </div>
-        {error && <div className="text-rose-400 text-xs">{error}</div>}
-      </aside>
+      <LayerDock
+        searchLens={searchParams.get('lens')}
+        layers={layers}
+        onToggle={handleToggleLayer}
+        onSelectModel={(model) => setLayers((prev) => ({ ...prev, model }))}
+        safetyDepthM={safetyDepthM}
+        onSafetyDepthM={setSafetyDepthM}
+        showTideCurrents={canadianTideCurrents}
+        activePreset={activePreset}
+        onApplyPreset={handleApplyPreset}
+        onResetToDefault={handleResetToDefault}
+        routeLensProps={{
+          livePos,
+          waypoints,
+          routePlan,
+          routes,
+          tz,
+          onTz: setTz,
+          routeColorMode,
+          onRouteColorMode: setRouteColorMode,
+          hasMotoring,
+          onRouted: handleRouted,
+          onClearRoute: handleClearRoute,
+          showIsochrones,
+          onShowIsochrones: setShowIsochrones,
+          showRouteWind,
+          onShowRouteWind: setShowRouteWind,
+          playbackStates,
+          onPlaybackStates: setPlaybackStates,
+          playT,
+          onPlayT: setPlayT,
+          onWindHour,
+          mapInstance,
+          mv,
+          availableHours,
+          latestRunAt,
+          windHours,
+          windLockNow,
+          windGrid,
+          windStatus,
+          currentStatus,
+          forecastBbox,
+          activeModel: layers.model,
+          setWindHours,
+          setWindLockNow,
+          showRadar: layers.radar,
+          mayaraWsBase,
+          radarOpacity: radarUi.opacity,
+          onRadarOpacity: (v) => setRadarUi((s) => ({ ...s, opacity: v })),
+          radarRangeM: radarUi.rangeM,
+          onRadarRange: (m) => setRadarUi((s) => ({ ...s, rangeM: m })),
+          error,
+        }}
+      />
     </main>
-  );
-}
-
-function LiveValues({ p }: { p: LivePos | null }) {
-  if (!p) {
-    return <div className="text-xs text-slate-500">Waiting for live fix…</div>;
-  }
-  // Compact marine DMM matching the shared coords helper:
-  // `33 42.232n` (no °/′ symbols, lowercase hemisphere).
-  const lat = fmtLatDmm(p.lat);
-  const lon = fmtLonDmm(p.lon);
-  const cogDeg = typeof p.cog === 'number' ? wrap360(p.cog * RAD_TO_DEG) : null;
-  const hdgDeg = typeof p.hdg === 'number' ? wrap360(p.hdg * RAD_TO_DEG) : null;
-  const sogKn = typeof p.sog === 'number' ? p.sog * MS_TO_KN : null;
-  return (
-    <div className="text-xs space-y-0.5 bg-slate-900/60 border border-slate-800 rounded p-2">
-      <div className="font-mono text-slate-200">
-        {`${lat.deg} ${lat.min}${lat.hemi.toLowerCase()}`}
-      </div>
-      <div className="font-mono text-slate-200">
-        {`${lon.deg} ${lon.min}${lon.hemi.toLowerCase()}`}
-      </div>
-      <div className="text-slate-400">
-        SOG:{' '}
-        <span className="text-slate-200 font-mono">
-          {sogKn !== null ? `${sogKn.toFixed(1)} kn` : '—'}
-        </span>
-      </div>
-      <div className="text-slate-400">
-        COG:{' '}
-        <span className="text-slate-200 font-mono">
-          {cogDeg !== null ? `${cogDeg.toFixed(0)}° T` : '—'}
-        </span>
-      </div>
-      <div className="text-slate-400">
-        HDG:{' '}
-        <span className="text-slate-200 font-mono">
-          {hdgDeg !== null ? `${hdgDeg.toFixed(0)}° T` : '—'}
-        </span>
-      </div>
-    </div>
   );
 }
 

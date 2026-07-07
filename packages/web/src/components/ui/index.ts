@@ -65,3 +65,6 @@ export {
   CELL_TILE_OVERRIDES,
   CELL_HIT_TARGET_CLASSES,
 } from './cell-grid-classes';
+
+export { BottomSheet } from './BottomSheet';
+export type { BottomSheetProps } from './BottomSheet';

@@ -1,23 +1,11 @@
 'use client';
-import { LayersControl, type LayersState } from './LayersControl';
+import { LayersControl, type LayersState, type LayerToggleKey } from './LayersControl';
 import type { ChartModel } from './model-layer';
 import { AnnotationDropper } from '../../components/AnnotationDropper';
 
 export interface ChartToolbarProps {
   layers: LayersState;
-  onToggleLayer: (
-    key:
-      | 'osm'
-      | 'enc'
-      | 'satellite'
-      | 'buoys'
-      | 'bathy'
-      | 'ais'
-      | 'aisCog'
-      | 'tideStations'
-      | 'currentStations'
-      | 'radar',
-  ) => void;
+  onToggleLayer: (key: LayerToggleKey) => void;
   onSelectModel: (model: ChartModel) => void;
   /** Shallow-contour highlight threshold (m) for the bathy layer. 0 = off. */
   safetyDepthM: number;

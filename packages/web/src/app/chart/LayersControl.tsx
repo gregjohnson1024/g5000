@@ -2,6 +2,23 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChartModel } from './model-layer';
 
+/**
+ * The canonical union of all layer toggle keys. Exported so LayersLens,
+ * ChartToolbar, and page.tsx all share one declaration instead of three
+ * copy-pasted inline union literals.
+ */
+export type LayerToggleKey =
+  | 'osm'
+  | 'enc'
+  | 'satellite'
+  | 'buoys'
+  | 'bathy'
+  | 'ais'
+  | 'aisCog'
+  | 'tideStations'
+  | 'currentStations'
+  | 'radar';
+
 export interface LayersState {
   /** OSM raster basemap. Defaults true. Off → pure black underneath (handy
    * for NOAA-only or night use). */
@@ -44,19 +61,7 @@ export function LayersControl({
   showTideCurrents,
 }: {
   state: LayersState;
-  onToggle: (
-    key:
-      | 'osm'
-      | 'enc'
-      | 'satellite'
-      | 'buoys'
-      | 'bathy'
-      | 'ais'
-      | 'aisCog'
-      | 'tideStations'
-      | 'currentStations'
-      | 'radar',
-  ) => void;
+  onToggle: (key: LayerToggleKey) => void;
   onSelectModel: (model: ChartModel) => void;
   /** Shallow-contour highlight threshold (m) for the bathy layer. 0 = off. */
   safetyDepthM: number;
