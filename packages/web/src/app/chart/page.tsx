@@ -37,12 +37,7 @@ import { MobButton } from '../../components/MobButton';
 import { MobLayer } from '../../components/MobLayer';
 import { AnchorWatchLayer } from '../../components/AnchorWatchLayer';
 import { type LayersState, type LayerToggleKey } from './LayersControl';
-import {
-  type PresetName,
-  CHART_PRESETS,
-  applyPresetPatch,
-  resetLayers,
-} from './presets';
+import { type PresetName, CHART_PRESETS, applyPresetPatch, resetLayers } from './presets';
 import { modelLayerView, type ChartModel } from './model-layer';
 import { LayerDock } from './LayerDock';
 import { ChartFollowControl } from './ChartFollowControl';

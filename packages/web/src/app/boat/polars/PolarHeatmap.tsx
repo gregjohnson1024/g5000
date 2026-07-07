@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { PolarTable } from '@g5000/db';
 import {
   addTwaBin,
@@ -15,6 +15,10 @@ import {
   setCell,
   vmgFor,
 } from '@g5000/compute';
+import { ConfirmDialog, Dialog, Button } from '../../../components/ui';
+import { HeatmapGrid, type HeatmapCell } from '../../../components/charts/HeatmapGrid';
+import { RampLegend } from '../../../components/charts/RampLegend';
+import { buildStops } from '../../../components/charts/ramp';
 
 export interface PolarHeatmapProps {
   polar: PolarTable;
@@ -32,67 +36,79 @@ const MS_TO_KNOTS = 1 / 0.514444;
 const KNOTS_TO_MS = 0.514444;
 const RAD_TO_DEG = 180 / Math.PI;
 
+/** Dialog state discriminated union for the three alert/confirm cases. */
+type DialogState =
+  | { kind: 'none' }
+  | { kind: 'alert'; message: string }
+  | { kind: 'confirm-remove-twa'; twaIdx: number; deg: string }
+  | { kind: 'confirm-remove-tws'; twsIdx: number; kn: string }
+  | { kind: 'edit-cell'; twsIdx: number; twaIdx: number };
+
 export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatmapProps) {
-  const [editing, setEditing] = useState<{ twsIdx: number; twaIdx: number } | null>(null);
+  const [dialog, setDialog] = useState<DialogState>({ kind: 'none' });
   const maxBsp = Math.max(1e-6, ...polar.boatSpeed.flat());
 
-  // When the polar shape changes underneath us (e.g. an import or resize), drop any in-flight edit.
+  // Canonical ramp — shared between HeatmapGrid and RampLegend (canonical-ramp law).
+  const stops = useMemo(() => buildStops('sequential'), []);
+
+  const domain = useMemo(
+    () => ({ mode: 'sequential' as const, min: 0, max: maxBsp * MS_TO_KNOTS }),
+    [maxBsp],
+  );
+
+  // When the polar shape changes (e.g. import or resize), dismiss any open dialog.
   useEffect(() => {
-    setEditing(null);
+    setDialog({ kind: 'none' });
   }, [polar.twsBins.length, polar.twaBins.length]);
 
-  const cellStyle = (v: number): CSSProperties => {
-    if (v <= 0) return { backgroundColor: 'var(--surface-raised)', color: 'var(--ink-value)' };
-    const intensity = Math.min(1, v / maxBsp);
-    // Cool teal → bright cyan as speed rises.
-    const r = Math.floor(24 + intensity * 80);
-    const g = Math.floor(80 + intensity * 150);
-    const b = Math.floor(160 + intensity * 60);
-    // Switch text colour by perceived luminance so cells stay legible at the bright end.
-    const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    // Read token-derived text colors at call time for theme-awareness.
-    const root = typeof document !== 'undefined' ? document.documentElement : null;
-    const cs = root ? getComputedStyle(root) : null;
-    const darkText = cs?.getPropertyValue('--surface-sunken').trim() || '#0f172a';
-    const lightText = cs?.getPropertyValue('--ink-value').trim() || '#e2e8f0';
-    const color = luma > 0.55 ? darkText : lightText;
-    return { backgroundColor: `rgb(${r},${g},${b})`, color };
-  };
+  // Build HeatmapCell array from the polar table.
+  const cells: HeatmapCell[] = useMemo(() => {
+    const out: HeatmapCell[] = [];
+    for (let r = 0; r < polar.twsBins.length; r++) {
+      for (let c = 0; c < polar.twaBins.length; c++) {
+        const ms = polar.boatSpeed[r]![c]!;
+        const kn = ms * MS_TO_KNOTS;
+        out.push({ row: r, col: c, value: kn, label: kn.toFixed(1) });
+      }
+    }
+    return out;
+  }, [polar]);
 
-  const commitCellEdit = async (
-    twsIdx: number,
-    twaIdx: number,
-    rawKnots: string,
-  ): Promise<void> => {
-    setEditing(null);
-    const parsed = Number(rawKnots);
-    if (!Number.isFinite(parsed)) return;
-    const newMs = parsed * KNOTS_TO_MS;
-    const currentMs = polar.boatSpeed[twsIdx]![twaIdx]!;
-    if (Math.abs(newMs - currentMs) < 1e-9) return; // no-op
-    if (!onChange) return;
-    const updated = setCell(polar, twsIdx, twaIdx, newMs);
-    await onChange(updated);
-  };
+  const rowLabels = useMemo(
+    () => polar.twsBins.map((tws) => `${(tws * MS_TO_KNOTS).toFixed(0)} kn`),
+    [polar.twsBins],
+  );
+  const colLabels = useMemo(
+    () => polar.twaBins.map((twa) => `${(twa * RAD_TO_DEG).toFixed(0)}°`),
+    [polar.twaBins],
+  );
+
+  const heatmapSelected = selected ? { row: selected.twsIdx, col: selected.twaIdx } : undefined;
+
+  // ---------------------------------------------------------------------------
+  // Bin add / remove handlers
+  // ---------------------------------------------------------------------------
 
   const handleAddTwa = async (): Promise<void> => {
     if (!onChange) return;
     if (!canAddTwaBin(polar)) {
-      alert('Cannot add TWA bin: already at 180°.');
+      setDialog({ kind: 'alert', message: 'Cannot add TWA bin: already at 180°.' });
       return;
     }
     await onChange(addTwaBin(polar));
   };
 
-  const handleRemoveTwa = async (twaIdx: number): Promise<void> => {
+  const handleRemoveTwa = (twaIdx: number): void => {
     if (!onChange) return;
     if (polar.twaBins.length <= MIN_BINS) {
-      alert(`Cannot shrink TWA bins below ${MIN_BINS}.`);
+      setDialog({
+        kind: 'alert',
+        message: `Cannot shrink TWA bins below ${MIN_BINS}.`,
+      });
       return;
     }
     const deg = (polar.twaBins[twaIdx]! * RAD_TO_DEG).toFixed(0);
-    if (!confirm(`Remove TWA ${deg}° bin? This will delete that column.`)) return;
-    await onChange(removeTwaBin(polar, twaIdx));
+    setDialog({ kind: 'confirm-remove-twa', twaIdx, deg });
   };
 
   const handleAddTws = async (): Promise<void> => {
@@ -101,15 +117,33 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
     await onChange(addTwsBin(polar));
   };
 
-  const handleRemoveTws = async (twsIdx: number): Promise<void> => {
+  const handleRemoveTws = (twsIdx: number): void => {
     if (!onChange) return;
     if (polar.twsBins.length <= MIN_BINS) {
-      alert(`Cannot shrink TWS bins below ${MIN_BINS}.`);
+      setDialog({
+        kind: 'alert',
+        message: `Cannot shrink TWS bins below ${MIN_BINS}.`,
+      });
       return;
     }
     const kn = (polar.twsBins[twsIdx]! * MS_TO_KNOTS).toFixed(0);
-    if (!confirm(`Remove TWS ${kn} kn bin? This will delete that row.`)) return;
-    await onChange(removeTwsBin(polar, twsIdx));
+    setDialog({ kind: 'confirm-remove-tws', twsIdx, kn });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Cell edit
+  // ---------------------------------------------------------------------------
+
+  const commitCellEdit = async (twsIdx: number, twaIdx: number, rawKnots: string): Promise<void> => {
+    setDialog({ kind: 'none' });
+    const parsed = Number(rawKnots);
+    if (!Number.isFinite(parsed)) return;
+    const newMs = parsed * KNOTS_TO_MS;
+    const currentMs = polar.boatSpeed[twsIdx]![twaIdx]!;
+    if (Math.abs(newMs - currentMs) < 1e-9) return;
+    if (!onChange) return;
+    const updated = setCell(polar, twsIdx, twaIdx, newMs);
+    await onChange(updated);
   };
 
   const canShrinkTwa = polar.twaBins.length > MIN_BINS && !!onChange;
@@ -118,251 +152,299 @@ export function PolarHeatmap({ polar, selected, onSelect, onChange }: PolarHeatm
   const canExpandTws = canAddTwsBin(polar) && !!onChange;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="border-collapse text-xs font-mono">
-        <thead>
-          <tr>
-            <th className="p-1 text-slate-500">TWS \ TWA</th>
-            {polar.twaBins.map((twa, i) => (
-              <th key={i} className="p-1 text-slate-500 text-right align-bottom">
-                <div className="flex flex-col items-end gap-0.5">
-                  <span>{(twa * RAD_TO_DEG).toFixed(0)}°</span>
-                  {canShrinkTwa && (
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveTwa(i)}
-                      title={`Remove ${(twa * RAD_TO_DEG).toFixed(0)}° column`}
-                      className="w-4 h-4 leading-none text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded text-[10px]"
-                    >
-                      −
-                    </button>
-                  )}
-                </div>
-              </th>
-            ))}
-            {onChange && (
-              <th className="p-1 text-slate-500 align-bottom">
-                <button
-                  type="button"
-                  onClick={() => void handleAddTwa()}
-                  disabled={!canExpandTwa}
-                  title="Add a new TWA bin at the high-angle end"
-                  className="w-5 h-5 leading-none rounded bg-slate-800 text-amber-400 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
-                >
-                  +
-                </button>
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {polar.twsBins.map((tws, twsIdx) => (
-            <tr key={twsIdx}>
-              <th className="p-1 text-slate-500 text-right pr-2 align-middle">
-                <div className="flex items-center justify-end gap-1">
-                  {canShrinkTws && (
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveTws(twsIdx)}
-                      title={`Remove ${(tws * MS_TO_KNOTS).toFixed(0)} kn row`}
-                      className="w-4 h-4 leading-none text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded text-[10px]"
-                    >
-                      −
-                    </button>
-                  )}
-                  <span>{(tws * MS_TO_KNOTS).toFixed(0)} kn</span>
-                </div>
-              </th>
-              {polar.twaBins.map((_, twaIdx) => {
-                const v = polar.boatSpeed[twsIdx]![twaIdx]!;
-                const isSelected = selected?.twsIdx === twsIdx && selected.twaIdx === twaIdx;
-                const isEditing = editing?.twsIdx === twsIdx && editing.twaIdx === twaIdx;
-                return (
-                  <td
-                    key={twaIdx}
-                    onClick={() => onSelect?.({ twsIdx, twaIdx })}
-                    onDoubleClick={() => setEditing({ twsIdx, twaIdx })}
-                    style={cellStyle(v)}
-                    className={`p-2 cursor-pointer text-right ${
-                      isSelected ? 'ring-2 ring-amber-400' : ''
-                    }`}
-                    title={`TWS ${(tws * MS_TO_KNOTS).toFixed(1)} kn, TWA ${(
-                      polar.twaBins[twaIdx]! * RAD_TO_DEG
-                    ).toFixed(
-                      0,
-                    )}°, target ${(v * MS_TO_KNOTS).toFixed(2)} kn — double-click to edit`}
-                  >
-                    {isEditing ? (
-                      <CellInput
-                        initialKnots={v * MS_TO_KNOTS}
-                        onCommit={(rawKn) => commitCellEdit(twsIdx, twaIdx, rawKn)}
-                        onCancel={() => setEditing(null)}
-                      />
-                    ) : (
-                      (v * MS_TO_KNOTS).toFixed(1)
-                    )}
-                  </td>
-                );
-              })}
-              {onChange && <td />}
-            </tr>
-          ))}
-          {onChange && (
-            <tr>
-              <th className="p-1 text-right">
-                <button
-                  type="button"
-                  onClick={() => void handleAddTws()}
-                  disabled={!canExpandTws}
-                  title="Add a new TWS bin at the high-wind end"
-                  className="w-5 h-5 leading-none rounded bg-slate-800 text-amber-400 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-sm"
-                >
-                  +
-                </button>
-              </th>
-              <td colSpan={polar.twaBins.length + 1} />
-            </tr>
-          )}
+    <div className="space-y-3">
+      {/* Heatmap grid via canonical primitive */}
+      <HeatmapGrid
+        cells={cells}
+        rows={polar.twsBins.length}
+        cols={polar.twaBins.length}
+        rowLabels={rowLabels}
+        colLabels={colLabels}
+        cornerLabel="TWS \ TWA"
+        stops={stops}
+        domain={domain}
+        selected={heatmapSelected}
+        onSelect={(cell) => onSelect?.({ twsIdx: cell.row, twaIdx: cell.col })}
+      />
 
-          {/* Computed target-TWA + target-VMG rows. Read-only, no click handlers. */}
-          <TargetRow
-            polar={polar}
-            label="Target TWA upwind"
-            kind="twa"
-            direction="upwind"
-            hasResizeColumn={!!onChange}
-          />
-          <TargetRow
-            polar={polar}
-            label="Target VMG upwind"
-            kind="vmg"
-            direction="upwind"
-            hasResizeColumn={!!onChange}
-          />
-          <TargetRow
-            polar={polar}
-            label="Target TWA downwind"
-            kind="twa"
-            direction="downwind"
-            hasResizeColumn={!!onChange}
-          />
-          <TargetRow
-            polar={polar}
-            label="Target VMG downwind"
-            kind="vmg"
-            direction="downwind"
-            hasResizeColumn={!!onChange}
-          />
-        </tbody>
-      </table>
-      <p className="text-xs text-slate-500 mt-2">
-        Boat speed shown in knots. Click to select, double-click to edit. Use{' '}
-        <span className="text-amber-400">+</span> / <span className="text-red-400">−</span> to
-        add/remove bins. Bottom four rows (<span className="text-sky-400">sky</span> /{' '}
-        <span className="text-orange-400">orange</span>) are computed targets — read-only.
-      </p>
+      {/* Ramp legend — derives from the same stops (canonical-ramp law) */}
+      <RampLegend stops={stops} domain={domain} unit="kn (boat speed)" className="max-w-xs" />
+
+      {/* Bin management controls */}
+      {onChange && (
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* TWA column controls */}
+          <span className="text-caption text-ink-3 uppercase tracking-wide">TWA cols:</span>
+          {canShrinkTwa && (
+            <div className="flex gap-1 flex-wrap">
+              {polar.twaBins.map((twa, i) => (
+                <Button
+                  key={i}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleRemoveTwa(i)}
+                  aria-label={`Remove ${(twa * RAD_TO_DEG).toFixed(0)}° column`}
+                  className="text-danger border-danger-strong text-caption px-2 py-0.5"
+                >
+                  −{(twa * RAD_TO_DEG).toFixed(0)}°
+                </Button>
+              ))}
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void handleAddTwa()}
+            disabled={!canExpandTwa}
+            aria-label="Add TWA bin at the high-angle end"
+          >
+            + TWA
+          </Button>
+
+          <span className="text-caption text-ink-3 uppercase tracking-wide ml-2">TWS rows:</span>
+          {canShrinkTws && (
+            <div className="flex gap-1 flex-wrap">
+              {polar.twsBins.map((tws, i) => (
+                <Button
+                  key={i}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleRemoveTws(i)}
+                  aria-label={`Remove ${(tws * MS_TO_KNOTS).toFixed(0)} kn row`}
+                  className="text-danger border-danger-strong text-caption px-2 py-0.5"
+                >
+                  −{(tws * MS_TO_KNOTS).toFixed(0)} kn
+                </Button>
+              ))}
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void handleAddTws()}
+            disabled={!canExpandTws}
+            aria-label="Add TWS bin at the high-wind end"
+          >
+            + TWS
+          </Button>
+
+          {/* Explicit edit affordance — replaces double-click */}
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              if (selected) {
+                setDialog({ kind: 'edit-cell', twsIdx: selected.twsIdx, twaIdx: selected.twaIdx });
+              }
+            }}
+            disabled={!selected}
+            aria-label="Edit selected cell value"
+          >
+            Edit cell
+          </Button>
+        </div>
+      )}
+
+      {/* Computed target rows */}
+      <div className="overflow-x-auto">
+        <table className="border-collapse text-caption font-mono">
+          <thead>
+            <tr>
+              <th className="p-1 text-ink-3 text-left font-normal w-36">Target</th>
+              {polar.twsBins.map((tws, i) => (
+                <th key={i} className="p-1 text-ink-3 text-right font-normal">
+                  {(tws * MS_TO_KNOTS).toFixed(0)} kn
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <TargetRow polar={polar} label="TWA upwind" kind="twa" direction="upwind" />
+            <TargetRow polar={polar} label="VMG upwind" kind="vmg" direction="upwind" />
+            <TargetRow polar={polar} label="TWA downwind" kind="twa" direction="downwind" />
+            <TargetRow polar={polar} label="VMG downwind" kind="vmg" direction="downwind" />
+          </tbody>
+        </table>
+        <p className="text-caption text-ink-3 mt-1">
+          Blue rows = upwind targets · Orange rows = downwind targets (read-only).
+          Click a cell to select it, then use &ldquo;Edit cell&rdquo; to change its value.
+        </p>
+      </div>
+
+      {/* Alert dialog (info only — no confirm needed) */}
+      <Dialog
+        open={dialog.kind === 'alert'}
+        onClose={() => setDialog({ kind: 'none' })}
+        title="Cannot resize"
+        actions={
+          <Button variant="secondary" onClick={() => setDialog({ kind: 'none' })}>
+            OK
+          </Button>
+        }
+      >
+        <p className="text-ink">{dialog.kind === 'alert' ? dialog.message : ''}</p>
+      </Dialog>
+
+      {/* Remove TWA column confirm */}
+      <ConfirmDialog
+        open={dialog.kind === 'confirm-remove-twa'}
+        onClose={() => setDialog({ kind: 'none' })}
+        onConfirm={async () => {
+          if (dialog.kind !== 'confirm-remove-twa') return;
+          setDialog({ kind: 'none' });
+          await onChange?.(removeTwaBin(polar, dialog.twaIdx));
+        }}
+        title="Remove TWA column?"
+        message={
+          dialog.kind === 'confirm-remove-twa'
+            ? `Remove TWA ${dialog.deg}° column? This will delete that column of values.`
+            : ''
+        }
+        confirmLabel="Remove column"
+        hold
+      />
+
+      {/* Remove TWS row confirm */}
+      <ConfirmDialog
+        open={dialog.kind === 'confirm-remove-tws'}
+        onClose={() => setDialog({ kind: 'none' })}
+        onConfirm={async () => {
+          if (dialog.kind !== 'confirm-remove-tws') return;
+          setDialog({ kind: 'none' });
+          await onChange?.(removeTwsBin(polar, dialog.twsIdx));
+        }}
+        title="Remove TWS row?"
+        message={
+          dialog.kind === 'confirm-remove-tws'
+            ? `Remove TWS ${dialog.kn} kn row? This will delete that row of values.`
+            : ''
+        }
+        confirmLabel="Remove row"
+        hold
+      />
+
+      {/* Cell edit dialog */}
+      {dialog.kind === 'edit-cell' && (
+        <CellEditDialog
+          twsIdx={dialog.twsIdx}
+          twaIdx={dialog.twaIdx}
+          polar={polar}
+          onCommit={commitCellEdit}
+          onClose={() => setDialog({ kind: 'none' })}
+        />
+      )}
     </div>
   );
 }
 
-/**
- * Read-only row displaying either the optimal TWA (degrees) or the resulting
- * target VMG (knots) at each TWS bin, in the requested direction
- * (upwind / downwind). Uses optimalTwaForVmg + interpolatePolarSpeed +
- * vmgFor from the compute package — no math re-implementation here.
- */
+// ---------------------------------------------------------------------------
+// TargetRow — read-only computed rows (upwind/downwind VMG + TWA)
+// ---------------------------------------------------------------------------
+
 function TargetRow({
   polar,
   label,
   kind,
   direction,
-  hasResizeColumn,
 }: {
   polar: PolarTable;
   label: string;
   kind: 'twa' | 'vmg';
   direction: 'upwind' | 'downwind';
-  hasResizeColumn: boolean;
 }): React.JSX.Element {
-  const labelColor = direction === 'upwind' ? 'text-sky-400' : 'text-orange-400';
+  const labelClass = direction === 'upwind' ? 'text-info' : 'text-[--series-4]';
   return (
-    <tr className="bg-slate-900/60">
-      <th className={`p-1 pr-2 text-right text-[11px] ${labelColor}`}>{label}</th>
+    <tr className="bg-surface-sunken/60">
+      <th className={`p-1 pr-2 text-right text-caption font-normal ${labelClass}`}>{label}</th>
       {polar.twsBins.map((tws, twsIdx) => {
         const optimalTwa = optimalTwaForVmg(polar, tws, direction);
         if (kind === 'twa') {
           return (
-            <td
-              key={twsIdx}
-              className={`p-2 text-right ${labelColor}`}
-              title={`Optimal ${direction} TWA at TWS ${(tws * MS_TO_KNOTS).toFixed(1)} kn`}
-            >
+            <td key={twsIdx} className={`p-2 text-right tabular-nums ${labelClass}`}>
               {(optimalTwa * RAD_TO_DEG).toFixed(0)}°
             </td>
           );
         }
-        // kind === 'vmg'
         const bsp = interpolatePolarSpeed(polar, tws, optimalTwa);
-        const vmg = Math.abs(vmgFor(bsp, optimalTwa)); // magnitude (always positive for display)
+        const vmg = Math.abs(vmgFor(bsp, optimalTwa));
         return (
-          <td
-            key={twsIdx}
-            className={`p-2 text-right ${labelColor}`}
-            title={`Target ${direction} VMG at TWS ${(tws * MS_TO_KNOTS).toFixed(1)} kn`}
-          >
+          <td key={twsIdx} className={`p-2 text-right tabular-nums ${labelClass}`}>
             {(vmg * MS_TO_KNOTS).toFixed(2)}
           </td>
         );
       })}
-      {hasResizeColumn && <td />}
     </tr>
   );
 }
 
-/**
- * Borderless `<input type=number>` that lives inside a cell. Auto-focuses,
- * selects all on mount, commits on Enter or blur, cancels on Escape.
- */
-function CellInput({
-  initialKnots,
-  onCommit,
-  onCancel,
-}: {
-  initialKnots: number;
-  onCommit: (rawKnots: string) => void | Promise<void>;
-  onCancel: () => void;
-}): React.JSX.Element {
-  const [value, setValue] = useState(initialKnots.toFixed(1));
-  const ref = useRef<HTMLInputElement>(null);
+// ---------------------------------------------------------------------------
+// CellEditDialog — Dialog-based cell editor (replaces double-click-to-edit)
+// ---------------------------------------------------------------------------
 
+function CellEditDialog({
+  twsIdx,
+  twaIdx,
+  polar,
+  onCommit,
+  onClose,
+}: {
+  twsIdx: number;
+  twaIdx: number;
+  polar: PolarTable;
+  onCommit: (twsIdx: number, twaIdx: number, rawKnots: string) => Promise<void>;
+  onClose: () => void;
+}): React.JSX.Element {
+  const initialKn = (polar.boatSpeed[twsIdx]![twaIdx]! * MS_TO_KNOTS).toFixed(1);
+  const [value, setValue] = useState(initialKn);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus on mount
   useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
+    inputRef.current?.focus();
+    inputRef.current?.select();
   }, []);
+
+  const tws = (polar.twsBins[twsIdx]! * MS_TO_KNOTS).toFixed(0);
+  const twa = (polar.twaBins[twaIdx]! * RAD_TO_DEG).toFixed(0);
 
   const handleKey = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      void onCommit(value);
+      void onCommit(twsIdx, twaIdx, value);
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      onCancel();
+      onClose();
     }
   };
 
   return (
-    <input
-      ref={ref}
-      type="number"
-      step="0.1"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => onCommit(value)}
-      onKeyDown={handleKey}
-      onClick={(e) => e.stopPropagation()}
-      // Inline borderless look: inherit cell colours, no outline, no spacing.
-      className="w-full bg-transparent border-0 outline-none text-right font-mono p-0 m-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      style={{ color: 'inherit' }}
-    />
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Edit cell — TWS ${tws} kn, TWA ${twa}°`}
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => void onCommit(twsIdx, twaIdx, value)}>
+            Apply
+          </Button>
+        </>
+      }
+    >
+      <label className="block space-y-2">
+        <span className="text-ink-2 text-sm">Boat speed (knots)</span>
+        <input
+          ref={inputRef}
+          type="number"
+          step="0.1"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKey}
+          className="block w-full bg-surface-sunken border border-hairline [border-radius:var(--r-control)] px-3 py-2 font-mono text-ink text-right focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
+        />
+      </label>
+    </Dialog>
   );
 }

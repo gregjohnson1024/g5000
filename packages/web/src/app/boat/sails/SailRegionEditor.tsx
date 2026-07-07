@@ -9,6 +9,8 @@ import {
 } from '@g5000/core';
 import type { Sail } from '@g5000/db';
 import { colorForId } from '../../../lib/config-color';
+import { Button } from '../../../components/ui';
+import { SailGridLines, SailGridTwsTicks, SailGridTwaTicks } from './SailGridAxes';
 
 const CELL_W = 14;
 const CELL_H = 14;
@@ -40,19 +42,21 @@ export function SailRegionEditor({ sail, onSave }: Props) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm">
-          Editing: <b>{sail.name}</b> ({cells.size} cells)
+        <span className="text-sm text-ink">
+          Editing: <b>{sail.name}</b>{' '}
+          <span className="text-ink-3">({cells.size} cells)</span>
         </span>
-        <button
+        <Button
+          size="sm"
+          variant="primary"
           disabled={!dirty}
           onClick={() => {
             void onSave(Array.from(cells).sort());
             setDirty(false);
           }}
-          className="px-2 py-1 bg-accent text-on-accent text-sm rounded disabled:opacity-50"
         >
           Save
-        </button>
+        </Button>
       </div>
       <svg
         viewBox={`0 0 ${W + MARGIN_L} ${H + MARGIN_B}`}
@@ -60,6 +64,7 @@ export function SailRegionEditor({ sail, onSave }: Props) {
         className="w-full h-auto max-w-[900px]"
       >
         <g transform={`translate(${MARGIN_L},0)`}>
+          {/* Cell grid */}
           {Array.from({ length: SAIL_GRID_TWA_BINS }, (_, twaIdx) =>
             Array.from({ length: SAIL_GRID_TWS_BINS }, (_, twsIdx) => {
               const key = cellKey({ twsIdx, twaIdx });
@@ -82,53 +87,28 @@ export function SailRegionEditor({ sail, onSave }: Props) {
             }),
           )}
 
+          {/* Grid overlay lines (shared axis primitive) */}
+          <SailGridLines
+            CELL_W={CELL_W}
+            CELL_H={CELL_H}
+            W={W}
+            H={H}
+            TWA_STEP_DEG={SAIL_GRID_TWA_STEP_DEG}
+          />
+
           {/* TWS tick labels (bottom) */}
-          {[0, 5, 10, 15, 20, 25, 30, 35, 40].map((kn) => (
-            <text
-              key={`tx-${kn}`}
-              x={kn * CELL_W}
-              y={H + 14}
-              fontSize={10}
-              fill="currentColor"
-              fillOpacity={0.7}
-              textAnchor="middle"
-            >
-              {kn}
-            </text>
-          ))}
+          <SailGridTwsTicks CELL_W={CELL_W} H={H} />
         </g>
 
-        {/* TWA tick labels (left) */}
-        {[0, 30, 60, 90, 120, 150, 180].map((deg) => {
-          const y = (deg / SAIL_GRID_TWA_STEP_DEG) * CELL_H;
-          return (
-            <text
-              key={`ty-${deg}`}
-              x={MARGIN_L - 6}
-              y={y + 4}
-              fontSize={10}
-              fill="currentColor"
-              fillOpacity={0.7}
-              textAnchor="end"
-            >
-              {deg}°
-            </text>
-          );
-        })}
-
-        <text x={4} y={10} fontSize={10} fill="currentColor" fillOpacity={0.7}>
-          TWA
-        </text>
-        <text
-          x={W + MARGIN_L - 4}
-          y={H + 24}
-          fontSize={10}
-          fill="currentColor"
-          fillOpacity={0.7}
-          textAnchor="end"
-        >
-          TWS (kn)
-        </text>
+        {/* TWA tick labels + axis annotations (root level) */}
+        <SailGridTwaTicks
+          CELL_H={CELL_H}
+          MARGIN_L={MARGIN_L}
+          MARGIN_B={MARGIN_B}
+          W={W}
+          H={H}
+          TWA_STEP_DEG={SAIL_GRID_TWA_STEP_DEG}
+        />
       </svg>
     </div>
   );

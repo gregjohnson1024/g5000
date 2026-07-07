@@ -68,3 +68,32 @@ export {
 
 export { BottomSheet } from './BottomSheet';
 export type { BottomSheetProps } from './BottomSheet';
+
+// Phase 6 (task-1): Tier-1 additions
+export { DataTable } from './DataTable';
+export type { DataTableProps, ColumnDef } from './DataTable';
+
+export { RecordList } from './RecordList';
+export type { RecordListProps, RecordItem, RecordKind } from './RecordList';
+
+export { sortRows, toggleSort } from './data-table-sort';
+export type { SortDir, SortableRow } from './data-table-sort';
+
+export { SaveBar } from './SaveBar';
+export type { SaveBarProps } from './SaveBar';
+
+export { useDirtySave } from './use-dirty-save';
+export type { UseDirtySaveOptions, UseDirtySaveResult } from './use-dirty-save';
+
+// Field family
+export { TextField, NumberField, CoordField, SelectField, Slider, Checkbox, Radio } from './fields';
+export type {
+  TextFieldProps,
+  NumberFieldProps,
+  CoordFieldProps,
+  SelectFieldProps,
+  SelectOption,
+  SliderProps,
+  CheckboxProps,
+  RadioProps,
+} from './fields';

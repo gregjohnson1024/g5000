@@ -76,7 +76,7 @@ export function PolarPlot({
       width={size}
       height={size}
       viewBox={`0 0 ${size} ${size}`}
-      className="bg-slate-900 rounded"
+      className="bg-surface-sunken [border-radius:var(--r-panel)]"
     >
       {/* Speed rings */}
       {rings.map((v, i) => (

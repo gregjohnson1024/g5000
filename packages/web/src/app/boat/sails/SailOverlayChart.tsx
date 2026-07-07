@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { SAIL_GRID_TWS_BINS, SAIL_GRID_TWA_BINS, SAIL_GRID_TWA_STEP_DEG } from '@g5000/core';
 import type { SailCategory, SailWardrobe } from '@g5000/db';
 import { colorForId } from '../../../lib/config-color';
+import { SailGridLines, SailGridTwsTicks, SailGridTwaTicks } from './SailGridAxes';
 
 const CELL_W = 14;
 const CELL_H = 14;
@@ -35,32 +36,14 @@ export function SailOverlayChart({ wardrobe, filterCategory = 'all', liveCell }:
       className="w-full h-auto max-w-[900px]"
     >
       <g transform={`translate(${MARGIN_L},0)`}>
-        {/* Axis lines */}
-        {[0, 5, 10, 15, 20, 25, 30, 35, 40].map((kn) => (
-          <line
-            key={`gx-${kn}`}
-            x1={kn * CELL_W}
-            y1={0}
-            x2={kn * CELL_W}
-            y2={H}
-            stroke="currentColor"
-            strokeOpacity={0.2}
-          />
-        ))}
-        {[0, 30, 60, 90, 120, 150, 180].map((deg) => {
-          const y = (deg / SAIL_GRID_TWA_STEP_DEG) * CELL_H;
-          return (
-            <line
-              key={`gy-${deg}`}
-              x1={0}
-              y1={y}
-              x2={W}
-              y2={y}
-              stroke="currentColor"
-              strokeOpacity={0.2}
-            />
-          );
-        })}
+        {/* Grid lines (shared axis primitive) */}
+        <SailGridLines
+          CELL_W={CELL_W}
+          CELL_H={CELL_H}
+          W={W}
+          H={H}
+          TWA_STEP_DEG={SAIL_GRID_TWA_STEP_DEG}
+        />
 
         {/* Region fills */}
         {sails.map((sail) => (
@@ -93,52 +76,18 @@ export function SailOverlayChart({ wardrobe, filterCategory = 'all', liveCell }:
         )}
 
         {/* TWS tick labels (bottom) */}
-        {[0, 5, 10, 15, 20, 25, 30, 35, 40].map((kn) => (
-          <text
-            key={`tx-${kn}`}
-            x={kn * CELL_W}
-            y={H + 14}
-            fontSize={10}
-            fill="currentColor"
-            fillOpacity={0.7}
-            textAnchor="middle"
-          >
-            {kn}
-          </text>
-        ))}
+        <SailGridTwsTicks CELL_W={CELL_W} H={H} />
       </g>
 
-      {/* TWA tick labels (left) */}
-      {[0, 30, 60, 90, 120, 150, 180].map((deg) => {
-        const y = (deg / SAIL_GRID_TWA_STEP_DEG) * CELL_H;
-        return (
-          <text
-            key={`ty-${deg}`}
-            x={MARGIN_L - 6}
-            y={y + 4}
-            fontSize={10}
-            fill="currentColor"
-            fillOpacity={0.7}
-            textAnchor="end"
-          >
-            {deg}°
-          </text>
-        );
-      })}
-
-      <text x={4} y={10} fontSize={10} fill="currentColor" fillOpacity={0.7}>
-        TWA
-      </text>
-      <text
-        x={W + MARGIN_L - 4}
-        y={H + 24}
-        fontSize={10}
-        fill="currentColor"
-        fillOpacity={0.7}
-        textAnchor="end"
-      >
-        TWS (kn)
-      </text>
+      {/* TWA tick labels + axis annotations (root level) */}
+      <SailGridTwaTicks
+        CELL_H={CELL_H}
+        MARGIN_L={MARGIN_L}
+        MARGIN_B={MARGIN_B}
+        W={W}
+        H={H}
+        TWA_STEP_DEG={SAIL_GRID_TWA_STEP_DEG}
+      />
     </svg>
   );
 }

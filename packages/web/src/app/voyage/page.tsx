@@ -13,6 +13,7 @@ import { bearingDeg, greatCircleNm } from '../../lib/geo';
 import { TzToggle } from '../../components/TzToggle';
 import { fmtLatLonDmm } from '../../lib/coords';
 import { EnginePanel } from './EnginePanel';
+import { TimeSeriesPanel } from '../../components/charts';
 
 interface EtaSnapshot {
   destinationLat: number;
@@ -32,12 +33,7 @@ const M_TO_NM = 1 / 1852;
 const TZ_KEY = 'passage:tz';
 
 /**
- * Bermuda reference for the "distance to/from Bermuda" tile. St George's
- * Town Cut entrance is the customary departure / clearance point for any
- * passage to the US East Coast or transatlantic, so it's the right anchor
- * for "how far back to Bermuda" thinking. At passage range the choice of
- * Bermuda landmark only matters to a couple of NM (the island is ~22 NM
- * long); this is precise enough for return-decision purposes.
+ * Bermuda reference for the "distance to/from Bermuda" tile.
  */
 const BERMUDA = {
   lat: 32 + 22.7 / 60,
@@ -63,77 +59,6 @@ interface DistanceStats {
   }>;
 }
 
-function Sparkline({
-  data,
-  tz,
-  width = 600,
-  height = 60,
-}: {
-  data: Array<{ endingAt: number; d24hM: number }>;
-  tz: TzMode;
-  width?: number;
-  height?: number;
-}) {
-  if (data.length < 2) {
-    return (
-      <div className="text-xs text-slate-500 italic">
-        Need ≥ 24 h of track for a 24h-rolling history. ({data.length} bucket
-        {data.length === 1 ? '' : 's'} so far.)
-      </div>
-    );
-  }
-  // History is newest-first from the API. Reverse for left-to-right time order.
-  const series = [...data].reverse();
-  const xs = series.map((d) => d.endingAt);
-  const ys = series.map((d) => d.d24hM * M_TO_NM);
-  const xMin = xs[0]!;
-  const xMax = xs[xs.length - 1]!;
-  const yMin = Math.min(...ys);
-  const yMax = Math.max(...ys);
-  const padY = (yMax - yMin) * 0.1 || 1;
-  const yLo = yMin - padY;
-  const yHi = yMax + padY;
-  const px = (x: number): number => ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
-  const py = (y: number): number =>
-    height - 12 - ((y - yLo) / Math.max(0.0001, yHi - yLo)) * (height - 24);
-  const path = series
-    .map((d, i) => {
-      const x = px(d.endingAt);
-      const y = py(d.d24hM * M_TO_NM);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const lastNm = ys[ys.length - 1]!.toFixed(1);
-  return (
-    <div className="space-y-1">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        width="100%"
-        height={height}
-        className="bg-slate-900 border border-slate-800 rounded"
-      >
-        <path d={path} fill="none" stroke="var(--accent-ink)" strokeWidth="1.5" />
-        {series.map((d, i) => (
-          <circle
-            key={d.endingAt}
-            cx={px(d.endingAt)}
-            cy={py(d.d24hM * M_TO_NM)}
-            r={i === series.length - 1 ? 2.5 : 1}
-            fill="var(--accent-ink)"
-          />
-        ))}
-      </svg>
-      <div className="flex justify-between text-[10px] text-slate-500 font-mono px-1">
-        <span>{fmtHourLabel(xMin, tz)}</span>
-        <span>
-          range {yMin.toFixed(0)}–{yMax.toFixed(0)} NM · latest {lastNm} NM
-        </span>
-        <span>{fmtHourLabel(xMax, tz)}</span>
-      </div>
-    </div>
-  );
-}
-
 interface PassageLogSnapshot {
   anchorAt: number | null;
   distanceM: number;
@@ -147,10 +72,6 @@ export default function PassagePage() {
   const [log, setLog] = useState<PassageLogSnapshot | null>(null);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Page-level timezone preference — controls how every timestamp on this
-  // page is displayed AND how datetime-local form inputs are interpreted.
-  // Default Local (matches /chart and what the user prefers for passage
-  // planning); persisted to localStorage so the choice sticks across reloads.
   const [tz, setTz] = useState<TzMode>('local');
   useEffect(() => {
     setTz(readTzMode(TZ_KEY, 'local'));
@@ -221,11 +142,11 @@ export default function PassagePage() {
   return (
     <main className="p-4 flex-1 overflow-y-auto bg-canvas space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-xl font-semibold text-slate-300">Passage</h1>
+        <h1 className="text-[1.111rem] font-semibold text-ink-value">Passage</h1>
         <div className="flex items-center gap-3">
           <TzToggle tz={tz} setTz={setTz} />
           {stats?.trackId && (
-            <div className="text-xs text-slate-500 font-mono">
+            <div className="text-caption text-ink-3 font-mono">
               {stats.trackId}
               {stats.trackStartAt &&
                 ` · ${formatDuration((stats.lastPointAt ?? Date.now() / 1000) - stats.trackStartAt)} elapsed`}
@@ -235,16 +156,16 @@ export default function PassagePage() {
       </div>
 
       {error && (
-        <div className="text-rose-400 text-sm bg-rose-900/20 border border-rose-800 rounded p-2">
+        <div className="text-danger text-body-sm bg-danger/10 border border-danger-strong [border-radius:var(--r-panel)] p-2">
           {error}
         </div>
       )}
 
       {!stats?.trackId && !error && (
-        <div className="text-slate-400 text-sm">
-          No active track. Start one on{' '}
-          <Link href="/tracks" className="underline hover:text-slate-200">
-            /tracks
+        <div className="text-ink-2 text-body-sm">
+          No active track. Start one on {/* Fixed: was /tracks (dead link); now /voyage/logbook */}
+          <Link href="/voyage/logbook" className="underline hover:text-ink">
+            Logbook
           </Link>
           .
         </div>
@@ -268,7 +189,7 @@ export default function PassagePage() {
 
           {stats.daily7.length > 0 && (
             <section className="space-y-2">
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+              <h2 className="text-label uppercase tracking-wider text-ink-2">
                 Previous 7 UTC-days (midnight to midnight)
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
@@ -279,12 +200,8 @@ export default function PassagePage() {
             </section>
           )}
 
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              24 h rolling (per hour, since track start)
-            </h2>
-            <Sparkline data={stats.history24h} tz={tz} />
-          </section>
+          {/* 24h rolling history sparkline via TimeSeriesPanel */}
+          <Sparkline24h data={stats.history24h} tz={tz} />
         </>
       )}
 
@@ -292,6 +209,127 @@ export default function PassagePage() {
     </main>
   );
 }
+
+// ---------------------------------------------------------------------------
+// 24h rolling history sparkline — migrated to TimeSeriesPanel
+// ---------------------------------------------------------------------------
+
+function Sparkline24h({
+  data,
+  tz,
+}: {
+  data: Array<{ endingAt: number; d24hM: number }>;
+  tz: TzMode;
+}) {
+  if (data.length < 2) {
+    return (
+      <div className="text-caption text-ink-3 italic">
+        Need &ge; 24 h of track for a 24h-rolling history. ({data.length} bucket
+        {data.length === 1 ? '' : 's'} so far.)
+      </div>
+    );
+  }
+
+  // History is newest-first from the API. Reverse for left-to-right time order.
+  const series = [...data].reverse();
+  const tMin = series[0]!.endingAt;
+  const tMax = series[series.length - 1]!.endingAt;
+  const points = series.map((d) => ({ tMs: d.endingAt, v: d.d24hM * M_TO_NM }));
+
+  const tMinLabel = fmtHourLabel(tMin, tz);
+  const tMaxLabel = fmtHourLabel(tMax, tz);
+
+  return (
+    <section className="space-y-1">
+      <h2 className="text-label uppercase tracking-wider text-ink-2">
+        24 h rolling (per hour, since track start)
+      </h2>
+      <TimeSeriesPanel
+        title="24h rolling NM"
+        unit="NM"
+        series={[
+          {
+            id: 'rolling24h',
+            label: '24h NM',
+            color: 'var(--accent-ink)',
+            points,
+          },
+        ]}
+        tMin={tMin}
+        tMax={tMax}
+        height={80}
+        valueFmt={(v) => v.toFixed(1)}
+      />
+      <div className="flex justify-between text-caption text-ink-3 font-mono px-1">
+        <span>{tMinLabel}</span>
+        <span>{tMaxLabel}</span>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cumulative sparkline — migrated to TimeSeriesPanel
+// ---------------------------------------------------------------------------
+
+function CumulativeSparkline({
+  anchorAt,
+  history,
+  tz,
+}: {
+  anchorAt: number;
+  history: Array<{ t: number; cumulativeM: number }>;
+  tz: TzMode;
+}) {
+  if (history.length < 2) {
+    return (
+      <div className="text-caption text-ink-3 italic">
+        Sparkline appears once at least an hour of travel has accumulated.
+      </div>
+    );
+  }
+
+  // Prepend (anchorAt, 0) so the curve starts at the baseline
+  const rawPoints = [{ t: anchorAt, cumulativeM: 0 }, ...history];
+  const points = rawPoints.map((d) => ({ tMs: d.t * 1000, v: d.cumulativeM * M_TO_NM }));
+  const tMin = points[0]!.tMs;
+  const tMax = points[points.length - 1]!.tMs;
+
+  const tMinLabel = fmtHourLabel(anchorAt * 1000, tz);
+  const tMaxLabel = fmtHourLabel(history[history.length - 1]!.t * 1000, tz);
+  const latestNm = (history[history.length - 1]!.cumulativeM * M_TO_NM).toFixed(1);
+
+  return (
+    <div className="space-y-1">
+      <TimeSeriesPanel
+        title="Cumulative NM"
+        unit="NM"
+        series={[
+          {
+            id: 'cumulative',
+            label: 'Cumulative NM',
+            color: 'var(--ok)',
+            points,
+          },
+        ]}
+        tMin={tMin}
+        tMax={tMax}
+        domain={[0, parseFloat(latestNm) * 1.1 || 1]}
+        height={80}
+        valueFmt={(v) => v.toFixed(1)}
+      />
+      <div className="flex justify-between text-caption text-ink-3 font-mono px-1">
+        <span>{tMinLabel}</span>
+        <span>0 → {latestNm} NM cumulative</span>
+        <span>{tMaxLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DailyTile
+// ---------------------------------------------------------------------------
 
 function DailyTile({
   bucket,
@@ -307,33 +345,34 @@ function DailyTile({
 }) {
   const nm = bucket.distanceM * M_TO_NM;
   const startsD = new Date(bucket.startsAt * 1000);
-  // The "label" for the bucket is the calendar date of `startsAt` —
-  // matches the marine convention of "today's run" = midnight-to-midnight
-  // of the date you started.
   const label =
     tz === 'utc'
       ? `${String(startsD.getUTCDate()).padStart(2, '0')} ${startsD.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`
       : `${String(startsD.getDate()).padStart(2, '0')} ${startsD.toLocaleString('en-GB', { month: 'short' })}`;
   return (
     <div
-      className={`rounded p-2 border flex flex-col gap-0.5 ${
+      className={`[border-radius:var(--r-panel)] p-2 border flex flex-col gap-0.5 ${
         bucket.complete
-          ? 'bg-slate-900 border-slate-800'
-          : 'bg-slate-900/50 border-slate-800 border-dashed'
+          ? 'bg-surface border-hairline'
+          : 'bg-surface/50 border-hairline border-dashed'
       }`}
       title={bucket.complete ? 'Full 24 h bucket' : 'Partial — bucket extends before track start'}
     >
-      <div className="text-xs uppercase tracking-wider text-slate-400">{label}</div>
+      <div className="text-label uppercase tracking-wider text-ink-2">{label}</div>
       <div className="flex items-baseline gap-1">
-        <div className="text-2xl font-mono text-slate-100">{nm.toFixed(1)}</div>
-        <div className="text-xs text-slate-400">NM</div>
+        <div className="text-[1.5rem] font-mono tabular-nums text-ink-value">{nm.toFixed(1)}</div>
+        <div className="text-caption text-ink-2">NM</div>
       </div>
-      <div className="text-[10px] text-slate-500 font-mono">
+      <div className="text-caption text-ink-3 font-mono tabular-nums">
         avg {(nm / 24).toFixed(2)} NM/h{bucket.complete ? '' : ' · partial'}
       </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// DistanceTile
+// ---------------------------------------------------------------------------
 
 function DistanceTile({
   label,
@@ -343,26 +382,33 @@ function DistanceTile({
 }: {
   label: string;
   valueNm: number;
-  /** Window length in hours; used to compute the avg-speed subtitle. */
   hours: number;
   highlight?: boolean;
 }) {
   const avgKn = valueNm / hours;
   return (
     <div
-      className={`rounded p-4 flex flex-col gap-1 border ${
-        highlight ? 'bg-amber-900/20 border-amber-700' : 'bg-slate-900 border-slate-800'
+      className={`[border-radius:var(--r-panel)] p-4 flex flex-col gap-1 border ${
+        highlight ? 'bg-accent/10 border-accent' : 'bg-surface border-hairline'
       }`}
     >
-      <div className="text-xs uppercase tracking-wider text-slate-400">{label}</div>
+      <div className="text-label uppercase tracking-wider text-ink-2">{label}</div>
       <div className="flex items-baseline gap-1">
-        <div className="text-3xl font-mono text-slate-100">{valueNm.toFixed(1)}</div>
-        <div className="text-sm text-slate-400">NM</div>
+        <div className="text-[1.875rem] font-mono tabular-nums text-ink-value">
+          {valueNm.toFixed(1)}
+        </div>
+        <div className="text-body-sm text-ink-2">NM</div>
       </div>
-      <div className="text-base text-slate-400 font-mono">avg {avgKn.toFixed(2)} NM/h</div>
+      <div className="text-body-sm text-ink-2 font-mono tabular-nums">
+        avg {avgKn.toFixed(2)} NM/h
+      </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// BermudaTile
+// ---------------------------------------------------------------------------
 
 function BermudaTile({ eta }: { eta: EtaSnapshot }) {
   const distNm = greatCircleNm(
@@ -374,26 +420,32 @@ function BermudaTile({ eta }: { eta: EtaSnapshot }) {
     { lat: BERMUDA.lat, lon: BERMUDA.lon },
   );
   return (
-    <section className="bg-slate-900 border border-cyan-700 rounded p-4 flex items-baseline justify-between gap-4 flex-wrap">
+    <section className="bg-surface border border-info [border-radius:var(--r-panel)] p-4 flex items-baseline justify-between gap-4 flex-wrap">
       <div>
-        <div className="text-xs uppercase tracking-wider text-cyan-400">From</div>
-        <div className="text-lg font-semibold text-slate-100">{BERMUDA.label}</div>
-        <div className="text-xs text-slate-500 font-mono">
+        <div className="text-label uppercase tracking-wider text-info">From</div>
+        <div className="text-[1.111rem] font-semibold text-ink-value">{BERMUDA.label}</div>
+        <div className="text-caption text-ink-3 font-mono">
           {fmtLatLonDmm(BERMUDA.lat, BERMUDA.lon)}
         </div>
       </div>
       <div className="text-right">
         <div className="flex items-baseline gap-1 justify-end">
-          <div className="text-4xl font-mono text-slate-100">{distNm.toFixed(1)}</div>
-          <div className="text-sm text-slate-400">NM</div>
+          <div className="text-[2.25rem] font-mono tabular-nums text-ink-value">
+            {distNm.toFixed(1)}
+          </div>
+          <div className="text-body-sm text-ink-2">NM</div>
         </div>
-        <div className="text-xs text-slate-500 font-mono">
+        <div className="text-caption text-ink-3 font-mono">
           bearing to Bermuda {String(Math.round(brgDeg)).padStart(3, '0')}°T
         </div>
       </div>
     </section>
   );
 }
+
+// ---------------------------------------------------------------------------
+// LogTile
+// ---------------------------------------------------------------------------
 
 function LogTile({
   log,
@@ -414,15 +466,17 @@ function LogTile({
   const elapsedText =
     log.anchorAt !== null ? ` · ${formatDuration(Date.now() / 1000 - log.anchorAt)} elapsed` : '';
   return (
-    <section className="bg-slate-900 border border-emerald-700 rounded p-4 space-y-3">
+    <section className="bg-surface border border-ok [border-radius:var(--r-panel)] p-4 space-y-3">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-1">
-          <div className="text-xs uppercase tracking-wider text-emerald-400">Log</div>
+          <div className="text-label uppercase tracking-wider text-ok">Log</div>
           <div className="flex items-baseline gap-1">
-            <div className="text-4xl font-mono text-slate-100">{distNm.toFixed(1)}</div>
-            <div className="text-sm text-slate-400">NM travelled</div>
+            <div className="text-[2.25rem] font-mono tabular-nums text-ink-value">
+              {distNm.toFixed(1)}
+            </div>
+            <div className="text-body-sm text-ink-2">NM travelled</div>
           </div>
-          <div className="text-xs text-slate-500 font-mono">
+          <div className="text-caption text-ink-3 font-mono">
             {sinceText}
             {elapsedText}
           </div>
@@ -431,7 +485,7 @@ function LogTile({
           type="button"
           onClick={onReset}
           disabled={resetting}
-          className="bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 text-white px-4 py-2 rounded text-sm self-start md:self-auto"
+          className="bg-ok border border-ok-strong text-on-accent disabled:opacity-50 px-4 py-2 [border-radius:var(--r-control)] text-body-sm self-start md:self-auto min-h-[44px]"
         >
           {resetting ? 'Resetting…' : 'Reset to now'}
         </button>
@@ -443,75 +497,9 @@ function LogTile({
   );
 }
 
-function CumulativeSparkline({
-  anchorAt,
-  history,
-  tz,
-  width = 600,
-  height = 60,
-}: {
-  anchorAt: number;
-  history: Array<{ t: number; cumulativeM: number }>;
-  tz: TzMode;
-  width?: number;
-  height?: number;
-}) {
-  if (history.length < 2) {
-    return (
-      <div className="text-xs text-slate-500 italic">
-        Sparkline appears once at least an hour of travel has accumulated.
-      </div>
-    );
-  }
-  // Always start the curve at (anchorAt, 0) so the slope from the origin
-  // is visible — otherwise the first bucket starts mid-air and the user
-  // can't see the zero baseline.
-  const series = [{ t: anchorAt, cumulativeM: 0 }, ...history];
-  const xs = series.map((d) => d.t);
-  const ys = series.map((d) => d.cumulativeM * M_TO_NM);
-  const xMin = xs[0]!;
-  const xMax = xs[xs.length - 1]!;
-  // Cumulative distance starts at 0 by construction; clamp yLo to 0 so the
-  // baseline is always at the bottom even if the boat has barely moved.
-  const yMax = Math.max(...ys);
-  const padY = yMax * 0.1 || 1;
-  const yHi = yMax + padY;
-  const px = (x: number): number => ((x - xMin) / Math.max(1, xMax - xMin)) * (width - 24) + 12;
-  const py = (y: number): number => height - 12 - (y / Math.max(0.0001, yHi)) * (height - 24);
-  const path = series
-    .map((d, i) => {
-      const x = px(d.t);
-      const y = py(d.cumulativeM * M_TO_NM);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const latestNm = ys[ys.length - 1]!.toFixed(1);
-  return (
-    <div className="space-y-1">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        width="100%"
-        height={height}
-        className="bg-slate-950 border border-slate-800 rounded"
-      >
-        <path d={path} fill="none" stroke="var(--ok)" strokeWidth="1.5" />
-        <circle cx={px(xMax)} cy={py(ys[ys.length - 1]!)} r={2.5} fill="var(--ok)" />
-      </svg>
-      <div className="flex justify-between text-[10px] text-slate-500 font-mono px-1">
-        <span>{fmtHourLabel(xMin, tz)}</span>
-        <span>0 → {latestNm} NM cumulative</span>
-        <span>{fmtHourLabel(xMax, tz)}</span>
-      </div>
-    </div>
-  );
-}
-
-function weekdayFor(unixSec: number, tz: TzMode): string {
-  return new Date(unixSec * 1000).toLocaleString('en-US', {
-    weekday: 'short',
-    timeZone: tz === 'utc' ? 'UTC' : undefined,
-  });
-}
+// ---------------------------------------------------------------------------
+// EtaTile
+// ---------------------------------------------------------------------------
 
 function EtaTile({
   eta,
@@ -524,47 +512,47 @@ function EtaTile({
 }) {
   const altTz: TzMode = tz === 'utc' ? 'local' : 'utc';
   return (
-    <section className="bg-slate-900 border border-amber-700 rounded p-4 space-y-3">
+    <section className="bg-surface border border-accent [border-radius:var(--r-panel)] p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
         <div>
-          <div className="text-xs uppercase tracking-wider text-amber-400">ETA</div>
-          <div className="text-lg font-semibold text-slate-100">{eta.destinationLabel}</div>
-          <div className="text-xs text-slate-500 font-mono">
+          <div className="text-label uppercase tracking-wider text-accent-ink">ETA</div>
+          <div className="text-[1.111rem] font-semibold text-ink-value">{eta.destinationLabel}</div>
+          <div className="text-caption text-ink-3 font-mono">
             {fmtLatLonDmm(eta.destinationLat, eta.destinationLon)}
           </div>
         </div>
         <div className="text-right">
           <div className="flex items-baseline gap-1 justify-end">
-            <div className="text-4xl font-mono text-slate-100">{eta.distanceNm.toFixed(1)}</div>
-            <div className="text-sm text-slate-400">NM remaining</div>
+            <div className="text-[2.25rem] font-mono tabular-nums text-ink-value">
+              {eta.distanceNm.toFixed(1)}
+            </div>
+            <div className="text-body-sm text-ink-2">NM remaining</div>
           </div>
-          <div className="text-xs text-slate-500 font-mono">
+          <div className="text-caption text-ink-3 font-mono">
             bearing {eta.bearingDeg.toFixed(0)}°T
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 text-sm font-mono">
+      <div className="grid grid-cols-2 gap-3 text-body-sm font-mono">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">
-            Avg speed (last 3 h)
-          </div>
-          <div className="text-xl text-slate-100">
+          <div className="text-label uppercase tracking-wider text-ink-3">Avg speed (last 3 h)</div>
+          <div className="text-[1.25rem] tabular-nums text-ink-value">
             {eta.avgSpeedKn3h !== null ? `${eta.avgSpeedKn3h.toFixed(2)} kn` : '—'}
           </div>
         </div>
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">Time remaining</div>
-          <div className="text-xl text-slate-100">
+          <div className="text-label uppercase tracking-wider text-ink-3">Time remaining</div>
+          <div className="text-[1.25rem] tabular-nums text-ink-value">
             {eta.etaSecRemaining !== null ? formatDuration(eta.etaSecRemaining) : '—'}
           </div>
         </div>
       </div>
-      <div className="text-base font-mono text-slate-100">
+      <div className="text-body font-mono tabular-nums text-ink-value">
         {eta.etaUnixSec !== null
           ? `${weekdayFor(eta.etaUnixSec, tz)} ${fmtTimestamp(eta.etaUnixSec, tz)}`
           : '— stopped, no ETA'}
         {eta.etaUnixSec !== null && (
-          <span className="text-xs text-slate-500 ml-2">
+          <span className="text-caption text-ink-3 ml-2">
             ({weekdayFor(eta.etaUnixSec, altTz)} {fmtTimestamp(eta.etaUnixSec, altTz)})
           </span>
         )}
@@ -574,4 +562,11 @@ function EtaTile({
       )}
     </section>
   );
+}
+
+function weekdayFor(unixSec: number, tz: TzMode): string {
+  return new Date(unixSec * 1000).toLocaleString('en-US', {
+    weekday: 'short',
+    timeZone: tz === 'utc' ? 'UTC' : undefined,
+  });
 }

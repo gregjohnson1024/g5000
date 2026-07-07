@@ -1,10 +1,20 @@
-import { readdir, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { GRIB_CACHE } from '../../../lib/paths';
+'use client';
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+/**
+ * /conditions/models — GRIB cache viewer.
+ *
+ * Phase 6 task-2:
+ *   - Converted from server component to client component so it can subscribe
+ *     to BroadcastChannel('forecast-cache') and auto-refresh when /conditions
+ *     posts a 'fetch-complete' event.
+ *   - Retokenized (no raw Tailwind slate-* or explicit bg-slate classes).
+ *   - Uses Panel + DataTable primitives.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import { Panel } from '../../../components/ui';
+import { DataTable } from '../../../components/ui';
+import type { ColumnDef } from '../../../components/ui/DataTable';
 
 interface CacheEntry {
   model: string;
@@ -13,60 +23,9 @@ interface CacheEntry {
   mtime: number;
 }
 
-async function listCache(): Promise<CacheEntry[]> {
-  if (!existsSync(GRIB_CACHE)) return [];
-  const items: CacheEntry[] = [];
-  let models: string[];
-  try {
-    models = await readdir(GRIB_CACHE);
-  } catch {
-    return [];
-  }
-  for (const model of models) {
-    const modelDir = join(GRIB_CACHE, model);
-    try {
-      const s = await stat(modelDir);
-      if (!s.isDirectory()) continue;
-    } catch {
-      continue;
-    }
-    const runs = await readdir(modelDir);
-    for (const run of runs) {
-      const runDir = join(modelDir, run);
-      try {
-        const s = await stat(runDir);
-        if (!s.isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      let size = 0;
-      let mtime = 0;
-      const bboxDirs = await readdir(runDir);
-      for (const bboxDir of bboxDirs) {
-        const bboxPath = join(runDir, bboxDir);
-        try {
-          const s = await stat(bboxPath);
-          if (!s.isDirectory()) continue;
-        } catch {
-          continue;
-        }
-        const files = await readdir(bboxPath);
-        for (const f of files) {
-          try {
-            const fs2 = await stat(join(bboxPath, f));
-            if (!fs2.isFile()) continue;
-            size += fs2.size;
-            if (fs2.mtimeMs > mtime) mtime = fs2.mtimeMs;
-          } catch {
-            // ignore
-          }
-        }
-      }
-      items.push({ model, runTime: run, size, mtime });
-    }
-  }
-  items.sort((a, b) => b.mtime - a.mtime);
-  return items;
+interface CacheResponse {
+  ok: boolean;
+  items: CacheEntry[];
 }
 
 function formatSize(bytes: number): string {
@@ -87,40 +46,115 @@ function formatMtime(ms: number): string {
   return new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
 }
 
-export default async function GribCachePage() {
-  const items = await listCache();
-  const totalSize = items.reduce((acc, it) => acc + it.size, 0);
+// ── DataTable column definitions ─────────────────────────────────────────────
+
+const COLS: ColumnDef<CacheEntry>[] = [
+  {
+    key: 'model',
+    label: 'Model',
+    sortable: true,
+    align: 'left',
+    render: (r) => r.model.toUpperCase(),
+    sortValue: (r) => r.model,
+  },
+  {
+    key: 'runTime',
+    label: 'Run time (UTC)',
+    sortable: true,
+    render: (r) => formatRunTime(r.runTime),
+    sortValue: (r) => Number(r.runTime),
+  },
+  {
+    key: 'size',
+    label: 'Size',
+    sortable: true,
+    render: (r) => formatSize(r.size),
+    sortValue: (r) => r.size,
+  },
+  {
+    key: 'mtime',
+    label: 'Last modified',
+    sortable: true,
+    render: (r) => formatMtime(r.mtime),
+    sortValue: (r) => r.mtime,
+  },
+];
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function GribCachePage() {
+  const [items, setItems] = useState<CacheEntry[]>([]);
+  const [totalSize, setTotalSize] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setErr(null);
+    try {
+      const r = await fetch('/api/grib/list', { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = (await r.json()) as CacheResponse;
+      if (j.ok) {
+        setItems(j.items);
+        setTotalSize(j.items.reduce((acc, it) => acc + it.size, 0));
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  // Subscribe to forecast-cache BroadcastChannel — same channel /conditions posts to
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const bc = new BroadcastChannel('forecast-cache');
+    bc.onmessage = () => {
+      // A refresh completed on /conditions — reload our cache list
+      void reload();
+    };
+    return () => bc.close();
+  }, [reload]);
+
+  const chipLabel = `${items.length} run${items.length === 1 ? '' : 's'} · ${formatSize(totalSize)}`;
+
   return (
-    <main className="p-8 max-w-4xl">
-      <h1 className="text-2xl mb-2">GRIB Cache</h1>
-      <div className="text-xs text-slate-500 mb-4">
-        {items.length} run{items.length === 1 ? '' : 's'} · {formatSize(totalSize)} total
-      </div>
-      {items.length === 0 && <div className="text-slate-400">Cache is empty.</div>}
-      {items.length > 0 && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-800">
-              <th className="py-2 pr-4">Model</th>
-              <th className="py-2 pr-4">Run time (UTC)</th>
-              <th className="py-2 pr-4 text-right">Size</th>
-              <th className="py-2 pr-4">Last modified</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {items.map((it) => (
-              <tr key={`${it.model}/${it.runTime}`}>
-                <td className="py-2 pr-4 uppercase">{it.model}</td>
-                <td className="py-2 pr-4 font-mono text-xs">{formatRunTime(it.runTime)}</td>
-                <td className="py-2 pr-4 text-right">{formatSize(it.size)}</td>
-                <td className="py-2 pr-4 font-mono text-xs text-slate-400">
-                  {formatMtime(it.mtime)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+    <main className="p-6 max-w-4xl mx-auto space-y-4">
+      <h1 className="text-xl font-semibold text-ink">GRIB Cache</h1>
+
+      <Panel
+        label="Cached model runs"
+        chip={loading ? 'neutral' : err ? 'alarm' : 'ok'}
+        chipLabel={loading ? 'Loading…' : err ? 'Error' : chipLabel}
+      >
+        {err && <p className="text-body-sm text-danger mb-3">{err}</p>}
+
+        {!loading && items.length === 0 && !err && (
+          <p className="text-body-sm text-ink-3">Cache is empty.</p>
+        )}
+
+        {items.length > 0 && (
+          <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+            <DataTable
+              columns={COLS}
+              rows={items}
+              rowKey={(r) => `${r.model}/${r.runTime}`}
+              defaultSortKey="mtime"
+              defaultSortDir="desc"
+            />
+          </div>
+        )}
+      </Panel>
+
+      <p className="text-caption text-ink-4">
+        Cache auto-refreshes when a fetch completes on the Forecast page. Navigate between tabs —
+        both pages share the same <code className="font-mono">forecast-cache</code> broadcast
+        channel.
+      </p>
     </main>
   );
 }

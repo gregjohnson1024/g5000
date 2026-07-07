@@ -1,7 +1,15 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { SatelliteCachePanel } from './SatelliteCachePanel';
 import { PLANNING_DEFAULTS, type PlanningSettings } from '../../../lib/planning-settings';
+import {
+  NumberField,
+  Checkbox,
+  SelectField,
+  SaveBar,
+  useDirtySave,
+  Panel,
+} from '../../../components/ui';
 
 type SourceMode = 'live' | 'demo' | 'replay';
 interface SourceModeStatus {
@@ -13,9 +21,29 @@ interface SourceModeStatus {
   errorMessage?: string;
 }
 
-// A fresh, mutable copy of the engine defaults. Used both for initial state and
-// the Reset button so the two never drift apart.
-function freshDefaults(): Required<PlanningSettings> {
+// ---------------------------------------------------------------------------
+// Shared: PATCH a single top-level key to /api/settings (no clobber race).
+// ---------------------------------------------------------------------------
+
+async function patchSettings(key: string, value: unknown): Promise<void> {
+  const res = await fetch('/api/settings', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ [key]: value }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? `PATCH failed: HTTP ${res.status}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Planning section — staged save via SaveBar + useDirtySave
+// ---------------------------------------------------------------------------
+
+type PlanningDraft = Required<PlanningSettings>;
+
+function freshDefaults(): PlanningDraft {
   return {
     stepMinutes: PLANNING_DEFAULTS.stepMinutes,
     pruneBucketDeg: PLANNING_DEFAULTS.pruneBucketDeg,
@@ -28,140 +56,142 @@ function freshDefaults(): Required<PlanningSettings> {
 }
 
 function PlanningSection() {
-  const [p, setP] = useState<Required<PlanningSettings>>(freshDefaults);
-  const [status, setStatus] = useState<string | null>(null);
+  const [serverValue, setServerValue] = useState<PlanningDraft | null>(null);
 
   useEffect(() => {
     void fetch('/api/settings')
       .then((r) => r.json())
-      .then((j) => {
+      .then((j: { ok?: boolean; settings?: { planning?: Partial<PlanningDraft> } }) => {
+        const defaults = freshDefaults();
         if (j.ok && j.settings?.planning) {
-          setP((prev) => ({
-            ...prev,
+          setServerValue({
+            ...defaults,
             ...j.settings.planning,
-            autoMotor: { ...prev.autoMotor, ...(j.settings.planning.autoMotor ?? {}) },
-          }));
+            autoMotor: { ...defaults.autoMotor, ...(j.settings.planning.autoMotor ?? {}) },
+          });
+        } else {
+          setServerValue(defaults);
         }
       })
-      .catch(() => {});
+      .catch(() => setServerValue(freshDefaults()));
   }, []);
 
-  const save = async () => {
-    setStatus('Saving…');
-    const cur = await fetch('/api/settings')
-      .then((r) => r.json())
-      .catch(() => ({ settings: {} }));
-    const merged = { ...(cur.settings ?? {}), planning: p };
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(merged),
+  const { draft, setDraftKey, dirtyCount, isDirty, busy, err, ok, save, reset } =
+    useDirtySave<PlanningDraft>({
+      initial: serverValue,
+      onSave: async (d) => patchSettings('planning', d),
     });
-    setStatus(res.ok ? 'Saved' : 'Save failed');
-    setTimeout(() => setStatus(null), 2500);
-  };
 
-  const num = (label: string, hint: string, key: keyof PlanningSettings, step = 1, min = 0) => (
-    <label className="block text-sm">
-      {label}
-      <input
-        type="number"
-        min={min}
-        step={step}
-        value={p[key] as number}
-        onChange={(e) => setP((s) => ({ ...s, [key]: Number(e.target.value) }))}
-        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-28 ml-2"
-      />
-      <span className="block text-[11px] text-slate-500">{hint}</span>
-    </label>
-  );
+  if (!draft) return <p className="text-ink-3 text-body-sm">Loading…</p>;
 
   return (
-    <section className="space-y-3 border border-slate-800 rounded p-3">
-      <h2 className="text-lg font-semibold">Planning</h2>
-      {num(
-        'Frontier size (°)',
-        'Smaller = denser frontier, slower but finer.',
-        'pruneBucketDeg',
-        0.5,
-        0.5,
-      )}
-      {num(
-        'Isochrone length (min)',
-        'Time between isochrones / planner step.',
-        'stepMinutes',
-        5,
-        5,
-      )}
-      {num(
-        'Heading fan (±°)',
-        'Search width around bearing-to-destination.',
-        'headingFanDeg',
-        5,
-        5,
-      )}
-      {num('Heading resolution (°)', 'Headings tried per fan.', 'headingResolutionDeg', 1, 1)}
-      {num('Max hours', 'Planning horizon cap.', 'maxHours', 12, 12)}
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={p.avoidLand}
-          onChange={(e) => setP((s) => ({ ...s, avoidLand: e.target.checked }))}
+    <section>
+      <Panel label="Planning" className="space-y-4">
+        <NumberField
+          label="Frontier size"
+          unit="°"
+          value={draft.pruneBucketDeg}
+          onChange={(v) => setDraftKey('pruneBucketDeg', v)}
+          step={0.5}
+          min={0.5}
+          caption="Smaller = denser frontier, slower but finer."
         />
-        Avoid land (uncheck to skip the land check on open-ocean routes — faster)
-      </label>
-      <fieldset className="border border-slate-800 rounded p-2 space-y-1">
-        <legend className="text-sm px-1">Auto-motor</legend>
-        <div className="text-sm">
-          motor when slower than
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={p.autoMotor.minSailKt}
-            onChange={(e) =>
-              setP((s) => ({
-                ...s,
-                autoMotor: { ...s.autoMotor, minSailKt: Number(e.target.value) },
-              }))
+        <NumberField
+          label="Isochrone length"
+          unit="min"
+          value={draft.stepMinutes}
+          onChange={(v) => setDraftKey('stepMinutes', v)}
+          step={5}
+          min={5}
+          caption="Time between isochrones / planner step."
+        />
+        <NumberField
+          label="Heading fan"
+          unit="±°"
+          value={draft.headingFanDeg}
+          onChange={(v) => setDraftKey('headingFanDeg', v)}
+          step={5}
+          min={5}
+          caption="Search width around bearing-to-destination."
+        />
+        <NumberField
+          label="Heading resolution"
+          unit="°"
+          value={draft.headingResolutionDeg}
+          onChange={(v) => setDraftKey('headingResolutionDeg', v)}
+          step={1}
+          min={1}
+          caption="Headings tried per fan."
+        />
+        <NumberField
+          label="Max hours"
+          value={draft.maxHours}
+          onChange={(v) => setDraftKey('maxHours', v)}
+          step={12}
+          min={12}
+          caption="Planning horizon cap."
+        />
+        <Checkbox
+          label="Avoid land"
+          checked={draft.avoidLand}
+          onChange={(v) => setDraftKey('avoidLand', v)}
+          caption="Uncheck to skip the land check on open-ocean routes — faster."
+        />
+
+        <fieldset className="border border-hairline rounded-[--r-panel] p-3 space-y-3">
+          <legend className="text-label uppercase tracking-wider text-ink-2 px-1">
+            Auto-motor
+          </legend>
+          <NumberField
+            label="Motor below"
+            unit="kn"
+            value={draft.autoMotor.minSailKt}
+            onChange={(v) =>
+              setDraftKey('autoMotor', { ...draft.autoMotor, minSailKt: v })
             }
-            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1"
-          />{' '}
-          kn, at
-          <input
-            type="number"
-            min={0}
             step={0.5}
-            value={p.autoMotor.motorKt}
-            onChange={(e) =>
-              setP((s) => ({
-                ...s,
-                autoMotor: { ...s.autoMotor, motorKt: Number(e.target.value) },
-              }))
+            min={0}
+            caption="Motor when sailing speed falls below this. 0 = never motor."
+          />
+          <NumberField
+            label="Motor speed"
+            unit="kn"
+            value={draft.autoMotor.motorKt}
+            onChange={(v) =>
+              setDraftKey('autoMotor', { ...draft.autoMotor, motorKt: v })
             }
-            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-16 mx-1"
-          />{' '}
-          kn
-        </div>
-        <p className="text-[11px] text-slate-500">
-          0 kn threshold = never motor. Set high to always motor.
-        </p>
-      </fieldset>
-      <div className="flex items-center gap-3">
-        <button onClick={save} className="bg-emerald-700 px-3 py-1 rounded text-sm">
-          Save planning
-        </button>
+            step={0.5}
+            min={0}
+            caption="Engine speed used during motor segments."
+          />
+        </fieldset>
+      </Panel>
+
+      <SaveBar
+        dirtyCount={dirtyCount}
+        busy={busy}
+        visible={isDirty}
+        err={err}
+        ok={ok}
+        onSave={() => void save()}
+        onDiscard={reset}
+      >
         <button
-          onClick={() => setP(freshDefaults())}
-          className="bg-slate-700 px-3 py-1 rounded text-sm"
+          type="button"
+          onClick={reset}
+          disabled={busy}
+          className="px-3 py-1.5 text-body-sm rounded-[--r-control] border border-hairline text-ink-3 hover:text-ink disabled:opacity-50 transition-colors"
         >
           Reset to defaults
         </button>
-        {status && <span className="text-sm text-slate-400">{status}</span>}
-      </div>
+      </SaveBar>
     </section>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Tide & currents section — instant-apply checkbox with inline feedback
+// ---------------------------------------------------------------------------
 
 function TideCurrentsSection() {
   const [enabled, setEnabled] = useState(false);
@@ -170,48 +200,46 @@ function TideCurrentsSection() {
   useEffect(() => {
     void fetch('/api/settings')
       .then((r) => r.json())
-      .then((j) => {
+      .then((j: { ok?: boolean; settings?: { canadianTideCurrents?: boolean } }) => {
         if (j.ok) setEnabled(j.settings?.canadianTideCurrents === true);
       })
       .catch(() => {});
   }, []);
 
-  // Read-merge-write: PUT /api/settings replaces the whole file, so merge
-  // onto the current settings rather than clobbering keys other sections own.
-  const apply = async (next: boolean) => {
+  // Instant-apply: PATCH only the canadianTideCurrents key on every toggle.
+  const apply = async (next: boolean): Promise<void> => {
     setEnabled(next);
     setStatus('Saving…');
-    const cur = await fetch('/api/settings')
-      .then((r) => r.json())
-      .catch(() => ({ settings: {} }));
-    const merged = { ...(cur.settings ?? {}), canadianTideCurrents: next };
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(merged),
-    });
-    setStatus(res.ok ? 'Saved' : 'Save failed');
+    try {
+      await patchSettings('canadianTideCurrents', next);
+      setStatus('Saved');
+    } catch {
+      setStatus('Save failed');
+    }
     setTimeout(() => setStatus(null), 2500);
   };
 
   return (
-    <section className="space-y-3 border border-slate-800 rounded p-3">
-      <h2 className="text-lg font-semibold">Tide &amp; currents</h2>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={enabled} onChange={(e) => void apply(e.target.checked)} />
-        Canadian Tide/Currents (CHS stations)
-      </label>
-      <p className="text-[11px] text-slate-500">
-        Shows the Tide and Currents tabs plus the chart&apos;s station overlays. Station data covers
-        Canadian waters only, so this is off by default.
-      </p>
-      {status && <span className="text-sm text-slate-400">{status}</span>}
-    </section>
+    <Panel label="Tide & currents">
+      <div className="space-y-3">
+        <Checkbox
+          label="Canadian Tide/Currents (CHS stations)"
+          checked={enabled}
+          onChange={(v) => void apply(v)}
+          caption="Shows the Tide and Currents tabs plus the chart's station overlays. Station data covers Canadian waters only, so this is off by default."
+        />
+        {status && (
+          <p className="text-body-sm text-ink-3" aria-live="polite">
+            {status}
+          </p>
+        )}
+      </div>
+    </Panel>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Anchor dashboard settings
+// Anchor dashboard settings — staged save via SaveBar + useDirtySave
 // ---------------------------------------------------------------------------
 
 interface AnchorDashboardConfig {
@@ -224,171 +252,177 @@ interface AnchorDashboardConfig {
   weatherPin?: { lat: number; lon: number } | null;
 }
 
+// Flat draft for dirty tracking (nested objects become individual fields).
+interface AnchorDashboardDraft {
+  bowHeightM: number;
+  droopDeductM: number;
+  keelBelowTransducerM: number;
+  transducerToWaterlineM: number;
+  pinEnabled: boolean;
+  pinLat: number;
+  pinLon: number;
+}
+
+const ANCHOR_DEFAULTS: AnchorDashboardDraft = {
+  bowHeightM: 0,
+  droopDeductM: 0,
+  keelBelowTransducerM: 0,
+  transducerToWaterlineM: 0,
+  pinEnabled: false,
+  pinLat: 0,
+  pinLon: 0,
+};
+
+function anchorConfigToDraft(cfg: AnchorDashboardConfig): AnchorDashboardDraft {
+  return {
+    bowHeightM: cfg.bowHeightM ?? 0,
+    droopDeductM: cfg.droopDeductM ?? 0,
+    keelBelowTransducerM: cfg.depthOffsets?.keelBelowTransducerM ?? 0,
+    transducerToWaterlineM: cfg.depthOffsets?.transducerToWaterlineM ?? 0,
+    pinEnabled: cfg.weatherPin != null,
+    pinLat: cfg.weatherPin?.lat ?? 0,
+    pinLon: cfg.weatherPin?.lon ?? 0,
+  };
+}
+
+function draftToAnchorConfig(d: AnchorDashboardDraft): AnchorDashboardConfig {
+  return {
+    bowHeightM: d.bowHeightM,
+    droopDeductM: d.droopDeductM,
+    depthOffsets: {
+      keelBelowTransducerM: d.keelBelowTransducerM,
+      transducerToWaterlineM: d.transducerToWaterlineM,
+    },
+    weatherPin:
+      d.pinEnabled && Number.isFinite(d.pinLat) && Number.isFinite(d.pinLon)
+        ? { lat: d.pinLat, lon: d.pinLon }
+        : null,
+  };
+}
+
 function AnchorDashboardSection() {
-  const [cfg, setCfg] = useState<AnchorDashboardConfig>({});
-  const [pinEnabled, setPinEnabled] = useState(false);
-  const [pinLat, setPinLat] = useState('');
-  const [pinLon, setPinLon] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
+  const [serverValue, setServerValue] = useState<AnchorDashboardDraft | null>(null);
 
   useEffect(() => {
     void fetch('/api/settings')
       .then((r) => r.json())
-      .then((j) => {
+      .then((j: { ok?: boolean; settings?: { anchorDashboard?: AnchorDashboardConfig } }) => {
         if (j.ok && j.settings?.anchorDashboard) {
-          const a = j.settings.anchorDashboard as AnchorDashboardConfig;
-          setCfg(a);
-          if (a.weatherPin) {
-            setPinEnabled(true);
-            setPinLat(String(a.weatherPin.lat));
-            setPinLon(String(a.weatherPin.lon));
-          }
+          setServerValue(anchorConfigToDraft(j.settings.anchorDashboard));
+        } else {
+          setServerValue({ ...ANCHOR_DEFAULTS });
         }
       })
-      .catch(() => {});
+      .catch(() => setServerValue({ ...ANCHOR_DEFAULTS }));
   }, []);
 
-  const save = async () => {
-    setStatus('Saving…');
-    const la = parseFloat(pinLat);
-    const lo = parseFloat(pinLon);
-    const weatherPin: AnchorDashboardConfig['weatherPin'] =
-      pinEnabled && Number.isFinite(la) && Number.isFinite(lo) ? { lat: la, lon: lo } : null;
-    const next: AnchorDashboardConfig = { ...cfg, weatherPin };
-    const cur = await fetch('/api/settings')
-      .then((r) => r.json())
-      .catch(() => ({ settings: {} }));
-    const merged = { ...(cur.settings ?? {}), anchorDashboard: next };
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(merged),
+  const { draft, setDraftKey, dirtyCount, isDirty, busy, err, ok, save, reset } =
+    useDirtySave<AnchorDashboardDraft>({
+      initial: serverValue,
+      onSave: async (d) => patchSettings('anchorDashboard', draftToAnchorConfig(d)),
     });
-    setStatus(res.ok ? 'Saved' : 'Save failed');
-    setTimeout(() => setStatus(null), 2500);
-  };
 
-  const numInput = (
-    label: string,
-    hint: string,
-    value: number | undefined,
-    onChange: (v: number | undefined) => void,
-  ) => (
-    <label className="block text-sm">
-      {label}
-      <input
-        type="number"
-        min={0}
-        step={0.1}
-        value={value ?? ''}
-        onChange={(e) => {
-          const v = parseFloat(e.target.value);
-          onChange(e.target.value === '' || Number.isNaN(v) ? undefined : v);
-        }}
-        placeholder="—"
-        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-28 ml-2"
-      />
-      <span className="block text-[11px] text-slate-500">{hint}</span>
-    </label>
-  );
+  if (!draft) return <p className="text-ink-3 text-body-sm">Loading…</p>;
 
   return (
-    <section className="space-y-3 border border-slate-800 rounded p-3">
-      <h2 className="text-lg font-semibold">Anchor dashboard</h2>
-
-      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
-        <legend className="text-sm px-1">Rode &amp; scope</legend>
-        {numInput(
-          'Bow height (m)',
-          'Height of bow chock above the waterline.',
-          cfg.bowHeightM,
-          (v) => setCfg((s) => ({ ...s, bowHeightM: v })),
-        )}
-        {numInput(
-          'Droop deduct (m)',
-          'Catenary sag to subtract from the counter reading.',
-          cfg.droopDeductM,
-          (v) => setCfg((s) => ({ ...s, droopDeductM: v })),
-        )}
-      </fieldset>
-
-      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
-        <legend className="text-sm px-1">Depth offsets</legend>
-        {numInput(
-          'Keel below transducer (m)',
-          'Depth under keel = sounder − this value.',
-          cfg.depthOffsets?.keelBelowTransducerM,
-          (v) =>
-            setCfg((s) => ({
-              ...s,
-              depthOffsets: { ...s.depthOffsets, keelBelowTransducerM: v },
-            })),
-        )}
-        {numInput(
-          'Transducer to waterline (m)',
-          'Total water depth = sounder + this value.',
-          cfg.depthOffsets?.transducerToWaterlineM,
-          (v) =>
-            setCfg((s) => ({
-              ...s,
-              depthOffsets: { ...s.depthOffsets, transducerToWaterlineM: v },
-            })),
-        )}
-      </fieldset>
-
-      <fieldset className="border border-slate-800 rounded p-2 space-y-2">
-        <legend className="text-sm px-1">Weather pin</legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={pinEnabled}
-            onChange={(e) => setPinEnabled(e.target.checked)}
+    <section>
+      <Panel label="Anchor dashboard" className="space-y-4">
+        <fieldset className="border border-hairline rounded-[--r-panel] p-3 space-y-3">
+          <legend className="text-label uppercase tracking-wider text-ink-2 px-1">
+            Rode &amp; scope
+          </legend>
+          <NumberField
+            label="Bow height"
+            unit="m"
+            value={draft.bowHeightM}
+            onChange={(v) => setDraftKey('bowHeightM', v)}
+            step={0.1}
+            min={0}
+            caption="Height of bow chock above the waterline."
           />
-          Pin weather to a fixed position (instead of following the live GPS fix)
-        </label>
-        {pinEnabled && (
-          <div className="flex flex-wrap gap-3 text-sm">
-            <label className="block">
-              Lat
-              <input
-                type="number"
-                step="0.0001"
-                value={pinLat}
-                onChange={(e) => setPinLat(e.target.value)}
-                placeholder="e.g. 41.63"
-                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-32 ml-2"
-              />
-            </label>
-            <label className="block">
-              Lon
-              <input
-                type="number"
-                step="0.0001"
-                value={pinLon}
-                onChange={(e) => setPinLon(e.target.value)}
-                placeholder="e.g. -71.26"
-                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-32 ml-2"
-              />
-            </label>
-          </div>
-        )}
-        <p className="text-[11px] text-slate-500">
-          When unchecked, the anchor page weather and forecast follow the live GPS position.
-        </p>
-      </fieldset>
+          <NumberField
+            label="Droop deduct"
+            unit="m"
+            value={draft.droopDeductM}
+            onChange={(v) => setDraftKey('droopDeductM', v)}
+            step={0.1}
+            min={0}
+            caption="Catenary sag to subtract from the counter reading."
+          />
+        </fieldset>
 
-      <div className="flex items-center gap-3">
-        <button onClick={() => void save()} className="bg-emerald-700 px-3 py-1 rounded text-sm">
-          Save anchor settings
-        </button>
-        {status && <span className="text-sm text-slate-400">{status}</span>}
-      </div>
+        <fieldset className="border border-hairline rounded-[--r-panel] p-3 space-y-3">
+          <legend className="text-label uppercase tracking-wider text-ink-2 px-1">
+            Depth offsets
+          </legend>
+          <NumberField
+            label="Keel below transducer"
+            unit="m"
+            value={draft.keelBelowTransducerM}
+            onChange={(v) => setDraftKey('keelBelowTransducerM', v)}
+            step={0.1}
+            min={0}
+            caption="Depth under keel = sounder − this value."
+          />
+          <NumberField
+            label="Transducer to waterline"
+            unit="m"
+            value={draft.transducerToWaterlineM}
+            onChange={(v) => setDraftKey('transducerToWaterlineM', v)}
+            step={0.1}
+            min={0}
+            caption="Total water depth = sounder + this value."
+          />
+        </fieldset>
+
+        <fieldset className="border border-hairline rounded-[--r-panel] p-3 space-y-3">
+          <legend className="text-label uppercase tracking-wider text-ink-2 px-1">
+            Weather pin
+          </legend>
+          <Checkbox
+            label="Pin weather to a fixed position (instead of following the live GPS fix)"
+            checked={draft.pinEnabled}
+            onChange={(v) => setDraftKey('pinEnabled', v)}
+          />
+          {draft.pinEnabled && (
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField
+                label="Lat"
+                value={draft.pinLat}
+                onChange={(v) => setDraftKey('pinLat', v)}
+                step={0.0001}
+                caption="e.g. 41.63"
+              />
+              <NumberField
+                label="Lon"
+                value={draft.pinLon}
+                onChange={(v) => setDraftKey('pinLon', v)}
+                step={0.0001}
+                caption="e.g. −71.26"
+              />
+            </div>
+          )}
+          <p className="text-caption text-ink-3">
+            When unchecked, the anchor page weather and forecast follow the live GPS position.
+          </p>
+        </fieldset>
+      </Panel>
+
+      <SaveBar
+        dirtyCount={dirtyCount}
+        busy={busy}
+        visible={isDirty}
+        err={err}
+        ok={ok}
+        onSave={() => void save()}
+        onDiscard={reset}
+      />
     </section>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Emporia AC settings
+// Emporia AC settings — staged save via SaveBar + useDirtySave
 // ---------------------------------------------------------------------------
 
 type Leg = 'L1' | 'L2' | '240V';
@@ -410,24 +444,21 @@ const SKIP_NAMES_SETTINGS = /^balance$/i;
 function EmporiaAcSection() {
   const [channels, setChannels] = useState<EmporiaChannelInfo[]>([]);
   const [devicesLoaded, setDevicesLoaded] = useState(false);
-  const [cfg, setCfg] = useState<EmporiaConfig>({ legAssignments: {}, hiddenChannels: [] });
-  const [status, setStatus] = useState<string | null>(null);
+  const [serverValue, setServerValue] = useState<EmporiaConfig | null>(null);
+
+  const defaultCfg: EmporiaConfig = { legAssignments: {}, hiddenChannels: [] };
 
   useEffect(() => {
-    // Load existing config from settings
     void fetch('/api/settings')
       .then((r) => r.json())
-      .then((j) => {
-        if (j.ok && j.settings?.emporiaConfig) {
-          setCfg(j.settings.emporiaConfig as EmporiaConfig);
-        }
+      .then((j: { ok?: boolean; settings?: { emporiaConfig?: EmporiaConfig } }) => {
+        setServerValue(j.ok && j.settings?.emporiaConfig ? j.settings.emporiaConfig : defaultCfg);
       })
-      .catch(() => {});
+      .catch(() => setServerValue(defaultCfg));
 
-    // Load channels from devices
     void fetch('/api/emporia/devices', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((j: { devices: Array<{ channels: EmporiaChannelInfo[] }> }) => {
+      .then((j: { devices?: Array<{ channels: EmporiaChannelInfo[] }> }) => {
         const all: EmporiaChannelInfo[] = [];
         for (const dev of j.devices ?? []) {
           for (const ch of dev.channels) {
@@ -439,63 +470,41 @@ function EmporiaAcSection() {
         setChannels(all);
         setDevicesLoaded(true);
       })
-      .catch(() => {
-        setDevicesLoaded(true);
-      });
+      .catch(() => setDevicesLoaded(true));
   }, []);
 
-  const setLeg = (channelNum: string, leg: Leg | '') => {
-    setCfg((prev) => {
-      const next = { ...prev.legAssignments };
+  const { draft, setDraft, dirtyCount, isDirty, busy, err, ok, save, reset } =
+    useDirtySave<EmporiaConfig>({
+      initial: serverValue,
+      onSave: async (d) => patchSettings('emporiaConfig', d),
+    });
+
+  const setLeg = useCallback(
+    (channelNum: string, leg: Leg | '') => {
+      if (!draft) return;
+      const next = { ...draft.legAssignments };
       if (leg === '') {
         delete next[channelNum];
       } else {
         next[channelNum] = leg;
       }
-      return { ...prev, legAssignments: next };
-    });
-  };
+      setDraft({ ...draft, legAssignments: next });
+    },
+    [draft, setDraft],
+  );
 
-  const setHidden = (channelNum: string, hidden: boolean) => {
-    setCfg((prev) => {
-      const set = new Set(prev.hiddenChannels);
+  const setHidden = useCallback(
+    (channelNum: string, hidden: boolean) => {
+      if (!draft) return;
+      const set = new Set(draft.hiddenChannels);
       if (hidden) set.add(channelNum);
       else set.delete(channelNum);
-      return { ...prev, hiddenChannels: [...set] };
-    });
-  };
+      setDraft({ ...draft, hiddenChannels: [...set] });
+    },
+    [draft, setDraft],
+  );
 
-  const save = async () => {
-    setStatus('Saving…');
-    // Abort instead of clobbering: if we can't read the current settings we
-    // must NOT PUT, because PUT replaces the whole file and would wipe every
-    // other section's keys.
-    let curSettings: Record<string, unknown> | null = null;
-    try {
-      const r = await fetch('/api/settings');
-      if (r.ok) {
-        const j = (await r.json()) as { ok?: boolean; settings?: Record<string, unknown> };
-        if (j.ok && j.settings) curSettings = j.settings;
-      }
-    } catch {
-      // network error — handled below
-    }
-    if (!curSettings) {
-      setStatus("Save failed — couldn't read current settings");
-      setTimeout(() => setStatus(null), 4000);
-      return;
-    }
-    const merged = { ...curSettings, emporiaConfig: cfg };
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(merged),
-    });
-    setStatus(res.ok ? 'Saved' : 'Save failed');
-    setTimeout(() => setStatus(null), 2500);
-  };
-
-  const legs: Array<{ value: Leg | ''; label: string }> = [
+  const legOptions: Array<{ value: Leg | ''; label: string }> = [
     { value: '', label: '—' },
     { value: 'L1', label: 'L1' },
     { value: 'L2', label: 'L2' },
@@ -503,93 +512,85 @@ function EmporiaAcSection() {
   ];
 
   return (
-    <section className="space-y-3 border border-slate-800 rounded p-3">
-      <h2 className="text-lg font-semibold">Emporia AC</h2>
-      <p className="text-[11px] text-slate-500">
-        Assign each circuit to a leg (L1 / L2 / 240V) or hide it from the AC Loads view. Requires an
-        Emporia Vue 3 connected or <code>EMPORIA_SIM=1</code>.
-      </p>
-
-      {!devicesLoaded && <p className="text-slate-500 text-xs italic">Loading channels…</p>}
-
-      {devicesLoaded && channels.length === 0 && (
-        <p className="text-slate-500 text-xs italic">
-          No Emporia device found (connect one, or run with EMPORIA_SIM=1).
+    <section>
+      <Panel label="Emporia AC">
+        <p className="text-caption text-ink-3 mb-3">
+          Assign each circuit to a leg (L1 / L2 / 240V) or hide it from the AC Loads view.
+          Requires an Emporia Vue 3 connected or <code>EMPORIA_SIM=1</code>.
         </p>
-      )}
 
-      {devicesLoaded && channels.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center text-[11px] text-slate-500 uppercase tracking-wide">
-            <span>Circuit</span>
-            <span>Leg</span>
-            <span>Hide</span>
-          </div>
-          {channels.map((ch) => (
-            <div
-              key={ch.channelNum}
-              className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center text-sm"
-            >
-              <span className="text-slate-300 truncate">
-                {ch.name}
-                <span className="text-slate-600 ml-1 text-[10px]">#{ch.channelNum}</span>
-              </span>
-              <select
-                value={cfg.legAssignments[ch.channelNum] ?? ''}
-                onChange={(e) => setLeg(ch.channelNum, e.target.value as Leg | '')}
-                className="bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-sm"
-              >
-                {legs.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="checkbox"
-                checked={cfg.hiddenChannels.includes(ch.channelNum)}
-                onChange={(e) => setHidden(ch.channelNum, e.target.checked)}
-                className="accent-sky-500"
-              />
+        {!devicesLoaded && (
+          <p className="text-ink-3 text-body-sm italic">Loading channels…</p>
+        )}
+
+        {devicesLoaded && channels.length === 0 && (
+          <p className="text-ink-3 text-body-sm italic">
+            No Emporia device found (connect one, or run with EMPORIA_SIM=1).
+          </p>
+        )}
+
+        {devicesLoaded && channels.length > 0 && draft && (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center text-label uppercase tracking-wider text-ink-3">
+              <span>Circuit</span>
+              <span>Leg</span>
+              <span>Hide</span>
             </div>
-          ))}
-        </div>
-      )}
+            {channels.map((ch) => (
+              <div
+                key={ch.channelNum}
+                className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center"
+              >
+                <span className="text-ink text-body-sm truncate">
+                  {ch.name}
+                  <span className="text-ink-3 ml-1 text-caption">#{ch.channelNum}</span>
+                </span>
+                <SelectField
+                  label=""
+                  value={(draft.legAssignments[ch.channelNum] ?? '') as Leg | ''}
+                  onChange={(v) => setLeg(ch.channelNum, v as Leg | '')}
+                  options={legOptions}
+                  className="w-24"
+                />
+                <Checkbox
+                  label=""
+                  checked={draft.hiddenChannels.includes(ch.channelNum)}
+                  onChange={(v) => setHidden(ch.channelNum, v)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
 
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => void save()}
-          className="bg-emerald-700 px-3 py-1 rounded text-sm"
-          disabled={!devicesLoaded || channels.length === 0}
-        >
-          Save Emporia settings
-        </button>
-        {status && <span className="text-sm text-slate-400">{status}</span>}
-      </div>
+      <SaveBar
+        dirtyCount={dirtyCount}
+        busy={busy}
+        visible={isDirty}
+        err={err}
+        ok={ok}
+        onSave={() => void save()}
+        onDiscard={reset}
+      />
     </section>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Root page: source mode + SocketCAN (instant-apply; untouched) + sections
+// ---------------------------------------------------------------------------
+
 export default function SettingsPage() {
-  // Source-mode state — separate from the persisted settings above because
-  // it's a runtime-only switch (lives in the SourceModeController, not
-  // settings.json). Polled so the UI reflects any out-of-band switch.
   const [sourceMode, setSourceMode] = useState<SourceModeStatus | null>(null);
   const [sourceModeBusy, setSourceModeBusy] = useState<boolean>(false);
   const [sourceModeError, setSourceModeError] = useState<string | undefined>();
 
-  // SocketCAN (PiCAN-M) config. Hot-applied via /api/socketcan — the
-  // POST both persists and toggles the live DriverHub, so the UI shows
-  // immediate feedback. Polled so an out-of-band change (curl, restart
-  // applying a stale settings.json, etc.) reflects here.
   const [socketCanEnabled, setSocketCanEnabled] = useState<boolean>(false);
   const [socketCanInterface, setSocketCanInterface] = useState<string>('can0');
   const [socketCanRunning, setSocketCanRunning] = useState<boolean>(false);
   const [socketCanBusy, setSocketCanBusy] = useState<boolean>(false);
   const [socketCanError, setSocketCanError] = useState<string | undefined>();
 
-  // Poll source mode so the radio reflects out-of-band switches (e.g.,
-  // someone hit /api/source-mode from curl or another tab).
   useEffect(() => {
     let cancelled = false;
     const tick = async (): Promise<void> => {
@@ -614,19 +615,13 @@ export default function SettingsPage() {
     };
   }, []);
 
-  // Poll SocketCAN state so the UI reflects the live DriverHub plus the
-  // persisted settings flag — these can diverge briefly if the driver
-  // failed to start (persisted: enabled=true, running=false).
   useEffect(() => {
     let cancelled = false;
     const tick = async (): Promise<void> => {
       try {
         const res = await fetch('/api/socketcan', { cache: 'no-store' });
         const j = (await res.json()) as
-          | {
-              ok: true;
-              state: { enabled: boolean; interface: string; running: boolean };
-            }
+          | { ok: true; state: { enabled: boolean; interface: string; running: boolean } }
           | { ok: false; error?: { message?: string } };
         if (cancelled) return;
         if (j.ok) {
@@ -657,10 +652,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ enabled, interface: iface }),
       });
       const j = (await res.json()) as
-        | {
-            ok: true;
-            state: { enabled: boolean; interface: string; running: boolean };
-          }
+        | { ok: true; state: { enabled: boolean; interface: string; running: boolean } }
         | {
             ok: false;
             error?: { message?: string };
@@ -671,9 +663,6 @@ export default function SettingsPage() {
         setSocketCanInterface(j.state.interface);
         setSocketCanRunning(j.state.running);
       } else {
-        // Even on driver_failed, the persisted state is now `enabled:true`
-        // and `running:false` — surface the error but reflect the
-        // returned state if present.
         if (j.state) {
           setSocketCanEnabled(j.state.enabled);
           setSocketCanInterface(j.state.interface);
@@ -709,26 +698,27 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="p-8 max-w-2xl space-y-4 text-slate-200">
-      <h1 className="text-2xl">Settings</h1>
+    <main className="p-8 max-w-2xl space-y-6 text-ink">
+      <h1 className="text-title">Settings</h1>
 
+      {/* Source mode — instant-apply radio */}
       <fieldset
-        className={`border rounded p-3 space-y-2 ${
+        className={`border rounded-[--r-panel] p-3 space-y-2 ${
           sourceMode?.mode === 'demo'
-            ? 'border-amber-600 bg-amber-900/10'
+            ? 'border-[--accent] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]'
             : sourceMode?.mode === 'replay'
-              ? 'border-violet-600 bg-violet-900/10'
-              : 'border-slate-700'
+              ? 'border-[--info] bg-[color-mix(in_srgb,var(--info)_10%,transparent)]'
+              : 'border-hairline'
         }`}
       >
-        <legend className="px-2 text-sm text-slate-300">Source mode</legend>
-        <p className="text-[11px] text-slate-500">
+        <legend className="px-2 text-body-sm text-ink-2">Source mode</legend>
+        <p className="text-caption text-ink-3">
           Switches the data source feeding the bus and pipelines. <strong>Live</strong> ingests from
           the real NMEA hardware (NGT-1 / YDWG / 0183). <strong>Demo</strong> swaps in a synthetic
           injector — useful on the dock or for UI work without a boat. <strong>Replay</strong> mode
           (not switchable here) is started via the Sessions page.
         </p>
-        <div className="flex items-center gap-4 flex-wrap text-sm">
+        <div className="flex items-center gap-4 flex-wrap text-body-sm">
           <label className="flex items-center gap-2">
             <input
               type="radio"
@@ -752,37 +742,40 @@ export default function SettingsPage() {
             <span>Demo</span>
           </label>
           {sourceMode?.mode === 'replay' && (
-            <span className="text-violet-300 font-mono text-xs">
+            <span className="text-[--info] font-mono text-caption">
               replay · {sourceMode.sessionId ?? 'unknown'} · {sourceMode.phase ?? '—'}
             </span>
           )}
-          {sourceModeBusy && <span className="text-slate-500 text-xs">Switching…</span>}
+          {sourceModeBusy && <span className="text-ink-3 text-caption">Switching…</span>}
         </div>
         {sourceMode?.mode === 'demo' && (
-          <div className="text-amber-300 text-xs">
-            ⚠ Demo data is synthetic — anything plotted on /chart or /helm is fake. Switch back to{' '}
+          <div className="text-[--warn] text-caption">
+            Demo data is synthetic — anything plotted on /chart or /helm is fake. Switch back to{' '}
             <strong>Live</strong> before relying on navigation data.
           </div>
         )}
-        {sourceModeError && <div className="text-rose-400 text-xs">{sourceModeError}</div>}
+        {sourceModeError && <div className="text-danger text-caption">{sourceModeError}</div>}
       </fieldset>
 
+      {/* SocketCAN — instant-apply checkbox */}
       <fieldset
-        className={`border rounded p-3 space-y-2 ${
+        className={`border rounded-[--r-panel] p-3 space-y-2 ${
           socketCanRunning
-            ? 'border-sky-600 bg-sky-900/10'
+            ? 'border-[--info] bg-[color-mix(in_srgb,var(--info)_10%,transparent)]'
             : socketCanEnabled
-              ? 'border-amber-600 bg-amber-900/10'
-              : 'border-slate-700'
+              ? 'border-[--accent] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)]'
+              : 'border-hairline'
         }`}
       >
-        <legend className="px-2 text-sm text-slate-300">Live ingest — SocketCAN (PiCAN-M)</legend>
-        <p className="text-[11px] text-slate-500">
+        <legend className="px-2 text-body-sm text-ink-2">
+          Live ingest — SocketCAN (PiCAN-M)
+        </legend>
+        <p className="text-caption text-ink-3">
           Reads N2K frames directly from a Linux SocketCAN interface (e.g. the PiCAN-M HAT on the
-          boat Pi). Runs <em>alongside</em> YDWG-02 and NGT-1 — the bridge dedupes by source address
-          + PGN, so toggling this on while YDWG stays connected is safe for verification.
+          boat Pi). Runs <em>alongside</em> YDWG-02 and NGT-1 — the bridge dedupes by source
+          address + PGN, so toggling this on while YDWG stays connected is safe for verification.
         </p>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-body-sm">
           <input
             type="checkbox"
             checked={socketCanEnabled}
@@ -792,25 +785,23 @@ export default function SettingsPage() {
             }
           />
           <span>Enable SocketCAN ingest</span>
-          {socketCanBusy && <span className="text-xs text-slate-500">Applying…</span>}
+          {socketCanBusy && <span className="text-caption text-ink-3">Applying…</span>}
           {!socketCanBusy && socketCanEnabled && socketCanRunning && (
-            <span className="text-xs text-sky-300 font-mono">running</span>
+            <span className="text-caption text-[--info] font-mono">running</span>
           )}
           {!socketCanBusy && socketCanEnabled && !socketCanRunning && (
-            <span className="text-xs text-amber-300 font-mono">
+            <span className="text-caption text-[--warn] font-mono">
               not running (driver failed to start)
             </span>
           )}
         </label>
-        <label className="block text-sm">
+        <label className="block text-body-sm">
           CAN interface name
           <input
             type="text"
             value={socketCanInterface}
             onChange={(e) => setSocketCanInterface(e.target.value)}
             onBlur={() => {
-              // Apply only if the value actually changed AND the toggle is
-              // on — otherwise we'd thrash the driver for no reason.
               if (
                 socketCanEnabled &&
                 socketCanInterface.trim().length > 0 &&
@@ -821,20 +812,18 @@ export default function SettingsPage() {
             }}
             placeholder="can0"
             disabled={socketCanBusy}
-            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-48 font-mono disabled:opacity-40"
+            className="bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 w-48 font-mono disabled:opacity-40 ml-2"
           />
-          <span className="text-[10px] text-slate-500 ml-2">
+          <span className="text-caption text-ink-3 ml-2">
             usually <code>can0</code>; <code>vcan0</code> for virtual-CAN testing
           </span>
         </label>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-caption text-ink-3">
           Takes effect immediately — the driver is added to or removed from the live bridge via{' '}
           <code>/api/socketcan</code> without a service restart. Persisted to{' '}
-          <code>~/.g5000-router/settings.json</code> so it also survives the next reboot. Requires{' '}
-          <code>socketcan</code> npm package on the Pi and the <code>mcp2515-can0</code> dt-overlay
-          loaded with the interface up at 250 kbit/s.
+          <code>~/.g5000-router/settings.json</code> so it also survives the next reboot.
         </p>
-        {socketCanError && <div className="text-rose-400 text-xs">{socketCanError}</div>}
+        {socketCanError && <div className="text-danger text-caption">{socketCanError}</div>}
       </fieldset>
 
       <SatelliteCachePanel />

@@ -49,10 +49,14 @@ export function CategoryRecommendation({ wardrobe }: { wardrobe: SailWardrobe })
         const valid = rec?.valid[cat] ?? [];
         const change = rec?.changeNeeded[cat] ?? false;
         return (
-          <div key={cat} className="border rounded p-2">
+          <div key={cat} className="border border-hairline [border-radius:var(--r-control)] p-2 bg-surface-raised">
             <div className="text-sm font-medium flex items-center gap-2">
               {labels[cat]}
-              {change && <span className="bg-red-500 text-white text-xs px-1 rounded">change</span>}
+              {change && (
+                <span className="bg-danger-strong text-ink-value text-caption px-1.5 py-0.5 [border-radius:var(--r-control)]">
+                  change
+                </span>
+              )}
             </div>
             <div className="text-sm">
               <span className="text-ink-4">active:</span>{' '}

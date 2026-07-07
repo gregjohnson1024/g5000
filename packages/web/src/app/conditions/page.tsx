@@ -1,6 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { fmtUtcMinute } from '../../lib/tz';
+import { Panel } from '../../components/ui';
+import { Button } from '../../components/ui';
+import { DataTable } from '../../components/ui';
+import type { ColumnDef } from '../../components/ui/DataTable';
 
 type WindModel = 'gfs' | 'ecmwf';
 
@@ -26,16 +30,11 @@ interface ManifestResponse {
   nowUnix: number;
 }
 
-// Fixed forecast hours: every 3 h out to 168 h (7 days). Matches the
-// systemd timer's refresh-forecast.sh, so the manual "Refresh now" button
-// fetches the same set as the periodic background refresh.
+// Fixed forecast hours: every 3 h out to 168 h (7 days).
 const FORECAST_HOURS: number[] = Array.from({ length: 57 }, (_, i) => i * 3);
 
 type Bbox = { latMin: number; latMax: number; lonMin: number; lonMax: number };
 
-// Western North Atlantic — the full Gulf Stream meander region. CMEMS always
-// covers at least this so the currents overlay shows the Stream regardless of
-// where the (smaller) wind ROI sits.
 const GULF_STREAM_BBOX: Bbox = { latMin: 20, latMax: 50, lonMin: -82, lonMax: -40 };
 
 function unionBbox(a: Bbox, b: Bbox): Bbox {
@@ -69,6 +68,54 @@ function fmtDuration(seconds: number): string {
   return `in ${h}h ${m}m`;
 }
 
+// ── Broadcast helper — also used by /conditions/models via BroadcastChannel ───
+
+function broadcastForecastRefresh(): void {
+  if (typeof BroadcastChannel !== 'undefined') {
+    const bc = new BroadcastChannel('forecast-cache');
+    bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
+    bc.close();
+  }
+}
+
+// ── DataTable column definitions ─────────────────────────────────────────────
+
+interface AvailRow {
+  id: string;
+  model: string;
+  latestRun: string;
+  age: string;
+  nextRun: string;
+}
+
+const AVAIL_COLS: ColumnDef<AvailRow>[] = [
+  { key: 'model', label: 'Model', sortable: false, align: 'left', render: (r) => r.model },
+  { key: 'latestRun', label: 'Latest run', sortable: false, render: (r) => r.latestRun },
+  { key: 'age', label: 'Age', sortable: false, render: (r) => r.age },
+  { key: 'nextRun', label: 'Next run', sortable: false, render: (r) => r.nextRun },
+];
+
+interface GridRow {
+  id: string;
+  model: string;
+  fh: string;
+  run: string;
+  valid: string;
+  bbox: string;
+  age: string;
+}
+
+const GRID_COLS: ColumnDef<GridRow>[] = [
+  { key: 'model', label: 'Model', sortable: false, align: 'left', render: (r) => r.model },
+  { key: 'fh', label: '+h', sortable: true, render: (r) => r.fh, sortValue: (r) => parseInt(r.fh) },
+  { key: 'run', label: 'Run', sortable: false, render: (r) => r.run },
+  { key: 'valid', label: 'Valid', sortable: false, render: (r) => r.valid },
+  { key: 'bbox', label: 'Bbox', sortable: false, render: (r) => r.bbox },
+  { key: 'age', label: 'Age', sortable: false, render: (r) => r.age },
+];
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function ForecastPage() {
   const [manifest, setManifest] = useState<ManifestResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -93,14 +140,19 @@ export default function ForecastPage() {
     return () => clearInterval(id);
   }, [reloadManifest]);
 
+  // Listen for refresh events from /conditions/models (and vice-versa)
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const bc = new BroadcastChannel('forecast-cache');
+    bc.onmessage = () => void reloadManifest();
+    return () => bc.close();
+  }, [reloadManifest]);
+
   const runFetch = async (): Promise<void> => {
     setErr(null);
     setNotice(null);
     setBusy(true);
     try {
-      // The ROI is whatever the draggable forecast box on the chart last set
-      // (persisted to settings.forecastBbox); this button just triggers an
-      // out-of-band pull of that same region.
       const s = await fetch('/api/settings', { cache: 'no-store' });
       const sj = (await s.json()) as { settings?: { forecastBbox?: ManifestEntry['bbox'] } };
       const bbox = sj.settings?.forecastBbox;
@@ -108,9 +160,6 @@ export default function ForecastPage() {
         setErr('No forecast ROI set yet — drag the ROI box on the chart first.');
         return;
       }
-      // The refresh runs as a background job server-side (returns 202), so we
-      // don't hold the connection while ~114 grids fetch. The cached-grids
-      // table below fills in as they land; re-poll the manifest a few times.
       const r = await fetch('/api/forecast/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,11 +177,7 @@ export default function ForecastPage() {
       setNotice(
         'Refresh started — caching GFS + ECMWF in the background. The cached-grids table below fills in over the next 1–2 min.',
       );
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('forecast-cache');
-        bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
-        bc.close();
-      }
+      broadcastForecastRefresh();
       [10_000, 30_000, 60_000, 120_000].forEach((ms) =>
         setTimeout(() => void reloadManifest(), ms),
       );
@@ -148,9 +193,6 @@ export default function ForecastPage() {
     setCmemsNotice(null);
     setCmemsBusy(true);
     try {
-      // Always cover the Gulf Stream; extend to include the wind ROI so the
-      // currents overlay has data wherever the route box sits (union — one
-      // grid, since the overlay shows a single current grid).
       const s = await fetch('/api/settings', { cache: 'no-store' });
       const sj = (await s.json()) as { settings?: { forecastBbox?: Bbox } };
       const roi = sj.settings?.forecastBbox;
@@ -172,7 +214,6 @@ export default function ForecastPage() {
         return;
       }
       setCmemsNotice('CMEMS surface currents refreshed.');
-      // Nudge an open /chart to re-read the cached current grid.
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('current-cache');
         bc.postMessage({ kind: 'fetch-complete', at: Date.now() });
@@ -187,126 +228,104 @@ export default function ForecastPage() {
 
   const now = manifest?.nowUnix ?? Math.floor(Date.now() / 1000);
 
+  // ── Build DataTable rows ──────────────────────────────────────────────────
+
+  const availRows: AvailRow[] = (['gfs', 'ecmwf'] as WindModel[]).flatMap((m) => {
+    const a = manifest?.availability?.[m];
+    if (!a) return [];
+    const ageSec = now - a.latestRunUnix;
+    const untilNext = a.nextRunAvailableUnix - now;
+    return [
+      {
+        id: m,
+        model: m.toUpperCase(),
+        latestRun: fmtUtcMinute(a.latestRunUnix),
+        age: fmtAge(ageSec) + ' ago',
+        nextRun: `${fmtUtcMinute(a.nextRunAvailableUnix)} (${fmtDuration(untilNext)})`,
+      },
+    ];
+  });
+
+  const gridRows: GridRow[] = (manifest?.entries ?? []).map((e, i) => ({
+    id: String(i),
+    model: e.model.toUpperCase(),
+    fh: `+${e.forecastHour}h`,
+    run: fmtUtcMinute(e.runAt),
+    valid: fmtUtcMinute(e.validAt),
+    bbox: `${e.bbox.latMin.toFixed(1)}…${e.bbox.latMax.toFixed(1)}N ${e.bbox.lonMin.toFixed(1)}…${e.bbox.lonMax.toFixed(1)}E`,
+    age: fmtAge(now - Math.floor(e.fetchedAt / 1000)),
+  }));
+
   return (
     <main className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Forecast data</h1>
-        <button
-          onClick={() => void reloadManifest()}
-          className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded"
-        >
+        <h1 className="text-xl font-semibold text-ink">Forecast data</h1>
+        <Button variant="secondary" size="sm" onClick={() => void reloadManifest()}>
           Reload manifest
-        </button>
+        </Button>
       </div>
 
-      {err && <p className="text-rose-400 text-sm">{err}</p>}
+      {err && <p className="text-body-sm text-danger">{err}</p>}
 
-      <section className="space-y-2">
-        <h2 className="text-base font-semibold">Run availability</h2>
-        <table className="text-sm border-collapse">
-          <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-800">
-              <th className="p-2">Model</th>
-              <th className="p-2">Latest available run</th>
-              <th className="p-2">Run age</th>
-              <th className="p-2">Next run becomes available</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(['gfs', 'ecmwf'] as WindModel[]).map((m) => {
-              const a = manifest?.availability?.[m];
-              if (!a) return null;
-              const ageSec = now - a.latestRunUnix;
-              const untilNext = a.nextRunAvailableUnix - now;
-              return (
-                <tr key={m} className="border-b border-slate-900">
-                  <td className="p-2 font-mono">{m.toUpperCase()}</td>
-                  <td className="p-2 font-mono">{fmtUtcMinute(a.latestRunUnix)}</td>
-                  <td className="p-2 text-slate-300">{fmtAge(ageSec)} ago</td>
-                  <td className="p-2 text-slate-300">
-                    {fmtUtcMinute(a.nextRunAvailableUnix)} ({fmtDuration(untilNext)})
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
+      {/* Run availability */}
+      <Panel label="Run availability">
+        {availRows.length === 0 ? (
+          <p className="text-body-sm text-ink-3">Loading availability…</p>
+        ) : (
+          <DataTable columns={AVAIL_COLS} rows={availRows} rowKey={(r) => r.id} />
+        )}
+      </Panel>
 
-      <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
-        <h2 className="text-base font-semibold">Refresh forecast cache</h2>
-        <p className="text-xs text-slate-500">
-          Fetches GFS + ECMWF for the forecast ROI (the draggable box on the chart), every 3 h out
-          to +168 h (57 snapshots/model). The Pi runs the same refresh on a 3 h timer in the
-          background; this button just lets you trigger one out of band. Partial 404s (ECMWF when
-          its run hasn&apos;t published yet) are normal.
-        </p>
-        <button
-          onClick={() => void runFetch()}
-          disabled={busy}
-          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded text-sm font-medium disabled:opacity-50"
-        >
-          {busy ? 'Starting…' : 'Refresh now'}
-        </button>
-        {notice && <p className="text-xs text-emerald-300">{notice}</p>}
-      </section>
+      {/* Refresh forecast cache */}
+      <Panel label="Refresh forecast cache">
+        <div className="space-y-3">
+          <p className="text-body-sm text-ink-3">
+            Fetches GFS + ECMWF for the forecast ROI (the draggable box on the chart), every 3 h out
+            to +168 h (57 snapshots/model). The Pi runs the same refresh on a 3 h timer in the
+            background; this button lets you trigger one out of band. Partial 404s (ECMWF when its
+            run hasn&apos;t published yet) are normal.
+          </p>
+          <Button variant="primary" onClick={() => void runFetch()} disabled={busy}>
+            {busy ? 'Starting…' : 'Refresh now'}
+          </Button>
+          {notice && <p className="text-body-sm text-ok">{notice}</p>}
+        </div>
+      </Panel>
 
-      <section className="space-y-3 border border-slate-800 rounded p-4 bg-slate-900/30">
-        <h2 className="text-base font-semibold">Surface currents (CMEMS)</h2>
-        <p className="text-xs text-slate-500">
-          Copernicus Marine daily-mean surface currents (1/12°). Covers the Gulf Stream region plus
-          your wind ROI (combined into one box). The Pi refreshes this automatically on the same 3 h
-          timer; this button triggers one out of band.
-        </p>
-        <button
-          onClick={() => void runCmemsFetch()}
-          disabled={cmemsBusy}
-          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded text-sm font-medium disabled:opacity-50"
-        >
-          {cmemsBusy ? 'Fetching CMEMS…' : 'Refresh CMEMS'}
-        </button>
-        {cmemsNotice && <p className="text-xs text-emerald-300">{cmemsNotice}</p>}
-      </section>
+      {/* Surface currents (CMEMS) */}
+      <Panel label="Surface currents (CMEMS)">
+        <div className="space-y-3">
+          <p className="text-body-sm text-ink-3">
+            Copernicus Marine daily-mean surface currents (1/12°). Covers the Gulf Stream region
+            plus your wind ROI (combined into one box). The Pi refreshes this automatically on the
+            same 3 h timer; this button triggers one out of band.
+          </p>
+          <Button variant="primary" onClick={() => void runCmemsFetch()} disabled={cmemsBusy}>
+            {cmemsBusy ? 'Fetching CMEMS…' : 'Refresh CMEMS'}
+          </Button>
+          {cmemsNotice && <p className="text-body-sm text-ok">{cmemsNotice}</p>}
+        </div>
+      </Panel>
 
-      <section className="space-y-2">
-        <h2 className="text-base font-semibold">Cached grids ({manifest?.entries.length ?? 0})</h2>
-        {(!manifest || manifest.entries.length === 0) && (
-          <p className="text-sm text-slate-500">
+      {/* Cached grids */}
+      <Panel
+        label={`Cached grids (${manifest?.entries.length ?? 0})`}
+        action={
+          <Button variant="ghost" size="sm" onClick={() => void reloadManifest()}>
+            ↻
+          </Button>
+        }
+      >
+        {!manifest || manifest.entries.length === 0 ? (
+          <p className="text-body-sm text-ink-3">
             Nothing cached yet. Drag the forecast ROI box on the chart, or click Refresh now.
           </p>
+        ) : (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <DataTable columns={GRID_COLS} rows={gridRows} rowKey={(r) => r.id} />
+          </div>
         )}
-        {manifest && manifest.entries.length > 0 && (
-          <table className="text-sm border-collapse">
-            <thead>
-              <tr className="text-left text-slate-400 border-b border-slate-800">
-                <th className="p-2">Model</th>
-                <th className="p-2">+h</th>
-                <th className="p-2">Run</th>
-                <th className="p-2">Valid</th>
-                <th className="p-2">Bbox</th>
-                <th className="p-2">Age</th>
-              </tr>
-            </thead>
-            <tbody>
-              {manifest.entries.map((e, i) => (
-                <tr key={i} className="border-b border-slate-900">
-                  <td className="p-2 font-mono">{e.model.toUpperCase()}</td>
-                  <td className="p-2 font-mono">+{e.forecastHour}h</td>
-                  <td className="p-2 font-mono">{fmtUtcMinute(e.runAt)}</td>
-                  <td className="p-2 font-mono">{fmtUtcMinute(e.validAt)}</td>
-                  <td className="p-2 font-mono text-xs text-slate-400">
-                    {e.bbox.latMin.toFixed(1)}…{e.bbox.latMax.toFixed(1)} N ·{' '}
-                    {e.bbox.lonMin.toFixed(1)}…{e.bbox.lonMax.toFixed(1)} E
-                  </td>
-                  <td className="p-2 text-slate-300">
-                    {fmtAge(now - Math.floor(e.fetchedAt / 1000))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      </Panel>
     </main>
   );
 }

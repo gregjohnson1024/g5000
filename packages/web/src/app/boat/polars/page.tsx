@@ -6,6 +6,7 @@ import type { PolarTable } from '@g5000/db';
 import { PolarHeatmap } from './PolarHeatmap';
 import { PolarPlot } from '../../../components/PolarPlot';
 import { useSse } from '../../../hooks/use-sse';
+import { Panel } from '../../../components/ui';
 
 export default function PolarsPage() {
   const [polar, setPolar] = useState<PolarTable | null>(null);
@@ -83,12 +84,9 @@ export default function PolarsPage() {
   return (
     <main className="p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold">Polars</h1>
+        <h1 className="text-xl font-semibold text-ink">Polars</h1>
         <div className="flex items-center gap-2">
-          <Link
-            href="/boat/sails"
-            className="text-xs text-slate-500 hover:text-slate-300 underline"
-          >
+          <Link href="/boat/sails" className="text-caption text-ink-3 hover:text-ink underline">
             manage sails →
           </Link>
           <input
@@ -104,21 +102,30 @@ export default function PolarsPage() {
           />
           <label
             htmlFor="polar-import-active"
-            className={`px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium cursor-pointer text-sm ${
-              importBusy ? 'opacity-50' : ''
-            }`}
+            className={[
+              'inline-flex items-center justify-center gap-2 font-semibold leading-none',
+              'transition-colors duration-150 [border-radius:var(--r-control)]',
+              'bg-accent text-on-accent border border-accent hover:bg-accent-hi active:bg-accent-strong',
+              'min-h-[36px] px-3 py-1.5 text-[0.833rem] cursor-pointer',
+              importBusy ? 'opacity-50 pointer-events-none' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
             {importBusy ? 'Importing…' : 'Import CSV'}
           </label>
         </div>
       </div>
 
-      {err && <div className="text-red-400 text-sm">Error: {err}</div>}
+      {err && (
+        <div className="text-danger text-sm bg-danger-surface border border-danger-strong [border-radius:var(--r-control)] px-3 py-2">
+          Error: {err}
+        </div>
+      )}
 
       {polar && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Polar plot (live)</h2>
+          <Panel label="Polar Plot (live)">
             <PolarPlot
               polar={polar}
               currentTws={num(twsSample)}
@@ -128,21 +135,20 @@ export default function PolarsPage() {
               targetTwa={num(targetTwaSample)}
               size={480}
             />
-          </section>
+          </Panel>
 
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Polar grid (active)</h2>
+          <Panel label="Polar Grid (active)">
             <PolarHeatmap
               polar={polar}
               selected={selected ?? undefined}
               onSelect={(c) => setSelected(c)}
               onChange={handleApply}
             />
-          </section>
+          </Panel>
         </div>
       )}
 
-      {!polar && !err && <p className="text-slate-400">Loading…</p>}
+      {!polar && !err && <p className="text-ink-3">Loading…</p>}
     </main>
   );
 }

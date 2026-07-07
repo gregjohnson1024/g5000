@@ -2,7 +2,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseCoordinate, parseLatLon, formatCoordinate } from '../../../lib/coords';
 import { greatCircleNm, bearingDeg } from '../../../lib/geo';
-import { ConfirmDialog } from '../../../components/ui';
+import {
+  Button,
+  ConfirmDialog,
+  DataTable,
+  Panel,
+  TextField,
+  CoordField,
+} from '../../../components/ui';
+import type { ColumnDef } from '../../../components/ui';
 
 interface Waypoint {
   id: string;
@@ -18,6 +26,18 @@ interface CurrentPos {
   lon: number;
 }
 
+// ---------------------------------------------------------------------------
+// Inline-edit state for one row
+// ---------------------------------------------------------------------------
+
+interface EditState {
+  id: string;
+  name: string;
+  latRaw: string;
+  lonRaw: string;
+  notes: string;
+}
+
 export default function WaypointsPage() {
   const [list, setList] = useState<Waypoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,29 +45,26 @@ export default function WaypointsPage() {
 
   // Add-form state
   const [name, setName] = useState('');
+  // CoordField value: null until the user enters a valid coord
+  const [addCoord, setAddCoord] = useState<{ lat: number; lon: number } | null>(null);
+  // Separate lat/lon fields (fallback)
   const [latRaw, setLatRaw] = useState('');
   const [lonRaw, setLonRaw] = useState('');
-  const [pasteRaw, setPasteRaw] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Per-row edit state (id of row being edited)
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editLatRaw, setEditLatRaw] = useState('');
-  const [editLonRaw, setEditLonRaw] = useState('');
-  const [editNotes, setEditNotes] = useState('');
+  // Per-row edit state
+  const [editing, setEditing] = useState<EditState | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  // Current boat position for the "Distance" column. Sourced from
-  // /api/stats/eta (which reads the active track's last point); shows "—"
-  // if there's no active track yet.
+  // Current boat position for the Distance column
   const [currentPos, setCurrentPos] = useState<CurrentPos | null>(null);
 
-  // GPX import state
+  // GPX import
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
 
-  // Delete confirmation state: null = no dialog; otherwise the waypoint pending deletion
+  // Delete confirmation
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const reload = useCallback(async () => {
@@ -69,9 +86,7 @@ export default function WaypointsPage() {
     void reload();
   }, [reload]);
 
-  // Poll current position so the Distance column stays live as the boat
-  // moves. 15 s matches the SOG rolling-average window — finer doesn't
-  // buy useful precision for a list view.
+  // Poll current position (15 s)
   useEffect(() => {
     let cancelled = false;
     const tick = async (): Promise<void> => {
@@ -101,10 +116,9 @@ export default function WaypointsPage() {
     try {
       let lat: number;
       let lon: number;
-      if (pasteRaw.trim().length > 0) {
-        const parsed = parseLatLon(pasteRaw);
-        lat = parsed.lat;
-        lon = parsed.lon;
+      if (addCoord !== null) {
+        lat = addCoord.lat;
+        lon = addCoord.lon;
       } else {
         lat = parseCoordinate(latRaw, 'lat');
         lon = parseCoordinate(lonRaw, 'lon');
@@ -117,9 +131,9 @@ export default function WaypointsPage() {
       const j = await res.json();
       if (!j.ok) throw new Error(j.error?.message ?? 'create failed');
       setName('');
+      setAddCoord(null);
       setLatRaw('');
       setLonRaw('');
-      setPasteRaw('');
       setNotes('');
       await reload();
     } catch (e) {
@@ -142,8 +156,6 @@ export default function WaypointsPage() {
       const res = await fetch(`/api/waypoints/${id}`, { method: 'DELETE' });
       const j = await res.json();
       if (!res.ok) {
-        // 409 waypoint_in_use (or any other error): surface the server message
-        // without removing the row
         setError(j.error?.message ?? 'delete failed');
         return;
       }
@@ -186,258 +198,302 @@ export default function WaypointsPage() {
   };
 
   const beginEdit = (w: Waypoint): void => {
-    setEditingId(w.id);
-    setEditName(w.name);
-    setEditLatRaw(formatCoordinate(w.lat, 'lat', { format: 'dmm' }));
-    setEditLonRaw(formatCoordinate(w.lon, 'lon', { format: 'dmm' }));
-    setEditNotes(w.notes ?? '');
+    setEditing({
+      id: w.id,
+      name: w.name,
+      latRaw: formatCoordinate(w.lat, 'lat', { format: 'dmm' }),
+      lonRaw: formatCoordinate(w.lon, 'lon', { format: 'dmm' }),
+      notes: w.notes ?? '',
+    });
+    setEditError(null);
   };
 
-  const saveEdit = async (id: string): Promise<void> => {
-    setError(null);
+  const cancelEdit = (): void => {
+    setEditing(null);
+    setEditError(null);
+  };
+
+  const saveEdit = async (): Promise<void> => {
+    if (!editing) return;
+    setEditError(null);
     setBusy(true);
     try {
-      const lat = parseCoordinate(editLatRaw, 'lat');
-      const lon = parseCoordinate(editLonRaw, 'lon');
-      const res = await fetch(`/api/waypoints/${id}`, {
+      const lat = parseCoordinate(editing.latRaw, 'lat');
+      const lon = parseCoordinate(editing.lonRaw, 'lon');
+      const res = await fetch(`/api/waypoints/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName.trim(), lat, lon, notes: editNotes.trim() }),
+        body: JSON.stringify({ name: editing.name.trim(), lat, lon, notes: editing.notes.trim() }),
       });
       const j = await res.json();
       if (!j.ok) throw new Error(j.error?.message ?? 'save failed');
-      setEditingId(null);
+      setEditing(null);
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setEditError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
 
-  return (
-    <main className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Waypoints</h1>
+  // ------------------------------------------------------------------
+  // DataTable column definitions
+  // ------------------------------------------------------------------
 
-      {error && <p className="text-rose-400 text-sm">{error}</p>}
-
-      <section className="space-y-2 border border-slate-800 rounded p-4 bg-slate-900/30">
-        <h2 className="text-base font-semibold">New waypoint</h2>
-        <label className="block text-sm">
-          <span className="text-slate-400">Name</span>
+  const columns: ColumnDef<Waypoint>[] = [
+    {
+      key: 'name',
+      label: 'Name',
+      align: 'left',
+      sortable: true,
+      sortValue: (w) => w.name,
+      render: (w) =>
+        editing?.id === w.id ? (
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="block w-80 mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
+            value={editing.name}
+            onChange={(e) =>
+              setEditing((prev) => (prev ? { ...prev, name: e.target.value } : prev))
+            }
+            className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 font-mono text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
           />
-        </label>
-        <label className="block text-sm">
-          <span className="text-slate-400">
-            Paste lat &amp; lon together (DMS / DM.M / decimal accepted)
+        ) : (
+          <span className="font-mono text-ink">{w.name}</span>
+        ),
+    },
+    {
+      key: 'lat',
+      label: 'Latitude',
+      align: 'left',
+      sortValue: (w) => w.lat,
+      render: (w) =>
+        editing?.id === w.id ? (
+          <input
+            type="text"
+            value={editing.latRaw}
+            onChange={(e) =>
+              setEditing((prev) => (prev ? { ...prev, latRaw: e.target.value } : prev))
+            }
+            className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 font-mono text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
+          />
+        ) : (
+          <span className="font-mono">{formatCoordinate(w.lat, 'lat', { format: 'dmm' })}</span>
+        ),
+    },
+    {
+      key: 'lon',
+      label: 'Longitude',
+      align: 'left',
+      sortValue: (w) => w.lon,
+      render: (w) =>
+        editing?.id === w.id ? (
+          <input
+            type="text"
+            value={editing.lonRaw}
+            onChange={(e) =>
+              setEditing((prev) => (prev ? { ...prev, lonRaw: e.target.value } : prev))
+            }
+            className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 font-mono text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
+          />
+        ) : (
+          <span className="font-mono">{formatCoordinate(w.lon, 'lon', { format: 'dmm' })}</span>
+        ),
+    },
+    {
+      key: 'dist',
+      label: 'Distance',
+      unit: 'NM',
+      align: 'right',
+      sortValue: (w) => (currentPos ? greatCircleNm(currentPos, w) : null),
+      render: (w) => {
+        if (editing?.id === w.id) return <span className="text-ink-4">—</span>;
+        if (!currentPos) return <span className="text-ink-4">—</span>;
+        const nm = greatCircleNm(currentPos, w);
+        const brg = String(Math.round(bearingDeg(currentPos, w))).padStart(3, '0');
+        return (
+          <span className="font-mono tabular-nums">
+            {nm.toFixed(1)} <span className="text-ink-3">{brg}°T</span>
           </span>
+        );
+      },
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      align: 'left',
+      render: (w) =>
+        editing?.id === w.id ? (
           <input
             type="text"
-            value={pasteRaw}
-            onChange={(e) => setPasteRaw(e.target.value)}
-            placeholder={`41 45.898n 71 07.710w`}
-            className="block w-full max-w-2xl mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
+            value={editing.notes}
+            onChange={(e) =>
+              setEditing((prev) => (prev ? { ...prev, notes: e.target.value } : prev))
+            }
+            className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-2 py-1 text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
           />
-        </label>
-        <div className="text-xs text-slate-500">or fill them separately:</div>
-        <div className="flex gap-3">
-          <label className="block text-sm flex-1 max-w-xs">
-            <span className="text-slate-400">Latitude</span>
-            <input
-              type="text"
-              value={latRaw}
-              onChange={(e) => setLatRaw(e.target.value)}
-              placeholder={`41 45.898n`}
-              className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
-            />
-          </label>
-          <label className="block text-sm flex-1 max-w-xs">
-            <span className="text-slate-400">Longitude</span>
-            <input
-              type="text"
-              value={lonRaw}
-              onChange={(e) => setLonRaw(e.target.value)}
-              placeholder={`71 07.710w`}
-              className="block w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono"
-            />
-          </label>
-        </div>
-        <label className="block text-sm">
-          <span className="text-slate-400">Notes (optional)</span>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="block w-full max-w-2xl mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded"
-          />
-        </label>
-        <button
-          onClick={() => void handleAdd()}
-          disabled={busy || name.trim().length === 0}
-          className="px-3 py-1 bg-amber-600 text-slate-900 rounded font-medium disabled:opacity-50"
-        >
-          Add waypoint
-        </button>
-      </section>
+        ) : (
+          <span className="text-ink-2">{w.notes ?? ''}</span>
+        ),
+    },
+    {
+      key: 'actions',
+      label: '',
+      align: 'right',
+      render: (w) =>
+        editing?.id === w.id ? (
+          <div className="flex items-center justify-end gap-2 min-h-[44px]">
+            <Button size="sm" variant="primary" onClick={() => void saveEdit()} disabled={busy}>
+              Save
+            </Button>
+            <Button size="sm" variant="secondary" onClick={cancelEdit}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-2 min-h-[44px]">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => beginEdit(w)}
+              disabled={editing !== null}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => handleDeleteRequest(w)}
+              disabled={busy || editing !== null}
+            >
+              Delete
+            </Button>
+          </div>
+        ),
+    },
+  ];
 
-      <section className="space-y-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold">Saved waypoints</h2>
-          <a
-            href="/api/waypoints/export-gpx"
-            download
-            className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
-          >
-            Export GPX
-          </a>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-            className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50"
-          >
-            Import GPX
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".gpx,application/gpx+xml"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) void handleImportFile(file);
-            }}
+  return (
+    <main className="p-4 max-w-5xl mx-auto space-y-4">
+      <h1 className="text-[1.111rem] font-semibold text-ink-value">Voyage Plan</h1>
+
+      {/* NOTE: Routes are GPX-imported alongside waypoints but are not managed
+          as first-class objects in this UI — the import endpoint handles them,
+          but there is no route-list view. This is the honest current state;
+          routes-as-first-class is a follow-up task. */}
+
+      {/* Add waypoint form */}
+      <Panel label="New waypoint">
+        <div className="space-y-3 pt-1">
+          {error && <p className="text-danger text-body-sm">{error}</p>}
+          <TextField
+            label="Name"
+            value={name}
+            onChange={setName}
+            placeholder="BR-4"
+            className="max-w-xs"
           />
-          {importMsg && <span className="text-xs text-emerald-400">{importMsg}</span>}
+          <CoordField
+            label="Coordinates (paste lat &amp; lon together)"
+            value={addCoord}
+            onChange={setAddCoord}
+            caption="DMS / DMM / decimal accepted, or fill separately below"
+          />
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-label uppercase tracking-wider text-ink-2 block mb-1">
+                Latitude
+              </label>
+              <input
+                type="text"
+                value={latRaw}
+                onChange={(e) => setLatRaw(e.target.value)}
+                placeholder="41 45.898n"
+                className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-3 h-11 font-mono text-ink placeholder:text-ink-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus] hover:border-hairline-strong"
+              />
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="text-label uppercase tracking-wider text-ink-2 block mb-1">
+                Longitude
+              </label>
+              <input
+                type="text"
+                value={lonRaw}
+                onChange={(e) => setLonRaw(e.target.value)}
+                placeholder="71 07.710w"
+                className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] px-3 h-11 font-mono text-ink placeholder:text-ink-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus] hover:border-hairline-strong"
+              />
+            </div>
+          </div>
+          <TextField label="Notes (optional)" value={notes} onChange={setNotes} />
+          <Button
+            variant="primary"
+            onClick={() => void handleAdd()}
+            disabled={busy || name.trim().length === 0}
+          >
+            Add waypoint
+          </Button>
         </div>
-        {loading && <p className="text-slate-500 text-sm">Loading…</p>}
-        {!loading && list.length === 0 && (
-          <p className="text-slate-500 text-sm">No waypoints yet.</p>
+      </Panel>
+
+      {/* Waypoints table */}
+      <Panel
+        label="Saved waypoints"
+        action={
+          <div className="flex items-center gap-2">
+            <a
+              href="/api/waypoints/export-gpx"
+              download
+              className="px-3 min-h-[36px] inline-flex items-center text-body-sm border border-hairline rounded-[--r-control] text-ink-2 hover:bg-surface-raised transition-colors"
+            >
+              Export GPX
+            </a>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+            >
+              Import GPX
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".gpx,application/gpx+xml"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void handleImportFile(file);
+              }}
+            />
+          </div>
+        }
+      >
+        {importMsg && <p className="text-ok text-body-sm mb-3">{importMsg}</p>}
+        {editError && <p className="text-danger text-body-sm mb-3">{editError}</p>}
+        {loading ? (
+          <p className="text-ink-4 text-body-sm py-4">Loading…</p>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={list}
+            rowKey={(w) => w.id}
+            defaultSortKey="name"
+            defaultSortDir="asc"
+            density="default"
+          />
         )}
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-800">
-              <th className="p-2">Name</th>
-              <th className="p-2">Latitude</th>
-              <th className="p-2">Longitude</th>
-              <th className="p-2">Decimal</th>
-              <th className="p-2" title={currentPos ? 'great-circle from boat' : 'no active track'}>
-                Distance
-                {currentPos === null && (
-                  <span className="text-[10px] text-slate-600 normal-case ml-1">(no track)</span>
-                )}
-              </th>
-              <th className="p-2">Notes</th>
-              <th className="p-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((w) =>
-              editingId === w.id ? (
-                <tr key={w.id} className="border-b border-slate-900 align-top bg-slate-900/40">
-                  <td className="p-2">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono w-full"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <input
-                      type="text"
-                      value={editLatRaw}
-                      onChange={(e) => setEditLatRaw(e.target.value)}
-                      className="px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono w-full"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <input
-                      type="text"
-                      value={editLonRaw}
-                      onChange={(e) => setEditLonRaw(e.target.value)}
-                      className="px-2 py-1 bg-slate-900 border border-slate-700 rounded font-mono w-full"
-                    />
-                  </td>
-                  <td className="p-2 text-slate-500 text-xs">edit above</td>
-                  <td className="p-2 text-slate-600 text-xs">—</td>
-                  <td className="p-2">
-                    <input
-                      type="text"
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                      className="px-2 py-1 bg-slate-900 border border-slate-700 rounded w-full"
-                    />
-                  </td>
-                  <td className="p-2 text-right space-x-1">
-                    <button
-                      onClick={() => void saveEdit(w.id)}
-                      disabled={busy}
-                      className="px-2 py-1 text-xs bg-emerald-700 hover:bg-emerald-600 text-white rounded disabled:opacity-50"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
-                    >
-                      Cancel
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={w.id} className="border-b border-slate-900">
-                  <td className="p-2 font-mono">{w.name}</td>
-                  <td className="p-2 font-mono">
-                    {formatCoordinate(w.lat, 'lat', { format: 'dmm' })}
-                  </td>
-                  <td className="p-2 font-mono">
-                    {formatCoordinate(w.lon, 'lon', { format: 'dmm' })}
-                  </td>
-                  <td className="p-2 font-mono text-slate-400">
-                    {w.lat.toFixed(5)}, {w.lon.toFixed(5)}
-                  </td>
-                  <td className="p-2 font-mono text-slate-200">
-                    {currentPos ? (
-                      <>
-                        {greatCircleNm(currentPos, w).toFixed(1)}{' '}
-                        <span className="text-slate-500">NM</span>{' '}
-                        <span className="text-xs text-slate-500">
-                          {String(Math.round(bearingDeg(currentPos, w))).padStart(3, '0')}
-                          °T
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-slate-600">—</span>
-                    )}
-                  </td>
-                  <td className="p-2 text-slate-300">{w.notes ?? ''}</td>
-                  <td className="p-2 text-right space-x-1">
-                    <button
-                      onClick={() => beginEdit(w)}
-                      className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRequest(w)}
-                      disabled={busy}
-                      className="px-2 py-1 text-xs bg-red-900 hover:bg-red-800 text-red-100 rounded disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ),
-            )}
-          </tbody>
-        </table>
-      </section>
+        {!loading && list.length === 0 && (
+          <p className="text-ink-4 text-body-sm py-2">
+            No waypoints yet. Add one above or import a GPX file.
+          </p>
+        )}
+        {!currentPos && list.length > 0 && (
+          <p className="text-ink-4 text-caption mt-2">
+            Distance column unavailable — no active track.
+          </p>
+        )}
+      </Panel>
 
       <ConfirmDialog
         open={pendingDelete !== null}

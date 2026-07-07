@@ -467,16 +467,17 @@ export function ForecastRoi({
 
   // Persist the box to settings (Pi auto-refresh + page reload read it). No
   // auto-fetch — the user starts a transfer with the ↻ button.
+  // Uses PATCH so only the forecastBbox key is written — other clients' keys
+  // (planning, anchorDashboard, emporiaConfig, canadianTideCurrents) are untouched.
   const persistBbox = async (next: Bbox): Promise<void> => {
     lastCommittedRef.current = next;
     try {
-      const prev = (await (await fetch('/api/settings')).json())?.settings ?? {};
-      const put = await fetch('/api/settings', {
-        method: 'PUT',
+      const patch = await fetch('/api/settings', {
+        method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...prev, forecastBbox: next }),
+        body: JSON.stringify({ forecastBbox: next }),
       });
-      if (!put.ok) throw new Error(`HTTP ${put.status}`);
+      if (!patch.ok) throw new Error(`HTTP ${patch.status}`);
     } catch (e) {
       setStatus('error');
       setStatusText(`save failed: ${String(e)}`);

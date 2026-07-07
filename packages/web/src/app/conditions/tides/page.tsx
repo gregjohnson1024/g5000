@@ -6,6 +6,10 @@ import { interpolateHeight, tideSnapshot } from '@g5000/tide';
 import type { Station, TidalEvent } from '@g5000/tide';
 import { fetchBoatFix } from '../../../lib/boat-fix';
 import { fmtDistanceNm, sortByDistanceNm, type LatLon } from '../../../lib/station-distance';
+import { StripChart, type StripPoint, type StripEvent } from '../../../components/charts';
+import { Panel } from '../../../components/ui';
+import { SelectField, type SelectOption, TextField } from '../../../components/ui/fields';
+import { Button } from '../../../components/ui';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type SourceId = 'admiralty' | 'chs';
@@ -15,7 +19,6 @@ interface PickerEntry {
   station: Station;
 }
 
-// Composite key used as <select> option value.
 function entryKey(e: PickerEntry): string {
   return `${e.sourceId}:${e.station.id}`;
 }
@@ -28,27 +31,48 @@ function parseEntryKey(key: string): { sourceId: SourceId; stationId: string } {
   };
 }
 
-// ── SVG dimensions ──────────────────────────────────────────────────────────
-const SVG_W = 700;
-const SVG_H = 120;
-const PAD = { top: 8, right: 12, bottom: 20, left: 36 };
+// ── UTC time formatters ──────────────────────────────────────────────────────
 
-// Sample the piecewise-cosine curve every 10 min across all event pairs.
-function buildCurvePts(events: TidalEvent[]): { x: number; y: number }[] {
+/** "HH:MMz DD Mon" */
+function fmtUtcShort(ms: number): string {
+  const d = new Date(ms);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const mon = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  return `${hh}:${mm}z ${day} ${mon}`;
+}
+
+/** "Www DD Mon" UTC group header */
+function fmtUtcDay(ms: number): string {
+  return new Date(ms).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/** Group events by UTC day. */
+function groupByUtcDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
+  const m = new Map<string, TidalEvent[]>();
+  for (const ev of events) {
+    const key = fmtUtcDay(ev.timeMs);
+    if (!m.has(key)) m.set(key, []);
+    m.get(key)!.push(ev);
+  }
+  return m;
+}
+
+// ── Build StripChart data ─────────────────────────────────────────────────
+
+function buildStripPoints(events: TidalEvent[]): StripPoint[] {
   if (events.length < 2) return [];
   const tMin = events[0]!.timeMs;
   const tMax = events[events.length - 1]!.timeMs;
-  const tSpan = Math.max(1, tMax - tMin);
-  const hVals = events.map((e) => e.heightM);
-  const hMin = Math.min(...hVals);
-  const hMax = Math.max(...hVals);
-  const hSpan = Math.max(0.1, hMax - hMin);
-  const plotW = SVG_W - PAD.left - PAD.right;
-  const plotH = SVG_H - PAD.top - PAD.bottom;
   const STEP_MS = 10 * 60_000;
-  const pts: { x: number; y: number }[] = [];
+  const pts: StripPoint[] = [];
   for (let t = tMin; t <= tMax; t += STEP_MS) {
-    // Find the bracketing pair for this sample.
     let h: number | null = null;
     for (let i = 0; i < events.length - 1; i++) {
       const a = events[i]!;
@@ -58,67 +82,36 @@ function buildCurvePts(events: TidalEvent[]): { x: number; y: number }[] {
         break;
       }
     }
-    if (h === null) continue;
-    const x = PAD.left + ((t - tMin) / tSpan) * plotW;
-    // Invert y: higher height → lower y value (top of box).
-    const y = PAD.top + (1 - (h - hMin) / hSpan) * plotH;
-    pts.push({ x, y });
+    if (h !== null) pts.push({ tMs: t, v: h });
   }
   return pts;
 }
 
-function ptsToPolyline(pts: { x: number; y: number }[]): string {
-  return pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+function buildStripEvents(events: TidalEvent[]): StripEvent[] {
+  return events.map((ev) => ({
+    tMs: ev.timeMs,
+    kind: ev.type === 'HW' ? 'flood' : 'ebb',
+    label: ev.type === 'HW' ? 'HW' : 'LW',
+  }));
 }
 
-// Format epoch ms as local date+time string.
-function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-// Group events by local date string for the table.
-function groupByDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
-  const m = new Map<string, TidalEvent[]>();
-  for (const ev of events) {
-    const key = new Date(ev.timeMs).toLocaleDateString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-    if (!m.has(key)) m.set(key, []);
-    m.get(key)!.push(ev);
-  }
-  return m;
-}
+// ── Page ───────────────────────────────────────────────────────────────────
 
 export default function TidePage() {
-  // pickerList is the flattened, sorted list of {sourceId, station} entries.
   const [pickerList, setPickerList] = useState<PickerEntry[]>([]);
-  // stationsLoaded tracks whether the initial fetch has completed.
   const [stationsLoaded, setStationsLoaded] = useState(false);
-  // tideSource from /api/tide/active (auto|admiralty|chs).
   const [tideSource, setTideSource] = useState<string | null>(null);
-  // pinnedStationId + pinnedSourceId from /api/tide/active.
   const [pinnedStationId, setPinnedStationId] = useState<string | null>(null);
   const [pinnedSourceId, setPinnedSourceId] = useState<string | null>(null);
-  // selectedKey is a composite "sourceId:stationId" string.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [events, setEvents] = useState<TidalEvent[]>([]);
   const [filter, setFilter] = useState('');
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [pinning, setPinning] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  // Feature gate: settings.canadianTideCurrents (default false). null = loading.
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
-  // One-shot boat fix for station distances; null = no fix (render undistanced).
   const [boatFix, setBoatFix] = useState<LatLon | null>(null);
 
-  // Mount: read the feature gate and grab a one-shot fix for distances.
   useEffect(() => {
     let cancelled = false;
     void fetch('/api/settings', { cache: 'no-store' })
@@ -137,13 +130,11 @@ export default function TidePage() {
     };
   }, []);
 
-  // Tick the "now" pointer once per minute.
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  // Fetch active pin state and update.
   const refreshActive = useCallback(async () => {
     const r = await fetch('/api/tide/active');
     if (!r.ok) return;
@@ -160,9 +151,6 @@ export default function TidePage() {
     }
   }, []);
 
-  // Mount: fetch stations + active, then choose the selected entry ONCE
-  // with precedence query-param > pinned > first. Computing it in one place
-  // avoids a late /api/tide/active callback overwriting a deep-link selection.
   useEffect(() => {
     void (async () => {
       const r = await fetch('/api/tide/stations');
@@ -183,7 +171,6 @@ export default function TidePage() {
       setPickerList(entries);
       setStationsLoaded(true);
 
-      // (1) Query-param selection (highest precedence).
       const params = new URLSearchParams(window.location.search);
       const qStation = params.get('station');
       const qSource = params.get('source');
@@ -195,7 +182,6 @@ export default function TidePage() {
         if (match) queryKey = entryKey(match);
       }
 
-      // (2) Pinned default — also drives the source label. Fetch regardless.
       let pinnedKey: string | null = null;
       const ar = await fetch('/api/tide/active');
       if (ar.ok) {
@@ -218,13 +204,11 @@ export default function TidePage() {
         }
       }
 
-      // (3) First entry as the final fallback. Select once.
       const firstKey = entries[0] ? entryKey(entries[0]) : null;
       setSelectedKey(queryKey ?? pinnedKey ?? firstKey);
     })();
   }, []);
 
-  // Fetch events whenever selected entry changes.
   useEffect(() => {
     if (!selectedKey) return;
     const { sourceId, stationId } = parseEntryKey(selectedKey);
@@ -240,8 +224,7 @@ export default function TidePage() {
       }
       const j = (await r.json()) as { ok: boolean; events: TidalEvent[] };
       if (j.ok) {
-        const sorted = [...j.events].sort((a, b) => a.timeMs - b.timeMs);
-        setEvents(sorted);
+        setEvents([...j.events].sort((a, b) => a.timeMs - b.timeMs));
       } else {
         setEvents([]);
       }
@@ -263,11 +246,10 @@ export default function TidePage() {
     setPinning(false);
   }, [selectedKey, pinnedStationId, pinnedSourceId, refreshActive]);
 
-  // ── Derived display data ───────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
+
   const multiSource = new Set(pickerList.map((e) => e.sourceId)).size > 1;
 
-  // Distance-annotated list, closest-first when a fix is available; otherwise
-  // the original (name-sorted) order with null distances.
   const annotated = useMemo(
     () => sortByDistanceNm(pickerList, boatFix, (e) => e.station),
     [pickerList, boatFix],
@@ -287,209 +269,162 @@ export default function TidePage() {
     pinnedStationId === selectedEntry.station.id &&
     pinnedSourceId === selectedEntry.sourceId;
 
-  const curvePts = events.length >= 2 ? buildCurvePts(events) : [];
-  const polyline = ptsToPolyline(curvePts);
+  const stripPoints = useMemo(() => buildStripPoints(events), [events]);
+  const stripEvents = useMemo(() => buildStripEvents(events), [events]);
   const snapshot = events.length >= 2 ? tideSnapshot(events, now) : null;
 
-  // Compute "now" x position for the vertical marker.
-  const nowX = (() => {
-    if (events.length < 2) return null;
-    const tMin = events[0]!.timeMs;
-    const tMax = events[events.length - 1]!.timeMs;
-    if (now < tMin || now > tMax) return null;
-    const plotW = SVG_W - PAD.left - PAD.right;
-    return PAD.left + ((now - tMin) / Math.max(1, tMax - tMin)) * plotW;
-  })();
+  const tMin = events.length > 0 ? events[0]!.timeMs : 0;
+  const tMax = events.length > 0 ? events[events.length - 1]!.timeMs : 1;
 
-  const dayGroups = groupByDay(events);
+  const dayGroups = useMemo(() => groupByUtcDay(events), [events]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Select options ─────────────────────────────────────────────────────────
 
-  // Feature gate: hidden by default until settings.canadianTideCurrents is on.
+  const selectOptions = useMemo((): SelectOption[] => {
+    return filtered.map(({ item: e, distanceNm }) => {
+      const key = entryKey(e);
+      const isEntryPinned = pinnedStationId === e.station.id && pinnedSourceId === e.sourceId;
+      const label = multiSource ? `${e.station.name} (${e.sourceId})` : e.station.name;
+      return {
+        value: key,
+        label: [
+          label,
+          distanceNm !== null ? fmtDistanceNm(distanceNm) : null,
+          isEntryPinned ? '★' : null,
+        ]
+          .filter(Boolean)
+          .join(' — '),
+      };
+    });
+  }, [filtered, multiSource, pinnedStationId, pinnedSourceId]);
+
+  // ── Source badge label ─────────────────────────────────────────────────────
+
+  const sourceBadge = selectedEntry
+    ? selectedEntry.sourceId.toUpperCase() + (tideSource ? ` · ${tideSource}` : '')
+    : undefined;
+
+  // ── Feature gate ──────────────────────────────────────────────────────────
+
   if (featureEnabled !== true) {
     return (
-      <main className="p-6 max-w-3xl mx-auto text-slate-100">
-        <h1 className="text-2xl font-semibold mb-4">Tide Planning</h1>
+      <main className="p-6 max-w-3xl mx-auto">
+        <h1 className="text-xl font-semibold text-ink mb-3">Tide Planning</h1>
         {featureEnabled === false && (
-          <p className="text-sm text-slate-400">
-            Canadian Tide/Currents is disabled — enable it in{' '}
-            <Link href="/boat/setup" className="text-sky-400 underline">
-              Settings
-            </Link>
-            .
-          </p>
+          <Panel label="Feature disabled" emptyState={{ reason: 'Canadian Tide/Currents is off' }}>
+            <p className="text-body-sm text-ink-2">
+              Enable it in{' '}
+              <Link href="/boat/setup" className="text-accent-ink underline">
+                Settings
+              </Link>
+              .
+            </p>
+          </Panel>
         )}
       </main>
     );
   }
 
-  // No-source state: loaded but nothing came back.
   if (stationsLoaded && pickerList.length === 0) {
     return (
-      <main className="p-6 max-w-3xl mx-auto text-slate-100">
-        <h1 className="text-2xl font-semibold mb-4">Tide Planning</h1>
-        <div className="p-4 bg-amber-900/40 border border-amber-700 rounded text-amber-200">
-          <p className="font-medium">No tide source available yet</p>
-          <p className="mt-1 text-sm text-amber-300">
+      <main className="p-6 max-w-3xl mx-auto">
+        <h1 className="text-xl font-semibold text-ink mb-3">Tide Planning</h1>
+        <Panel label="No tide source" chip="warn" chipLabel="Waiting">
+          <p className="text-body-sm text-ink-2">
             Waiting for position, or set{' '}
-            <code className="font-mono bg-amber-900/60 px-1 rounded">ADMIRALTY_TIDAL_API_KEY</code>{' '}
+            <code className="font-mono bg-surface-raised px-1 rounded-sm">
+              ADMIRALTY_TIDAL_API_KEY
+            </code>{' '}
             for UK waters.
           </p>
-        </div>
+        </Panel>
       </main>
     );
   }
 
   return (
-    <main className="p-6 max-w-4xl mx-auto text-slate-100">
-      <div className="flex items-baseline gap-3 mb-4">
-        <h1 className="text-2xl font-semibold">Tide Planning</h1>
-        {selectedEntry && (
-          <span className="text-sm text-slate-400">
-            Source:{' '}
-            <span className="font-medium text-slate-200 uppercase">{selectedEntry.sourceId}</span>
-            {tideSource && (
-              <span className="ml-2 text-xs text-slate-500">(mode: {tideSource})</span>
-            )}
-          </span>
-        )}
-      </div>
+    <main className="p-6 max-w-4xl mx-auto space-y-4">
+      <h1 className="text-xl font-semibold text-ink">Tide Planning</h1>
 
       {/* Station picker */}
-      <div className="mb-4 flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
-          placeholder="Filter stations…"
+      <div className="flex flex-col sm:flex-row gap-3">
+        <TextField
+          label="Filter"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="flex-none w-full sm:w-48 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-slate-400"
+          onChange={setFilter}
+          placeholder="Filter stations…"
+          className="sm:w-48 flex-none"
         />
-        <select
-          value={selectedKey ?? ''}
-          onChange={(e) => {
-            setSelectedKey(e.target.value || null);
-          }}
-          className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 focus:outline-none focus:border-slate-400"
-          disabled={pickerList.length === 0}
-        >
-          {pickerList.length === 0 && !stationsLoaded && (
-            <option value="">Loading stations…</option>
-          )}
-          {filtered.map(({ item: e, distanceNm }) => {
-            const key = entryKey(e);
-            const isEntryPinned = pinnedStationId === e.station.id && pinnedSourceId === e.sourceId;
-            const label = multiSource ? `${e.station.name} (${e.sourceId})` : e.station.name;
-            return (
-              <option key={key} value={key}>
-                {label}
-                {distanceNm !== null ? ` — ${fmtDistanceNm(distanceNm)}` : ''}
-                {isEntryPinned ? ' ★' : ''}
-              </option>
-            );
-          })}
-        </select>
-
+        <div className="flex-1">
+          <SelectField
+            label="Station"
+            value={selectedKey}
+            onChange={setSelectedKey}
+            options={selectOptions}
+            placeholder={stationsLoaded ? 'Select a station…' : 'Loading stations…'}
+            disabled={pickerList.length === 0}
+          />
+        </div>
         {selectedEntry && (
-          <button
-            type="button"
-            disabled={pinning}
-            onClick={() => void handlePin()}
-            className={`px-3 py-1.5 rounded text-sm font-medium disabled:opacity-40 ${
-              isPinned
-                ? 'bg-amber-700 hover:bg-amber-600 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-slate-100'
-            }`}
-          >
-            {pinning ? '…' : isPinned ? 'Un-pin' : 'Pin this station'}
-          </button>
+          <div className="flex items-end">
+            <Button
+              variant={isPinned ? 'primary' : 'secondary'}
+              disabled={pinning}
+              onClick={() => void handlePin()}
+              size="md"
+            >
+              {pinning ? '…' : isPinned ? 'Pinned' : 'Pin station'}
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Height curve */}
-      {!loadingEvents && curvePts.length > 0 && (
-        <div className="mb-4 bg-slate-900 border border-slate-700 rounded p-3">
-          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-            Height curve — {selectedEntry?.station.name ?? ''}
-          </div>
-          <svg
-            viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-            className="w-full"
-            style={{ height: `${SVG_H * 1.2}px` }}
-          >
-            {/* Zero baseline (lowest displayed height) */}
-            <line
-              x1={PAD.left}
-              y1={SVG_H - PAD.bottom}
-              x2={SVG_W - PAD.right}
-              y2={SVG_H - PAD.bottom}
-              stroke="var(--ink-4)"
-              strokeDasharray="2 2"
-            />
-            {/* Curve */}
-            <polyline points={polyline} fill="none" stroke="var(--info)" strokeWidth="1.5" />
-            {/* "Now" line */}
-            {nowX !== null && (
-              <>
-                <line
-                  x1={nowX}
-                  y1={PAD.top}
-                  x2={nowX}
-                  y2={SVG_H - PAD.bottom}
-                  stroke="var(--flow-ebb)"
-                  strokeWidth="1.5"
-                />
-                <text
-                  x={nowX + 3}
-                  y={PAD.top + 10}
-                  fill="var(--flow-ebb)"
-                  fontSize="9"
-                  fontFamily="monospace"
-                >
-                  now
-                </text>
-              </>
-            )}
-            {/* Y axis label */}
-            <text
-              x={PAD.left - 4}
-              y={SVG_H - PAD.bottom}
-              fill="var(--ink-3)"
-              fontSize="8"
-              textAnchor="end"
-            >
-              m
-            </text>
-          </svg>
+      {/* Height strip chart */}
+      {loadingEvents && <p className="text-body-sm text-ink-3">Loading tide events…</p>}
 
-          {/* Snapshot readout */}
-          <div className="mt-1 text-xs font-mono text-slate-300">
-            {snapshot?.heightNowM != null ? (
-              <>
-                Now: <span className="text-sky-300">{snapshot.heightNowM.toFixed(2)} m</span>
-                {snapshot.state && <span className="ml-2 text-slate-400">{snapshot.state}</span>}
-                {snapshot.next && (
-                  <span className="ml-2 text-slate-400">
-                    → {snapshot.next.type} {snapshot.next.heightM.toFixed(2)} m at{' '}
-                    {fmtTime(snapshot.next.timeMs)}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-slate-500">— outside forecast window</span>
-            )}
-          </div>
-        </div>
+      {!loadingEvents && stripPoints.length > 0 && (
+        <StripChart
+          label={`Height — ${selectedEntry?.station.name ?? ''}`}
+          points={stripPoints}
+          tMin={tMin}
+          tMax={tMax}
+          color="var(--info)"
+          events={stripEvents}
+          nowMs={now}
+          source={sourceBadge}
+          pinned={selectedEntry ? isPinned : undefined}
+          onPinToggle={selectedEntry ? () => void handlePin() : undefined}
+          height={90}
+        />
       )}
 
-      {loadingEvents && <div className="mb-4 text-sm text-slate-500">Loading tide events…</div>}
+      {/* Snapshot readout */}
+      {!loadingEvents && snapshot && (
+        <p className="text-caption font-mono text-ink-2">
+          {snapshot.heightNowM != null ? (
+            <>
+              Now: <span className="text-info">{snapshot.heightNowM.toFixed(2)} m</span>
+              {snapshot.state && <span className="ml-2 text-ink-3">{snapshot.state}</span>}
+              {snapshot.next && (
+                <span className="ml-2 text-ink-3">
+                  → {snapshot.next.type} {snapshot.next.heightM.toFixed(2)} m at{' '}
+                  {fmtUtcShort(snapshot.next.timeMs)}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-ink-4">— outside forecast window</span>
+          )}
+        </p>
+      )}
 
       {/* Tide table */}
       {!loadingEvents && events.length > 0 && (
-        <div className="mb-4">
-          <table className="w-full text-sm font-mono border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full text-body-sm font-mono border-collapse">
             <thead>
-              <tr className="text-slate-400 border-b border-slate-700">
-                <th className="text-left py-2 pr-4">Time (local)</th>
+              <tr className="text-ink-3 border-b border-hairline">
+                <th className="text-left py-2 pr-4">Time (UTC)</th>
                 <th className="text-left py-2 pr-4">Type</th>
                 <th className="text-right py-2">Height</th>
               </tr>
@@ -500,27 +435,29 @@ export default function TidePage() {
                   <tr>
                     <td
                       colSpan={3}
-                      className="pt-3 pb-1 text-xs uppercase tracking-wide text-slate-500"
+                      className="pt-3 pb-1 text-caption uppercase tracking-wide text-ink-3"
                     >
                       {day}
                     </td>
                   </tr>
                   {dayEvents.map((ev) => (
-                    <tr key={ev.timeMs} className="border-b border-slate-800 hover:bg-slate-900/40">
-                      <td className="py-1.5 pr-4 text-slate-300">
-                        {new Date(ev.timeMs).toLocaleString(undefined, {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                    <tr
+                      key={ev.timeMs}
+                      className="border-b border-hairline hover:bg-surface-raised"
+                    >
+                      <td className="py-1.5 pr-4 text-ink-2 tabular-nums">
+                        {fmtUtcShort(ev.timeMs)}
                       </td>
                       <td
                         className={`py-1.5 pr-4 font-semibold ${
-                          ev.type === 'HW' ? 'text-sky-300' : 'text-slate-400'
+                          ev.type === 'HW' ? 'text-flow-flood' : 'text-flow-ebb'
                         }`}
                       >
                         {ev.type}
                       </td>
-                      <td className="py-1.5 text-right">{ev.heightM.toFixed(1)} m</td>
+                      <td className="py-1.5 text-right text-ink tabular-nums">
+                        {ev.heightM.toFixed(1)} m
+                      </td>
                     </tr>
                   ))}
                 </Fragment>
@@ -531,11 +468,11 @@ export default function TidePage() {
       )}
 
       {!loadingEvents && events.length === 0 && selectedKey && (
-        <div className="text-sm text-slate-500">No events available for this station.</div>
+        <p className="text-body-sm text-ink-4">No events available for this station.</p>
       )}
 
-      {/* Disclaimer labels */}
-      <div className="mt-6 space-y-0.5 text-[11px] text-slate-500">
+      {/* Footer */}
+      <div className="space-y-0.5 text-caption text-ink-4">
         <p>Heights in metres above Chart Datum.</p>
         <p>Approximate curve — not for under-keel clearance.</p>
         <p>Free tier: 7-day horizon.</p>
