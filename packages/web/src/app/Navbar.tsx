@@ -23,7 +23,7 @@ const TOP_LEVEL: NavItem[] = [
   { href: '/passage', label: 'Passage' },
   { href: '/tracker', label: 'Tracker' },
   { href: '/ais', label: 'AIS' },
-  { href: '/polars', label: 'Polars' },
+  { href: '/boat/polars', label: 'Polars' },
   { href: '/tide', label: 'Tide' },
   { href: '/currents', label: 'Currents' },
   { href: '/waypoints', label: 'Waypoints' },
@@ -41,9 +41,9 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     label: 'Calibration',
     items: [
-      { href: '/calibration/wind', label: 'Wind cal' },
-      { href: '/calibration/bsp', label: 'BSP cal' },
-      { href: '/calibration/compass', label: 'Compass' },
+      { href: '/boat/setup/cal/wind', label: 'Wind cal' },
+      { href: '/boat/setup/cal/bsp', label: 'BSP cal' },
+      { href: '/boat/setup/cal/compass', label: 'Compass' },
     ],
   },
   {
@@ -52,24 +52,24 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: '/devices', label: 'Devices' },
       { href: '/sensors', label: 'Sensors' },
       { href: '/sniff', label: 'Sniff' },
-      { href: '/damping', label: 'Damping' },
+      { href: '/boat/setup/damping', label: 'Damping' },
       { href: '/inspect', label: 'Inspect' },
     ],
   },
   {
     label: 'Configuration',
     items: [
-      { href: '/settings', label: 'Settings' },
+      { href: '/boat/setup', label: 'Settings' },
       { href: '/forecast', label: 'Forecast' },
     ],
   },
   {
     label: 'Boat',
     items: [
-      { href: '/boat', label: 'Boat' },
-      { href: '/sails', label: 'Sails' },
-      { href: '/sails/crossover', label: 'Crossover' },
-      { href: '/mast-config', label: 'Mast' },
+      { href: '/boat/setup/profile', label: 'Boat profile' },
+      { href: '/boat/sails', label: 'Sails' },
+      { href: '/boat/crossover', label: 'Crossover' },
+      { href: '/boat/setup/displays', label: 'Displays' },
     ],
   },
   {

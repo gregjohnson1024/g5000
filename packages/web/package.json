@@ -21,6 +21,7 @@
     "@g5000/tide": "*",
     "d3-contour": "^4.0.2",
     "fast-xml-parser": "^5.9.3",
+    "lucide-react": "^1.23.0",
     "maplibre-gl": "^4.7.0",
     "next": "^16",
     "pmtiles": "^4.4.1",

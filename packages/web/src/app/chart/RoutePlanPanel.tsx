@@ -4,7 +4,7 @@ import type { Route } from '@g5000/routing';
 import { PlanControls, type PlanParams } from '../../components/PlanControls';
 import type { RouteColorMode } from '../../components/RoutePolyline';
 import type { TzMode } from '../../lib/tz';
-import { reorder } from '../routes/reorder';
+import { reorder } from '../../lib/reorder';
 import { type SavedRouteLite } from '../../lib/plan-via';
 import { removeAt, insertAt, setStart, setEnd, startOf, endOf, viaOf } from '../../lib/route-plan';
 

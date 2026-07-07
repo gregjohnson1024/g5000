@@ -53,7 +53,7 @@ export function WindTimeline({
     return (
       <div className="text-xs text-amber-300">
         No {activeWindModel.toUpperCase()} forecast cached. Visit{' '}
-        <Link href="/forecast" className="underline">
+        <Link href="/conditions" className="underline">
           Forecast
         </Link>
         .
@@ -74,7 +74,7 @@ export function WindTimeline({
       <div className="text-xs text-amber-300">
         {activeWindModel.toUpperCase()} forecast cache is stale (all valid times in the past).
         Refresh on{' '}
-        <Link href="/forecast" className="underline">
+        <Link href="/conditions" className="underline">
           Forecast
         </Link>
         .

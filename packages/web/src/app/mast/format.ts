@@ -1,7 +1,7 @@
 import type { JsonSafeSample } from '@g5000/core';
 import type { DisplayUnit, MastThreshold, MastTile } from '@g5000/mast';
 import { MS_TO_KN, RAD_TO_DEG, wrap360 } from '../../lib/units';
-import { STALE_THRESHOLD_MS } from '../sensors/freshness';
+import { STALE_THRESHOLD_MS } from '../boat/diag/sensors/freshness';
 
 export const M_TO_FT = 3.280839895;
 

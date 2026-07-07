@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useAlarms } from './AlarmStore';
 
 /**
- * Global audible alarm, mounted once in the root layout. Polls /api/alarms
- * every 2 s; while any ACTIVE unacked alarm exists it sounds through a lazily
- * created AudioContext (same klaxon recipe as /ais's use-threat-audio):
+ * Global audible alarm, mounted once in the root layout. Derives alarm state
+ * from the shared AlarmStore (one /api/alarms poll app-wide). While any
+ * ACTIVE unacked alarm exists it sounds through a lazily created AudioContext:
  *
  *   - CRITICAL → continuous two-tone square-wave klaxon (800/600 Hz at 4 Hz)
  *   - WARN     → short chirp roughly once per 2 s
@@ -19,11 +20,6 @@ import { useEffect, useRef, useState } from 'react';
 export const AUDIO_ENABLED_KEY = 'alarms:audio-enabled';
 export const AUDIO_TOGGLE_EVENT = 'alarms:audio-toggle';
 
-interface AlarmRow {
-  id: string;
-  severity: 'CRITICAL' | 'WARN' | 'INFO';
-}
-
 type SoundMode = 'CRITICAL' | 'WARN' | null;
 
 export function AlarmAudio() {
@@ -36,7 +32,11 @@ export function AlarmAudio() {
   const chirpTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [armed, setArmed] = useState(false);
   const [enabled, setEnabled] = useState(true);
-  const [mode, setMode] = useState<SoundMode>(null);
+
+  // Derive sound mode from the shared alarm store (no private fetch).
+  const { topSeverity } = useAlarms();
+  const mode: SoundMode =
+    topSeverity === 'CRITICAL' ? 'CRITICAL' : topSeverity === 'WARN' ? 'WARN' : null;
 
   // Speaker on/off preference — default on; AlarmBanner owns the toggle UI.
   useEffect(() => {
@@ -77,30 +77,6 @@ export function AlarmAudio() {
     return () => {
       document.removeEventListener('pointerdown', arm);
       document.removeEventListener('keydown', arm);
-    };
-  }, []);
-
-  // Poll the active alarm set; the worst severity picks the sound.
-  useEffect(() => {
-    let stopped = false;
-    async function poll() {
-      try {
-        const r = await fetch('/api/alarms', { cache: 'no-store' });
-        if (stopped) return;
-        const body = await r.json();
-        const active = (body.active ?? []) as AlarmRow[];
-        if (active.some((a) => a.severity === 'CRITICAL')) setMode('CRITICAL');
-        else if (active.some((a) => a.severity === 'WARN')) setMode('WARN');
-        else setMode(null);
-      } catch {
-        // transient
-      }
-    }
-    poll();
-    const t = setInterval(poll, 2000);
-    return () => {
-      stopped = true;
-      clearInterval(t);
     };
   }, []);
 

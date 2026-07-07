@@ -1,12 +1,13 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { Navbar } from './Navbar';
-import { AlarmBanner } from '../components/AlarmBanner';
+import { NavShell } from './NavShell';
 import { AlarmAudio } from '../components/AlarmAudio';
+import { AlarmStore } from '../components/AlarmStore';
 import { StorageMigrationGate } from '../components/StorageMigrationGate';
 import { SseStoreProvider } from '../components/SseStoreProvider';
 import { ThemeController } from '../components/ThemeController';
+import { ThemeStoreProvider } from '../lib/theme-store';
 
 export const metadata: Metadata = {
   title: 'G5000',
@@ -44,12 +45,32 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="h-screen flex flex-col">
         <SseStoreProvider>
-          <StorageMigrationGate />
-          <ThemeController />
-          <AlarmBanner />
-          <AlarmAudio />
-          <Navbar hiddenHrefs={hiddenHrefs} />
-          {children}
+          {/*
+           * ThemeStoreProvider holds the shared theme state (current theme +
+           * setTheme). ThemeController reads from it to push SSE-received
+           * boat-wide theme changes into the store. NavShell's ThemeChip reads
+           * from it to display + cycle the theme. Must wrap ThemeController.
+           */}
+          <ThemeStoreProvider>
+            <StorageMigrationGate />
+            {/*
+             * ThemeController owns the /api/mast/stream SSE subscription and
+             * forwards boat-wide theme pushes into the shared ThemeStore.
+             * It renders nothing — the AppBar ThemeChip is the UI.
+             */}
+            <ThemeController />
+            {/*
+             * AlarmStore mounts ONE /api/alarms poll (via usePoll) and exposes
+             * the derived state through useAlarms(). All consumers — AlarmAudio,
+             * NavShell (AlarmLane + bell), AlarmBanner — read from this context
+             * instead of running independent fetches.
+             */}
+            <AlarmStore>
+              <AlarmAudio />
+              <NavShell hiddenHrefs={hiddenHrefs} />
+              {children}
+            </AlarmStore>
+          </ThemeStoreProvider>
         </SseStoreProvider>
       </body>
     </html>
