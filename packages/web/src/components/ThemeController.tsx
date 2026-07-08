@@ -22,13 +22,16 @@
 
 import { useEffect } from 'react';
 import type { Theme } from '@g5000/mast';
-import { useThemeStore, applyScale, SCALE_PRESETS, type ScalePreset } from '../lib/theme-store';
-import { storageSet } from '../lib/storage';
+import { useThemeStore, SCALE_PRESETS, type ScalePreset } from '../lib/theme-store';
 
 const THEMES: readonly Theme[] = ['day', 'night', 'sun'];
 
 export function ThemeController(): React.ReactNode {
-  const { setTheme, setScale } = useThemeStore();
+  // Receive-only appliers: applying an inbound SSE theme/scale must NOT POST
+  // back, or the server re-broadcasts it and we echo-loop (a ~333 req/s storm
+  // that froze the whole UI). setTheme/setScale (which POST) are for the chip's
+  // user-initiated changes only.
+  const { receiveTheme, receiveScale } = useThemeStore();
 
   // Open SSE stream to receive boat-wide theme + scale changes.
   useEffect(() => {
@@ -38,9 +41,8 @@ export function ThemeController(): React.ReactNode {
       try {
         const t = JSON.parse((ev as MessageEvent).data) as string;
         if (THEMES.includes(t as Theme)) {
-          const valid = t as Theme;
-          // Use setTheme so the shared store + chip state both update.
-          setTheme(valid);
+          // Apply locally only — do NOT POST back (echo-loop guard).
+          receiveTheme(t as Theme);
         }
       } catch {
         /* ignore malformed payloads */
@@ -54,12 +56,11 @@ export function ThemeController(): React.ReactNode {
           // Snap to nearest preset.
           const preset = (SCALE_PRESETS as readonly number[]).includes(s)
             ? (s as ScalePreset)
-            : (SCALE_PRESETS.reduce((prev, curr) =>
+            : (SCALE_PRESETS.reduce((prev: ScalePreset, curr: ScalePreset) =>
                 Math.abs(curr - s) < Math.abs(prev - s) ? curr : prev,
               ) as ScalePreset);
-          applyScale(preset);
-          storageSet('instrument-scale', String(preset));
-          setScale(preset);
+          // Apply locally only — do NOT POST back (echo-loop guard).
+          receiveScale(preset);
         }
       } catch {
         /* ignore malformed payloads */
@@ -69,7 +70,7 @@ export function ThemeController(): React.ReactNode {
     return () => {
       es.close();
     };
-  }, [setTheme, setScale]);
+  }, [receiveTheme, receiveScale]);
 
   // Renders nothing — UI chip lives in NavShell AppBar.
   return null;

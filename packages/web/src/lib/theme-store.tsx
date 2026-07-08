@@ -72,6 +72,14 @@ interface ThemeStore {
   scale: ScalePreset;
   /** Apply scale locally + persist + POST /api/mast/scale for boat-wide sync. */
   setScale: (s: ScalePreset) => void;
+  /**
+   * Apply an INBOUND (SSE-pushed) theme locally + persist, WITHOUT POSTing back.
+   * Using setTheme here would POST → the server re-broadcasts → we receive it →
+   * POST again … an echo loop. Inbound events must never re-POST.
+   */
+  receiveTheme: (t: Theme) => void;
+  /** Apply an INBOUND (SSE-pushed) scale locally + persist, WITHOUT POSTing back. */
+  receiveScale: (s: ScalePreset) => void;
 }
 
 const ThemeContext = createContext<ThemeStore | null>(null);
@@ -132,8 +140,23 @@ export function ThemeStoreProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, []);
 
+  // Inbound (SSE) appliers — apply + persist + update state, but NEVER POST.
+  const receiveTheme = useCallback((t: Theme) => {
+    applyTheme(t);
+    storageSet('theme', t);
+    setThemeState(t);
+  }, []);
+
+  const receiveScale = useCallback((s: ScalePreset) => {
+    applyScale(s);
+    storageSet('instrument-scale', String(s));
+    setScaleState(s);
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, cycleTheme, scale, setScale }}>
+    <ThemeContext.Provider
+      value={{ theme, setTheme, cycleTheme, scale, setScale, receiveTheme, receiveScale }}
+    >
       {children}
     </ThemeContext.Provider>
   );
