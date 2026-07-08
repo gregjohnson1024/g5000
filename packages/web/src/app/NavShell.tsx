@@ -46,7 +46,10 @@ import { SectionSuggestor } from './SectionSuggestor';
 // ---------------------------------------------------------------------------
 
 function useUtcClock(): string {
-  const [display, setDisplay] = useState(() => formatUtc(new Date()));
+  // Start empty so SSR and the first client render agree (rendering the live
+  // time in the useState initialiser makes server-time ≠ client-time → a React
+  // #418 hydration text mismatch). Fill in after mount via the effect.
+  const [display, setDisplay] = useState('');
 
   useEffect(() => {
     const tick = () => setDisplay(formatUtc(new Date()));
