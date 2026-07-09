@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { mapAlive } from './Map';
 import { cssColor } from '../lib/map-colors';
 
 export interface LivePos {
@@ -82,6 +83,7 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true, onUpdate }: LiveBo
     else map.once('load', ensureTrailLayer);
 
     const updateTrail = (): void => {
+      if (!mapAlive(map)) return;
       const src = map.getSource(TRAIL_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
       if (!src) return;
       src.setData({

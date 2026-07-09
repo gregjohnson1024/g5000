@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Route } from '@g5000/routing';
+import { mapAlive } from './Map';
 
 const SOURCE_GFS = 'isochrones-gfs';
 const SOURCE_ECMWF = 'isochrones-ecmwf';
@@ -98,6 +99,7 @@ export function IsochroneLayer({
     map.on('styledata', sync);
 
     return () => {
+      if (!mapAlive(map)) return;
       map.off('styledata', sync);
       removeModel(map, SOURCE_GFS, LAYER_GFS);
       removeModel(map, SOURCE_ECMWF, LAYER_ECMWF);

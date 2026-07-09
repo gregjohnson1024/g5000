@@ -30,6 +30,18 @@ const LONG_PRESS_MS = 500;
 // from the start of a pan.
 const LONG_PRESS_MOVE_TOLERANCE = 8;
 
+/**
+ * True while the map instance is still usable. `map.remove()` (our unmount
+ * cleanup) clears `map.style`, after which any style-touching call throws
+ * "undefined is not an object (evaluating 'this.style.getLayer')". React
+ * runs this component's cleanup before later siblings' — so every layer
+ * component's cleanup, timer, RAF, or promise continuation that touches the
+ * map MUST bail out via this guard first.
+ */
+export function mapAlive(m: maplibregl.Map): boolean {
+  return !!(m as unknown as { style?: unknown }).style;
+}
+
 export function Map({
   center,
   zoom,

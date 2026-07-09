@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { cssColor } from '../lib/map-colors';
+import { mapAlive } from './Map';
 
 export interface MarkLike {
   /** Waypoint id, when this mark is a saved waypoint (enables selection). */
@@ -268,13 +269,14 @@ export function WaypointsLayer({
     map.on('mouseleave', DOT_LAYER, onLeave);
 
     return () => {
+      syncRef.current = null;
+      if (!mapAlive(map)) return;
       map.off('click', DOT_LAYER, onDotClick);
       map.off('mousedown', DOT_LAYER, onDotMouseDown);
       map.off('mousemove', onMouseMove);
       map.off('mouseup', onMouseUp);
       map.off('mouseenter', DOT_LAYER, onEnter);
       map.off('mouseleave', DOT_LAYER, onLeave);
-      syncRef.current = null;
       for (const mk of labelMarkers.values()) {
         try {
           mk.remove();

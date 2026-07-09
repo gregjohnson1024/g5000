@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Route } from '@g5000/routing';
 import { makeBarb } from '../lib/wind-barb';
+import { mapAlive } from './Map';
 
 const MS_TO_KN = 1 / 0.514444;
 // One barb per ~6 h of sailing time.
@@ -127,6 +128,7 @@ export function RouteWindLayer({
     map.on('styledata', sync);
 
     return () => {
+      if (!mapAlive(map)) return;
       map.off('styledata', sync);
       removeModel(map, 'rwind-gfs', 'rwind-gfs-line', 'rwind-gfs-fill');
       removeModel(map, 'rwind-ecmwf', 'rwind-ecmwf-line', 'rwind-ecmwf-fill');

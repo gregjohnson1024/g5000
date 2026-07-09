@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import type maplibregl from 'maplibre-gl';
+import { mapAlive } from './Map';
 import { MayaraClient } from '../lib/radar/mayara-client';
 import { RadarCanvas } from '../lib/radar/renderer';
 import { rangeBboxCorners } from '../lib/radar/geo';
@@ -90,6 +91,7 @@ export function RadarOverlay(props: {
     ensure();
     map.on('styledata', ensure);
     const timer = setInterval(() => {
+      if (!mapAlive(map)) return;
       const src = map.getSource(SRC) as maplibregl.ImageSource | undefined;
       const corners = cornersNow();
       if (!src || !corners) return;

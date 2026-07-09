@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import { mapAlive } from './Map';
 import { cssColor } from '../lib/map-colors';
 
 interface LineEnd {
@@ -163,6 +164,7 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
   useEffect(() => {
     if (!map) return;
     return () => {
+      if (!mapAlive(map)) return;
       for (const id of [POINTS_LAYER, LINE_LAYER]) {
         if (map.getLayer(id)) {
           try {

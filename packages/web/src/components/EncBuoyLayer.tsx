@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import type maplibregl from 'maplibre-gl';
+import { mapAlive } from './Map';
 import { useRasterTileLayer } from './use-raster-tile-layer';
 
 const SOURCE_ID = 'noaa-vector-buoys';
@@ -101,6 +102,7 @@ export function EncBuoyLayer({
     let aborter: AbortController | null = null;
 
     const refresh = async (): Promise<void> => {
+      if (!mapAlive(map)) return;
       if (map.getZoom() < MIN_ZOOM) {
         const src = map.getSource(SOURCE_ID);
         if (src && 'setData' in src && typeof src.setData === 'function') {
