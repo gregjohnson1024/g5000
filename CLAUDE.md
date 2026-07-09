@@ -152,7 +152,7 @@ Disabled / preserved-but-unmounted (one-line revert):
 
 **Chart UI controls and localStorage keys:**
 
-- **Top-left:** `<ChartFollowControl/>` — two-button stack from `useChartCamera` hook. Follow toggle (sticky state, NOT a one-shot recenter) and Orientation cycle (`N` → `↑COG` → `↑HDG`). Course/heading orientations also push a 30% top padding so the boat sits at lower-third → implicit lookahead.
+- **Top-left:** `<ChartFollowControl/>` — two-button stack from `useChartCamera` hook. Follow toggle (sticky state, NOT a one-shot recenter) and Orientation cycle (`N` → `↑COG` → `↑HDG`). Course/heading orientations also push a 30% top padding so the boat sits at lower-third → implicit lookahead. While following, wheel/pinch zooms are re-anchored `around: 'center'` so they pivot on the boat (default around-cursor zoom would drag the center off the boat and the follow ease would visibly snap it back).
 - **Top-right:** `<ChartToolbar/>` wraps `<LayersControl/>` — a layers popover with OSM / NOAA / **Satellite** / Buoys toggles, a mutually-exclusive Model-overlay radio (None / GFS / ECMWF / CMEMS), and a Misc section (AIS targets + COG extensions). `onToggle` takes a key union — add new toggle keys there and to `LayersState`.
 - **Bottom corners on demand:** `<OffscreenVesselIndicator/>` — amber pill anchored to the viewport edge closest to the (off-screen) boat. Tap = re-enter follow mode. Renders only when `follow=false` AND `livePos` is outside the viewport bounds.
 

@@ -69,6 +69,11 @@ export interface ChartCameraHandle {
  * `map.setPadding({ top: 30% * height })` so the viewport center sits below
  * the geometric center — the boat ends up ~30% from the bottom edge and the
  * user sees more ahead than behind.
+ *
+ * Zoom pivot: while following, wheel and pinch zooms are re-anchored to the
+ * camera center (`around: 'center'`) so they pivot on the boat; the default
+ * around-cursor zoom would shift the center and make the follow ease visibly
+ * re-center right after every zoom.
  */
 export function useChartCamera({
   map,
@@ -129,6 +134,31 @@ export function useChartCamera({
       map.off('dragend', onDragEnd);
     };
   }, [map]);
+
+  // Zoom pivot: while following, gesture zooms (wheel/trackpad, pinch) pivot
+  // around the camera center — which follow pins to the boat — instead of the
+  // cursor/pinch point. Without this a zoom drags the center off the boat and
+  // the next 1 Hz position ease snaps it back (a visible two-step). 'center'
+  // is the padding-aware point, so lookahead orientation keeps the boat at
+  // the lower-third through the zoom.
+  useEffect(() => {
+    if (!map) return;
+    if (follow) {
+      map.scrollZoom.enable({ around: 'center' });
+      map.touchZoomRotate.enable({ around: 'center' });
+    } else {
+      map.scrollZoom.enable();
+      map.touchZoomRotate.enable();
+    }
+    return () => {
+      try {
+        map.scrollZoom.enable();
+        map.touchZoomRotate.enable();
+      } catch {
+        /* map already destroyed */
+      }
+    };
+  }, [map, follow]);
 
   // Lookahead padding
   useEffect(() => {
