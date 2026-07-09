@@ -9,6 +9,8 @@ import {
   fmtSetDeg,
   CURRENT_KIND_LABEL,
 } from '../lib/station-summary';
+import { fmtShortTime, type ShipClock } from '../lib/tz';
+import { useShipClock } from '../lib/use-ship-clock';
 
 type Kind = 'tide' | 'current';
 
@@ -22,11 +24,6 @@ interface StationFeatureProps {
   id: string;
   name: string;
   sourceId?: string;
-}
-
-/** Local clock label, e.g. "14:02". Not pure (locale/tz) — kept out of station-summary. */
-function fmtClock(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
 /** Read a CSS custom property from the document root (resolved value). */
@@ -85,7 +82,11 @@ function deepLink(kind: Kind, p: StationFeatureProps): string {
 }
 
 /** Fetch this station's live data and format the one-line popup summary. */
-async function fetchSummaryLine(kind: Kind, p: StationFeatureProps): Promise<string> {
+async function fetchSummaryLine(
+  kind: Kind,
+  p: StationFeatureProps,
+  clock: ShipClock,
+): Promise<string> {
   try {
     if (kind === 'tide') {
       const r = await fetch(
@@ -99,7 +100,7 @@ async function fetchSummaryLine(kind: Kind, p: StationFeatureProps): Promise<str
       const s = summarizeTide(j.events ?? [], Date.now());
       if (!s) return 'outside forecast window';
       const next = s.next
-        ? ` · → ${s.next.type} ${s.next.heightM.toFixed(1)} m ${fmtClock(s.next.timeMs)}`
+        ? ` · → ${s.next.type} ${s.next.heightM.toFixed(1)} m ${fmtShortTime(s.next.timeMs / 1000, clock)}`
         : '';
       return `Height ${s.heightNowM.toFixed(1)} m${s.state ? ` · ${s.state}` : ''}${next}`;
     }
@@ -112,7 +113,9 @@ async function fetchSummaryLine(kind: Kind, p: StationFeatureProps): Promise<str
     if (!r.ok || !j.ok) return 'data unavailable';
     const s = summarizeCurrent(j.predictions ?? [], j.events ?? [], Date.now());
     if (!s) return 'no current data';
-    const next = s.next ? ` · → ${CURRENT_KIND_LABEL[s.next.kind]} ${fmtClock(s.next.timeMs)}` : '';
+    const next = s.next
+      ? ` · → ${CURRENT_KIND_LABEL[s.next.kind]} ${fmtShortTime(s.next.timeMs / 1000, clock)}`
+      : '';
     return `Set ${fmtSetDeg(s.dirDeg)} · Drift ${s.speedKn.toFixed(1)} kn${next}`;
   } catch {
     return 'data unavailable';
@@ -132,6 +135,9 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
+  const clock = useShipClock();
+  const clockRef = useRef(clock);
+  clockRef.current = clock;
   const popupRef = useRef<maplibregl.Popup | null>(null);
 
   useEffect(() => {
@@ -252,7 +258,7 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
         .setDOMContent(root)
         .addTo(map);
 
-      void fetchSummaryLine(kind, props).then((text) => {
+      void fetchSummaryLine(kind, props, clockRef.current).then((text) => {
         // Popup may have been closed/replaced before the fetch resolved.
         if (line.isConnected) line.textContent = text;
       });

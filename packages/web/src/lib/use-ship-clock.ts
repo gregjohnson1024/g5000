@@ -9,6 +9,7 @@
  * the lib/tz.ts formatters.
  */
 
+import { useMemo } from 'react';
 import { useSseChannel } from '../hooks/use-sse-store';
 import { useThemeStore } from './theme-store';
 import { resolveClock, type ShipClock } from './tz';
@@ -23,5 +24,9 @@ export function useShipClock(): ShipClock {
   const { sample } = useSseChannel(auto ? 'nav.gps.position' : OFF);
   const v = sample?.value as { lon?: number } | null | undefined;
   const lon = typeof v?.lon === 'number' ? v.lon : null;
-  return resolveClock(clockCfg, lon);
+  const { mode, offsetMin } = resolveClock(clockCfg, lon);
+  // Referentially stable while the resolved VALUE is unchanged, so consumers
+  // can safely put the clock in dependency lists (auto mode re-resolves per
+  // GPS fix but the zone offset almost never moves).
+  return useMemo(() => ({ mode, offsetMin }), [mode, offsetMin]);
 }

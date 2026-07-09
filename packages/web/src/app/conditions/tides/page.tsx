@@ -6,6 +6,8 @@ import { interpolateHeight, tideSnapshot } from '@g5000/tide';
 import type { Station, TidalEvent } from '@g5000/tide';
 import { fetchBoatFix } from '../../../lib/boat-fix';
 import { fmtDistanceNm, sortByDistanceNm, type LatLon } from '../../../lib/station-distance';
+import { fmtDayLabel, fmtHourLabel, toDayKey, type ShipClock } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 import { StripChart, type StripPoint, type StripEvent } from '../../../components/charts';
 import { Panel } from '../../../components/ui';
 import { SelectField, type SelectOption, TextField } from '../../../components/ui/fields';
@@ -31,33 +33,13 @@ function parseEntryKey(key: string): { sourceId: SourceId; stationId: string } {
   };
 }
 
-// ── UTC time formatters ──────────────────────────────────────────────────────
+// ── Day grouping ─────────────────────────────────────────────────────────────
 
-/** "HH:MMz DD Mon" */
-function fmtUtcShort(ms: number): string {
-  const d = new Date(ms);
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const mon = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
-  return `${hh}:${mm}z ${day} ${mon}`;
-}
-
-/** "Www DD Mon" UTC group header */
-function fmtUtcDay(ms: number): string {
-  return new Date(ms).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-/** Group events by UTC day. */
-function groupByUtcDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
+/** Group events by ship-clock wall day. */
+function groupByDay(events: TidalEvent[], clock: ShipClock): Map<string, TidalEvent[]> {
   const m = new Map<string, TidalEvent[]>();
   for (const ev of events) {
-    const key = fmtUtcDay(ev.timeMs);
+    const key = toDayKey(ev.timeMs / 1000, clock);
     if (!m.has(key)) m.set(key, []);
     m.get(key)!.push(ev);
   }
@@ -98,6 +80,7 @@ function buildStripEvents(events: TidalEvent[]): StripEvent[] {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function TidePage() {
+  const clock = useShipClock();
   const [pickerList, setPickerList] = useState<PickerEntry[]>([]);
   const [stationsLoaded, setStationsLoaded] = useState(false);
   const [tideSource, setTideSource] = useState<string | null>(null);
@@ -276,7 +259,7 @@ export default function TidePage() {
   const tMin = events.length > 0 ? events[0]!.timeMs : 0;
   const tMax = events.length > 0 ? events[events.length - 1]!.timeMs : 1;
 
-  const dayGroups = useMemo(() => groupByUtcDay(events), [events]);
+  const dayGroups = useMemo(() => groupByDay(events, clock), [events, clock]);
 
   // ── Select options ─────────────────────────────────────────────────────────
 
@@ -408,7 +391,7 @@ export default function TidePage() {
               {snapshot.next && (
                 <span className="ml-2 text-ink-3">
                   → {snapshot.next.type} {snapshot.next.heightM.toFixed(2)} m at{' '}
-                  {fmtUtcShort(snapshot.next.timeMs)}
+                  {fmtHourLabel(snapshot.next.timeMs / 1000, clock)}
                 </span>
               )}
             </>
@@ -424,7 +407,7 @@ export default function TidePage() {
           <table className="w-full text-body-sm font-mono border-collapse">
             <thead>
               <tr className="text-ink-3 border-b border-hairline">
-                <th className="text-left py-2 pr-4">Time (UTC)</th>
+                <th className="text-left py-2 pr-4">Time</th>
                 <th className="text-left py-2 pr-4">Type</th>
                 <th className="text-right py-2">Height</th>
               </tr>
@@ -437,7 +420,7 @@ export default function TidePage() {
                       colSpan={3}
                       className="pt-3 pb-1 text-caption uppercase tracking-wide text-ink-3"
                     >
-                      {day}
+                      {fmtDayLabel(dayEvents[0]!.timeMs / 1000, clock)}
                     </td>
                   </tr>
                   {dayEvents.map((ev) => (
@@ -446,7 +429,7 @@ export default function TidePage() {
                       className="border-b border-hairline hover:bg-surface-raised"
                     >
                       <td className="py-1.5 pr-4 text-ink-2 tabular-nums">
-                        {fmtUtcShort(ev.timeMs)}
+                        {fmtHourLabel(ev.timeMs / 1000, clock)}
                       </td>
                       <td
                         className={`py-1.5 pr-4 font-semibold ${

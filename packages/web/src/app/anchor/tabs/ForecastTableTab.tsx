@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { WeatherForecast, HourPoint } from '../../../lib/weather-dto';
+import { fmtClockSuffix, shiftedDate, toDayKey } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 const DEFAULT_LAT = 32.3;
 const DEFAULT_LON = -64.7;
@@ -190,6 +192,7 @@ function textColor(bg: string): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ForecastTableTab({ lat, lon }: { lat: number; lon: number }): React.ReactElement {
+  const clock = useShipClock();
   const [forecast, setForecast] = useState<WeatherForecast | null>(null);
   const [error, setError] = useState(false);
 
@@ -240,7 +243,7 @@ export function ForecastTableTab({ lat, lon }: { lat: number; lon: number }): Re
   return (
     <div className="overflow-x-auto">
       <p className="text-[0.611rem] text-ink-4 mb-1 uppercase tracking-wide">
-        Hourly heatmap — UTC
+        Hourly heatmap — {clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`}
       </p>
       <table className="text-[0.611rem] font-mono border-collapse min-w-max">
         <thead>
@@ -249,18 +252,25 @@ export function ForecastTableTab({ lat, lon }: { lat: number; lon: number }): Re
             <th className="sticky left-0 z-10 bg-surface-sunken text-ink-3 text-left pr-2 py-0.5 font-normal whitespace-nowrap">
               {' '}
             </th>
-            {hours.map((h) => {
-              const d = new Date(h.timeMs);
+            {hours.map((h, i) => {
+              const d = shiftedDate(h.timeMs / 1000, clock);
               const hr = d.getUTCHours();
-              // Show day/month at midnight, otherwise just the hour
-              const label =
-                hr === 0
-                  ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
-                  : hr % 6 === 0
-                    ? `${hr}Z`
-                    : hr % 3 === 0
-                      ? `${hr}`
-                      : '';
+              const min = d.getUTCMinutes();
+              // Show day/month on day rollover, otherwise just the hour
+              const rollover =
+                i === 0
+                  ? hr === 0
+                  : toDayKey(h.timeMs / 1000, clock) !==
+                    toDayKey(hours[i - 1]!.timeMs / 1000, clock);
+              const label = rollover
+                ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
+                : hr % 3 !== 0
+                  ? ''
+                  : min !== 0
+                    ? `${hr}:${String(min).padStart(2, '0')}${fmtClockSuffix(clock)}`
+                    : hr % 6 === 0
+                      ? `${hr}${fmtClockSuffix(clock)}`
+                      : `${hr}`;
               return (
                 <th
                   key={h.timeMs}

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { AutopilotCommandName, JsonSafeSample } from '@g5000/core';
 import { useSse } from '../../../hooks/use-sse';
+import { fmtClockTime } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 import { Dialog } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
 import { HoldButton } from '../../../components/ui/HoldButton';
@@ -70,6 +72,7 @@ export function ControlPanel(): React.ReactElement {
   const [cooldownUntil, setCooldownUntil] = useState<number>(0);
   const logIdRef = useRef(0);
   const { channels } = useSse();
+  const clock = useShipClock();
   // useSse returns a fresh Map on every SSE event. The 2s ack-poll below
   // runs inside a long-lived closure; without this ref it would keep reading
   // the snapshot taken at click time and never observe the mode change.
@@ -269,26 +272,20 @@ export function ControlPanel(): React.ReactElement {
         )}
       </Dialog>
 
-      {/* Ack log — UTC timestamps */}
+      {/* Ack log — ship-clock timestamps */}
       <div>
         <h3 className="text-xs uppercase tracking-wider text-ink-2 mb-2">Recent commands</h3>
         <div className="text-xs font-mono space-y-1 text-ink-3">
           {log.length === 0 && <div className="text-ink-4 italic">No commands sent yet.</div>}
-          {log.map((r) => {
-            const d = new Date(r.t * 1000);
-            const hh = String(d.getUTCHours()).padStart(2, '0');
-            const mm = String(d.getUTCMinutes()).padStart(2, '0');
-            const ss = String(d.getUTCSeconds()).padStart(2, '0');
-            return (
-              <div key={r.id} className="flex gap-3">
-                <span className="text-ink-4">{`${hh}:${mm}:${ss}Z`}</span>
-                <span className="font-semibold w-32">
-                  {COMMANDS.find((c) => c.name === r.command)?.label ?? r.command}
-                </span>
-                <span>→ {r.result}</span>
-              </div>
-            );
-          })}
+          {log.map((r) => (
+            <div key={r.id} className="flex gap-3">
+              <span className="text-ink-4">{fmtClockTime(r.t, clock)}</span>
+              <span className="font-semibold w-32">
+                {COMMANDS.find((c) => c.name === r.command)?.label ?? r.command}
+              </span>
+              <span>→ {r.result}</span>
+            </div>
+          ))}
         </div>
       </div>
     </section>

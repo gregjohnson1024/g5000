@@ -5,6 +5,8 @@ import type { LivePos } from './LiveBoatMarker';
 import { fmtLatLonDmm } from '../lib/coords';
 import { cssColor } from '../lib/map-colors';
 import { haversineM, initialBearingDeg } from '../lib/mob';
+import { fmtClockTime, toDayKey } from '../lib/tz';
+import { useShipClock } from '../lib/use-ship-clock';
 
 const SRC = 'mob';
 const LINE_LAYER = 'mob-return-line';
@@ -55,8 +57,8 @@ function featureCollection(mob: MobState, live: LivePos | null): GeoJSON.Feature
  * active 'mob' alarm carries a position in its context, draws:
  *  - a distinctive MOB marker (red core, white ring, 'MOB' text), and
  *  - a return line from the live boat position to the MOB point,
- * plus a fixed bottom-left panel with the locked coordinates, fire time
- * (UTC), and a live bearing/distance readout back to the point. Ack tears
+ * plus a fixed bottom-left panel with the locked coordinates, fire time,
+ * and a live bearing/distance readout back to the point. Ack tears
  * everything down (layers, source, panel).
  *
  * Annotation layer: appends normally (no beforeId) so it renders above
@@ -69,6 +71,7 @@ export function MobLayer({
   map: maplibregl.Map | null;
   livePos: LivePos | null;
 }) {
+  const clock = useShipClock();
   const [mob, setMob] = useState<MobState | null>(null);
   const livePosRef = useRef<LivePos | null>(livePos);
   livePosRef.current = livePos;
@@ -218,7 +221,10 @@ export function MobLayer({
         ? `${Math.round(distM)} m`
         : `${(distM / 1852).toFixed(2)} NM`;
   const brgText = brgDeg === null ? '—' : `${Math.round(brgDeg).toString().padStart(3, '0')}°T`;
-  const firedText = `${mob.firedAt.slice(0, 19).replace('T', ' ')} UTC`;
+  const firedSec = Date.parse(mob.firedAt) / 1000;
+  // Seconds matter on a MOB timestamp (elapsed-time reckoning), so compose
+  // date + seconds-precision time rather than the minute-resolution stamp.
+  const firedText = `${toDayKey(firedSec, clock)} ${fmtClockTime(firedSec, clock)}`;
 
   return (
     <div className="absolute bottom-3 left-3 z-20 w-64 rounded border border-red-700 bg-slate-900/90 shadow-lg">

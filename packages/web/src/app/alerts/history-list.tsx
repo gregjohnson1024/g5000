@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useShipClock } from '../../lib/use-ship-clock';
+import { fmtClockTime, toDayKey, type ShipClock } from '../../lib/tz';
+
+function fmtWhen(iso: string, clock: ShipClock): string {
+  const sec = Date.parse(iso) / 1000;
+  return `${toDayKey(sec, clock)} ${fmtClockTime(sec, clock)}`;
+}
 
 interface HistoryRow {
   id: number;
@@ -13,6 +20,7 @@ interface HistoryRow {
 }
 
 export function HistoryList() {
+  const clock = useShipClock();
   const [rows, setRows] = useState<HistoryRow[]>([]);
 
   useEffect(() => {
@@ -30,7 +38,7 @@ export function HistoryList() {
     <table className="w-full text-sm">
       <thead>
         <tr className="text-left text-gray-600">
-          <th className="py-2">Time (UTC)</th>
+          <th className="py-2">Time</th>
           <th>Alarm</th>
           <th>Severity</th>
           <th>Cleared</th>
@@ -40,15 +48,11 @@ export function HistoryList() {
       <tbody>
         {rows.map((r) => (
           <tr key={r.id} className="border-t">
-            <td className="py-2 font-mono">{r.firedAt.replace('T', ' ').replace(/\..+$/, '')}</td>
+            <td className="py-2 font-mono">{fmtWhen(r.firedAt, clock)}</td>
             <td>{r.alarmId}</td>
             <td>{r.severity}</td>
-            <td className="text-gray-500">
-              {r.clearedAt ? r.clearedAt.replace('T', ' ').replace(/\..+$/, '') : '—'}
-            </td>
-            <td className="text-gray-500">
-              {r.ackedAt ? r.ackedAt.replace('T', ' ').replace(/\..+$/, '') : '—'}
-            </td>
+            <td className="text-gray-500">{r.clearedAt ? fmtWhen(r.clearedAt, clock) : '—'}</td>
+            <td className="text-gray-500">{r.ackedAt ? fmtWhen(r.ackedAt, clock) : '—'}</td>
           </tr>
         ))}
       </tbody>

@@ -5,6 +5,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { EmporiaSnapshot, EmporiaCircuit, EmporiaDevice } from '@g5000/core';
+import {
+  fmtClockSuffix,
+  fmtShortTime,
+  shiftedDate,
+  toDayKey,
+  type ShipClock,
+} from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 const POLL_MS = 2_000;
 const FETCH_CAP = 8; // max concurrent history fetches
@@ -59,14 +67,6 @@ function circuitColor(idx: number): string {
 function fmtW(v: number | null | undefined): string {
   if (v == null || !isFinite(v)) return '—';
   return `${Math.round(v)} W`;
-}
-
-function fmtTime(epochMs: number): string {
-  try {
-    return new Date(epochMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '—';
-  }
 }
 
 function fmtKwh(v: number): string {
@@ -127,18 +127,32 @@ interface CircuitSeries {
 
 // ── Aggregate label for the time axis ─────────────────────────────────────────
 
-function bucketLabel(epochMs: number, bucketMs: number): string {
-  const d = new Date(epochMs);
+function bucketLabel(
+  epochMs: number,
+  bucketMs: number,
+  clock: ShipClock,
+  isFirst: boolean,
+): string {
   if (bucketMs >= 86_400_000) {
-    // Day bucket: show MM/DD
+    // Day bucket: show MM/DD. Emporia's cloud day boundaries are fixed
+    // upstream, so day labels stay pinned to the UTC bucket boundary.
+    const d = new Date(epochMs);
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
   }
-  // Hour bucket: show HH:MM Z at midnight rollover, else HH Z
+  // Hour bucket: show MM/DD at day rollover, else the wall hour
+  const d = shiftedDate(epochMs / 1000, clock);
   const h = d.getUTCHours();
-  if (h === 0 && d.getUTCMinutes() === 0) {
+  const m = d.getUTCMinutes();
+  const rollover = isFirst
+    ? h === 0 && m === 0
+    : toDayKey(epochMs / 1000, clock) !== toDayKey((epochMs - bucketMs) / 1000, clock);
+  if (rollover) {
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
   }
-  return `${h}Z`;
+  if (m !== 0) {
+    return `${h}:${String(m).padStart(2, '0')}${fmtClockSuffix(clock)}`;
+  }
+  return `${h}${fmtClockSuffix(clock)}`;
 }
 
 // ── SVG stacked-bar chart ─────────────────────────────────────────────────────
@@ -162,6 +176,7 @@ function StackedBarChart({
   firstEpochMs: number;
   bucketMs: number;
 }): React.ReactElement {
+  const clock = useShipClock();
   if (bucketCount === 0 || series.length === 0) {
     return <p className="text-ink-3 text-xs italic">No data in range.</p>;
   }
@@ -225,7 +240,7 @@ function StackedBarChart({
       {Array.from({ length: bucketCount }, (_, bi) => {
         if (bi % labelEvery !== 0) return null;
         const epochMs = firstEpochMs + bi * bucketMs;
-        const label = bucketLabel(epochMs, bucketMs);
+        const label = bucketLabel(epochMs, bucketMs, clock, bi === 0);
         const x = PAD_L + bi * barSpacing + barW / 2;
         return (
           <text key={bi} x={x} y={BAR_AREA_H + 14} fill="#64748b" fontSize={8} textAnchor="middle">
@@ -290,6 +305,7 @@ interface HistoryState {
 // ── AcHistoryView ─────────────────────────────────────────────────────────────
 
 function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): React.ReactElement {
+  const clock = useShipClock();
   const [selected, setSelected] = useState<HistoryScale>('DAY');
   const [hist, setHist] = useState<HistoryState>({
     status: 'idle',
@@ -557,7 +573,8 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
           {/* Stacked bar chart */}
           <div className="overflow-x-auto">
             <p className="text-[0.611rem] text-ink-4 mb-1 uppercase tracking-wide">
-              kWh per bucket — UTC
+              kWh per bucket —{' '}
+              {selected !== 'DAY' || clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`}
             </p>
             <StackedBarChart
               series={hist.series}
@@ -602,6 +619,7 @@ function AcHistoryView({ emporiaConfig }: { emporiaConfig: EmporiaConfig }): Rea
 type SubView = 'loads' | 'history';
 
 export function AcLoadsTab(): React.ReactElement {
+  const clock = useShipClock();
   const [view, setView] = useState<SubView>('loads');
   const [snapshot, setSnapshot] = useState<(EmporiaSnapshot & { offline?: boolean }) | null>(null);
   const [lastKnownAt, setLastKnownAt] = useState<number | null>(null);
@@ -688,7 +706,9 @@ export function AcLoadsTab(): React.ReactElement {
           </span>
         </div>
         {lastKnownAt != null && lastKnownAt > 0 && (
-          <p className="text-ink-4 text-[0.611rem]">Last known: {fmtTime(lastKnownAt)}</p>
+          <p className="text-ink-4 text-[0.611rem]">
+            Last known: {fmtShortTime(lastKnownAt / 1000, clock)}
+          </p>
         )}
       </div>
     );

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useShipClock } from '../../../../lib/use-ship-clock';
+import { fmtTimestamp } from '../../../../lib/tz';
 
 interface SessionInfo {
   id: string;
@@ -38,6 +40,7 @@ function formatDuration(ms: number): string {
 }
 
 export default function SessionsPage() {
+  const clock = useShipClock();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [summaries, setSummaries] = useState<Record<string, SessionSummary>>({});
   const [status, setStatus] = useState<ReplayStatus>({ mode: 'live' });
@@ -170,7 +173,7 @@ export default function SessionsPage() {
               >
                 <td className="py-2 pr-3">{s.id}</td>
                 <td className="py-2 pr-3 text-slate-300">
-                  {s.startedAt ?? s.mtime.slice(0, 19).replace('T', ' ')}
+                  {fmtTimestamp(Date.parse(s.startedAt ?? s.mtime) / 1000, clock)}
                 </td>
                 <td className="py-2 pr-3 text-right">{formatBytes(s.sizeBytes)}</td>
                 <td className="py-2 pr-3 text-right text-slate-300">

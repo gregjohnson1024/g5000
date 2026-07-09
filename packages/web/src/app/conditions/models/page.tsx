@@ -11,10 +11,12 @@
  *   - Uses Panel + DataTable primitives.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Panel } from '../../../components/ui';
 import { DataTable } from '../../../components/ui';
 import type { ColumnDef } from '../../../components/ui/DataTable';
+import { fmtTimestamp, type ShipClock } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 interface CacheEntry {
   model: string;
@@ -35,54 +37,59 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
 }
 
+/** GRIB run identifier (e.g. '2026-07-09 12Z') — always UTC, never ship time. */
 function formatRunTime(run: string): string {
   const n = Number(run);
   if (!Number.isFinite(n) || n <= 0) return run;
   return new Date(n * 1000).toISOString().replace('T', ' ').slice(0, 16) + 'Z';
 }
 
-function formatMtime(ms: number): string {
+function formatMtime(ms: number, clock: ShipClock): string {
   if (!Number.isFinite(ms) || ms <= 0) return '—';
-  return new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+  return fmtTimestamp(Math.floor(ms / 1000), clock);
 }
 
 // ── DataTable column definitions ─────────────────────────────────────────────
 
-const COLS: ColumnDef<CacheEntry>[] = [
-  {
-    key: 'model',
-    label: 'Model',
-    sortable: true,
-    align: 'left',
-    render: (r) => r.model.toUpperCase(),
-    sortValue: (r) => r.model,
-  },
-  {
-    key: 'runTime',
-    label: 'Run time (UTC)',
-    sortable: true,
-    render: (r) => formatRunTime(r.runTime),
-    sortValue: (r) => Number(r.runTime),
-  },
-  {
-    key: 'size',
-    label: 'Size',
-    sortable: true,
-    render: (r) => formatSize(r.size),
-    sortValue: (r) => r.size,
-  },
-  {
-    key: 'mtime',
-    label: 'Last modified',
-    sortable: true,
-    render: (r) => formatMtime(r.mtime),
-    sortValue: (r) => r.mtime,
-  },
-];
+function buildCols(clock: ShipClock): ColumnDef<CacheEntry>[] {
+  return [
+    {
+      key: 'model',
+      label: 'Model',
+      sortable: true,
+      align: 'left',
+      render: (r) => r.model.toUpperCase(),
+      sortValue: (r) => r.model,
+    },
+    {
+      key: 'runTime',
+      label: 'Run time (UTC)',
+      sortable: true,
+      render: (r) => formatRunTime(r.runTime),
+      sortValue: (r) => Number(r.runTime),
+    },
+    {
+      key: 'size',
+      label: 'Size',
+      sortable: true,
+      render: (r) => formatSize(r.size),
+      sortValue: (r) => r.size,
+    },
+    {
+      key: 'mtime',
+      label: 'Last modified',
+      sortable: true,
+      render: (r) => formatMtime(r.mtime, clock),
+      sortValue: (r) => r.mtime,
+    },
+  ];
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function GribCachePage() {
+  const clock = useShipClock();
+  const cols = useMemo(() => buildCols(clock), [clock]);
   const [items, setItems] = useState<CacheEntry[]>([]);
   const [totalSize, setTotalSize] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -140,7 +147,7 @@ export default function GribCachePage() {
         {items.length > 0 && (
           <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
             <DataTable
-              columns={COLS}
+              columns={cols}
               rows={items}
               rowKey={(r) => `${r.model}/${r.runTime}`}
               defaultSortKey="mtime"

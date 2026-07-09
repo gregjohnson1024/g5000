@@ -18,7 +18,7 @@ export interface SkyInfo {
 export function computeSky(lat: number, lon: number, date: Date): SkyInfo {
   const t = SunCalc.getTimes(date, lat, lon);
   const illum = SunCalc.getMoonIllumination(date);
-  const moonT = SunCalc.getMoonTimes(date, lat, lon);
+  const moonT = SunCalc.getMoonTimes(date, lat, lon, true);
   const dayLengthMs = t.sunset && t.sunrise ? t.sunset.getTime() - t.sunrise.getTime() : null;
   return {
     sunrise: t.sunrise,

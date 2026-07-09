@@ -6,6 +6,8 @@ import { currentNow, nextCurrentEvent } from '@g5000/tide';
 import type { CurrentPrediction, CurrentEvent } from '@g5000/tide';
 import { fetchBoatFix } from '../../../lib/boat-fix';
 import { fmtDistanceNm, sortByDistanceNm, type LatLon } from '../../../lib/station-distance';
+import { fmtHourLabel } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 import { StripChart, type StripPoint, type StripEvent } from '../../../components/charts';
 import { Panel } from '../../../components/ui';
 import { SelectField, type SelectOption, TextField } from '../../../components/ui/fields';
@@ -36,16 +38,6 @@ function fmtDir(deg: number): string {
   return String(rounded).padStart(3, '0') + '°';
 }
 
-/** "HH:MMz DD Mon" UTC */
-function fmtUtcShort(ms: number): string {
-  const d = new Date(ms);
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  const mon = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
-  return `${hh}:${mm}z ${day} ${mon}`;
-}
-
 // ── Build StripChart data ─────────────────────────────────────────────────────
 
 function buildStripPoints(predictions: CurrentPrediction[]): StripPoint[] {
@@ -65,6 +57,7 @@ function buildStripEvents(events: CurrentEvent[]): StripEvent[] {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CurrentsPage() {
+  const clock = useShipClock();
   const [stations, setStations] = useState<CurrentStation[]>([]);
   const [stationsError, setStationsError] = useState(false);
   const [stationsLoaded, setStationsLoaded] = useState(false);
@@ -359,7 +352,7 @@ export default function CurrentsPage() {
           <table className="w-full text-body-sm font-mono border-collapse">
             <thead>
               <tr className="text-ink-3 border-b border-hairline">
-                <th className="text-left py-2 pr-4">Time (UTC)</th>
+                <th className="text-left py-2 pr-4">Time</th>
                 <th className="text-left py-2 pr-4">Event</th>
                 <th className="text-right py-2">Speed</th>
               </tr>
@@ -384,7 +377,7 @@ export default function CurrentsPage() {
                     className="border-b border-hairline hover:bg-surface-raised"
                   >
                     <td className="py-1.5 pr-4 text-ink-2 tabular-nums">
-                      {fmtUtcShort(ev.timeMs)}
+                      {fmtHourLabel(ev.timeMs / 1000, clock)}
                     </td>
                     <td className={`py-1.5 pr-4 font-semibold ${colClass}`}>
                       {EVENT_LABELS[ev.kind] ?? ev.kind}

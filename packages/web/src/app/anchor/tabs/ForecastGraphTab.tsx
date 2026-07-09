@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import type { WeatherForecast, HourPoint } from '../../../lib/weather-dto';
 import { computeSky } from '../../../lib/sky';
+import { fmtClockSuffix, shiftedDate } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 const DEFAULT_LAT = 32.3;
 const DEFAULT_LON = -64.7;
@@ -127,6 +129,7 @@ function Meteogram({
   lat: number;
   lon: number;
 }): React.ReactElement {
+  const clock = useShipClock();
   if (hours.length < 2) {
     return <p className="text-xs text-ink-3 italic">No forecast data.</p>;
   }
@@ -168,16 +171,17 @@ function Meteogram({
   const tickMs: { ms: number; label: string }[] = [];
   {
     const step = 6 * 3_600_000;
-    // Align to first full 6-h boundary after tMin
-    const first = Math.ceil(tMin / step) * step;
+    const offsetMs = clock.offsetMin * 60_000;
+    // Align to first full 6-h wall-clock boundary after tMin
+    const first = Math.ceil((tMin + offsetMs) / step) * step - offsetMs;
     for (let t = first; t <= tMax; t += step) {
-      const d = new Date(t);
+      const d = shiftedDate(t / 1000, clock);
       const h = d.getUTCHours();
       const label =
         h % 12 === 0
-          ? `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${h === 0 ? '00' : '12'}Z`
+          ? `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${h === 0 ? '00' : '12'}${fmtClockSuffix(clock)}`
           : h === 6 || h === 18
-            ? `${h}Z`
+            ? `${h}${fmtClockSuffix(clock)}`
             : '';
       tickMs.push({ ms: t, label });
     }
@@ -366,6 +370,7 @@ function Meteogram({
 }
 
 export function ForecastGraphTab({ lat, lon }: { lat: number; lon: number }): React.ReactElement {
+  const clock = useShipClock();
   const [forecast, setForecast] = useState<WeatherForecast | null>(null);
   const [error, setError] = useState(false);
 
@@ -412,7 +417,9 @@ export function ForecastGraphTab({ lat, lon }: { lat: number; lon: number }): Re
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-ink-3 uppercase tracking-wide">72-hour meteogram — UTC</span>
+        <span className="text-xs text-ink-3 uppercase tracking-wide">
+          72-hour meteogram — {clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`}
+        </span>
         <div className="flex items-center gap-3 text-[0.611rem] text-ink-3">
           <span>
             {/* orange-400 line — temperature legend swatch; raw hex matches SVG render stop */}

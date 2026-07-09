@@ -1,6 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openPeriodStart, type TrackAnnotation } from '../lib/track-annotations';
+import { fmtClockTime } from '../lib/tz';
+import { useShipClock } from '../lib/use-ship-clock';
 import { type BoatState, type SailCategory, type SailWardrobe } from '@g5000/db';
 import { sailGroups } from './sail-groups';
 import { daggerboardLabel } from './daggerboard-label';
@@ -76,6 +78,7 @@ export function AnnotationDropper({
   const [submitting, setSubmitting] = useState(false);
   const [tickMs, setTickMs] = useState<number>(() => Date.now());
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const clock = useShipClock();
 
   // 1 Hz tick so the "open period — N min" pill updates without polling
   // the server. Cheap; only renders when state changes.
@@ -178,7 +181,7 @@ export function AnnotationDropper({
         }
         const body = (await res.json()) as DropperState;
         setState(body);
-        const time = new Date().toISOString().slice(11, 19) + 'Z';
+        const time = fmtClockTime(Date.now() / 1000, clock);
         setFlash(`✓ Marked: ${label} at ${time}`);
         window.setTimeout(() => setFlash(null), 1500);
       } catch (err) {
@@ -189,7 +192,7 @@ export function AnnotationDropper({
         setSubmitting(false);
       }
     },
-    [state.trackId, submitting],
+    [state.trackId, submitting, clock],
   );
 
   const setSail = useCallback(
@@ -264,7 +267,7 @@ export function AnnotationDropper({
     : disabled
       ? 'Set sails (no active track)'
       : open_
-        ? `Open period since ${new Date(open_.tsMs).toISOString().slice(11, 19)}Z`
+        ? `Open period since ${fmtClockTime(open_.tsMs / 1000, clock)}`
         : 'Annotate the track';
   const pillClass = open_
     ? 'bg-amber-500/85 text-slate-900 border-amber-600 hover:bg-amber-400'

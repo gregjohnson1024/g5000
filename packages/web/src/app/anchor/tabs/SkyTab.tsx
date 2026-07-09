@@ -3,15 +3,16 @@
 import { useMemo } from 'react';
 import * as SunCalc from 'suncalc';
 import { computeSky } from '../../../lib/sky';
+import { fmtDayLabel, fmtShortTime } from '../../../lib/tz';
+import type { ShipClock } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Format a Date as UTC HH:MM, or '—' for null (polar night/day). */
-function fmtUtc(d: Date | null): string {
+/** Format a Date as ship-clock HH:MM + suffix, or '—' for null (polar night/day). */
+function fmtTime(d: Date | null, clock: ShipClock): string {
   if (d === null) return '—';
-  const h = d.getUTCHours().toString().padStart(2, '0');
-  const m = d.getUTCMinutes().toString().padStart(2, '0');
-  return `${h}:${m} UTC`;
+  return fmtShortTime(d.getTime() / 1000, clock);
 }
 
 /** Format milliseconds as 'Xh Ym'. */
@@ -93,9 +94,9 @@ function findUpcomingPhases(start: Date, limit = 4): UpcomingPhase[] {
   return Array.from(found.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
-/** Format a Date as a short date string (e.g. "Jul 12"). */
-function fmtDate(d: Date): string {
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+/** Format a Date as a short day label (e.g. "Sat 12 Jul"). */
+function fmtDate(d: Date, clock: ShipClock): string {
+  return fmtDayLabel(d.getTime() / 1000, clock);
 }
 
 // ── Row component ─────────────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ function Row({
 // ── Tab component ─────────────────────────────────────────────────────────────
 
 export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactElement {
+  const clock = useShipClock();
   const now = new Date();
 
   const sky = useMemo(() => computeSky(lat, lon, now), [lat, lon]);
@@ -137,18 +139,18 @@ export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactE
         <div className="text-[0.611rem] uppercase tracking-wider text-ink-2 font-medium mb-0.5">
           ☀ Sun
         </div>
-        <Row label="Rise" value={fmtUtc(sky.sunrise)} />
-        <Row label="Set" value={fmtUtc(sky.sunset)} />
+        <Row label="Rise" value={fmtTime(sky.sunrise, clock)} />
+        <Row label="Set" value={fmtTime(sky.sunset, clock)} />
         <Row label="Day length" value={fmtDuration(sky.dayLengthMs)} />
         <div className="mt-1 text-[0.611rem] uppercase tracking-wider text-ink-3 font-medium">
           Twilight
         </div>
-        <Row label="Civil dawn" value={fmtUtc(sky.civilDawn)} dim />
-        <Row label="Civil dusk" value={fmtUtc(sky.civilDusk)} dim />
-        <Row label="Nautical dawn" value={fmtUtc(sky.nauticalDawn)} dim />
-        <Row label="Nautical dusk" value={fmtUtc(sky.nauticalDusk)} dim />
-        <Row label="Astro dawn" value={fmtUtc(sky.astroDawn)} dim />
-        <Row label="Astro dusk" value={fmtUtc(sky.astroDusk)} dim />
+        <Row label="Civil dawn" value={fmtTime(sky.civilDawn, clock)} dim />
+        <Row label="Civil dusk" value={fmtTime(sky.civilDusk, clock)} dim />
+        <Row label="Nautical dawn" value={fmtTime(sky.nauticalDawn, clock)} dim />
+        <Row label="Nautical dusk" value={fmtTime(sky.nauticalDusk, clock)} dim />
+        <Row label="Astro dawn" value={fmtTime(sky.astroDawn, clock)} dim />
+        <Row label="Astro dusk" value={fmtTime(sky.astroDusk, clock)} dim />
       </div>
 
       {/* Moon column */}
@@ -158,8 +160,8 @@ export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactE
         </div>
         <Row label="Phase" value={phaseName(sky.moon.phase)} />
         <Row label="Illumination" value={`${moonPct}%`} />
-        <Row label="Rise" value={fmtUtc(sky.moon.rise)} />
-        <Row label="Set" value={fmtUtc(sky.moon.set)} />
+        <Row label="Rise" value={fmtTime(sky.moon.rise, clock)} />
+        <Row label="Set" value={fmtTime(sky.moon.set, clock)} />
 
         {/* Upcoming phases */}
         {upcomingPhases.length > 0 && (
@@ -168,7 +170,7 @@ export function SkyTab({ lat, lon }: { lat: number; lon: number }): React.ReactE
               Upcoming
             </div>
             {upcomingPhases.map((p) => (
-              <Row key={p.name} label={p.name} value={fmtDate(p.date)} dim />
+              <Row key={p.name} label={p.name} value={fmtDate(p.date, clock)} dim />
             ))}
           </>
         )}

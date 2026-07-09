@@ -1,8 +1,11 @@
 'use client';
 import type { Route } from '@g5000/routing';
 import { routeToGpx } from '../lib/gpx';
+import { fmtShortTime } from '../lib/tz';
+import { useShipClock } from '../lib/use-ship-clock';
 
 export function RouteTimeline({ route }: { route: Route }) {
+  const clock = useShipClock();
   const KN = 1.94384;
   const DEG = 180 / Math.PI;
   const onExport = () => {
@@ -32,7 +35,7 @@ export function RouteTimeline({ route }: { route: Route }) {
           <tbody>
             {route.legs.map((l, i) => (
               <tr key={i}>
-                <td>{new Date(l.t * 1000).toISOString().slice(11, 16)}</td>
+                <td>{fmtShortTime(l.t, clock)}</td>
                 <td className="text-right">{(l.tws * KN).toFixed(1)}</td>
                 <td className="text-right">{(l.twa * DEG).toFixed(0)}°</td>
                 <td className="text-right">{(l.bsp * KN).toFixed(1)}</td>

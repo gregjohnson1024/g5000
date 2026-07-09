@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { fmtClockTimeMs } from '../../../../lib/tz';
+import { useShipClock } from '../../../../lib/use-ship-clock';
 
 interface Frame {
   t: number;
@@ -17,15 +19,6 @@ const MAX_ROWS = 200;
 
 function fmtSrcHex(n: number): string {
   return `0x${n.toString(16).padStart(2, '0')}`;
-}
-
-function fmtTime(unixSec: number): string {
-  const d = new Date(unixSec * 1000);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
-  const ms = String(d.getMilliseconds()).padStart(3, '0');
-  return `${hh}:${mm}:${ss}.${ms}`;
 }
 
 /**
@@ -138,6 +131,7 @@ function summary(pgn: number, fields: Record<string, unknown>): string {
 }
 
 export default function SniffPage() {
+  const clock = useShipClock();
   const [pgnsInput, setPgnsInput] = useState<string>(DEFAULT_PGNS);
   const [streaming, setStreaming] = useState<boolean>(true);
   const [frames, setFrames] = useState<Frame[]>([]);
@@ -266,7 +260,9 @@ export default function SniffPage() {
               if (f.fields.__marker) {
                 return (
                   <tr key={f.rowId} className="bg-amber-950/40 border-y border-amber-800">
-                    <td className="px-2 py-1 text-amber-300">{fmtTime(f.t)}</td>
+                    <td className="px-2 py-1 text-amber-300">
+                      {fmtClockTimeMs(f.t * 1000, clock)}
+                    </td>
                     <td className="px-2 py-1 text-amber-300">—</td>
                     <td className="px-2 py-1 text-amber-300">—</td>
                     <td className="px-2 py-1 text-amber-200 font-semibold">
@@ -277,7 +273,7 @@ export default function SniffPage() {
               }
               return (
                 <tr key={f.rowId} className="border-t border-slate-800/60">
-                  <td className="px-2 py-1 text-slate-400">{fmtTime(f.t)}</td>
+                  <td className="px-2 py-1 text-slate-400">{fmtClockTimeMs(f.t * 1000, clock)}</td>
                   <td className="px-2 py-1 text-slate-200">{f.pgn}</td>
                   <td className="px-2 py-1 text-slate-200">{fmtSrcHex(f.src)}</td>
                   <td className="px-2 py-1 text-slate-200 whitespace-pre-wrap">

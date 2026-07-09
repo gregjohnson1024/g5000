@@ -1,4 +1,6 @@
 'use client';
+import { fmtTimestamp, toDayKey } from '../lib/tz';
+import { useShipClock } from '../lib/use-ship-clock';
 
 export interface WindowResult {
   departure: number;
@@ -17,6 +19,7 @@ export function WindowHeatmap({
   results: WindowResult[];
   onPick: (r: WindowResult) => void;
 }) {
+  const clock = useShipClock();
   if (results.length === 0) return null;
   const hours = results.filter((r) => !r.incomplete).map((r) => (r.eta - r.departure) / 3600);
   const min = hours.length > 0 ? Math.min(...hours) : 0;
@@ -30,7 +33,7 @@ export function WindowHeatmap({
   // group by day-of-departure
   const byDay = new Map<string, WindowResult[]>();
   for (const r of results) {
-    const k = new Date(r.departure * 1000).toISOString().slice(0, 10);
+    const k = toDayKey(r.departure, clock);
     const arr = byDay.get(k) ?? [];
     arr.push(r);
     byDay.set(k, arr);
@@ -44,8 +47,8 @@ export function WindowHeatmap({
             {rs.map((r) => {
               const etaH = (r.eta - r.departure) / 3600;
               const tip = r.incomplete
-                ? `Dep: ${new Date(r.departure * 1000).toISOString()}\nIncomplete${r.reason ? `: ${r.reason}` : ''}`
-                : `Dep: ${new Date(r.departure * 1000).toISOString()}\nETA: ${etaH.toFixed(1)} h\nDist: ${(r.distance / 1852).toFixed(0)} NM\nMean TWS: ${r.meanTws.toFixed(1)} m/s\nMax TWS: ${r.maxTws.toFixed(1)} m/s`;
+                ? `Dep: ${fmtTimestamp(r.departure, clock)}\nIncomplete${r.reason ? `: ${r.reason}` : ''}`
+                : `Dep: ${fmtTimestamp(r.departure, clock)}\nETA: ${etaH.toFixed(1)} h\nDist: ${(r.distance / 1852).toFixed(0)} NM\nMean TWS: ${r.meanTws.toFixed(1)} m/s\nMax TWS: ${r.maxTws.toFixed(1)} m/s`;
               return (
                 <td
                   key={r.departure}

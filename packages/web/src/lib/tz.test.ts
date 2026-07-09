@@ -3,12 +3,17 @@ import {
   UTC_CLOCK,
   fmtClockSuffix,
   fmtClockTime,
+  fmtClockTimeMs,
+  fmtDayLabel,
   fmtHourLabel,
+  fmtShortTime,
   fmtTimestamp,
   parseDatetimeLocalInput,
   resolveClock,
+  shiftedDate,
   suggestedOffsetMin,
   toDatetimeLocalInput,
+  toDayKey,
   type ShipClock,
 } from './tz';
 
@@ -81,6 +86,30 @@ describe('formatters', () => {
   it('fmtClockTime includes seconds', () => {
     expect(fmtClockTime(T, UTC_CLOCK)).toBe('02:16:20Z');
     expect(fmtClockTime(T, SHIP_P530)).toBe('07:46:20+5:30');
+  });
+  it('fmtShortTime is HH:MM + suffix', () => {
+    expect(fmtShortTime(T, UTC_CLOCK)).toBe('02:16Z');
+    expect(fmtShortTime(T, SHIP_M4)).toBe('22:16-4');
+  });
+  it('fmtClockTimeMs keeps milliseconds', () => {
+    expect(fmtClockTimeMs(T * 1000 + 7, UTC_CLOCK)).toBe('02:16:20.007Z');
+    expect(fmtClockTimeMs(T * 1000 + 7, SHIP_M4)).toBe('22:16:20.007-4');
+  });
+});
+
+describe('day grouping', () => {
+  it('toDayKey follows the ship wall date across midnight', () => {
+    expect(toDayKey(T, UTC_CLOCK)).toBe('2026-07-09');
+    expect(toDayKey(T, SHIP_M4)).toBe('2026-07-08');
+  });
+  it('fmtDayLabel renders the shifted day, optionally with year', () => {
+    expect(fmtDayLabel(T, UTC_CLOCK)).toBe('Thu 09 Jul');
+    expect(fmtDayLabel(T, SHIP_M4)).toBe('Wed 08 Jul');
+    expect(fmtDayLabel(T, SHIP_M4, { year: true })).toBe('Wed 08 Jul 2026');
+  });
+  it('shiftedDate exposes the offset instant for bespoke labels', () => {
+    expect(shiftedDate(T, SHIP_M4).getUTCHours()).toBe(22);
+    expect(shiftedDate(T, UTC_CLOCK).getUTCHours()).toBe(2);
   });
 });
 

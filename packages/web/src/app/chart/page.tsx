@@ -1095,7 +1095,7 @@ function ChartPageInner() {
             } else if (grid) {
               setCurrentGrid(grid);
               setCurrentStatus(
-                `CMEMS daily mean for ${new Date(grid.validAt * 1000).toISOString().slice(0, 10)}`,
+                `CMEMS daily mean for ${new Date(grid.validAt * 1000).toISOString().slice(0, 10)} (UTC)`,
               );
             }
           }}

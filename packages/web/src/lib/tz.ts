@@ -71,6 +71,15 @@ function shifted(unixSec: number, clock: ShipClock): Date {
   return new Date((unixSec + clock.offsetMin * 60) * 1000);
 }
 
+/**
+ * The shifted instant for bespoke compact renders (axis ticks, meteogram
+ * labels) that none of the canned formatters fit. Read parts with getUTC*
+ * ONLY — local-time getters reintroduce the device-timezone bug.
+ */
+export function shiftedDate(unixSec: number, clock: ShipClock): Date {
+  return shifted(unixSec, clock);
+}
+
 const pad = (n: number): string => String(n).padStart(2, '0');
 
 /** UNIX seconds → 'YYYY-MM-DD HH:MM' + clock suffix (minute resolution). */
@@ -93,6 +102,40 @@ export function fmtHourLabel(unixSec: number, clock: ShipClock): string {
 export function fmtClockTime(unixSec: number, clock: ShipClock): string {
   const d = shifted(unixSec, clock);
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}${fmtClockSuffix(clock)}`;
+}
+
+/** UNIX seconds → 'HH:MM' + suffix. Popups and table cells. */
+export function fmtShortTime(unixSec: number, clock: ShipClock): string {
+  const d = shifted(unixSec, clock);
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}${fmtClockSuffix(clock)}`;
+}
+
+/** UNIX milliseconds → 'HH:MM:SS.mmm' + suffix. Diagnostics feeds. */
+export function fmtClockTimeMs(unixMs: number, clock: ShipClock): string {
+  const d = new Date(unixMs + clock.offsetMin * 60_000);
+  return (
+    `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}` +
+    `.${String(d.getUTCMilliseconds()).padStart(3, '0')}${fmtClockSuffix(clock)}`
+  );
+}
+
+/**
+ * UNIX seconds → the ship-clock wall DATE as a 'YYYY-MM-DD' key. Use for
+ * grouping rows into days: near midnight the ship date differs from the UTC
+ * date, and groups must follow the clock the row labels render in.
+ */
+export function toDayKey(unixSec: number, clock: ShipClock): string {
+  const d = shifted(unixSec, clock);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** UNIX seconds → 'Thu 09 Jul' (+ ' 2026' with year) in ship wall time. */
+export function fmtDayLabel(unixSec: number, clock: ShipClock, opts?: { year?: boolean }): string {
+  const d = shifted(unixSec, clock);
+  const wd = d.toLocaleString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  const mon = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  const base = `${wd} ${pad(d.getUTCDate())} ${mon}`;
+  return opts?.year ? `${base} ${d.getUTCFullYear()}` : base;
 }
 
 /**

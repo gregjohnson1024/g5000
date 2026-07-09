@@ -5,6 +5,9 @@ import { interpolateHeight, tideSnapshot } from '@g5000/tide';
 import type { Station, TidalEvent } from '@g5000/tide';
 import { fmtDistanceNm, sortByDistanceNm } from '../../../lib/station-distance';
 import type { LatLon } from '../../../lib/station-distance';
+import { fmtDayLabel, fmtHourLabel, fmtShortTime, toDayKey } from '../../../lib/tz';
+import type { ShipClock } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,25 +71,10 @@ function ptsToPolyline(pts: { x: number; y: number }[]): string {
   return pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
 }
 
-function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  });
-}
-
-function groupByDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
+function groupByDay(events: TidalEvent[], clock: ShipClock): Map<string, TidalEvent[]> {
   const m = new Map<string, TidalEvent[]>();
   for (const ev of events) {
-    const key = new Date(ev.timeMs).toLocaleDateString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
+    const key = toDayKey(ev.timeMs / 1000, clock);
     if (!m.has(key)) m.set(key, []);
     m.get(key)!.push(ev);
   }
@@ -96,6 +84,7 @@ function groupByDay(events: TidalEvent[]): Map<string, TidalEvent[]> {
 // ── Tab component ─────────────────────────────────────────────────────────────
 
 export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.ReactElement {
+  const clock = useShipClock();
   const [pickerList, setPickerList] = useState<PickerEntry[]>([]);
   const [stationsLoaded, setStationsLoaded] = useState(false);
   const [tideSource, setTideSource] = useState<string | null>(null);
@@ -282,7 +271,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
     return PAD.left + ((now - tMin) / Math.max(1, tMax - tMin)) * plotW;
   })();
 
-  const dayGroups = groupByDay(events);
+  const dayGroups = groupByDay(events, clock);
 
   // ── Feature gate ───────────────────────────────────────────────────────────
 
@@ -404,7 +393,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
                 {snapshot.next && (
                   <span className="ml-2 text-ink-3">
                     → {snapshot.next.type} {snapshot.next.heightM.toFixed(2)} m at{' '}
-                    {fmtTime(snapshot.next.timeMs)}
+                    {fmtHourLabel(snapshot.next.timeMs / 1000, clock)}
                   </span>
                 )}
               </>
@@ -423,7 +412,7 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
           <table className="w-full text-xs font-mono border-collapse">
             <thead>
               <tr className="text-ink-3 border-b border-hairline">
-                <th className="text-left py-1 pr-3">Time (UTC)</th>
+                <th className="text-left py-1 pr-3">Time</th>
                 <th className="text-left py-1 pr-3">Type</th>
                 <th className="text-right py-1">Height</th>
               </tr>
@@ -438,17 +427,13 @@ export function TidesTab({ lat, lon }: { lat: number; lon: number }): React.Reac
                         colSpan={3}
                         className="pt-2 pb-0.5 text-[0.611rem] uppercase tracking-wide text-ink-4"
                       >
-                        {day}
+                        {fmtDayLabel(dayEvents[0]!.timeMs / 1000, clock)}
                       </td>
                     </tr>
                     {dayEvents.map((ev) => (
                       <tr key={ev.timeMs} className="border-b border-hairline">
                         <td className="py-0.5 pr-3 text-ink-2">
-                          {new Date(ev.timeMs).toLocaleString(undefined, {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'UTC',
-                          })}
+                          {fmtShortTime(ev.timeMs / 1000, clock)}
                         </td>
                         <td
                           className={`py-0.5 pr-3 font-semibold ${

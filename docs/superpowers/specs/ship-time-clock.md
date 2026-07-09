@@ -69,11 +69,34 @@ interface ClockConfig {
 text never matched the client (#418 args=text on every /chart load). Both now
 seed the anchor in a mount effect and format offset-shifted UTC parts.
 
-## Not covered (follow-up sweep)
+## Long-tail sweep (done 2026-07-09, second commit)
 
-Long-tail wall-clock render sites still hard-UTC (correct, just not
-mode-aware yet): anchor drawer tabs (Sky/Tides/Forecast/TodayNow/AC),
-conditions tides/currents/windows pages, autopilot ack log, RouteTimeline,
-RouteWeatherPanel, WindowHeatmap, StationsOverlay popups, StripChart axes,
-AnnotationDropper, RecordList, trip-stats/wind-runs/hrrr-helpers labels.
-Each is now a mechanical edit: `useShipClock()` + the lib/tz formatter.
+All previously-listed hard-UTC render sites migrated to `useShipClock()` +
+lib/tz formatters: anchor drawer tabs (Sky/Tides/ForecastTable/ForecastGraph/
+AcLoads/TodayNow), conditions tides/currents/windows/models pages, autopilot
+ack log, RouteTimeline, RouteWeatherPanel, WindowHeatmap, StationsOverlay
+popups, StripChart axes, AnnotationDropper, RecordList — plus sites the
+original list missed: boat diag logs + N2K sniffer (were device-local, a
+bug), diag sessions page, alerts history table, MOB popup (date + seconds
+precision), logbook delete-dialog (showed ship time labeled "UTC"), CMEMS
+toast (kept UTC, now labeled). suncalc `getMoonTimes` now passes `inUTC` so
+the moon-day window no longer depends on the viewing device's OS timezone.
+New shared helpers grew in lib/tz.ts: `fmtShortTime`, `fmtClockTimeMs`,
+`toDayKey`, `fmtDayLabel`, `shiftedDate`; `useShipClock` memoizes on the
+resolved value so it is referentially stable in dependency lists.
+`trip-stats` / `wind-runs` / `hrrr-helpers` / `current-fetch` were audited
+and left alone — they compute data-plane values (GRIB runs, bucket keys),
+not display text.
+
+## Still not covered (deferred)
+
+- **Server-rendered text**: `/api/boat-status` counts "sessions today" by
+  UTC calendar day, and `/api/alarms/push-test` ntfy body renders UTC (both
+  labeled). Making server routes clock-aware needs a server-side
+  `resolveClock` against ConfigStore + last GPS fix — small design job, not
+  a mechanical edit.
+- **Unmounted dead code**: `WindowHeatmap` / `RouteTimeline` have no JSX
+  consumers (windows page renders `HeatmapGrid`); they were migrated anyway
+  so they're correct if remounted.
+- Logbook trip rows render shifted time via `fmtParts` without a per-cell
+  suffix (the header chip names the mode); delete-dialog now suffixes.

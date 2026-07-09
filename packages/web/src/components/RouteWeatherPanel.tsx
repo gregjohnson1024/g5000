@@ -2,6 +2,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Route } from '@g5000/routing';
 import { buildRouteWeatherSeries } from '../lib/route-weather';
+import { fmtShortTime } from '../lib/tz';
+import { useShipClock } from '../lib/use-ship-clock';
 import { MS_TO_KN } from '../lib/units';
 
 const MODELS = ['GFS', 'ECMWF'] as const;
@@ -19,13 +21,6 @@ const PLOT_H = H - M.top - M.bottom;
 /** Candidate x-tick intervals (seconds); pick the smallest giving ≤ 6 ticks. */
 const TICK_STEPS = [3600, 3 * 3600, 6 * 3600, 12 * 3600, 24 * 3600, 48 * 3600];
 
-function fmtUtcHm(unixSec: number): string {
-  const d = new Date(unixSec * 1000);
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
 /** Weather-along-route card: TWS/SOG vs time from the planned route's own
  *  legs (no fetches), with motoring stretches shaded and a cursor synced to
  *  the shared playback clock. Click/drag on the chart scrubs playback. */
@@ -40,6 +35,7 @@ export function RouteWeatherPanel(props: {
   const model = props.routes[tab] ? tab : available[0];
   const route = model ? props.routes[model] : undefined;
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const clock = useShipClock();
 
   const series = useMemo(() => (route ? buildRouteWeatherSeries(route) : null), [route]);
 
@@ -155,7 +151,7 @@ export function RouteWeatherPanel(props: {
             </text>
           </g>
         ))}
-        {/* X ticks (UTC) */}
+        {/* X ticks (ship clock) */}
         {ticks.map((t) => (
           <g key={t}>
             <line
@@ -167,7 +163,7 @@ export function RouteWeatherPanel(props: {
               strokeWidth={0.5}
             />
             <text x={xOf(t)} y={H - 4} fontSize={7} fill="var(--ink-2)" textAnchor="middle">
-              {fmtUtcHm(t)}
+              {fmtShortTime(t, clock)}
             </text>
           </g>
         ))}

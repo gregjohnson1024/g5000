@@ -5,6 +5,8 @@ import { tideSnapshot } from '@g5000/tide';
 import type { TidalEvent } from '@g5000/tide';
 import type { JsonSafeSample } from '@g5000/core';
 import type { WeatherCurrent, HourPoint } from '../../../lib/weather-dto';
+import { fmtShortTime } from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 import { Panel } from '../../../components/ui/Panel';
 
 // Default position (Bermuda) — used when no GPS fix is available.
@@ -33,6 +35,7 @@ export function TodayNowPanel({
   /** Optional override lon for weather/forecast (from settings weatherPin or anchor position). */
   weatherLon?: number;
 }): React.ReactElement {
+  const clock = useShipClock();
   const position = geo(channels.get('nav.gps.position'));
   const lat = weatherLat ?? position?.lat ?? DEFAULT_LAT;
   const lon = weatherLon ?? position?.lon ?? DEFAULT_LON;
@@ -192,12 +195,7 @@ export function TodayNowPanel({
                   Next {snapshot.next.type}{' '}
                   <span className="text-ink-2">{snapshot.next.heightM.toFixed(1)} m</span>
                   {' @ '}
-                  {new Date(snapshot.next.timeMs).toLocaleTimeString(undefined, {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'UTC',
-                    timeZoneName: 'short',
-                  })}
+                  {fmtShortTime(snapshot.next.timeMs / 1000, clock)}
                 </span>
               )}
             </div>

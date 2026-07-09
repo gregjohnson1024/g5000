@@ -8,7 +8,7 @@
  * Keeps the keep-list invariants:
  *   - trips' StatCard grammar (kept — see overhaul-keep-list)
  *   - day-grouped feed structure
- *   - stable UTC timestamps
+ *   - stable ship-clock timestamps
  *
  * Token-only. No raw hex.
  */
@@ -16,6 +16,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { fmtDayLabel, toDayKey } from '../../lib/tz';
+import { useShipClock } from '../../lib/use-ship-clock';
 
 export type RecordKind = string;
 
@@ -42,22 +44,6 @@ export interface RecordListProps {
   className?: string;
 }
 
-function toDateKey(tMs: number): string {
-  return new Date(tMs).toISOString().slice(0, 10); // YYYY-MM-DD UTC
-}
-
-function fmtDay(dateKey: string): string {
-  // Simple UTC day label: "Mon 07 Jul 2026"
-  const d = new Date(`${dateKey}T00:00:00Z`);
-  return d.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
 export function RecordList({
   items,
   kindOptions,
@@ -65,6 +51,7 @@ export function RecordList({
   className = '',
 }: RecordListProps): React.ReactElement {
   const [kindFilter, setKindFilter] = useState<RecordKind | 'all'>('all');
+  const clock = useShipClock();
 
   // Filter
   const filtered = useMemo(() => {
@@ -75,17 +62,17 @@ export function RecordList({
   // Sort descending by time
   const sorted = useMemo(() => [...filtered].sort((a, b) => b.tMs - a.tMs), [filtered]);
 
-  // Group by UTC date
+  // Group by ship-clock date
   const groups = useMemo(() => {
     const map = new Map<string, RecordItem[]>();
     for (const item of sorted) {
-      const k = toDateKey(item.tMs);
+      const k = toDayKey(item.tMs / 1000, clock);
       const arr = map.get(k) ?? [];
       arr.push(item);
       map.set(k, arr);
     }
     return [...map.entries()];
-  }, [sorted]);
+  }, [sorted, clock]);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -133,7 +120,7 @@ export function RecordList({
             {/* Day header — StatCard grammar (keep-list) */}
             <div className="flex items-center gap-3 mb-2 pb-1 border-b border-hairline">
               <span className="text-label uppercase tracking-wider text-ink-3">
-                {fmtDay(dateKey)}
+                {fmtDayLabel(dayItems[0]!.tMs / 1000, clock, { year: true })}
               </span>
               {/* Day-level stat chips from the first item that provides one */}
               {dayItems.find((i) => i.dayStat)?.dayStat}

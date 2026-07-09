@@ -9,13 +9,15 @@
  *   - Pin button (keeps or removes the strip from a multi-strip view)
  *   - Tap-scrub: touch/click on the SVG emits the interpolated value at that x
  *
- * Token-only. UTC-only time labels. No raw hex.
+ * Token-only. Ship-clock time labels. No raw hex.
  * Pure presentational except for the tap-scrub interaction.
  */
 
 'use client';
 
 import { useCallback, useRef } from 'react';
+import { fmtShortTime } from '../../lib/tz';
+import { useShipClock } from '../../lib/use-ship-clock';
 
 export type EventKind = 'flood' | 'ebb' | 'slack';
 
@@ -90,10 +92,6 @@ function lerp(points: StripPoint[], tMs: number): number | null {
   return null;
 }
 
-function fmtTimeUtc(tMs: number): string {
-  return new Date(tMs).toISOString().slice(11, 16) + 'z';
-}
-
 export function StripChart({
   label,
   points,
@@ -111,6 +109,7 @@ export function StripChart({
   className = '',
 }: StripChartProps): React.ReactElement {
   const svgRef = useRef<SVGSVGElement>(null);
+  const clock = useShipClock();
 
   const [dMin, dMax] = domain ?? autoFitDomain(points);
   const tSpan = Math.max(1, tMax - tMin);
@@ -260,7 +259,7 @@ export function StripChart({
               fontFamily="monospace"
               fill="var(--ink-3)"
             >
-              {fmtTimeUtc(t)}
+              {fmtShortTime(t / 1000, clock)}
             </text>
           ))}
         </svg>

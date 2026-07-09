@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogEntry, LogLevel } from '@g5000/core';
+import { fmtClockTimeMs } from '../../../../lib/tz';
+import { useShipClock } from '../../../../lib/use-ship-clock';
 
 const MAX_BUFFER = 500;
 
@@ -13,16 +15,8 @@ const LEVEL_CHIP: Record<LogLevel, string> = {
 
 type ConnState = 'connecting' | 'connected' | 'reconnecting';
 
-function formatTimestamp(t: number): string {
-  const d = new Date(t);
-  const hh = d.getHours().toString().padStart(2, '0');
-  const mm = d.getMinutes().toString().padStart(2, '0');
-  const ss = d.getSeconds().toString().padStart(2, '0');
-  const ms = d.getMilliseconds().toString().padStart(3, '0');
-  return `${hh}:${mm}:${ss}.${ms}`;
-}
-
 export default function LogsPage() {
+  const clock = useShipClock();
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [conn, setConn] = useState<ConnState>('connecting');
   const [autoScroll, setAutoScroll] = useState(true);
@@ -127,7 +121,7 @@ export default function LogsPage() {
         ) : (
           visible.map((e, i) => (
             <div key={`${e.t}-${i}`} className="flex gap-2 items-start py-0.5">
-              <span className="text-slate-500 shrink-0">{formatTimestamp(e.t)}</span>
+              <span className="text-slate-500 shrink-0">{fmtClockTimeMs(e.t, clock)}</span>
               <span
                 className={`shrink-0 px-1 rounded text-[10px] uppercase ${LEVEL_CHIP[e.level]}`}
               >

@@ -148,7 +148,10 @@ export function RouteLens({
       <div className="flex items-center justify-between">
         <StatusBadge />
         {/* Clock mode is boat-wide now — shown read-only, set on /boat/setup */}
-        <span className="text-xs font-mono text-ink-3 select-none" title="Clock mode (set in Boat → Setup)">
+        <span
+          className="text-xs font-mono text-ink-3 select-none"
+          title="Clock mode (set in Boat → Setup)"
+        >
           {clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`}
         </span>
       </div>

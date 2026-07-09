@@ -269,7 +269,9 @@ export function EnginePanel({ clock }: { clock: ShipClock }) {
             <table className="w-full text-xs font-mono">
               <thead>
                 <tr className="text-slate-500 text-left">
-                  <th className="py-1 pr-2">When ({clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`})</th>
+                  <th className="py-1 pr-2">
+                    When ({clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`})
+                  </th>
                   <th className="py-1 pr-2">Port</th>
                   <th className="py-1 pr-2">Stbd</th>
                   <th className="py-1 pr-2">Note</th>

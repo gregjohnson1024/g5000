@@ -2,12 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fmtLatLonDmm } from '../../../lib/coords';
-import {
-  formatDuration,
-  fmtClockSuffix,
-  fmtTimestamp,
-  type ShipClock,
-} from '../../../lib/tz';
+import { formatDuration, fmtClockSuffix, fmtTimestamp, type ShipClock } from '../../../lib/tz';
 import { useShipClock } from '../../../lib/use-ship-clock';
 import { Button, ConfirmDialog, RecordList, StatusChip } from '../../../components/ui';
 import type { RecordItem } from '../../../components/ui';
@@ -272,7 +267,8 @@ function TripRow({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 font-mono">
             <div>
               <span className="text-ink-3">Start </span>
-              {fmtTimestamp(trip.startMs / 1000, clock)} · {fmtLatLonDmm(trip.startLat, trip.startLon)}
+              {fmtTimestamp(trip.startMs / 1000, clock)} ·{' '}
+              {fmtLatLonDmm(trip.startLat, trip.startLon)}
             </div>
             <div>
               <span className="text-ink-3">End </span>
@@ -540,8 +536,7 @@ export function TripsClientView() {
       <div className="flex items-baseline justify-between mb-4">
         <h1 className="text-[1.111rem] font-semibold text-ink-value">Logbook</h1>
         <div className="text-caption text-ink-2 font-mono tabular-nums">
-          {clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`} · {trips.length}{' '}
-          loaded
+          {clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`} · {trips.length} loaded
         </div>
       </div>
 
@@ -634,9 +629,9 @@ export function TripsClientView() {
         message={
           pendingDeleteTrip
             ? (() => {
-                const { ymd, hm } = fmtParts(pendingDeleteTrip.startMs, clock);
+                const when = fmtTimestamp(pendingDeleteTrip.startMs / 1000, clock);
                 const nm = (pendingDeleteTrip.distanceM / M_PER_NM).toFixed(1);
-                return `Delete trip ${ymd} ${hm} UTC — ${nm} NM? This cannot be undone.`;
+                return `Delete trip ${when} — ${nm} NM? This cannot be undone.`;
               })()
             : ''
         }

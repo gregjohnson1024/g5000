@@ -11,7 +11,7 @@
  *   - Retokenized (Panel + Button primitives; no raw slate-* classes).
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Panel, Button } from '../../../components/ui';
 import { HeatmapGrid, RampLegend, buildStops, type HeatmapCell } from '../../../components/charts';
@@ -22,6 +22,17 @@ import {
   Checkbox,
   type SelectOption,
 } from '../../../components/ui/fields';
+import {
+  UTC_CLOCK,
+  fmtClockSuffix,
+  fmtTimestamp,
+  parseDatetimeLocalInput,
+  shiftedDate,
+  toDatetimeLocalInput,
+  toDayKey,
+  type ShipClock,
+} from '../../../lib/tz';
+import { useShipClock } from '../../../lib/use-ship-clock';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,11 +70,14 @@ const MODEL_OPTIONS: SelectOption<'GFS' | 'ECMWF'>[] = [
 /**
  * Build cells + axes from window results.
  *
- * Layout: rows = UTC day, columns = hour-of-day at the departure step.
+ * Layout: rows = ship-clock day, columns = hour-of-day at the departure step.
  * Value: ETA duration in hours (lower = better = darker blue).
  * Incomplete results get a sentinel value that renders as '—' at full ramp.
  */
-function buildHeatmap(results: WindowResult[]): {
+function buildHeatmap(
+  results: WindowResult[],
+  clock: ShipClock,
+): {
   cells: HeatmapCell[];
   rowLabels: string[];
   colLabels: string[];
@@ -75,29 +89,29 @@ function buildHeatmap(results: WindowResult[]): {
     return { cells: [], rowLabels: [], colLabels: [], rows: 0, cols: 0, domainMax: 1 };
   }
 
-  // Extract unique UTC days (row) and departure hours (col)
-  const days = new Map<string, number>(); // ISO date → row index
+  // Extract unique days (row) and departure hours (col)
+  const days = new Map<string, number>(); // day key → row index
   const hours = new Map<number, number>(); // hour-of-day → col index
 
   for (const r of results) {
-    const d = new Date(r.departure * 1000);
-    const dayKey = d.toISOString().slice(0, 10);
+    const dayKey = toDayKey(r.departure, clock);
     if (!days.has(dayKey)) days.set(dayKey, days.size);
-    const h = d.getUTCHours();
+    const h = shiftedDate(r.departure, clock).getUTCHours();
     if (!hours.has(h)) hours.set(h, hours.size);
   }
 
   const rowLabels = Array.from(days.keys());
-  const colLabels = Array.from(hours.keys()).map((h) => `${String(h).padStart(2, '0')}z`);
+  const colLabels = Array.from(hours.keys()).map(
+    (h) => `${String(h).padStart(2, '0')}${fmtClockSuffix(clock)}`,
+  );
 
   const completeResults = results.filter((r) => !r.incomplete);
   const etaHours = completeResults.map((r) => (r.eta - r.departure) / 3600);
   const domainMax = etaHours.length > 0 ? Math.max(...etaHours) : 200;
 
   const cells: HeatmapCell[] = results.map((r) => {
-    const d = new Date(r.departure * 1000);
-    const dayKey = d.toISOString().slice(0, 10);
-    const h = d.getUTCHours();
+    const dayKey = toDayKey(r.departure, clock);
+    const h = shiftedDate(r.departure, clock).getUTCHours();
     const row = days.get(dayKey)!;
     const col = hours.get(h)!;
 
@@ -133,13 +147,20 @@ function buildHeatmap(results: WindowResult[]): {
 
 export default function WindowPage() {
   const router = useRouter();
+  const clock = useShipClock();
 
   const [startStr, setStartStr] = useState<string>('32.30, -64.78'); // Bermuda
   const [endStr, setEndStr] = useState<string>('41.49, -71.31'); // Newport, RI
   const [model, setModel] = useState<'GFS' | 'ECMWF'>('GFS');
-  const [windowStart, setWindowStart] = useState<string>(
-    new Date(Date.now() + 3600_000).toISOString().slice(0, 16),
-  );
+  // Window start is stored as an absolute UNIX-seconds anchor; the displayed
+  // string is derived from anchor + clock, so a clock-mode change preserves
+  // the moment in time. Seeded on mount to keep SSR and client text identical.
+  const [windowStartAnchor, setWindowStartAnchor] = useState<number | null>(null);
+  useEffect(() => {
+    setWindowStartAnchor((cur) => cur ?? Date.now() / 1000 + 3600);
+  }, []);
+  const windowStartInput =
+    windowStartAnchor !== null ? toDatetimeLocalInput(windowStartAnchor, clock) : '';
   const [windowHours, setWindowHours] = useState<number>(120);
   const [stepHours, setStepHours] = useState<number>(6);
   const [useCurrents, setUseCurrents] = useState<boolean>(false);
@@ -156,8 +177,7 @@ export default function WindowPage() {
       setError('Start/End must be "lat, lon".');
       return;
     }
-    // windowStart is a datetime-local string — treat as UTC (user sees "z" suffix in label)
-    const ts = Math.floor(new Date(windowStart + ':00Z').getTime() / 1000);
+    const ts = windowStartAnchor !== null ? Math.floor(windowStartAnchor) : NaN;
     if (!Number.isFinite(ts)) {
       setError('Invalid window-start datetime.');
       return;
@@ -213,20 +233,17 @@ export default function WindowPage() {
     const days = new Map<string, number>();
     const hours = new Map<number, number>();
     for (const r of results) {
-      const d = new Date(r.departure * 1000);
-      const dayKey = d.toISOString().slice(0, 10);
+      const dayKey = toDayKey(r.departure, clock);
       if (!days.has(dayKey)) days.set(dayKey, days.size);
-      const h = d.getUTCHours();
+      const h = shiftedDate(r.departure, clock).getUTCHours();
       if (!hours.has(h)) hours.set(h, hours.size);
     }
 
-    const result = results.find((r) => {
-      const d = new Date(r.departure * 1000);
-      return (
-        days.get(d.toISOString().slice(0, 10)) === cell.row &&
-        hours.get(d.getUTCHours()) === cell.col
-      );
-    });
+    const result = results.find(
+      (r) =>
+        days.get(toDayKey(r.departure, clock)) === cell.row &&
+        hours.get(shiftedDate(r.departure, clock).getUTCHours()) === cell.col,
+    );
     if (!result) return;
 
     const start = parseLatLon(startStr);
@@ -255,8 +272,8 @@ export default function WindowPage() {
   const stops = useMemo(() => buildStops('sequential'), []);
 
   const { cells, rowLabels, colLabels, rows, cols, domainMax } = useMemo(
-    () => buildHeatmap(results ?? []),
-    [results],
+    () => buildHeatmap(results ?? [], clock),
+    [results, clock],
   );
 
   const domain = useMemo(
@@ -287,17 +304,22 @@ export default function WindowPage() {
           />
           <div>
             <label className="text-label uppercase tracking-wider text-ink-2 block mb-1">
-              Window start (UTC)
+              Window start ({clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`})
             </label>
-            {/* datetime-local is inherently local-time in the browser; we label it UTC
-                and parse with Z suffix to treat it as UTC per the keep-list convention. */}
             <input
               type="datetime-local"
-              value={windowStart}
-              onChange={(e) => setWindowStart(e.target.value)}
+              value={windowStartInput}
+              onChange={(e) => {
+                const sec = parseDatetimeLocalInput(e.target.value, clock);
+                setWindowStartAnchor(Number.isFinite(sec) ? sec : null);
+              }}
               className="w-full bg-surface-sunken border border-hairline rounded-[--r-control] text-ink px-3 h-11 text-body focus:outline-none focus-visible:ring-2 focus-visible:ring-[--focus]"
             />
-            <p className="text-caption text-ink-3 mt-1">Enter in UTC</p>
+            {clock.mode === 'ship' && windowStartAnchor !== null && (
+              <p className="text-caption text-ink-3 mt-1 font-mono">
+                ≡ {fmtTimestamp(windowStartAnchor, UTC_CLOCK)}
+              </p>
+            )}
           </div>
           <SelectField
             label="Wind model"
@@ -334,8 +356,8 @@ export default function WindowPage() {
       {results && (
         <Panel label="Departure windows" chip="ok" chipLabel={`${results.length} departures`}>
           <p className="text-caption text-ink-3 mb-3">
-            Rows = UTC day · Columns = departure hour · Value = passage duration (h). Tap a cell to
-            open it on the chart.
+            Rows = day · Columns = departure hour · Value = passage duration (h). Tap a cell to open
+            it on the chart.
           </p>
 
           {rows > 0 && (
