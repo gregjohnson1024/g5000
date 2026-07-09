@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl';
 import type { AisTarget } from '@g5000/core';
 import { computeCpa, type CpaResult } from '@g5000/compute';
 import { aisDetailRows } from '../lib/ais-detail';
+import { cssColor } from '../lib/map-colors';
 import { projectGeo } from '../lib/wind-barb';
 
 export interface AisTargetsProps {
@@ -151,7 +152,11 @@ export function AisTargets({
           id: COG_LAYER_ID,
           type: 'line',
           source: COG_SOURCE_ID,
-          paint: { 'line-color': 'var(--ink-3)', 'line-width': 1, 'line-opacity': 0.7 },
+          paint: {
+            'line-color': cssColor('--ink-3', '#64748b'),
+            'line-width': 1,
+            'line-opacity': 0.7,
+          },
         });
       }
       if (!map.getLayer(TARGET_CIRCLE_ID)) {
@@ -162,8 +167,18 @@ export function AisTargets({
           paint: {
             'circle-radius': 5,
             // Stale targets render hollow + dim; fresh ones solid grey.
-            'circle-color': ['case', ['get', 'stale'], 'rgba(0,0,0,0)', 'var(--ais-normal)'],
-            'circle-stroke-color': ['case', ['get', 'stale'], 'var(--ink-3)', 'var(--surface)'],
+            'circle-color': [
+              'case',
+              ['get', 'stale'],
+              'rgba(0,0,0,0)',
+              cssColor('--ais-normal', '#7cc7e8'),
+            ],
+            'circle-stroke-color': [
+              'case',
+              ['get', 'stale'],
+              cssColor('--ink-3', '#64748b'),
+              cssColor('--surface', '#0f172a'),
+            ],
             'circle-stroke-width': 1.2,
             'circle-opacity': ['case', ['get', 'stale'], 0.6, 1],
           },

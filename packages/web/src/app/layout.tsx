@@ -29,7 +29,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   if (process.env.G5000_HIDE_AIS === '1') hiddenHrefs.push('/ais');
 
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the pre-hydration script below mutates
+    // <html> (data-theme + --instrument-scale) before React hydrates, so the
+    // server-rendered element never matches — without this, React 19 throws
+    // hydration error #418 on every page load. Applies to <html> only.
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/*
          * Pre-hydration theme script: reads g5000:theme from localStorage and

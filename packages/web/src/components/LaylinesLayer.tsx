@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import maplibregl from 'maplibre-gl';
 import { useSse } from '../hooks/use-sse';
+import { cssColor } from '../lib/map-colors';
 
 const LAYLINE_SOURCE = 'race-laylines';
 const LAYLINE_LAYER = 'race-laylines-layer';
@@ -85,10 +86,10 @@ export function LaylinesLayer({ map }: { map: maplibregl.Map | null }): null {
               'match',
               ['get', 'tack'],
               'port',
-              'var(--stbd)',
+              cssColor('--stbd', '#4ade80'),
               'stbd',
-              'var(--port)',
-              'var(--ink-value)',
+              cssColor('--port', '#fb7185'),
+              cssColor('--ink-value', '#f1f5f9'),
             ],
             'line-width': 2,
             'line-opacity': 0.7,

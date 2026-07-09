@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { LivePos } from './LiveBoatMarker';
+import { cssColor } from '../lib/map-colors';
 import { projectGeo } from '../lib/wind-barb';
 
 const SOURCE_ID = 'cog-extension';
@@ -53,7 +54,7 @@ export function CogExtension({
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'shaft'],
         paint: {
-          'line-color': 'var(--replay)', // violet — distinct from drift cyan
+          'line-color': cssColor('--replay', '#a78bfa'), // violet — distinct from drift cyan
           'line-width': 2,
           'line-dasharray': [3, 2],
         },
@@ -65,8 +66,8 @@ export function CogExtension({
         filter: ['==', ['get', 'kind'], 'tip'],
         paint: {
           'circle-radius': 5,
-          'circle-color': 'var(--replay)',
-          'circle-stroke-color': 'var(--canvas)',
+          'circle-color': cssColor('--replay', '#a78bfa'),
+          'circle-stroke-color': cssColor('--canvas', '#0b0e14'),
           'circle-stroke-width': 1.5,
         },
       });

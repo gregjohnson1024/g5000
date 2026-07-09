@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl';
 import { FILL_STOPS } from '../lib/wind-scale';
 import { projectGeo, makeBarb } from '../lib/wind-barb';
 import { contourField, buildSpeedContours, buildStepExpr } from '../lib/contour-field';
+import { cssColor } from '../lib/map-colors';
 
 export type WindModel = 'gfs' | 'ecmwf' | 'hrrr';
 
@@ -217,7 +218,7 @@ export function WindOverlay({
             type: 'line',
             source: SRC_BARBS,
             filter: ['in', ['get', 'kind'], ['literal', ['shaft', 'barb']]],
-            paint: { 'line-color': 'var(--canvas)', 'line-width': 1.4 },
+            paint: { 'line-color': cssColor('--canvas', '#0b0e14'), 'line-width': 1.4 },
           },
           beforeId(),
         );
@@ -227,7 +228,7 @@ export function WindOverlay({
             type: 'fill',
             source: SRC_BARBS,
             filter: ['==', ['get', 'kind'], 'pennant'],
-            paint: { 'fill-color': 'var(--canvas)' },
+            paint: { 'fill-color': cssColor('--canvas', '#0b0e14') },
           },
           beforeId(),
         );
@@ -243,7 +244,7 @@ export function WindOverlay({
             type: 'line',
             source: SRC_ISOBARS,
             paint: {
-              'line-color': 'var(--surface-raised)', // hairline-strength divider
+              'line-color': cssColor('--surface-raised', '#1e293b'), // hairline-strength divider
               'line-width': [
                 'case',
                 // Bold every 10 hPa

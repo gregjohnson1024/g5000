@@ -15,6 +15,7 @@ import { IsochroneLayer } from '../../components/IsochroneLayer';
 import { RouteWindLayer } from '../../components/RouteWindLayer';
 import { WaypointEditPopup } from '../../components/WaypointEditPopup';
 import { fmtLatLonDmm } from '../../lib/coords';
+import { cssColor } from '../../lib/map-colors';
 import { greatCircleNm, bearingDeg } from '../../lib/geo';
 import { MS_TO_KN, cardinal16 } from '../../lib/units';
 // DriftArrow removed at user's request; computation kept on /helm via the
@@ -384,8 +385,8 @@ function ChartPageInner() {
   // route-weather panel stay in sync. Null until the scrubber initialises.
   const [playT, setPlayT] = useState<number | null>(null);
   const ROUTE_COLOR: Record<'GFS' | 'ECMWF', string> = {
-    GFS: 'var(--accent-hi)',
-    ECMWF: 'var(--route-alt)',
+    GFS: cssColor('--accent-hi', '#f59e0b'),
+    ECMWF: cssColor('--route-alt', '#22d3ee'),
   };
   const ROUTE_LAYER: Record<'GFS' | 'ECMWF', string> = { GFS: 'route-gfs', ECMWF: 'route-ecmwf' };
   // Route line-colour mode (display only). Persisted; hydrated after mount.

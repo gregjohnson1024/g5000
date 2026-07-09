@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import { cssColor } from '../lib/map-colors';
 
 interface LineEnd {
   lat: number;
@@ -122,7 +123,7 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
           source: LINE_SOURCE,
           filter: ['==', '$type', 'LineString'],
           paint: {
-            'line-color': 'var(--accent-ink)',
+            'line-color': cssColor('--accent-ink', '#fbbf24'),
             'line-width': 3,
             'line-dasharray': [2, 2],
           },
@@ -138,12 +139,12 @@ export function StartLineLayer({ map }: { map: maplibregl.Map | null }): null {
               'match',
               ['get', 'end'],
               'port',
-              'var(--port)',
+              cssColor('--port', '#fb7185'),
               'stbd',
-              'var(--stbd)',
-              'var(--ink-value)',
+              cssColor('--stbd', '#4ade80'),
+              cssColor('--ink-value', '#f1f5f9'),
             ],
-            'circle-stroke-color': 'var(--canvas)',
+            'circle-stroke-color': cssColor('--canvas', '#0b0e14'),
             'circle-stroke-width': 1.5,
           },
         });

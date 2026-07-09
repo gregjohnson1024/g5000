@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { LivePos } from './LiveBoatMarker';
+import { cssColor } from '../lib/map-colors';
 
 const SOURCE_ID = 'drift-arrow';
 const LAYER_LINE = 'drift-arrow-line';
@@ -91,14 +92,18 @@ export function DriftArrow({ map, p, scaleNmPerKt = 5 }: DriftArrowProps) {
         type: 'line',
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'shaft'],
-        paint: { 'line-color': 'var(--info)', 'line-width': 3, 'line-opacity': 0.9 },
+        paint: {
+          'line-color': cssColor('--info', '#38bdf8'),
+          'line-width': 3,
+          'line-opacity': 0.9,
+        },
       });
       map.addLayer({
         id: LAYER_HEAD,
         type: 'fill',
         source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'head'],
-        paint: { 'fill-color': 'var(--info)', 'fill-opacity': 0.9 },
+        paint: { 'fill-color': cssColor('--info', '#38bdf8'), 'fill-opacity': 0.9 },
       });
       // No text-symbol layer — the raster-only style has no glyphs URL,
       // and the magnitude is already shown in the sidebar panel.

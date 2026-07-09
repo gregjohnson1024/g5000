@@ -13,6 +13,8 @@ const config: NextConfig = {
       // Phase-2 route-move: CONDITIONS section (Task 2b)
       { source: '/forecast', destination: '/conditions', permanent: true },
       { source: '/tide', destination: '/conditions/tides', permanent: true },
+      // Real legacy route was /tides (plural); keep both spellings covered
+      { source: '/tides', destination: '/conditions/tides', permanent: true },
       { source: '/currents', destination: '/conditions/currents', permanent: true },
       { source: '/grib', destination: '/conditions/models', permanent: true },
       { source: '/window', destination: '/conditions/windows', permanent: true },

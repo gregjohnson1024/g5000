@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { LivePos } from './LiveBoatMarker';
+import { cssColor } from '../lib/map-colors';
 
 const SRC = 'anchor-watch';
 const ZONE_FILL = 'anchor-zone-fill';
@@ -179,7 +180,12 @@ export function AnchorWatchLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'zone'],
             paint: {
-              'fill-color': ['case', ['get', 'breached'], 'var(--danger)', 'var(--info)'],
+              'fill-color': [
+                'case',
+                ['get', 'breached'],
+                cssColor('--danger', '#f87171'),
+                cssColor('--info', '#38bdf8'),
+              ],
               'fill-opacity': ['case', ['get', 'breached'], 0.25, 0.1],
             },
           });
@@ -191,7 +197,12 @@ export function AnchorWatchLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'zone'],
             paint: {
-              'line-color': ['case', ['get', 'breached'], 'var(--danger)', 'var(--info)'],
+              'line-color': [
+                'case',
+                ['get', 'breached'],
+                cssColor('--danger', '#f87171'),
+                cssColor('--info', '#38bdf8'),
+              ],
               'line-width': 1.5,
             },
           });
@@ -203,7 +214,7 @@ export function AnchorWatchLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'rode'],
             paint: {
-              'line-color': 'var(--ink-2)',
+              'line-color': cssColor('--ink-2', '#94a3b8'),
               'line-width': 1.5,
               'line-dasharray': [2, 2],
             },
@@ -217,8 +228,8 @@ export function AnchorWatchLayer({
             filter: ['==', ['get', 'kind'], 'anchor'],
             paint: {
               'circle-radius': 5,
-              'circle-color': 'var(--surface)',
-              'circle-stroke-color': 'var(--info)',
+              'circle-color': cssColor('--surface', '#0f172a'),
+              'circle-stroke-color': cssColor('--info', '#38bdf8'),
               'circle-stroke-width': 2,
             },
           });
@@ -236,8 +247,8 @@ export function AnchorWatchLayer({
               'text-allow-overlap': true,
             },
             paint: {
-              'text-color': 'var(--info)',
-              'text-halo-color': 'var(--surface)',
+              'text-color': cssColor('--info', '#38bdf8'),
+              'text-halo-color': cssColor('--surface', '#0f172a'),
               'text-halo-width': 1.2,
             },
           });

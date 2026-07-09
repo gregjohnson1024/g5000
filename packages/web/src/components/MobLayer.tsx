@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { LivePos } from './LiveBoatMarker';
 import { fmtLatLonDmm } from '../lib/coords';
+import { cssColor } from '../lib/map-colors';
 import { haversineM, initialBearingDeg } from '../lib/mob';
 
 const SRC = 'mob';
@@ -121,7 +122,7 @@ export function MobLayer({
             source: SRC,
             filter: ['==', ['get', 'kind'], 'return'],
             paint: {
-              'line-color': 'var(--danger)',
+              'line-color': cssColor('--danger', '#f87171'),
               'line-width': 2.5,
               'line-dasharray': [2, 1.5],
             },
@@ -135,8 +136,8 @@ export function MobLayer({
             filter: ['==', ['get', 'kind'], 'mob'],
             paint: {
               'circle-radius': 8,
-              'circle-color': 'var(--danger-strong)',
-              'circle-stroke-color': 'var(--ink-value)',
+              'circle-color': cssColor('--danger-strong', '#dc2626'),
+              'circle-stroke-color': cssColor('--ink-value', '#f1f5f9'),
               'circle-stroke-width': 3,
             },
           });
@@ -154,8 +155,8 @@ export function MobLayer({
               'text-allow-overlap': true,
             },
             paint: {
-              'text-color': 'var(--danger)',
-              'text-halo-color': 'var(--ink-value)',
+              'text-color': cssColor('--danger', '#f87171'),
+              'text-halo-color': cssColor('--ink-value', '#f1f5f9'),
               'text-halo-width': 1.5,
             },
           });

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { cssColor } from '../lib/map-colors';
 
 export interface LivePos {
   lat: number;
@@ -71,7 +72,7 @@ export function LiveBoatMarker({ map, flyToOnFirstFix = true, onUpdate }: LiveBo
         source: TRAIL_SOURCE_ID,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': 'var(--ok)',
+          'line-color': cssColor('--ok', '#34d399'),
           'line-width': 2,
           'line-opacity': 0.85,
         },

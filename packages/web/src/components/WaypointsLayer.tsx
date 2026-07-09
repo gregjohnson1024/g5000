@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { cssColor } from '../lib/map-colors';
 
 export interface MarkLike {
   /** Waypoint id, when this mark is a saved waypoint (enables selection). */
@@ -97,10 +98,10 @@ export function WaypointsLayer({
               'match',
               ['get', 'badge'],
               'S',
-              'var(--stbd)',
+              cssColor('--stbd', '#4ade80'),
               'E',
-              'var(--danger)',
-              'var(--accent-ink)',
+              cssColor('--danger', '#f87171'),
+              cssColor('--accent-ink', '#fbbf24'),
             ],
           },
         });
@@ -117,12 +118,12 @@ export function WaypointsLayer({
               'match',
               ['get', 'badge'],
               'S',
-              'var(--stbd)',
+              cssColor('--stbd', '#4ade80'),
               'E',
-              'var(--danger)',
-              'var(--accent-ink)',
+              cssColor('--danger', '#f87171'),
+              cssColor('--accent-ink', '#fbbf24'),
             ],
-            'circle-stroke-color': 'var(--surface)',
+            'circle-stroke-color': cssColor('--surface', '#0f172a'),
             'circle-stroke-width': 1.2,
           },
         });

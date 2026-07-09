@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import maplibregl from 'maplibre-gl';
+import { cssColor } from '../lib/map-colors';
 import {
   summarizeTide,
   summarizeCurrent,
@@ -144,7 +145,8 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
     const stationLayerId = `stations-${kind}-point`;
     const iconId = `station-icon-${kind}`;
     // Cluster fill: tide uses info-strong (cyan), current uses series-4 (fuchsia).
-    const clusterColor = kind === 'tide' ? 'var(--info-strong)' : 'var(--series-4)';
+    const clusterColor =
+      kind === 'tide' ? cssColor('--info-strong', '#0284c7') : cssColor('--series-4', '#f472b6');
 
     const ensureIcon = (): void => {
       if (map.hasImage(iconId)) return;
@@ -172,7 +174,7 @@ export function StationsOverlay({ map, kind }: StationsOverlayProps): null {
           paint: {
             'circle-color': clusterColor,
             'circle-opacity': 0.85,
-            'circle-stroke-color': 'var(--canvas)',
+            'circle-stroke-color': cssColor('--canvas', '#0b0e14'),
             'circle-stroke-width': 1.5,
             'circle-radius': ['step', ['get', 'point_count'], 12, 25, 16, 100, 22],
           },

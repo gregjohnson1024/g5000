@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
+import { cssColor } from '../lib/map-colors';
 
 const R_NM = 3440.065; // earth radius in nautical miles (spherical)
 
@@ -50,7 +51,8 @@ export interface RangeRingsProps {
    * and layer so multiple instances on the same map don't collide.
    */
   id: string;
-  /** Line color. Default `var(--track)` (≈ --ink-2 in DAY). Accepts CSS var() or hex. */
+  /** Line color. Default resolves `--track` (≈ --ink-2 in DAY). Must be a concrete
+   *  color (hex/rgb) — the value feeds MapLibre paint, which can't parse `var()`. */
   color?: string;
   /** Optional prefix shown in each label, e.g. "Sula" or "WF". */
   labelPrefix?: string;
@@ -70,7 +72,7 @@ export function RangeRings({
   origin,
   radiiNm,
   id,
-  color = 'var(--track)',
+  color = cssColor('--track', '#94a3b8'),
   labelPrefix,
   hidden = false,
 }: RangeRingsProps) {

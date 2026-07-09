@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { buildSpeedContours, buildStepExpr } from '../lib/contour-field';
+import { cssColor } from '../lib/map-colors';
 import { projectGeo } from '../lib/wind-barb';
 
 export interface CurrentGrid {
@@ -213,7 +214,7 @@ export function CurrentOverlay({
             id: LAYER_ARROWS,
             type: 'line',
             source: SRC_ARROWS,
-            paint: { 'line-color': 'var(--canvas)', 'line-width': 1.5 },
+            paint: { 'line-color': cssColor('--canvas', '#0b0e14'), 'line-width': 1.5 },
           },
           beforeId(),
         );

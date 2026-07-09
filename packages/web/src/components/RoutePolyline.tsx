@@ -1,6 +1,7 @@
 'use client';
 import type maplibregl from 'maplibre-gl';
 import type { Route } from '@g5000/routing';
+import { cssColor } from '../lib/map-colors';
 import { SOG_COLOR_EXPR } from '../lib/sog-color';
 
 export type RouteColorMode = 'none' | 'tack' | 'sog' | 'twa';
@@ -13,7 +14,15 @@ function colorExpr(
 ): maplibregl.ExpressionSpecification | string {
   switch (mode) {
     case 'tack':
-      return ['match', ['get', 'tack'], 'port', 'var(--port)', 'starboard', 'var(--stbd)', base];
+      return [
+        'match',
+        ['get', 'tack'],
+        'port',
+        cssColor('--port', '#fb7185'),
+        'starboard',
+        cssColor('--stbd', '#4ade80'),
+        base,
+      ];
     case 'sog':
       // Through-water/over-ground speed in m/s (~0–20 kn): slow blue → fast red.
       // interpolate-hcl blends in perceptual colour space — no muddy RGB midpoints.
@@ -25,13 +34,13 @@ function colorExpr(
         ['linear'],
         ['get', 'twa'],
         0,
-        'var(--info)',
+        cssColor('--info', '#38bdf8'),
         1.0472,
-        'var(--stbd)',
+        cssColor('--stbd', '#4ade80'),
         2.0944,
-        'var(--accent-hi)',
+        cssColor('--accent-hi', '#f59e0b'),
         Math.PI,
-        'var(--port)',
+        cssColor('--port', '#fb7185'),
       ];
     default:
       return base;
@@ -76,7 +85,7 @@ export function attachRoute(
   map: maplibregl.Map,
   id: string,
   route: Route,
-  color = 'var(--canvas)',
+  color = cssColor('--canvas', '#0b0e14'),
   mode: RouteColorMode = 'none',
 ): void {
   const data = segments(route);

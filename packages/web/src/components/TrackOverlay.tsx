@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { TrackPoint } from '../lib/tracks';
+import { cssColor } from '../lib/map-colors';
 import { SOG_COLOR_EXPR } from '../lib/sog-color';
 
 export type TrackColorMode = 'none' | 'sog';
@@ -12,8 +13,9 @@ export type TrackColorMode = 'none' | 'sog';
 const SOG_EXPR = SOG_COLOR_EXPR as maplibregl.ExpressionSpecification;
 
 /** Solid colour for `none` mode. Replay/violet so an ended track is visually distinct
- *  from the live recording's green trail (LiveBoatMarker). */
-const PLAIN_COLOR = 'var(--replay)';
+ *  from the live recording's green trail (LiveBoatMarker). Resolved lazily because
+ *  MapLibre paint can't parse `var()` (see lib/map-colors). */
+const plainColor = (): string => cssColor('--replay', '#a78bfa');
 
 /** One LineString feature per consecutive pair, carrying the leading point's
  *  SOG so the `sog` colour mode can shade each segment. */
@@ -58,7 +60,7 @@ export function TrackOverlay({
     if (!map) return;
     const layerId = `${id}-line`;
     const data = segments(points);
-    const color = colorMode === 'sog' ? SOG_EXPR : PLAIN_COLOR;
+    const color = colorMode === 'sog' ? SOG_EXPR : plainColor();
     const ensure = (): void => {
       try {
         const src = map.getSource(id) as maplibregl.GeoJSONSource | undefined;
