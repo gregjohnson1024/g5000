@@ -36,6 +36,32 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
 import type { LivePos } from '../../components/LiveBoatMarker';
 
+/**
+ * Point wheel/pinch zooms at the camera center (the boat, while following)
+ * or back at the cursor/pinch midpoint (default).
+ *
+ * MapLibre trap: ScrollZoomHandler.enable() is a NO-OP when the handler is
+ * already enabled (`isEnabled() || (...)`) — and scrollZoom is enabled at
+ * map construction, so passing `{around: 'center'}` straight to enable()
+ * silently does nothing. Options only stick after a disable() first.
+ * (TwoFingersTouchHandler.enable() has no such guard, but gets the same
+ * disable-first treatment so the two can't drift apart.)
+ */
+export function applyZoomPivot(
+  map: Pick<maplibregl.Map, 'scrollZoom' | 'touchZoomRotate'>,
+  aroundBoat: boolean,
+): void {
+  map.scrollZoom.disable();
+  map.touchZoomRotate.disable();
+  if (aroundBoat) {
+    map.scrollZoom.enable({ around: 'center' });
+    map.touchZoomRotate.enable({ around: 'center' });
+  } else {
+    map.scrollZoom.enable();
+    map.touchZoomRotate.enable();
+  }
+}
+
 const RAD_TO_DEG = 180 / Math.PI;
 const BEARING_DEADBAND_DEG = 3;
 const EASE_DURATION_MS = 300;
@@ -143,17 +169,10 @@ export function useChartCamera({
   // the lower-third through the zoom.
   useEffect(() => {
     if (!map) return;
-    if (follow) {
-      map.scrollZoom.enable({ around: 'center' });
-      map.touchZoomRotate.enable({ around: 'center' });
-    } else {
-      map.scrollZoom.enable();
-      map.touchZoomRotate.enable();
-    }
+    applyZoomPivot(map, follow);
     return () => {
       try {
-        map.scrollZoom.enable();
-        map.touchZoomRotate.enable();
+        applyZoomPivot(map, false);
       } catch {
         /* map already destroyed */
       }

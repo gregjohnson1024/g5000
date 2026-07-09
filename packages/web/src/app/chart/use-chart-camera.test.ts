@@ -1,10 +1,62 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applyZoomPivot,
   cycleOrientation,
   wrapBearingDelta,
   readFollowFromStorage,
   readOrientationFromStorage,
 } from './use-chart-camera';
+
+describe('applyZoomPivot', () => {
+  /** Mimics MapLibre's ScrollZoomHandler: enable() is a NO-OP while already
+   *  enabled — the exact trap that made the first version of this feature
+   *  silently do nothing. Starts enabled, like a real map. */
+  function stubHandler() {
+    const calls: Array<string> = [];
+    let enabled = true;
+    let aroundCenter = false;
+    return {
+      calls,
+      get aroundCenter() {
+        return aroundCenter;
+      },
+      enable(opts?: { around?: string }) {
+        calls.push(`enable(${opts?.around ?? ''})`);
+        if (enabled) return; // ScrollZoomHandler's isEnabled() guard
+        enabled = true;
+        aroundCenter = opts?.around === 'center';
+      },
+      disable() {
+        calls.push('disable()');
+        enabled = false;
+      },
+      isEnabled: () => enabled,
+      isActive: () => false,
+    };
+  }
+
+  it('makes around:center stick on an already-enabled handler (disable first)', () => {
+    const scrollZoom = stubHandler();
+    const touchZoomRotate = stubHandler();
+    applyZoomPivot(
+      { scrollZoom, touchZoomRotate } as unknown as Parameters<typeof applyZoomPivot>[0],
+      true,
+    );
+    expect(scrollZoom.aroundCenter).toBe(true);
+    expect(touchZoomRotate.aroundCenter).toBe(true);
+    expect(scrollZoom.calls).toEqual(['disable()', 'enable(center)']);
+  });
+
+  it('restores default cursor-pivot zoom when follow is off', () => {
+    const scrollZoom = stubHandler();
+    const touchZoomRotate = stubHandler();
+    const m = { scrollZoom, touchZoomRotate } as unknown as Parameters<typeof applyZoomPivot>[0];
+    applyZoomPivot(m, true);
+    applyZoomPivot(m, false);
+    expect(scrollZoom.aroundCenter).toBe(false);
+    expect(touchZoomRotate.aroundCenter).toBe(false);
+  });
+});
 
 describe('cycleOrientation', () => {
   it('walks north → course → heading → north', () => {
