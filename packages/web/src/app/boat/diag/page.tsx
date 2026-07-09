@@ -30,7 +30,7 @@ const CARDS: {
 
 export default function DiagnosticsHubPage() {
   return (
-    <main className="p-6 space-y-4 max-w-2xl">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-2xl font-semibold">Diagnostics</h1>
       <p className="text-sm text-slate-400">N2K bus inspection, session replay, and server logs.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

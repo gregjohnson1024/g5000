@@ -140,7 +140,7 @@ export default function DampingPage() {
   }, [cfg, draft]);
 
   return (
-    <main className="p-6 space-y-4 max-w-3xl">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-2xl font-semibold">Damping</h1>
       <p className="text-sm text-slate-400">
         Per-channel low-pass filter (EMA) applied at display time. The time constant τ controls how

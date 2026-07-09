@@ -291,7 +291,7 @@ export default function TidePage() {
 
   if (featureEnabled !== true) {
     return (
-      <main className="p-6 max-w-3xl mx-auto">
+      <main className="page-main p-6">
         <h1 className="text-xl font-semibold text-ink mb-3">Tide Planning</h1>
         {featureEnabled === false && (
           <Panel label="Feature disabled" emptyState={{ reason: 'Canadian Tide/Currents is off' }}>
@@ -310,7 +310,7 @@ export default function TidePage() {
 
   if (stationsLoaded && pickerList.length === 0) {
     return (
-      <main className="p-6 max-w-3xl mx-auto">
+      <main className="page-main p-6">
         <h1 className="text-xl font-semibold text-ink mb-3">Tide Planning</h1>
         <Panel label="No tide source" chip="warn" chipLabel="Waiting">
           <p className="text-body-sm text-ink-2">
@@ -326,7 +326,7 @@ export default function TidePage() {
   }
 
   return (
-    <main className="p-6 max-w-4xl mx-auto space-y-4">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-xl font-semibold text-ink">Tide Planning</h1>
 
       {/* Station picker */}

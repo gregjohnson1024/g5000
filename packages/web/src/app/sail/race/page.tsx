@@ -9,12 +9,12 @@ import { WindShiftPlot } from '../../../components/WindShiftPlot';
 
 export default function RacePage(): React.ReactElement {
   return (
-    <main className="p-4 flex-1 overflow-y-auto bg-canvas">
+    <main className="page-main p-4 flex-1 overflow-y-auto bg-canvas">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-ink-2">Race</h1>
         <RaceAudible />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
           <RaceTimer />
         </div>

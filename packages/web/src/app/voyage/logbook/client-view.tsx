@@ -532,7 +532,7 @@ export function TripsClientView() {
   );
 
   return (
-    <main className="p-4 max-w-5xl mx-auto text-ink">
+    <main className="page-main p-4 text-ink">
       <div className="flex items-baseline justify-between mb-4">
         <h1 className="text-[1.111rem] font-semibold text-ink-value">Logbook</h1>
         <div className="text-caption text-ink-2 font-mono tabular-nums">

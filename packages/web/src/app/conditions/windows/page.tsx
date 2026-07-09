@@ -284,7 +284,7 @@ export default function WindowPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <main className="p-6 max-w-5xl mx-auto space-y-4">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-xl font-semibold text-ink">Departure-window scan</h1>
 
       {/* Form inputs */}

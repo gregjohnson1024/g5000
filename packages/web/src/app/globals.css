@@ -761,3 +761,13 @@ body {
   border: 1px solid var(--hairline-strong);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
+
+/* Page shell — every content tab renders inside a 90%-wide, horizontally
+   centred column (2026-07-09 consistency pass). The ONLY source of truth
+   for page width: pages keep their own padding/spacing/scroll classes and
+   add .page-main instead of ad-hoc max-w-* / mx-auto. Full-bleed views
+   (/chart plotter grid, /mast kiosk) are the deliberate exceptions. */
+.page-main {
+  width: 90%;
+  margin-inline: auto;
+}

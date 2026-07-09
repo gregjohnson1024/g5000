@@ -7,7 +7,7 @@ export default function AnchorRadarPage() {
   const { gpsLat, gpsLon } = useAnchorContext();
 
   return (
-    <main className="p-6 max-w-5xl mx-auto">
+    <main className="p-6 page-main">
       <h1 className="text-xl font-semibold text-ink mb-3">Radar</h1>
       <RadarTab lat={gpsLat} lon={gpsLon} />
     </main>

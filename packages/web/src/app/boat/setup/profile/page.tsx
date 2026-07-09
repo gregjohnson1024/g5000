@@ -90,7 +90,7 @@ export default function BoatConfigPage() {
   };
 
   return (
-    <main className="p-6 space-y-4 max-w-xl">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-2xl font-semibold">Boat configuration</h1>
       {err && <div className="text-red-400 text-sm">Error: {err}</div>}
       {ok && <div className="text-green-400 text-sm">Saved.</div>}

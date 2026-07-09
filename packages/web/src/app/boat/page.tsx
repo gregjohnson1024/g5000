@@ -189,7 +189,7 @@ export default function BoatHubPage() {
   const groups = statusState.status === 'ok' ? statusState.data : STATIC_FALLBACK;
 
   return (
-    <main className="p-6 space-y-6 max-w-3xl">
+    <main className="page-main p-6 space-y-6">
       {/* Page header */}
       <div className="space-y-1">
         <h1 className="text-[1.111rem] font-semibold text-ink">Boat</h1>

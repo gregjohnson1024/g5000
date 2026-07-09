@@ -224,7 +224,7 @@ export default function WindDiagPage(): React.ReactElement {
   const live = history !== null && err === null;
 
   return (
-    <main className="p-4 bg-canvas min-h-full space-y-4">
+    <main className="page-main p-4 bg-canvas min-h-full space-y-4">
       <header>
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-slate-100">Wind Diagnostics</h1>

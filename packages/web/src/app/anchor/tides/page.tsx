@@ -7,7 +7,7 @@ export default function AnchorTidesPage() {
   const { wxLat, wxLon } = useAnchorContext();
 
   return (
-    <main className="p-6 max-w-5xl mx-auto">
+    <main className="p-6 page-main">
       <h1 className="text-xl font-semibold text-ink mb-3">Tides</h1>
       <TidesTab lat={wxLat} lon={wxLon} />
     </main>

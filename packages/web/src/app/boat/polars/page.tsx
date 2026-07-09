@@ -82,7 +82,7 @@ export default function PolarsPage() {
     s && s.value.kind === 'scalar' ? s.value.value : undefined;
 
   return (
-    <main className="p-6 space-y-4">
+    <main className="page-main p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-semibold text-ink">Polars</h1>
         <div className="flex items-center gap-2">

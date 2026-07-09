@@ -98,7 +98,7 @@ export default function SailsPage() {
     dlg.kind === 'confirm-delete' ? wardrobe.sails.find((s) => s.id === dlg.sailId) : undefined;
 
   return (
-    <main className="p-4 space-y-6">
+    <main className="page-main p-4 space-y-6">
       <h1 className="text-xl font-semibold text-ink">Sail Wardrobe</h1>
 
       {CATEGORIES.map(({ key, label }) => {

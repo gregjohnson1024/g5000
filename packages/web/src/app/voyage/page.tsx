@@ -134,7 +134,7 @@ export default function PassagePage() {
   }, []);
 
   return (
-    <main className="p-4 flex-1 overflow-y-auto bg-canvas space-y-4">
+    <main className="page-main p-4 flex-1 overflow-y-auto bg-canvas space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-[1.111rem] font-semibold text-ink-value">Passage</h1>
         <div className="flex items-center gap-3">

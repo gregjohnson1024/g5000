@@ -259,7 +259,7 @@ export default function ForecastPage() {
   }));
 
   return (
-    <main className="p-6 space-y-6">
+    <main className="page-main p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-ink">Forecast data</h1>
         <Button variant="secondary" size="sm" onClick={() => void reloadManifest()}>

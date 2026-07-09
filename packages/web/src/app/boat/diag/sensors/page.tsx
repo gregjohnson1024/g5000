@@ -126,7 +126,7 @@ export default function SensorsPage() {
   }, []);
 
   return (
-    <main className="max-w-3xl mx-auto p-4 space-y-4">
+    <main className="page-main p-4 space-y-4">
       <header>
         <h1 className="text-xl font-semibold text-slate-100">Sensors</h1>
         <p className="text-sm text-slate-400 mt-1">

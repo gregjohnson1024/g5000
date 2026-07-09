@@ -45,7 +45,7 @@ export default function CalibrationWindPage() {
   };
 
   return (
-    <main className="p-6 space-y-6">
+    <main className="page-main p-6 space-y-6">
       <h1 className="text-2xl font-semibold">AWS/AWA wind calibration</h1>
       {err && <div className="text-red-400 text-sm">Error: {err}</div>}
 

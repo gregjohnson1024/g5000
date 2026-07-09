@@ -248,7 +248,7 @@ export default function CurrentsPage() {
 
   if (featureEnabled !== true) {
     return (
-      <main className="p-6 max-w-3xl mx-auto">
+      <main className="page-main p-6">
         <h1 className="text-xl font-semibold text-ink mb-3">Current Planning</h1>
         {featureEnabled === false && (
           <Panel label="Feature disabled" emptyState={{ reason: 'Canadian Tide/Currents is off' }}>
@@ -267,7 +267,7 @@ export default function CurrentsPage() {
 
   if (stationsError) {
     return (
-      <main className="p-6 max-w-3xl mx-auto">
+      <main className="page-main p-6">
         <h1 className="text-xl font-semibold text-ink mb-3">Current Planning</h1>
         <Panel label="Unavailable" chip="warn" chipLabel="Error">
           <p className="text-body-sm text-ink-2">CHS currents unavailable — try again.</p>
@@ -279,7 +279,7 @@ export default function CurrentsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <main className="p-6 max-w-4xl mx-auto space-y-4">
+    <main className="page-main p-6 space-y-4">
       <div className="flex items-baseline gap-3">
         <h1 className="text-xl font-semibold text-ink">Current Planning</h1>
         <span className="text-caption text-ink-3">Predictions · next 48 h</span>

@@ -130,7 +130,7 @@ export default function GribCachePage() {
   const chipLabel = `${items.length} run${items.length === 1 ? '' : 's'} · ${formatSize(totalSize)}`;
 
   return (
-    <main className="p-6 max-w-4xl mx-auto space-y-4">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-xl font-semibold text-ink">GRIB Cache</h1>
 
       <Panel

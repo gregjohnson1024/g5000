@@ -56,7 +56,7 @@ export default function CrossoverPage() {
   ];
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="page-main p-4 space-y-4">
       <h1 className="text-xl font-semibold text-ink">Sail Crossover</h1>
 
       <div className="grid grid-cols-[240px_minmax(0,1fr)_200px] gap-4">

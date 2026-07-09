@@ -246,7 +246,7 @@ export default function MastConfigPage() {
   // ── render ──────────────────────────────────────────────────────────────────
 
   return (
-    <main className="p-6 space-y-6 max-w-4xl">
+    <main className="page-main p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Mast Display</h1>
       <p className="text-sm text-slate-400">
         Configure which data each page of the mast display shows. Changes take effect live — no

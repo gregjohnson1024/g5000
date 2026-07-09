@@ -8,7 +8,7 @@ export default function AnchorForecastPage() {
   const { wxLat, wxLon } = useAnchorContext();
 
   return (
-    <main className="p-6 max-w-5xl mx-auto">
+    <main className="p-6 page-main">
       <h1 className="text-xl font-semibold text-ink mb-3">Forecast</h1>
       <div className="space-y-6">
         <ForecastGraphTab lat={wxLat} lon={wxLon} />

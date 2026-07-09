@@ -141,7 +141,7 @@ export default function BspCalPage() {
   };
 
   return (
-    <main className="p-6 space-y-4">
+    <main className="page-main p-6 space-y-4">
       <h1 className="text-2xl font-semibold">BSP calibration</h1>
       {err && <div className="text-red-400 text-sm">Error: {err}</div>}
 

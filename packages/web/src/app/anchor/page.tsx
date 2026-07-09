@@ -14,7 +14,7 @@ export default function AnchorPage(): React.ReactElement {
     useAnchorContext();
 
   return (
-    <main className="p-4 flex-1 overflow-y-auto bg-canvas">
+    <main className="p-4 flex-1 overflow-y-auto bg-canvas page-main">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold text-ink">Anchor</h1>
         <div className="text-xs text-ink-3">{connected ? 'Live' : 'Reconnecting…'}</div>

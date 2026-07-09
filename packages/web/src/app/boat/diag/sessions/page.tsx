@@ -108,7 +108,7 @@ export default function SessionsPage() {
   const replaying = status.mode === 'replay';
 
   return (
-    <main className="p-6 max-w-6xl mx-auto text-slate-100">
+    <main className="page-main p-6 text-slate-100">
       <h1 className="text-2xl font-semibold mb-4">Sessions</h1>
 
       <div

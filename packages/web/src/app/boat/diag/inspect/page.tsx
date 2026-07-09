@@ -81,7 +81,7 @@ export default function InspectPage() {
   const sorted = Array.from(channels.entries()).sort(([a], [b]) => a.localeCompare(b));
 
   return (
-    <main className="p-6">
+    <main className="page-main p-6">
       <h1 className="text-2xl font-semibold mb-4">Channel inspector</h1>
       <p className="text-slate-400 mb-4 text-sm">
         Live channels published on the bus. {sorted.length} active.

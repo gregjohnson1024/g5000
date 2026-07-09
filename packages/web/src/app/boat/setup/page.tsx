@@ -778,7 +778,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="p-8 max-w-2xl space-y-6 text-ink">
+    <main className="page-main p-8 space-y-6 text-ink">
       <h1 className="text-title">Settings</h1>
 
       {/* Source mode — instant-apply radio */}
