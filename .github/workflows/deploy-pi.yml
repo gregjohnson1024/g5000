@@ -82,9 +82,38 @@ jobs:
         working-directory: ${{ env.AUTOPILOT_DIR }}/apps/g5000
         run: npm run build
 
+      - name: Snapshot previous build's static assets
+        working-directory: ${{ env.AUTOPILOT_DIR }}/packages/web
+        run: |
+          # Version-skew protection, part 1. `next build` wipes .next; a
+          # browser that was open across the deploy still requests the OLD
+          # build's content-hashed chunks, and a 404 there throws
+          # ChunkLoadError into the client (the "This page couldn't load"
+          # card — see app/error.tsx). Save the current chunks so we can
+          # put them back next to the new build's.
+          rm -rf /tmp/g5000-prev-static
+          if [ -d .next/static ]; then cp -a .next/static /tmp/g5000-prev-static; fi
+
       - name: Build web (next build)
         working-directory: ${{ env.AUTOPILOT_DIR }}/packages/web
         run: npm run build
+
+      - name: Restore previous build's static assets
+        working-directory: ${{ env.AUTOPILOT_DIR }}/packages/web
+        run: |
+          # Version-skew protection, part 2: merge the old chunks back in,
+          # no-clobber (names are content-hashed, so a collision is the
+          # identical file). Timestamps are preserved so the age prune
+          # below sees the ORIGINAL build dates, letting chunk files from
+          # several builds coexist but not accumulate forever. Old
+          # navigations then load fine, and the first live RSC fetch
+          # hard-navigates onto the new build via Next's build-id check.
+          if [ -d /tmp/g5000-prev-static ]; then
+            cp -Rn --preserve=timestamps,mode /tmp/g5000-prev-static/. .next/static/
+            rm -rf /tmp/g5000-prev-static
+          fi
+          find .next/static -type f -mtime +14 -delete
+          find .next/static -type d -empty -delete
 
       - name: Sync systemd unit if changed
         working-directory: ${{ env.AUTOPILOT_DIR }}
