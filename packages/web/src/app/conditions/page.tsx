@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { fmtUtcMinute } from '../../lib/tz';
+import { fmtTimestamp } from '../../lib/tz';
+import { useShipClock } from '../../lib/use-ship-clock';
 import { Panel } from '../../components/ui';
 import { Button } from '../../components/ui';
 import { DataTable } from '../../components/ui';
@@ -117,6 +118,7 @@ const GRID_COLS: ColumnDef<GridRow>[] = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ForecastPage() {
+  const clock = useShipClock();
   const [manifest, setManifest] = useState<ManifestResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -239,9 +241,9 @@ export default function ForecastPage() {
       {
         id: m,
         model: m.toUpperCase(),
-        latestRun: fmtUtcMinute(a.latestRunUnix),
+        latestRun: fmtTimestamp(a.latestRunUnix, clock),
         age: fmtAge(ageSec) + ' ago',
-        nextRun: `${fmtUtcMinute(a.nextRunAvailableUnix)} (${fmtDuration(untilNext)})`,
+        nextRun: `${fmtTimestamp(a.nextRunAvailableUnix, clock)} (${fmtDuration(untilNext)})`,
       },
     ];
   });
@@ -250,8 +252,8 @@ export default function ForecastPage() {
     id: String(i),
     model: e.model.toUpperCase(),
     fh: `+${e.forecastHour}h`,
-    run: fmtUtcMinute(e.runAt),
-    valid: fmtUtcMinute(e.validAt),
+    run: fmtTimestamp(e.runAt, clock),
+    valid: fmtTimestamp(e.validAt, clock),
     bbox: `${e.bbox.latMin.toFixed(1)}…${e.bbox.latMax.toFixed(1)}N ${e.bbox.lonMin.toFixed(1)}…${e.bbox.lonMax.toFixed(1)}E`,
     age: fmtAge(now - Math.floor(e.fetchedAt / 1000)),
   }));

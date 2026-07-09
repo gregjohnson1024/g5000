@@ -4,6 +4,23 @@ import type { DayBaseColor } from './colors.js';
 /** App-wide UI theme. Drives <html data-theme> on every connected browser. */
 export type Theme = 'day' | 'night' | 'sun';
 
+/**
+ * App-wide clock display mode. 'utc' renders z-suffixed UTC everywhere
+ * (historic behaviour); 'ship' renders UTC + a fixed offset ("ship's time")
+ * with a ±H[:MM] suffix so the two modes can never be confused.
+ */
+export type ClockMode = 'utc' | 'ship';
+
+/**
+ * Boat-wide clock display config, synced to every connected browser like the
+ * theme. `offsetMin` is minutes east of UTC; `null` means "auto" — derive the
+ * offset from the GPS longitude via nautical time zones (round(lon/15) hours).
+ */
+export interface ClockConfig {
+  mode: ClockMode;
+  offsetMin: number | null;
+}
+
 /** Number-tile grids for v1. 'fields+graph' is intentionally deferred. */
 export type GridKind = '1' | '2' | '3' | '4' | '6';
 
@@ -79,4 +96,7 @@ export interface MastRuntime {
   /** Instrument numeral scale multiplier (1.0 / 1.15 / 1.6). */
   readonly scale$: Observable<number>;
   getScale(): number;
+  /** Boat-wide clock display config (UTC vs ship time + offset). */
+  readonly clock$: Observable<ClockConfig>;
+  getClock(): ClockConfig;
 }

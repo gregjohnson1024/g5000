@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Route } from '@g5000/routing';
 import { PlanControls, type PlanParams } from '../../components/PlanControls';
 import type { RouteColorMode } from '../../components/RoutePolyline';
-import type { TzMode } from '../../lib/tz';
+import type { ShipClock } from '../../lib/tz';
 import { reorder } from '../../lib/reorder';
 import { type SavedRouteLite } from '../../lib/plan-via';
 import { removeAt, insertAt, setStart, setEnd, startOf, endOf, viaOf } from '../../lib/route-plan';
@@ -70,7 +70,7 @@ function WaypointSelect(props: {
  */
 export function RoutePlanPanel(props: {
   waypoints: Wp[];
-  tz: TzMode;
+  clock: ShipClock;
   hasRoute: boolean;
   /** Unified ordered waypoint IDs [start, ...via, end], owned by the parent. */
   ids: string[];
@@ -306,7 +306,7 @@ export function RoutePlanPanel(props: {
             via={via}
             onPlan={onPlan}
             loading={loading}
-            tz={props.tz}
+            clock={props.clock}
             colorMode={props.colorMode}
             onColorMode={props.onColorMode}
             colorTwaDisabled={props.colorTwaDisabled}

@@ -21,7 +21,7 @@
  */
 
 import { useEffect } from 'react';
-import type { Theme } from '@g5000/mast';
+import type { ClockConfig, Theme } from '@g5000/mast';
 import { useThemeStore, SCALE_PRESETS, type ScalePreset } from '../lib/theme-store';
 
 const THEMES: readonly Theme[] = ['day', 'night', 'sun'];
@@ -31,7 +31,7 @@ export function ThemeController(): React.ReactNode {
   // back, or the server re-broadcasts it and we echo-loop (a ~333 req/s storm
   // that froze the whole UI). setTheme/setScale (which POST) are for the chip's
   // user-initiated changes only.
-  const { receiveTheme, receiveScale } = useThemeStore();
+  const { receiveTheme, receiveScale, receiveClockCfg } = useThemeStore();
 
   // Open SSE stream to receive boat-wide theme + scale changes.
   useEffect(() => {
@@ -67,10 +67,25 @@ export function ThemeController(): React.ReactNode {
       }
     });
 
+    es.addEventListener('clock', (ev) => {
+      try {
+        const c = JSON.parse((ev as MessageEvent).data) as Partial<ClockConfig>;
+        if (
+          (c.mode === 'utc' || c.mode === 'ship') &&
+          (c.offsetMin === null || typeof c.offsetMin === 'number')
+        ) {
+          // Apply locally only — do NOT POST back (echo-loop guard).
+          receiveClockCfg({ mode: c.mode, offsetMin: c.offsetMin ?? null });
+        }
+      } catch {
+        /* ignore malformed payloads */
+      }
+    });
+
     return () => {
       es.close();
     };
-  }, [receiveTheme, receiveScale]);
+  }, [receiveTheme, receiveScale, receiveClockCfg]);
 
   // Renders nothing — UI chip lives in NavShell AppBar.
   return null;

@@ -1,10 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
+  UTC_CLOCK,
+  fmtClockSuffix,
   fmtTimestamp,
   parseDatetimeLocalInput,
   toDatetimeLocalInput,
-  type TzMode,
+  type ShipClock,
 } from '../../lib/tz';
 
 interface EngineState {
@@ -32,25 +34,28 @@ function fmtHoursMin(h: number): string {
   return `${hh}h ${String(mm).padStart(2, '0')}m`;
 }
 
-export function EnginePanel({ tz }: { tz: TzMode }) {
+export function EnginePanel({ clock }: { clock: ShipClock }) {
   const [summary, setSummary] = useState<EngineSummary | null>(null);
   const [baseline, setBaseline] = useState<{ port: number; stbd: number }>({ port: 0, stbd: 0 });
   const [entries, setEntries] = useState<EngineEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Form state. `whenInput` is the raw string from the datetime-local
-  // widget; interpretation as UTC or local depends on the current `tz`
-  // mode at submit time.
+  // widget; interpretation follows the app-wide ship clock at submit time.
   const [portOn, setPortOn] = useState(false);
   const [portRpm, setPortRpm] = useState<string>('');
   const [stbdOn, setStbdOn] = useState(false);
   const [stbdRpm, setStbdRpm] = useState<string>('');
   const [note, setNote] = useState<string>('');
   // Stored as an absolute UNIX timestamp; rendered into the input via
-  // toDatetimeLocalInput(anchor, tz) so toggling tz preserves the
-  // moment-in-time rather than its wallclock string.
-  const [whenAnchor, setWhenAnchor] = useState<number>(() => Date.now() / 1000);
-  const whenInput = toDatetimeLocalInput(whenAnchor, tz);
+  // toDatetimeLocalInput(anchor, clock) so a clock-mode change preserves the
+  // moment-in-time rather than its wallclock string. Seeded on mount — a
+  // Date.now() initialiser makes SSR text differ from the client's (#418).
+  const [whenAnchor, setWhenAnchor] = useState<number | null>(null);
+  useEffect(() => {
+    setWhenAnchor((cur) => cur ?? Date.now() / 1000);
+  }, []);
+  const whenInput = whenAnchor !== null ? toDatetimeLocalInput(whenAnchor, clock) : '';
   const [useNow, setUseNow] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
   // Seed the form with the current engine state EXACTLY ONCE on mount.
@@ -105,7 +110,7 @@ export function EnginePanel({ tz }: { tz: TzMode }) {
     setSubmitting(true);
     setError(null);
     try {
-      const t = useNow ? Date.now() / 1000 : whenAnchor;
+      const t = useNow ? Date.now() / 1000 : (whenAnchor ?? Date.now() / 1000);
       const body = {
         t,
         port: {
@@ -221,7 +226,7 @@ export function EnginePanel({ tz }: { tz: TzMode }) {
           </label>
           <label className="text-xs text-slate-400 flex flex-col gap-1">
             <span className="flex items-center gap-2">
-              When ({tz === 'utc' ? 'UTC' : 'local'})
+              When ({clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`})
               <label className="flex items-center gap-1 normal-case">
                 <input
                   type="checkbox"
@@ -234,17 +239,15 @@ export function EnginePanel({ tz }: { tz: TzMode }) {
             <input
               type="datetime-local"
               value={whenInput}
-              onChange={(e) => setWhenAnchor(parseDatetimeLocalInput(e.target.value, tz))}
+              onChange={(e) => setWhenAnchor(parseDatetimeLocalInput(e.target.value, clock))}
               disabled={useNow}
               className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 disabled:opacity-40"
             />
-            <span className="text-[10px] text-slate-500 font-mono">
-              ≡{' '}
-              {fmtTimestamp(
-                useNow ? Date.now() / 1000 : whenAnchor,
-                tz === 'utc' ? 'local' : 'utc',
-              )}
-            </span>
+            {clock.mode === 'ship' && !useNow && whenAnchor !== null && (
+              <span className="text-[10px] text-slate-500 font-mono">
+                ≡ {fmtTimestamp(whenAnchor, UTC_CLOCK)}
+              </span>
+            )}
           </label>
           <button
             type="submit"
@@ -266,7 +269,7 @@ export function EnginePanel({ tz }: { tz: TzMode }) {
             <table className="w-full text-xs font-mono">
               <thead>
                 <tr className="text-slate-500 text-left">
-                  <th className="py-1 pr-2">When ({tz === 'utc' ? 'UTC' : 'local'})</th>
+                  <th className="py-1 pr-2">When ({clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`})</th>
                   <th className="py-1 pr-2">Port</th>
                   <th className="py-1 pr-2">Stbd</th>
                   <th className="py-1 pr-2">Note</th>
@@ -275,7 +278,7 @@ export function EnginePanel({ tz }: { tz: TzMode }) {
               <tbody>
                 {[...entries].reverse().map((e) => (
                   <tr key={e.t} className="border-t border-slate-800">
-                    <td className="py-1 pr-2 text-slate-300">{fmtTimestamp(e.t, tz)}</td>
+                    <td className="py-1 pr-2 text-slate-300">{fmtTimestamp(e.t, clock)}</td>
                     <td className="py-1 pr-2 text-slate-200">
                       {e.port.on ? `on${e.port.rpm ? ` ${e.port.rpm} rpm` : ''}` : 'off'}
                     </td>

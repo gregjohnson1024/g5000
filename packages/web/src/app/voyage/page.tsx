@@ -2,15 +2,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  UTC_CLOCK,
   fmtHourLabel,
   fmtTimestamp,
   formatDuration,
-  readTzMode,
-  writeTzMode,
-  type TzMode,
+  type ShipClock,
 } from '../../lib/tz';
+import { useShipClock } from '../../lib/use-ship-clock';
 import { bearingDeg, greatCircleNm } from '../../lib/geo';
-import { TzToggle } from '../../components/TzToggle';
 import { fmtLatLonDmm } from '../../lib/coords';
 import { EnginePanel } from './EnginePanel';
 import { TimeSeriesPanel } from '../../components/charts';
@@ -30,7 +29,6 @@ interface EtaSnapshot {
 }
 
 const M_TO_NM = 1 / 1852;
-const TZ_KEY = 'passage:tz';
 
 /**
  * Bermuda reference for the "distance to/from Bermuda" tile.
@@ -72,13 +70,9 @@ export default function PassagePage() {
   const [log, setLog] = useState<PassageLogSnapshot | null>(null);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tz, setTz] = useState<TzMode>('local');
-  useEffect(() => {
-    setTz(readTzMode(TZ_KEY, 'local'));
-  }, []);
-  useEffect(() => {
-    writeTzMode(TZ_KEY, tz);
-  }, [tz]);
+  // App-wide ship clock (boat-synced; replaces the old per-page toggle and
+  // its passage:tz localStorage key).
+  const clock = useShipClock();
 
   useEffect(() => {
     let cancelled = false;
@@ -144,7 +138,6 @@ export default function PassagePage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-[1.111rem] font-semibold text-ink-value">Passage</h1>
         <div className="flex items-center gap-3">
-          <TzToggle tz={tz} setTz={setTz} />
           {stats?.trackId && (
             <div className="text-caption text-ink-3 font-mono">
               {stats.trackId}
@@ -173,11 +166,11 @@ export default function PassagePage() {
 
       {stats?.trackId && (
         <>
-          {eta && <EtaTile eta={eta} tz={tz} log={log} />}
+          {eta && <EtaTile eta={eta} clock={clock} log={log} />}
 
           {eta && <BermudaTile eta={eta} />}
 
-          {log && <LogTile log={log} tz={tz} onReset={resetLog} resetting={resetting} />}
+          {log && <LogTile log={log} clock={clock} onReset={resetLog} resetting={resetting} />}
 
           <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <DistanceTile label="Last 1 h" valueNm={stats.d1hM * M_TO_NM} hours={1} />
@@ -194,18 +187,18 @@ export default function PassagePage() {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-7 gap-2">
                 {stats.daily7.map((d) => (
-                  <DailyTile key={d.startsAt} bucket={d} tz={tz} />
+                  <DailyTile key={d.startsAt} bucket={d} clock={clock} />
                 ))}
               </div>
             </section>
           )}
 
           {/* 24h rolling history sparkline via TimeSeriesPanel */}
-          <Sparkline24h data={stats.history24h} tz={tz} />
+          <Sparkline24h data={stats.history24h} clock={clock} />
         </>
       )}
 
-      <EnginePanel tz={tz} />
+      <EnginePanel clock={clock} />
     </main>
   );
 }
@@ -216,10 +209,10 @@ export default function PassagePage() {
 
 function Sparkline24h({
   data,
-  tz,
+  clock,
 }: {
   data: Array<{ endingAt: number; d24hM: number }>;
-  tz: TzMode;
+  clock: ShipClock;
 }) {
   if (data.length < 2) {
     return (
@@ -236,8 +229,8 @@ function Sparkline24h({
   const tMax = series[series.length - 1]!.endingAt;
   const points = series.map((d) => ({ tMs: d.endingAt, v: d.d24hM * M_TO_NM }));
 
-  const tMinLabel = fmtHourLabel(tMin, tz);
-  const tMaxLabel = fmtHourLabel(tMax, tz);
+  const tMinLabel = fmtHourLabel(tMin, clock);
+  const tMaxLabel = fmtHourLabel(tMax, clock);
 
   return (
     <section className="space-y-1">
@@ -275,11 +268,11 @@ function Sparkline24h({
 function CumulativeSparkline({
   anchorAt,
   history,
-  tz,
+  clock,
 }: {
   anchorAt: number;
   history: Array<{ t: number; cumulativeM: number }>;
-  tz: TzMode;
+  clock: ShipClock;
 }) {
   if (history.length < 2) {
     return (
@@ -295,8 +288,9 @@ function CumulativeSparkline({
   const tMin = points[0]!.tMs;
   const tMax = points[points.length - 1]!.tMs;
 
-  const tMinLabel = fmtHourLabel(anchorAt * 1000, tz);
-  const tMaxLabel = fmtHourLabel(history[history.length - 1]!.t * 1000, tz);
+  // fmtHourLabel takes UNIX seconds (t is seconds; only tMs above is ms).
+  const tMinLabel = fmtHourLabel(anchorAt, clock);
+  const tMaxLabel = fmtHourLabel(history[history.length - 1]!.t, clock);
   const latestNm = (history[history.length - 1]!.cumulativeM * M_TO_NM).toFixed(1);
 
   return (
@@ -333,7 +327,7 @@ function CumulativeSparkline({
 
 function DailyTile({
   bucket,
-  tz,
+  clock,
 }: {
   bucket: {
     startsAt: number;
@@ -341,14 +335,12 @@ function DailyTile({
     distanceM: number;
     complete: boolean;
   };
-  tz: TzMode;
+  clock: ShipClock;
 }) {
   const nm = bucket.distanceM * M_TO_NM;
-  const startsD = new Date(bucket.startsAt * 1000);
-  const label =
-    tz === 'utc'
-      ? `${String(startsD.getUTCDate()).padStart(2, '0')} ${startsD.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`
-      : `${String(startsD.getDate()).padStart(2, '0')} ${startsD.toLocaleString('en-GB', { month: 'short' })}`;
+  // Shift by the ship offset, then read UTC parts (never the device zone).
+  const startsD = new Date((bucket.startsAt + clock.offsetMin * 60) * 1000);
+  const label = `${String(startsD.getUTCDate()).padStart(2, '0')} ${startsD.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })}`;
   return (
     <div
       className={`[border-radius:var(--r-panel)] p-2 border flex flex-col gap-0.5 ${
@@ -449,19 +441,19 @@ function BermudaTile({ eta }: { eta: EtaSnapshot }) {
 
 function LogTile({
   log,
-  tz,
+  clock,
   onReset,
   resetting,
 }: {
   log: PassageLogSnapshot;
-  tz: TzMode;
+  clock: ShipClock;
   onReset: () => void;
   resetting: boolean;
 }) {
   const distNm = log.distanceM * M_TO_NM;
   const sinceText =
     log.anchorAt !== null
-      ? `since ${weekdayFor(log.anchorAt, tz)} ${fmtTimestamp(log.anchorAt, tz)}`
+      ? `since ${weekdayFor(log.anchorAt, clock)} ${fmtTimestamp(log.anchorAt, clock)}`
       : 'no anchor set';
   const elapsedText =
     log.anchorAt !== null ? ` · ${formatDuration(Date.now() / 1000 - log.anchorAt)} elapsed` : '';
@@ -491,7 +483,7 @@ function LogTile({
         </button>
       </div>
       {log.anchorAt !== null && (
-        <CumulativeSparkline anchorAt={log.anchorAt} history={log.history} tz={tz} />
+        <CumulativeSparkline anchorAt={log.anchorAt} history={log.history} clock={clock} />
       )}
     </section>
   );
@@ -503,14 +495,13 @@ function LogTile({
 
 function EtaTile({
   eta,
-  tz,
+  clock,
   log,
 }: {
   eta: EtaSnapshot;
-  tz: TzMode;
+  clock: ShipClock;
   log: PassageLogSnapshot | null;
 }) {
-  const altTz: TzMode = tz === 'utc' ? 'local' : 'utc';
   return (
     <section className="bg-surface border border-accent [border-radius:var(--r-panel)] p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-4 flex-wrap">
@@ -549,24 +540,25 @@ function EtaTile({
       </div>
       <div className="text-body font-mono tabular-nums text-ink-value">
         {eta.etaUnixSec !== null
-          ? `${weekdayFor(eta.etaUnixSec, tz)} ${fmtTimestamp(eta.etaUnixSec, tz)}`
+          ? `${weekdayFor(eta.etaUnixSec, clock)} ${fmtTimestamp(eta.etaUnixSec, clock)}`
           : '— stopped, no ETA'}
-        {eta.etaUnixSec !== null && (
+        {eta.etaUnixSec !== null && clock.mode === 'ship' && (
           <span className="text-caption text-ink-3 ml-2">
-            ({weekdayFor(eta.etaUnixSec, altTz)} {fmtTimestamp(eta.etaUnixSec, altTz)})
+            ({weekdayFor(eta.etaUnixSec, UTC_CLOCK)} {fmtTimestamp(eta.etaUnixSec, UTC_CLOCK)})
           </span>
         )}
       </div>
       {log && log.anchorAt !== null && (
-        <CumulativeSparkline anchorAt={log.anchorAt} history={log.history} tz={tz} />
+        <CumulativeSparkline anchorAt={log.anchorAt} history={log.history} clock={clock} />
       )}
     </section>
   );
 }
 
-function weekdayFor(unixSec: number, tz: TzMode): string {
-  return new Date(unixSec * 1000).toLocaleString('en-US', {
+function weekdayFor(unixSec: number, clock: ShipClock): string {
+  // Shift by the ship offset, then read in UTC (never the device zone).
+  return new Date((unixSec + clock.offsetMin * 60) * 1000).toLocaleString('en-US', {
     weekday: 'short',
-    timeZone: tz === 'utc' ? 'UTC' : undefined,
+    timeZone: 'UTC',
   });
 }

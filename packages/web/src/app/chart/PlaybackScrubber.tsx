@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Route } from '@g5000/routing';
 import { stateAtTime, type PlaybackRoute, type PlaybackState } from '../../lib/route-playback';
-import { fmtHourLabel, type TzMode } from '../../lib/tz';
+import { fmtHourLabel, type ShipClock } from '../../lib/tz';
 
 const MODELS = ['GFS', 'ECMWF'] as const;
 type Model = (typeof MODELS)[number];
@@ -28,7 +28,7 @@ function fmtElapsed(secs: number): string {
 export function PlaybackScrubber(props: {
   map: maplibregl.Map | null;
   routes: Partial<Record<Model, Route>>;
-  tz: TzMode;
+  clock: ShipClock;
   onStates: (states: Partial<Record<Model, PlaybackState>>) => void;
   onWindHour: (t: number) => void;
   /** Optional controlled playback time. When provided (with onTChange) the
@@ -142,7 +142,7 @@ export function PlaybackScrubber(props: {
         >
           {playing ? 'Pause' : 'Play'}
         </button>
-        <span className="text-xs font-mono">{fmtHourLabel(t, props.tz)}</span>
+        <span className="text-xs font-mono">{fmtHourLabel(t, props.clock)}</span>
         <span className="text-xs font-mono text-slate-400">+{fmtElapsed(t - tMin)}</span>
         <select
           value={speed}

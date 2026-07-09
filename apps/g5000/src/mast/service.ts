@@ -4,6 +4,7 @@ import {
   DEFAULT_MAST_LAYOUT,
   knownChannelSet,
   validateMastLayout,
+  type ClockConfig,
   type DayBaseColor,
   type MastLayout,
   type MastRuntime,
@@ -127,6 +128,16 @@ export class MastService implements MastRuntime {
 
   getScale(): number {
     return this.configStore.getDisplayConfig().scale ?? 1.0;
+  }
+
+  get clock$(): Observable<ClockConfig> {
+    return this.configStore.displayConfig$.pipe(
+      map((c) => c.clock ?? { mode: 'utc', offsetMin: null }),
+    );
+  }
+
+  getClock(): ClockConfig {
+    return this.configStore.getDisplayConfig().clock ?? { mode: 'utc', offsetMin: null };
   }
 
   async stop(): Promise<void> {

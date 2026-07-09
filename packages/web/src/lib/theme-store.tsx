@@ -17,8 +17,8 @@
  *   - ThemeChip (NavShell) calls useThemeStore() to read theme + cycle.
  */
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { Theme } from '@g5000/mast';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import type { ClockConfig, Theme } from '@g5000/mast';
 import { storageGet, storageSet } from './storage';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +59,22 @@ export function readStoredScale(): ScalePreset {
   return (SCALE_PRESETS as readonly number[]).includes(v) ? (v as ScalePreset) : 1.0;
 }
 
+export const DEFAULT_CLOCK_CONFIG: ClockConfig = { mode: 'utc', offsetMin: null };
+
+export function readStoredClockConfig(): ClockConfig {
+  const raw = storageGet('clock');
+  if (raw === null) return DEFAULT_CLOCK_CONFIG;
+  try {
+    const p = JSON.parse(raw) as Partial<ClockConfig>;
+    const mode = p.mode === 'ship' ? 'ship' : 'utc';
+    const offsetMin =
+      typeof p.offsetMin === 'number' && Number.isInteger(p.offsetMin) ? p.offsetMin : null;
+    return { mode, offsetMin };
+  } catch {
+    return DEFAULT_CLOCK_CONFIG;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
@@ -80,6 +96,12 @@ interface ThemeStore {
   receiveTheme: (t: Theme) => void;
   /** Apply an INBOUND (SSE-pushed) scale locally + persist, WITHOUT POSTing back. */
   receiveScale: (s: ScalePreset) => void;
+  /** Boat-wide clock config (UTC vs ship time). See lib/tz.ts for resolution. */
+  clockCfg: ClockConfig;
+  /** Persist + POST /api/mast/clock for boat-wide sync (user-initiated). */
+  setClockCfg: (c: ClockConfig) => void;
+  /** Apply an INBOUND (SSE-pushed) clock locally + persist, WITHOUT POSTing back. */
+  receiveClockCfg: (c: ClockConfig) => void;
 }
 
 const ThemeContext = createContext<ThemeStore | null>(null);
@@ -140,6 +162,26 @@ export function ThemeStoreProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, []);
 
+  // Start at the DEFAULT (matching SSR, which has no localStorage) and load
+  // the persisted value in a mount effect — initialising from storage makes
+  // the first client render differ from the server's for any component that
+  // renders clock-derived text (React #418). The mast SSE stream delivers
+  // the authoritative boat value moments later regardless.
+  const [clockCfg, setClockCfgState] = useState<ClockConfig>(DEFAULT_CLOCK_CONFIG);
+  useEffect(() => {
+    setClockCfgState(readStoredClockConfig());
+  }, []);
+
+  const setClockCfg = useCallback((c: ClockConfig) => {
+    storageSet('clock', JSON.stringify(c));
+    setClockCfgState(c);
+    fetch('/api/mast/clock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(c),
+    }).catch(() => {});
+  }, []);
+
   // Inbound (SSE) appliers — apply + persist + update state, but NEVER POST.
   const receiveTheme = useCallback((t: Theme) => {
     applyTheme(t);
@@ -153,9 +195,25 @@ export function ThemeStoreProvider({ children }: { children: ReactNode }) {
     setScaleState(s);
   }, []);
 
+  const receiveClockCfg = useCallback((c: ClockConfig) => {
+    storageSet('clock', JSON.stringify(c));
+    setClockCfgState(c);
+  }, []);
+
   return (
     <ThemeContext.Provider
-      value={{ theme, setTheme, cycleTheme, scale, setScale, receiveTheme, receiveScale }}
+      value={{
+        theme,
+        setTheme,
+        cycleTheme,
+        scale,
+        setScale,
+        receiveTheme,
+        receiveScale,
+        clockCfg,
+        setClockCfg,
+        receiveClockCfg,
+      }}
     >
       {children}
     </ThemeContext.Provider>

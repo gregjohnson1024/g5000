@@ -3,7 +3,7 @@
 import { type Dispatch, type SetStateAction } from 'react';
 import Link from 'next/link';
 import { hrrrHorizonHours, pickHrrrRun } from '../../lib/hrrr-helpers';
-import { fmtHourLabel, type TzMode } from '../../lib/tz';
+import { fmtHourLabel, type ShipClock } from '../../lib/tz';
 
 // Full intended forecast set: GFS is hourly to +120 h then 3-hourly to +168 h.
 // Matches the refresh job, so the timeline can show how far the cache has
@@ -26,7 +26,7 @@ interface WindTimelineProps {
   };
   windHours: number;
   windLockNow: boolean;
-  tz: TzMode;
+  clock: ShipClock;
   model: 'gfs' | 'ecmwf' | 'hrrr' | null;
   setWindHours: Dispatch<SetStateAction<number>>;
   setWindLockNow: Dispatch<SetStateAction<boolean>>;
@@ -42,7 +42,7 @@ export function WindTimeline({
   latestRunAt,
   windHours,
   windLockNow,
-  tz,
+  clock,
   model,
   setWindHours,
   setWindLockNow,
@@ -123,7 +123,7 @@ export function WindTimeline({
   let label = `+${effectiveHours}h`;
   if (runAt) {
     const validUnix = runAt + effectiveHours * 3600;
-    const absLabel = fmtHourLabel(validUnix, tz);
+    const absLabel = fmtHourLabel(validUnix, clock);
     const hoursFromNow = (validUnix - nowS) / 3600;
     const rel =
       Math.abs(hoursFromNow) < 0.5

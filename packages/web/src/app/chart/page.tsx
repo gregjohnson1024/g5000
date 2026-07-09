@@ -49,7 +49,7 @@ import { resolveTarget, type ContextTarget, type HitWaypoint } from '../../lib/r
 import { OffscreenVesselIndicator } from './OffscreenVesselIndicator';
 import { useChartCamera } from './use-chart-camera';
 import { nextWaypointName } from './waypoint-name';
-import { readTzMode, writeTzMode, type TzMode } from '../../lib/tz';
+import { useShipClock } from '../../lib/use-ship-clock';
 import { nearestForecastHour, type PlaybackState } from '../../lib/route-playback';
 import type { Route } from '@g5000/routing';
 import type { Track } from '../../lib/tracks';
@@ -135,17 +135,9 @@ function ChartPageInner() {
   // cleared when it leaves. Used by the bottom-left cursor-position panel
   // (distance + bearing from the live boat fix when available).
   const [cursorLatLon, setCursorLatLon] = useState<{ lat: number; lon: number } | null>(null);
-  // Page-level Local/UTC toggle for the forecast timeline label and the
-  // Departure picker. Default Local — per user request. Persisted to its
-  // own localStorage key (separate from /passage so each page remembers
-  // independently).
-  const [tz, setTz] = useState<TzMode>('local');
-  useEffect(() => {
-    setTz(readTzMode('chart:tz', 'local'));
-  }, []);
-  useEffect(() => {
-    writeTzMode('chart:tz', tz);
-  }, [tz]);
+  // App-wide ship clock (boat-synced UTC ↔ ship-time setting; replaces the
+  // old per-page Local/UTC toggle and its chart:tz localStorage key).
+  const clock = useShipClock();
   // Layer visibility — persists to localStorage so the choice survives
   // reloads. Hydrated AFTER first render (not via lazy `useState` init)
   // so server and client agree on the initial paint — otherwise the
@@ -1230,8 +1222,7 @@ function ChartPageInner() {
           waypoints,
           routePlan,
           routes,
-          tz,
-          onTz: setTz,
+          clock,
           routeColorMode,
           onRouteColorMode: setRouteColorMode,
           hasMotoring,

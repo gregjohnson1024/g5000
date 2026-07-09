@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import {
+  UTC_CLOCK,
+  fmtClockSuffix,
   fmtTimestamp,
   parseDatetimeLocalInput,
   toDatetimeLocalInput,
-  type TzMode,
+  type ShipClock,
 } from '../lib/tz';
 import type { RouteColorMode } from './RoutePolyline';
 
@@ -61,9 +63,9 @@ export function PlanControls(props: {
   via?: { lat: number; lon: number }[];
   onPlan: (params: PlanParams) => void;
   loading: boolean;
-  /** Page-level timezone display preference. Controls how the Departure
-   *  picker labels itself and how its input string is interpreted. */
-  tz: TzMode;
+  /** App-wide ship clock: labels the Departure picker and interprets the
+   *  typed wall time (boat-synced; set on /boat/setup). */
+  clock: ShipClock;
   /** Route line-colour mode (display only — recolours live, does not re-plan). */
   colorMode: RouteColorMode;
   onColorMode: (m: RouteColorMode) => void;
@@ -74,12 +76,18 @@ export function PlanControls(props: {
   showRouteWind: boolean;
   onShowRouteWind: (v: boolean) => void;
 }) {
-  const tz = props.tz;
+  const clock = props.clock;
   // Departure is stored as an absolute UNIX-seconds anchor; the displayed
-  // string is derived from anchor + tz, so flipping the toggle preserves
-  // the moment in time rather than the wallclock typed.
-  const [departureAnchor, setDepartureAnchor] = useState<number>(() => Date.now() / 1000 + 3600);
-  const departureInput = toDatetimeLocalInput(departureAnchor, tz);
+  // string is derived from anchor + clock, so a clock-mode change preserves
+  // the moment in time rather than the wallclock typed. Starts null and is
+  // seeded on mount — computing Date.now() in the initialiser makes the SSR
+  // text differ from the client's (React #418 args=text on every load).
+  const [departureAnchor, setDepartureAnchor] = useState<number | null>(null);
+  useEffect(() => {
+    setDepartureAnchor((cur) => cur ?? Date.now() / 1000 + 3600);
+  }, []);
+  const departureInput =
+    departureAnchor !== null ? toDatetimeLocalInput(departureAnchor, clock) : '';
   const [useCurrents, setUseCurrents] = useState<boolean>(false);
   // Wind models to plan against — both on by default so a single Plan press
   // fans out a GFS and an ECMWF route for side-by-side comparison.
@@ -129,7 +137,7 @@ export function PlanControls(props: {
       start: props.start,
       end: props.end,
       via: props.via,
-      departure: Math.floor(departureAnchor),
+      departure: Math.floor(departureAnchor ?? Date.now() / 1000 + 3600),
       models: selected,
       useCurrents,
       minDepthM: minDepthM > 0 ? minDepthM : undefined,
@@ -150,16 +158,18 @@ export function PlanControls(props: {
   return (
     <div className="space-y-2">
       <label className="block text-sm">
-        Departure ({tz === 'utc' ? 'UTC' : 'local'})
+        Departure ({clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`})
         <input
           type="datetime-local"
           value={departureInput}
-          onChange={(e) => setDepartureAnchor(parseDatetimeLocalInput(e.target.value, tz))}
+          onChange={(e) => setDepartureAnchor(parseDatetimeLocalInput(e.target.value, clock))}
           className={`${inputClass} w-full`}
         />
-        <span className="text-[10px] text-slate-500 font-mono">
-          ≡ {fmtTimestamp(departureAnchor, tz === 'utc' ? 'local' : 'utc')}
-        </span>
+        {clock.mode === 'ship' && departureAnchor !== null && (
+          <span className="text-[10px] text-slate-500 font-mono">
+            ≡ {fmtTimestamp(departureAnchor, UTC_CLOCK)}
+          </span>
+        )}
       </label>
       <fieldset className="block text-sm">
         <legend>Wind models</legend>

@@ -11,7 +11,7 @@
 import type { SourcePriorityRule, SourcePriorityConfig } from '@g5000/core';
 export type { SourcePriorityRule, SourcePriorityConfig };
 import type { Station } from '@g5000/tide';
-import type { DayBaseColor, Theme } from '@g5000/mast';
+import type { ClockConfig, DayBaseColor, Theme } from '@g5000/mast';
 
 export interface BoatConfig {
   /** Mast height above the masthead unit's measurement reference, meters. */
@@ -406,9 +406,10 @@ export const DEFAULT_TIDE_CONFIG: TideConfig = {
   stationsCacheBySource: {},
 };
 
-// Theme is defined in @g5000/mast and re-exported here so consumers can
-// import it from either package without creating a circular dependency.
-export type { Theme };
+// Theme and ClockConfig are defined in @g5000/mast and re-exported here so
+// consumers can import them from either package without creating a circular
+// dependency.
+export type { Theme, ClockConfig };
 
 /** Per-boat mast-display panel settings. Applied by the appliance brightness agent. */
 export interface DisplayConfig {
@@ -427,6 +428,12 @@ export interface DisplayConfig {
    * Default 1.0 (no scaling).
    */
   scale: number;
+  /**
+   * Boat-wide clock display: 'utc' (z-suffixed, historic behaviour) or 'ship'
+   * (UTC + offsetMin, ±H[:MM]-suffixed). offsetMin null = auto from the GPS
+   * longitude via nautical zones. Default UTC.
+   */
+  clock: ClockConfig;
 }
 
 export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
@@ -435,6 +442,7 @@ export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   dayBaseColor: 'white',
   theme: 'day',
   scale: 1.0,
+  clock: { mode: 'utc', offsetMin: null },
 };
 
 export const DEFAULT_WARDROBE: SailWardrobe = {

@@ -24,6 +24,7 @@ export async function GET(req: Request): Promise<Response> {
       send('daybasecolor', mastRuntime.getDayBaseColor());
       send('theme', mastRuntime.getTheme());
       send('scale', mastRuntime.getScale());
+      send('clock', mastRuntime.getClock());
 
       const layoutSub = mastRuntime.layout$.subscribe((l) => send('layout', l));
       const overrideSub = mastRuntime.override$.subscribe((o) => send('override', o));
@@ -32,6 +33,7 @@ export async function GET(req: Request): Promise<Response> {
       const dayBaseColorSub = mastRuntime.dayBaseColor$.subscribe((c) => send('daybasecolor', c));
       const themeSub = mastRuntime.theme$.subscribe((t) => send('theme', t));
       const scaleSub = mastRuntime.scale$.subscribe((s) => send('scale', s));
+      const clockSub = mastRuntime.clock$.subscribe((c) => send('clock', c));
       const heartbeat = setInterval(() => controller.enqueue(encoder.encode(': ping\n\n')), 15_000);
 
       req.signal.addEventListener('abort', () => {
@@ -42,6 +44,7 @@ export async function GET(req: Request): Promise<Response> {
         dayBaseColorSub.unsubscribe();
         themeSub.unsubscribe();
         scaleSub.unsubscribe();
+        clockSub.unsubscribe();
         clearInterval(heartbeat);
         try {
           controller.close();

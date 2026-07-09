@@ -9,7 +9,12 @@ import {
   SaveBar,
   useDirtySave,
   Panel,
+  SegmentedControl,
 } from '../../../components/ui';
+import { useThemeStore } from '../../../lib/theme-store';
+import { useShipClock } from '../../../lib/use-ship-clock';
+import { useSseChannel } from '../../../hooks/use-sse-store';
+import { fmtClockSuffix, fmtClockTime, suggestedOffsetMin, type ClockMode } from '../../../lib/tz';
 
 type SourceMode = 'live' | 'demo' | 'replay';
 interface SourceModeStatus {
@@ -574,6 +579,87 @@ function EmporiaAcSection() {
 // Root page: source mode + SocketCAN (instant-apply; untouched) + sections
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Clock section — boat-wide UTC ↔ ship-time display mode (immediate save,
+// synced to every connected browser over the mast SSE stream like the theme)
+// ---------------------------------------------------------------------------
+
+/** '' = Auto (GPS); otherwise offsetMin as a string, half-hour steps. */
+function offsetOptions(gpsSuggestionMin: number | null): Array<{ value: string; label: string }> {
+  const opts: Array<{ value: string; label: string }> = [
+    {
+      value: '',
+      label:
+        gpsSuggestionMin !== null
+          ? `Auto — GPS suggests ${fmtClockSuffix({ mode: 'ship', offsetMin: gpsSuggestionMin })}`
+          : 'Auto — from GPS (no fix yet → UTC)',
+    },
+  ];
+  for (let m = -720; m <= 840; m += 30) {
+    opts.push({ value: String(m), label: `UTC${fmtClockSuffix({ mode: 'ship', offsetMin: m })}` });
+  }
+  return opts;
+}
+
+function ClockSection() {
+  const { clockCfg, setClockCfg } = useThemeStore();
+  const clock = useShipClock();
+  const { sample } = useSseChannel('nav.gps.position');
+  const v = sample?.value as { lon?: number } | null | undefined;
+  const gpsSuggestionMin = typeof v?.lon === 'number' ? suggestedOffsetMin(v.lon) : null;
+
+  // Live preview, seeded on mount (a Date.now() initialiser would make the
+  // SSR text differ from the client's — React #418).
+  const [nowSec, setNowSec] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNowSec(Date.now() / 1000);
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <Panel label="Clock" className="space-y-4">
+      <p className="text-caption text-ink-3">
+        Boat-wide time display for every panel, table, and time input — synced to all connected
+        displays. <strong>UTC</strong> is the z-suffixed convention; <strong>Ship time</strong>{' '}
+        renders UTC plus a fixed offset with a ±H suffix so the modes can never be confused.
+      </p>
+      <SegmentedControl<ClockMode>
+        aria-label="Clock display mode"
+        segments={[
+          { value: 'utc', label: 'UTC' },
+          { value: 'ship', label: 'Ship time' },
+        ]}
+        value={clockCfg.mode}
+        onChange={(mode) => setClockCfg({ ...clockCfg, mode })}
+      />
+      {clockCfg.mode === 'ship' && (
+        <SelectField
+          label="UTC offset"
+          caption="Auto follows the GPS longitude (nautical zones); pick an explicit offset to override — e.g. to keep DST or a chosen ship's time."
+          value={clockCfg.offsetMin === null ? '' : String(clockCfg.offsetMin)}
+          onChange={(val) =>
+            setClockCfg({ ...clockCfg, offsetMin: val === '' ? null : Number(val) })
+          }
+          options={offsetOptions(gpsSuggestionMin)}
+        />
+      )}
+      {nowSec !== null && (
+        <p className="text-body-sm font-mono tabular-nums text-ink-2">
+          Now: {fmtClockTime(nowSec, clock).toLowerCase()}
+          {clock.mode === 'ship' && (
+            <span className="text-ink-3">
+              {' '}
+              ({fmtClockTime(nowSec, { mode: 'utc', offsetMin: 0 }).toLowerCase()})
+            </span>
+          )}
+        </p>
+      )}
+    </Panel>
+  );
+}
+
 export default function SettingsPage() {
   const [sourceMode, setSourceMode] = useState<SourceModeStatus | null>(null);
   const [sourceModeBusy, setSourceModeBusy] = useState<boolean>(false);
@@ -817,6 +903,8 @@ export default function SettingsPage() {
         </p>
         {socketCanError && <div className="text-danger text-caption">{socketCanError}</div>}
       </fieldset>
+
+      <ClockSection />
 
       <SatelliteCachePanel />
 

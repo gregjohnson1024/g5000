@@ -14,7 +14,6 @@
 
 import maplibregl from 'maplibre-gl';
 import { StatusBadge } from '../../../components/StatusBadge';
-import { TzToggle } from '../../../components/TzToggle';
 import { AnchorCard } from '../AnchorCard';
 import { RoutePlanPanel } from '../RoutePlanPanel';
 import { PlaybackScrubber } from '../PlaybackScrubber';
@@ -25,7 +24,7 @@ import { WindLegend } from '../../../components/WindLegend';
 import { RadarControls } from '../RadarControls';
 import { fmtLatDmm, fmtLonDmm } from '../../../lib/coords';
 import { MS_TO_KN, RAD_TO_DEG, wrap360 } from '../../../lib/units';
-import { fmtHourLabel, type TzMode } from '../../../lib/tz';
+import { fmtHourLabel, fmtClockSuffix, type ShipClock } from '../../../lib/tz';
 import { inHrrrDomain } from '../../../lib/hrrr-helpers';
 import type { LivePos } from '../../../components/LiveBoatMarker';
 import type { RouteColorMode } from '../../../components/RoutePolyline';
@@ -50,10 +49,8 @@ export interface RouteLensProps {
   routePlan: RoutePlan;
   /** Computed routes indexed by model (GFS / ECMWF). */
   routes: Partial<Record<'GFS' | 'ECMWF', Route>>;
-  /** UTC ↔ local toggle (UTC-everywhere: no new local-time surfaces added). */
-  tz: TzMode;
-  /** Setter for the UTC ↔ local toggle rendered in the lens header. */
-  onTz: (tz: TzMode) => void;
+  /** App-wide ship clock (boat-synced; set on /boat/setup, not per page). */
+  clock: ShipClock;
   /** Route line-colour display mode. */
   routeColorMode: RouteColorMode;
   onRouteColorMode: (m: RouteColorMode) => void;
@@ -107,8 +104,7 @@ export function RouteLens({
   waypoints,
   routePlan,
   routes,
-  tz,
-  onTz,
+  clock,
   routeColorMode,
   onRouteColorMode,
   hasMotoring,
@@ -151,7 +147,10 @@ export function RouteLens({
       {/* ── Status + live position ───────────────────────────────── */}
       <div className="flex items-center justify-between">
         <StatusBadge />
-        <TzToggle tz={tz} setTz={onTz} />
+        {/* Clock mode is boat-wide now — shown read-only, set on /boat/setup */}
+        <span className="text-xs font-mono text-ink-3 select-none" title="Clock mode (set in Boat → Setup)">
+          {clock.mode === 'utc' ? 'UTC' : `ship ${fmtClockSuffix(clock)}`}
+        </span>
       </div>
       <LiveValues p={livePos} />
 
@@ -173,7 +172,7 @@ export function RouteLens({
       {/* ── Route plan controls ──────────────────────────────────── */}
       <RoutePlanPanel
         waypoints={waypoints}
-        tz={tz}
+        clock={clock}
         hasRoute={hasRoute}
         ids={routePlan.ids}
         onIdsChange={routePlan.setIds}
@@ -194,7 +193,7 @@ export function RouteLens({
           <PlaybackScrubber
             map={mapInstance}
             routes={routes}
-            tz={tz}
+            clock={clock}
             onStates={onPlaybackStates}
             onWindHour={onWindHour}
             t={playT ?? undefined}
@@ -232,7 +231,7 @@ export function RouteLens({
             latestRunAt={latestRunAt}
             windHours={windHours}
             windLockNow={windLockNow}
-            tz={tz}
+            clock={clock}
             model={mv.windModel}
             setWindHours={setWindHours}
             setWindLockNow={setWindLockNow}
@@ -244,11 +243,11 @@ export function RouteLens({
               Showing: <span className="text-ink font-mono">{windGrid.model.toUpperCase()}</span>
             </div>
             <div>
-              Run: <span className="text-ink font-mono">{fmtHourLabel(windGrid.runAt, tz)}</span>
+              Run: <span className="text-ink font-mono">{fmtHourLabel(windGrid.runAt, clock)}</span>
             </div>
             <div>
               Valid:{' '}
-              <span className="text-ink font-mono">{fmtHourLabel(windGrid.validAt, tz)}</span> (+
+              <span className="text-ink font-mono">{fmtHourLabel(windGrid.validAt, clock)}</span> (+
               {windGrid.forecastHour}h)
             </div>
           </div>

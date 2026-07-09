@@ -36,36 +36,35 @@ import type { LivePos } from '../components/LiveBoatMarker';
 import { geo } from './sail/tile-helpers';
 import { useAlarms, type AlarmRow, SEVERITY_RANK } from '../components/AlarmStore';
 import { useThemeStore } from '../lib/theme-store';
+import { useShipClock } from '../lib/use-ship-clock';
+import { fmtClockTime } from '../lib/tz';
 import type { Theme } from '@g5000/mast';
 import { SECTIONS, activeSection, shouldHideSectionTabs, bestMatchHref } from './nav-sections';
 import { useBoatState } from './use-boat-state';
 import { SectionSuggestor } from './SectionSuggestor';
 
 // ---------------------------------------------------------------------------
-// UTC clock — HH:MM:SSz, updates every second
+// AppBar clock — HH:MM:SSz (UTC mode) or HH:MM:SS±H (ship mode), 1 s ticks
 // ---------------------------------------------------------------------------
 
-function useUtcClock(): string {
+function useAppBarClock(): string {
+  const clock = useShipClock();
   // Start empty so SSR and the first client render agree (rendering the live
   // time in the useState initialiser makes server-time ≠ client-time → a React
   // #418 hydration text mismatch). Fill in after mount via the effect.
   const [display, setDisplay] = useState('');
 
   useEffect(() => {
-    const tick = () => setDisplay(formatUtc(new Date()));
+    // Lowercase suffix ('z' not 'Z') is the established AppBar style.
+    const tick = () => setDisplay(fmtClockTime(Date.now() / 1000, clock).toLowerCase());
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+    // Depend on primitives — the clock object identity changes per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clock.mode, clock.offsetMin]);
 
   return display;
-}
-
-function formatUtc(d: Date): string {
-  const hh = String(d.getUTCHours()).padStart(2, '0');
-  const mm = String(d.getUTCMinutes()).padStart(2, '0');
-  const ss = String(d.getUTCSeconds()).padStart(2, '0');
-  return `${hh}:${mm}:${ss}z`;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +245,7 @@ function LinkLED() {
 
 export function NavShell({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
   const pathname = usePathname();
-  const utcTime = useUtcClock();
+  const clockTime = useAppBarClock();
 
   // Settings: canadianTideCurrents gate (same logic as Navbar.tsx).
   const [canadianTideCurrents, setCanadianTideCurrents] = useState(false);
@@ -341,13 +340,13 @@ export function NavShell({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
             <AlarmLane alarms={activeAlarms} />
           </div>
 
-          {/* UTC clock */}
+          {/* Ship clock — z-suffixed UTC or ±H-suffixed ship time */}
           <time
-            dateTime={utcTime}
+            dateTime={clockTime}
             className="hidden sm:block text-xs font-mono tabular-nums text-ink-2 shrink-0 select-none"
-            aria-label={`UTC time: ${utcTime}`}
+            aria-label={`Ship clock: ${clockTime}`}
           >
-            {utcTime}
+            {clockTime}
           </time>
 
           {/* Link LED */}
