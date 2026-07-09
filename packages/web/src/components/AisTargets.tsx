@@ -105,7 +105,7 @@ export function AisTargets({
           el.className = 'ais-name-label';
           el.style.cssText =
             'font: 11px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-            'background: var(--scrim);' +
+            'color: var(--ink-on-scrim); background: var(--scrim);' +
             'padding: 1px 4px; border-radius: 2px;' +
             'transform: translateY(8px); white-space: nowrap;' +
             'pointer-events: none;';

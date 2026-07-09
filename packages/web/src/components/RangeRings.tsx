@@ -150,7 +150,9 @@ export function RangeRings({
           const el = document.createElement('div');
           el.style.cssText =
             'font: 10px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace;' +
-            `color: ${color}; background: var(--scrim);` +
+            // Ring strokes keep `color` (they sit on the map); the text pill
+            // sits on the scrim, where theme inks aren't guaranteed legible.
+            'color: var(--ink-on-scrim); background: var(--scrim);' +
             'padding: 1px 4px; border-radius: 2px;' +
             'transform: translateY(-50%); white-space: nowrap;' +
             'pointer-events: none;';
@@ -162,7 +164,6 @@ export function RangeRings({
           mk.setLngLat([lonLabel, latLabel]);
           const el = mk.getElement();
           el.textContent = text;
-          el.style.color = color;
         }
       }
       for (const [k, mk] of labels) {

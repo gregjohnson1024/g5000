@@ -106,8 +106,9 @@
   --track: #94a3b8;
   --ais-normal: #7cc7e8;
 
-  /* Scrim */
+  /* Scrim + the ink that stays legible ON it (labels pinned to the map) */
   --scrim: rgba(2, 6, 23, 0.72);
+  --ink-on-scrim: #94a3b8;
 
   /* Map filter — DAY: no filter */
   --map-filter: none;
@@ -237,6 +238,7 @@
   --ais-normal: #991b1b;
 
   --scrim: rgba(0, 0, 0, 0.85);
+  --ink-on-scrim: #b91c1c;
 
   /* Map filter — NIGHT: desaturate + hue shift to red */
   --map-filter: brightness(0.4) sepia(0.9) saturate(2.4) hue-rotate(-30deg);
@@ -364,7 +366,10 @@
   --track: #5d6579;
   --ais-normal: #0284c7;
 
+  /* Scrim stays dark even on the light theme (it backs modals + map labels),
+     so on-scrim ink must be LIGHT here - SUN regular inks are dark-on-light. */
   --scrim: rgba(16, 20, 29, 0.72);
+  --ink-on-scrim: #e7eaf3;
 
   /* Map filter — SUN: no filter (OSM/NOAA already light) */
   --map-filter: none;
