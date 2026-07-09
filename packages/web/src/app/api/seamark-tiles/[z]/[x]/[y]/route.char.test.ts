@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { HIT_MISS_CACHE_CONTROL } from '../../../../../../lib/tile-proxy';
 
 /**
  * Characterization tests for the OpenSeaMap seamark tile proxy
@@ -53,7 +54,7 @@ describe('seamark-tiles proxy — characterization', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/png');
     expect(res.headers.get('x-cache')).toBe('MISS');
-    expect(res.headers.get('cache-control')).toBe('public, max-age=2592000');
+    expect(res.headers.get('cache-control')).toBe(HIT_MISS_CACHE_CONTROL);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
       'https://tiles.openseamap.org/seamark/12/1234/5678.png',
     );

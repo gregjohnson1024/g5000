@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { HIT_MISS_CACHE_CONTROL } from '../../../../../../lib/tile-proxy';
 
 /**
  * Characterization tests for the NOAA NCDS chart proxy (/api/enc-tiles).
@@ -10,7 +11,7 @@ import { tmpdir } from 'node:os';
  *   - disk cache key uses STANDARD z/x/y (not noaaZ);
  *   - png on HIT and MISS;
  *   - off-coverage zoom (outside std z 2..18) -> transparent 1x1 PNG,
- *     x-cache=EMPTY, max-age=2592000, NO fetch;
+ *     x-cache=EMPTY, shared HIT/MISS cache-control, NO fetch;
  *   - SOFT error policy: 5xx -> transparent PNG x-cache=UPSTREAM-5XX max-age=60;
  *     fetch throw -> transparent PNG x-cache=TIMEOUT max-age=60 (swallowed);
  *     404 -> 404 text body.
@@ -57,7 +58,7 @@ describe('enc-tiles (NOAA) proxy — characterization', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/png');
     expect(res.headers.get('x-cache')).toBe('MISS');
-    expect(res.headers.get('cache-control')).toBe('public, max-age=2592000');
+    expect(res.headers.get('cache-control')).toBe(HIT_MISS_CACHE_CONTROL);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
       'https://gis.charttools.noaa.gov/arcgis/rest/services/' +
         'MarineChart_Services/NOAACharts/MapServer/tile/10/5678/1234',
@@ -85,13 +86,13 @@ describe('enc-tiles (NOAA) proxy — characterization', () => {
     expect(Array.from(new Uint8Array(await res.arrayBuffer()))).toEqual([4, 5, 6]);
   });
 
-  it('off-coverage low zoom (z=1): transparent 1x1 PNG, x-cache=EMPTY, max-age=2592000, no fetch', async () => {
+  it('off-coverage low zoom (z=1): transparent 1x1 PNG, x-cache=EMPTY, HIT/MISS cache-control, no fetch', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const res = await GET(new Request('http://x/api/enc-tiles/1/0/0'), makeCtx('1', '0', '0'));
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/png');
     expect(res.headers.get('x-cache')).toBe('EMPTY');
-    expect(res.headers.get('cache-control')).toBe('public, max-age=2592000');
+    expect(res.headers.get('cache-control')).toBe(HIT_MISS_CACHE_CONTROL);
     expect(fetchSpy).not.toHaveBeenCalled();
     const body = new Uint8Array(await res.arrayBuffer());
     expect(body.length).toBe(67); // 67-byte transparent PNG

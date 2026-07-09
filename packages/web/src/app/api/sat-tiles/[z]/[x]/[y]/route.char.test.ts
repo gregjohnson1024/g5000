@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { HIT_MISS_CACHE_CONTROL } from '../../../../../../lib/tile-proxy';
 
 /**
  * Characterization tests for the Esri World Imagery satellite proxy
@@ -69,7 +70,7 @@ describe('sat-tiles (Esri) proxy — characterization', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('MISS');
-    expect(res.headers.get('cache-control')).toBe('public, max-age=2592000');
+    expect(res.headers.get('cache-control')).toBe(HIT_MISS_CACHE_CONTROL);
     // PASSTHROUGH: upstream said png, response must be png (proves not hardcoded jpeg)
     expect(res.headers.get('content-type')).toBe('image/png');
     expect(String(fetchSpy.mock.calls[0]?.[0])).toBe(
@@ -139,7 +140,7 @@ describe('sat-tiles (Esri) proxy — characterization', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('x-cache')).toBe('EMPTY');
     expect(res.headers.get('content-type')).toBe('image/png'); // EMPTY is png even for sat
-    expect(res.headers.get('cache-control')).toBe('public, max-age=2592000');
+    expect(res.headers.get('cache-control')).toBe(HIT_MISS_CACHE_CONTROL);
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(new Uint8Array(await res.arrayBuffer()).length).toBe(67);
   });
