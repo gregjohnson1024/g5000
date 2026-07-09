@@ -79,8 +79,12 @@ export function elevGridToDepthTile(
   };
 }
 
+// NGDC's thredds-ocean ERDDAP went away (404 as of 2026-07-09); CoastWatch
+// hosts the same ETOPO 2022 15-arc-second grid (variable `z`, same CSV
+// shape). Bedrock-vs-ice-surface only differs under ice sheets, so the
+// non-bed dataset is equivalent for navigable water.
 export const DEFAULT_ETOPO_URL =
-  'https://www.ngdc.noaa.gov/thredds-ocean/erddap/griddap/etopo_2022_bed_15s';
+  'https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s';
 
 /** griddap CSV subset URL for variable `z` over a lat/lon box with a stride. */
 export function griddapCsvUrl(
