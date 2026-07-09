@@ -34,7 +34,7 @@ describe('POST /api/alarms/push-test', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('sends a test push to the configured topic with boat id + UTC time in the body', async () => {
+  it('sends a test push to the configured topic with boat id + ship-clock time in the body', async () => {
     vi.stubEnv('G5000_BOAT_ID', 'sula');
     setRef({ ntfyTopic: 'sula-alarms', ntfyUrl: 'https://push.example.com' });
     const body = await (await POST()).json();
@@ -43,7 +43,8 @@ describe('POST /api/alarms/push-test', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://push.example.com/sula-alarms');
     expect(String(init.body)).toContain('boat sula');
-    expect(String(init.body)).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z UTC/);
+    // No ConfigStore under vitest → the server clock degrades to UTC ('Z').
+    expect(String(init.body)).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z/);
   });
 
   it('falls back to env G5000_NTFY_TOPIC when the config ref is unbound', async () => {

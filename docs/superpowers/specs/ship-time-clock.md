@@ -88,13 +88,22 @@ resolved value so it is referentially stable in dependency lists.
 and left alone — they compute data-plane values (GRIB runs, bucket keys),
 not display text.
 
-## Still not covered (deferred)
+## Server-side resolution (done 2026-07-10, third commit)
 
-- **Server-rendered text**: `/api/boat-status` counts "sessions today" by
-  UTC calendar day, and `/api/alarms/push-test` ntfy body renders UTC (both
-  labeled). Making server routes clock-aware needs a server-side
-  `resolveClock` against ConfigStore + last GPS fix — small design job, not
-  a mechanical edit.
+`lib/server-clock.ts` gives API routes `getServerClock()` — the server
+counterpart of `useShipClock()`. It reads ClockConfig from the shared
+ConfigStore and, for ship+auto, the last GPS longitude from a process-wide
+bus subscriber cached on `globalThis.__g5kServerLastFix__` (the Bus has no
+replay, so a per-request subscribe can't see a fix synchronously; the
+subscription is created lazily on first call and lives for the process).
+Degradation mirrors the client: no ConfigStore → UTC; auto with no fix yet
+(including the first call right after boot) → offset 0, never a guess.
+Consumers: `/api/boat-status` counts "sessions today" by ship-clock day key
+(`toDayKey`), `/api/alarms/push-test` body renders `toDayKey + fmtClockTime`
+with the suffix instead of hardcoded ISO + ' UTC'.
+
+## Remaining notes
+
 - **Unmounted dead code**: `WindowHeatmap` / `RouteTimeline` have no JSX
   consumers (windows page renders `HeatmapGrid`); they were migrated anyway
   so they're correct if remounted.

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { sendNtfyPush } from '@g5000/compute';
 import type { AlarmsConfig } from '@g5000/db';
+import { getServerClock } from '../../../../lib/server-clock';
+import { fmtClockTime, toDayKey } from '../../../../lib/tz';
 
 /**
  * POST /api/alarms/push-test — send a test notification to the configured
@@ -36,12 +38,14 @@ export async function POST(): Promise<NextResponse> {
   const url = nonBlank(push?.ntfyUrl) ?? nonBlank(process.env.G5000_NTFY_URL);
 
   const boatId = process.env.G5000_BOAT_ID ?? 'sula';
-  const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const clock = getServerClock();
+  const nowSec = Date.now() / 1000;
+  const now = `${toDayKey(nowSec, clock)} ${fmtClockTime(nowSec, clock)}`;
   const result = await sendNtfyPush({
     url,
     topic,
     title: 'g5000 test notification',
-    body: `g5000 test notification from boat ${boatId} at ${now} UTC`,
+    body: `g5000 test notification from boat ${boatId} at ${now}`,
     priority: 'default',
     tags: 'white_check_mark',
   });

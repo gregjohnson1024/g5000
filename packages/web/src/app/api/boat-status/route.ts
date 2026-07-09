@@ -3,6 +3,8 @@ import path from 'node:path';
 import { firstValueFrom } from 'rxjs';
 import { getSharedConfigStore } from '@g5000/db';
 import { getSharedDeviceRegistry, listSessions } from '@g5000/bridge';
+import { getServerClock } from '../../../lib/server-clock';
+import { toDayKey } from '../../../lib/tz';
 import { sessionsDir } from '../sessions/dir';
 
 export const dynamic = 'force-dynamic';
@@ -54,11 +56,6 @@ function compassCalCustomized(cal: { deviation: number[] }): boolean {
 function fmtDays(days: number): string {
   if (days < 1) return '<1d';
   return `${Math.floor(days)}d`;
-}
-
-/** ISO date string prefix for "today" in UTC (YYYY-MM-DD). */
-function todayUtc(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 export interface BoatStatusCard {
@@ -198,9 +195,14 @@ export async function GET(): Promise<Response> {
   const deviceTint: BoatStatusCard['tint'] =
     deviceSnap === null ? 'neutral' : silentCount > 0 ? 'warn' : 'ok';
 
-  // Sessions today
-  const today = todayUtc();
-  const todaySessions = sessions.filter((s) => (s.startedAt ?? s.mtime).startsWith(today)).length;
+  // Sessions today — "today" is the ship-clock wall date, matching what the
+  // diag sessions table renders (a malformed startedAt parses to NaN and
+  // simply never matches the key).
+  const clock = getServerClock();
+  const todayKey = toDayKey(Date.now() / 1000, clock);
+  const todaySessions = sessions.filter(
+    (s) => toDayKey(Date.parse(s.startedAt ?? s.mtime) / 1000, clock) === todayKey,
+  ).length;
   const sessionStatus =
     sessions === null
       ? '—'
