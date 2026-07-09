@@ -79,6 +79,11 @@ const config: NextConfig = {
     // Allow consuming the bus singleton from a parent process when integrated
     // via custom server in Task 13.
     externalDir: true,
+    // When an error lands while a client-side navigation is in flight
+    // (post-deploy stale chunk, dropped wifi), hard-navigate to the clicked
+    // destination instead of rendering an error card. Complements the
+    // stale-build auto-reload in app/error.tsx / app/global-error.tsx.
+    appNavFailHandling: true,
   },
 };
 
