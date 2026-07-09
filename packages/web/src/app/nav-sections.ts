@@ -49,9 +49,19 @@ export const SECTIONS: readonly Section[] = [
     id: 'anchor',
     label: 'ANCHOR',
     href: '/anchor',
-    tabs: [],
-    // Anchor has its own drawer; no SectionTabs row per spec.
-    hideSectionTabs: true,
+    // Former slide-up drawer tabs, promoted to route-backed sub-tabs for
+    // consistency with the other sections (2026-07-09). Forecast absorbs the
+    // old Graph/Table split — that split only existed for the drawer's
+    // 224 px height budget.
+    tabs: [
+      { href: '/anchor', label: 'Watch' },
+      { href: '/anchor/forecast', label: 'Forecast' },
+      { href: '/anchor/tides', label: 'Tides' },
+      { href: '/anchor/radar', label: 'Radar' },
+      { href: '/anchor/sky', label: 'Sky' },
+      { href: '/anchor/solar', label: 'Solar' },
+      { href: '/anchor/ac', label: 'AC' },
+    ],
   },
   {
     id: 'conditions',

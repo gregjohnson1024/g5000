@@ -7,7 +7,7 @@
  *   AppBar (48px): brand · 6 section chips · AlarmLane · UTC clock · link LED
  *                  ThemeChip · AlertsBell · MOB cell
  *   SectionTabs (40px): underline sub-nav for the active section.
- *                       HIDDEN on /chart and /anchor.
+ *                       HIDDEN on /chart only.
  *   Phone bottom TabBar: 6 items ≥56px targets (responsive, never wrapped rows).
  *
  * Task-3: hrefs are canonical new URLs; Mast (/mast) added to SAIL tabs; BOAT tabs
@@ -371,7 +371,7 @@ export function NavShell({ hiddenHrefs }: { hiddenHrefs?: string[] } = {}) {
 
       {/* =====================================================================
           SectionTabs — ~40px underline row.
-          Absent on /chart (hideSectionTabs=true) and /anchor (hideSectionTabs=true).
+          Absent on /chart (hideSectionTabs=true).
           Also absent when no tabs to show.
       ===================================================================== */}
       {!hideTabs && currentSection && visibleTabs(currentSection).length > 0 && (

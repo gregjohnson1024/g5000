@@ -178,14 +178,17 @@ Disabled / preserved-but-unmounted (one-line revert):
 
 ## At-anchor page (`/anchor`)
 
-`packages/web/src/app/anchor/page.tsx` is a dedicated monitoring dashboard for when Sula is on the hook. It has a fixed **top zone** of panels (Depth, Position, Nearby Vessels, an apparent-wind course-up dial with gust ring, Anchor Watch + rode/scope calculator, Today & Now, and Systems/Tanks/Temps) plus a **slide-up drawer** at the bottom with sub-tabs:
+`/anchor` is a dedicated monitoring section for when Sula is on the hook. It is a set of **sub-tab routes** rendered by NavShell's SectionTabs row, exactly like every other section (the old slide-up drawer is gone):
 
-- **Forecast** — Open-Meteo 7-day graph + hourly table (cached under `~/.g5000-router/weather-cache/`; degrades to last-good data offline).
-- **Tides** — tide prediction (reuses the tides infrastructure).
-- **Radar** — Windy radar embed (requires internet; shows a "no connection" state offline).
-- **Sky** — suncalc sun/moon rise–set, golden hour, and civil-twilight times.
-- **Solar** — per-MPPT solar yield + battery state from the Victron Cerbo GX.
-- **AC** — Loads sub-tab: live per-circuit watts; History sub-tab: kWh DAY/WEEK/MONTH aggregates. Data comes from an **Emporia Vue 3** via its cloud API (AWS Cognito SRP auth, `authtoken` header) — separate from the Victron Cerbo. Simulated under `EMPORIA_SIM=1`; off when `EMPORIA_EMAIL`/`EMPORIA_PASSWORD` are unset.
+- **Watch** (`/anchor`, `packages/web/src/app/anchor/page.tsx`) — the main dashboard: Depth, Position, Nearby Vessels, an apparent-wind course-up dial with gust ring, Anchor Watch + rode/scope calculator, Today & Now, and Systems/Tanks/Temps.
+- **Forecast** (`/anchor/forecast`) — Open-Meteo 7-day graph + hourly table on one page (cached under `~/.g5000-router/weather-cache/`; degrades to last-good data offline).
+- **Tides** (`/anchor/tides`) — tide prediction (reuses the tides infrastructure).
+- **Radar** (`/anchor/radar`) — Windy radar embed (requires internet; shows a "no connection" state offline).
+- **Sky** (`/anchor/sky`) — suncalc sun/moon rise–set, golden hour, and civil-twilight times.
+- **Solar** (`/anchor/solar`) — per-MPPT solar yield + battery state from the Victron Cerbo GX.
+- **AC** (`/anchor/ac`) — Loads sub-tab: live per-circuit watts; History sub-tab: kWh DAY/WEEK/MONTH aggregates. Data comes from an **Emporia Vue 3** via its cloud API (AWS Cognito SRP auth, `authtoken` header) — separate from the Victron Cerbo. Simulated under `EMPORIA_SIM=1`; off when `EMPORIA_EMAIL`/`EMPORIA_PASSWORD` are unset.
+
+The sub-pages share `useAnchorContext()` (`packages/web/src/app/anchor/use-anchor-context.ts`) for the SSE channels, GPS position, weather-pin coordinates, and rode geometry; the tab components themselves live under `packages/web/src/app/anchor/tabs/`.
 
 Victron data flows from `VictronDriver` (live MQTT from the Cerbo) or `VictronSim` (under `VICTRON_SIM=1` or `DEMO_MODE=1`) → bus `electrical.*` channels → `/api/victron` route → `<SolarTab/>`. When `VICTRON_MQTT_HOST` is unset or `none` the driver is off and the Solar tab shows a "Cerbo offline" state; all other tabs are unaffected.
 

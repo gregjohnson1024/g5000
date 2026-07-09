@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 /**
  * BottomSheet — reusable peek/half/full slide-up panel.
  *
- * Derived from the anchor AnchorDrawer pattern; generalised into a primitive
+ * Derived from the original anchor-page drawer; generalised into a primitive
  * so the chart dock and any future sheet can share the same chrome.
  *
  * Props
@@ -14,8 +14,8 @@ import type { ReactNode } from 'react';
  * open        — controlled: whether the sheet is expanded (non-peek)
  * onClose     — called when the user taps outside or the handle
  * children    — the sheet's scrollable body content
- * tabBar      — optional persistent tab-bar rendered below the content (the
- *               anchor drawer pattern: always visible, toggles the body)
+ * tabBar      — optional persistent tab-bar rendered below the content
+ *               (always visible, toggles the body)
  * label       — accessible aria-label for the dialog role
  * maxHeight   — CSS value for the body's max-height (default '50vh')
  * className   — extra classes on the root container
@@ -25,7 +25,7 @@ import type { ReactNode } from 'react';
  * slides in above the tabBar.
  *
  * The component does NOT manage its own open state — callers own that so they
- * can deep-link / persist it. See AnchorDrawer for the localStorage pattern.
+ * can deep-link / persist it.
  */
 
 export interface BottomSheetProps {
