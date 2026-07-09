@@ -18,7 +18,9 @@ export interface SkyInfo {
 export function computeSky(lat: number, lon: number, date: Date): SkyInfo {
   const t = SunCalc.getTimes(date, lat, lon);
   const illum = SunCalc.getMoonIllumination(date);
-  const moonT = SunCalc.getMoonTimes(date, lat, lon, true);
+  // suncalc 2.x scans the UTC calendar day of `date` (setUTCHours(0,0,0,0)
+  // internally) — deterministic across devices; v1's inUTC flag is gone.
+  const moonT = SunCalc.getMoonTimes(date, lat, lon);
   const dayLengthMs = t.sunset && t.sunrise ? t.sunset.getTime() - t.sunrise.getTime() : null;
   return {
     sunrise: t.sunrise,
