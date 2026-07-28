@@ -59,7 +59,7 @@ g5000_weather/     ← worktree of g5000, router work
 ```
 
 This means two Claude sessions can operate concurrently without `npm install`,
-`tsc -b`, `package-lock.json` or `.code-review-graph/` races. Created via
+`tsc -b` or `package-lock.json` races. Created via
 `git worktree add ../g5000_weather router`.
 
 ### 3.2 Packages added to g5000

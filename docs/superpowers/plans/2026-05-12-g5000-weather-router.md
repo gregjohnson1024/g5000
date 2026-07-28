@@ -173,7 +173,7 @@ g5000/
 ls -la /Users/gregjohnson/code/g5000_weather/
 ```
 
-Expected: just `.code-review-graph/` and `.remember/` (both gitignored tool scratch).
+Expected: just `.remember/` (gitignored tool scratch).
 
 - [ ] **Step 2: Remove the placeholder directory's contents**
 
