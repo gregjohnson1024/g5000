@@ -23,6 +23,7 @@
 import { useEffect } from 'react';
 import type { ClockConfig, Theme } from '@g5000/mast';
 import { useThemeStore, SCALE_PRESETS, type ScalePreset } from '../lib/theme-store';
+import { openReconnectingSse } from '../lib/reconnecting-sse';
 
 const THEMES: readonly Theme[] = ['day', 'night', 'sun'];
 
@@ -35,56 +36,56 @@ export function ThemeController(): React.ReactNode {
 
   // Open SSE stream to receive boat-wide theme + scale changes.
   useEffect(() => {
-    const es = new EventSource('/api/mast/stream');
+    // Reconnecting: a g5000 restart must not strand long-lived pages (notably
+    // the mast kiosk) on a dead stream, silently ignoring theme changes.
+    return openReconnectingSse('/api/mast/stream', {
+      listeners: {
+        theme: (ev) => {
+          try {
+            const t = JSON.parse(ev.data) as string;
+            if (THEMES.includes(t as Theme)) {
+              // Apply locally only — do NOT POST back (echo-loop guard).
+              receiveTheme(t as Theme);
+            }
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
 
-    es.addEventListener('theme', (ev) => {
-      try {
-        const t = JSON.parse((ev as MessageEvent).data) as string;
-        if (THEMES.includes(t as Theme)) {
-          // Apply locally only — do NOT POST back (echo-loop guard).
-          receiveTheme(t as Theme);
-        }
-      } catch {
-        /* ignore malformed payloads */
-      }
+        scale: (ev) => {
+          try {
+            const s = JSON.parse(ev.data) as number;
+            if (typeof s === 'number' && isFinite(s)) {
+              // Snap to nearest preset.
+              const preset = (SCALE_PRESETS as readonly number[]).includes(s)
+                ? (s as ScalePreset)
+                : (SCALE_PRESETS.reduce((prev: ScalePreset, curr: ScalePreset) =>
+                    Math.abs(curr - s) < Math.abs(prev - s) ? curr : prev,
+                  ) as ScalePreset);
+              // Apply locally only — do NOT POST back (echo-loop guard).
+              receiveScale(preset);
+            }
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
+
+        clock: (ev) => {
+          try {
+            const c = JSON.parse(ev.data) as Partial<ClockConfig>;
+            if (
+              (c.mode === 'utc' || c.mode === 'ship') &&
+              (c.offsetMin === null || typeof c.offsetMin === 'number')
+            ) {
+              // Apply locally only — do NOT POST back (echo-loop guard).
+              receiveClockCfg({ mode: c.mode, offsetMin: c.offsetMin ?? null });
+            }
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
+      },
     });
-
-    es.addEventListener('scale', (ev) => {
-      try {
-        const s = JSON.parse((ev as MessageEvent).data) as number;
-        if (typeof s === 'number' && isFinite(s)) {
-          // Snap to nearest preset.
-          const preset = (SCALE_PRESETS as readonly number[]).includes(s)
-            ? (s as ScalePreset)
-            : (SCALE_PRESETS.reduce((prev: ScalePreset, curr: ScalePreset) =>
-                Math.abs(curr - s) < Math.abs(prev - s) ? curr : prev,
-              ) as ScalePreset);
-          // Apply locally only — do NOT POST back (echo-loop guard).
-          receiveScale(preset);
-        }
-      } catch {
-        /* ignore malformed payloads */
-      }
-    });
-
-    es.addEventListener('clock', (ev) => {
-      try {
-        const c = JSON.parse((ev as MessageEvent).data) as Partial<ClockConfig>;
-        if (
-          (c.mode === 'utc' || c.mode === 'ship') &&
-          (c.offsetMin === null || typeof c.offsetMin === 'number')
-        ) {
-          // Apply locally only — do NOT POST back (echo-loop guard).
-          receiveClockCfg({ mode: c.mode, offsetMin: c.offsetMin ?? null });
-        }
-      } catch {
-        /* ignore malformed payloads */
-      }
-    });
-
-    return () => {
-      es.close();
-    };
   }, [receiveTheme, receiveScale, receiveClockCfg]);
 
   // Renders nothing — UI chip lives in NavShell AppBar.

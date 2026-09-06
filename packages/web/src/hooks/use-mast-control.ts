@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { DayBaseColor, MastLayout } from '@g5000/mast';
+import { openReconnectingSse } from '../lib/reconnecting-sse';
 
 export interface UseMastControlResult {
   layout: MastLayout | null;
@@ -24,42 +25,42 @@ export function useMastControl(): UseMastControlResult {
   const [dayBaseColor, setDayBaseColor] = useState<DayBaseColor>('white');
 
   useEffect(() => {
-    const es = new EventSource('/api/mast/stream');
-    es.onopen = () => setConnected(true);
-    es.onerror = () => {
-      setConnected(false);
-    };
-    es.addEventListener('layout', (ev) => {
-      try {
-        setLayout(JSON.parse((ev as MessageEvent).data) as MastLayout);
-      } catch {
-        /* ignore malformed payloads */
-      }
+    // Reconnecting: the mast panel is a kiosk that stays open for weeks, so a
+    // g5000 restart must not leave it rendering stale state forever.
+    return openReconnectingSse('/api/mast/stream', {
+      onOpen: () => setConnected(true),
+      onError: () => setConnected(false),
+      listeners: {
+        layout: (ev) => {
+          try {
+            setLayout(JSON.parse(ev.data) as MastLayout);
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
+        override: (ev) => {
+          try {
+            setOverride(JSON.parse(ev.data) as string | null);
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
+        nightmode: (ev) => {
+          try {
+            setNightMode(JSON.parse(ev.data) as boolean);
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
+        daybasecolor: (ev) => {
+          try {
+            setDayBaseColor(JSON.parse(ev.data) as DayBaseColor);
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
+      },
     });
-    es.addEventListener('override', (ev) => {
-      try {
-        setOverride(JSON.parse((ev as MessageEvent).data) as string | null);
-      } catch {
-        /* ignore malformed payloads */
-      }
-    });
-    es.addEventListener('nightmode', (ev) => {
-      try {
-        setNightMode(JSON.parse((ev as MessageEvent).data) as boolean);
-      } catch {
-        /* ignore malformed payloads */
-      }
-    });
-    es.addEventListener('daybasecolor', (ev) => {
-      try {
-        setDayBaseColor(JSON.parse((ev as MessageEvent).data) as DayBaseColor);
-      } catch {
-        /* ignore malformed payloads */
-      }
-    });
-    return () => {
-      es.close();
-    };
   }, []);
 
   return { layout, override, connected, nightMode, dayBaseColor };
