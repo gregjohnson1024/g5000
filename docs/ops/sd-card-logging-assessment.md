@@ -1,4 +1,4 @@
-# SD-Card Wear & Data-Logging Assessment — g5000 on `sula-bassana`
+# SD-Card Wear & Data-Logging Assessment — g5000 on `g5000`
 
 Last written: 2026-07-06.
 
@@ -115,7 +115,7 @@ and fsync pattern that is hardest on flash.
 - **Tailscale is not running on this Mac** (only the `.app` bundle is
   installed; the daemon is stopped and needs interactive sign-in; the CLI
   isn't on `$PATH`). Port 22 to `100.64.0.117` was unreachable.
-- Boat ethernet (`192.168.2.2`) / wifi (`192.168.1.232`) unreachable — not
+- Boat wired LAN (`10.10.10.10`) / wifi (`192.168.1.232`) unreachable — not
   on the boat LAN.
 - **The public URL `https://g5000.sulabassana.net` (cloudflared) IS
   reachable** — HTTP only, no SSH — so the Pi and `g5000-autopilot` are

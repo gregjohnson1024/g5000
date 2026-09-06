@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-G5000 is a sailing instrumentation platform for a real boat (`Sula`). It ingests NMEA 2000 / NMEA 0183 from B&G/Navico/YDWG hardware, runs compute pipelines (true wind, polars, currents, routing), serves a Next.js web UI with helm/chart/forecast/autopilot views, and exposes its data back out via an H-LINK TCP server so Expedition can read it. Production target is a Raspberry Pi (`sula-bassana`) running a single Node systemd service.
+G5000 is a sailing instrumentation platform for a real boat (`Sula`). It ingests NMEA 2000 / NMEA 0183 from B&G/Navico/YDWG hardware, runs compute pipelines (true wind, polars, currents, routing), serves a Next.js web UI with helm/chart/forecast/autopilot views, and exposes its data back out via an H-LINK TCP server so Expedition can read it. Production target is a Raspberry Pi (`g5000`) running a single Node systemd service.
 
 Git remote is GitHub (`github.com/gregjohnson1024/g5000`). Public repo; deploy on the Pi pulls from this remote via HTTPS (no auth needed for `git pull` on a public repo). Switched from a private Forgejo at `git.rbr-global.com` on 2026-05-18 — if a stale clone is still pointing there, it'll fail to pull and needs `git remote set-url origin https://github.com/gregjohnson1024/g5000.git`.
 
@@ -220,7 +220,7 @@ For experimental work that shouldn't land on `develop` yet, branch off `develop`
 
 ## Deployment
 
-Production runs on RPi5 `sula-bassana` reachable via Tailscale (`100.64.0.117`), boat ethernet (`192.168.2.2`), boat wifi (`192.168.1.232`), or `https://g5000.sulabassana.net` (cloudflared). Systemd unit is `scripts/g5000-autopilot.service` (`Type=notify`, `WatchdogSec=60`). A separate `g5000-forecast-refresh.timer` pokes `/api/forecast/refresh` every ~3h on a curated bbox read live from `/api/settings`.
+Production runs on RPi5 `g5000` (hostname changed from `sula-bassana` on 2026-09-06) reachable via Tailscale (`100.64.0.117`, node `g5000-pi`), boat wired LAN (`10.10.10.10`, DHCP reservation), boat wifi (`192.168.1.232`), `g5000.local` (mDNS), or `https://g5000.sulabassana.net` (cloudflared). SSH user is `greg`. See `docs/ops/network-map.md` for the full topology. Systemd unit is `scripts/g5000-autopilot.service` (`Type=notify`, `WatchdogSec=60`). A separate `g5000-forecast-refresh.timer` pokes `/api/forecast/refresh` every ~3h on a curated bbox read live from `/api/settings`.
 
 The Pi pulls from `origin/main` only — see _Branching model_ above for the promote step that gets work from `develop` onto `main` before deploying. Skipping the promote step and trying to `git pull` on the Pi will silently no-op (Pi is already at main's tip) and your "deploy" won't actually ship the develop-side changes.
 

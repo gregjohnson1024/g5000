@@ -1,6 +1,6 @@
 # Deploy runner — GitHub Actions self-hosted on Pi
 
-The Pi (`sula-bassana`) runs the GitHub Actions runner as a systemd service. On push-to-main, GitHub queues a job; the runner picks it up over outbound HTTPS and executes `.github/workflows/deploy-pi.yml` locally — `git pull`, rebuild, `systemctl restart g5000-autopilot`.
+The Pi (`g5000`) runs the GitHub Actions runner as a systemd service. On push-to-main, GitHub queues a job; the runner picks it up over outbound HTTPS and executes `.github/workflows/deploy-pi.yml` locally — `git pull`, rebuild, `systemctl restart g5000-autopilot`.
 
 No inbound connection to the Pi is needed. This is the equivalent of the old Forgejo Actions setup; the Pi is firewalled to outbound-only by Tailscale + the home router, so polling-out is the only practical option.
 

@@ -1,4 +1,4 @@
-# mayara-server — install & run guide (Pi `sula-bassana`)
+# mayara-server — install & run guide (Pi `g5000`)
 
 [mayara-server](https://github.com/MarineYachtRadar/mayara-server) is the open-source
 bridge that exposes a Navico/B&G radar over a WebSocket API. The g5000 radar overlay
@@ -95,7 +95,7 @@ on port 6502 — no `/settings` field is needed in phase 1.
 
 | Access path                            | Protocol | Works?                       |
 | -------------------------------------- | -------- | ---------------------------- |
-| `http://sula-bassana.local:3000`       | `ws://`  | Yes                          |
+| `http://g5000.local:3000`              | `ws://`  | Yes                          |
 | `http://100.64.0.117:3000` (Tailscale) | `ws://`  | Yes                          |
 | `https://g5000.sulabassana.net`        | `wss://` | Needs extra step — see below |
 

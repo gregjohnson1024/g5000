@@ -81,7 +81,7 @@ Node ≥22 is required; the project relies on Node 22's native `fetch` and ESM-o
 
 ## Deployment
 
-Production runs on a Raspberry Pi 5 (`sula-bassana`) reachable over Tailscale, boat ethernet, boat WiFi, or `https://g5000.sulabassana.net` via Cloudflared.
+Production runs on a Raspberry Pi 5 (`g5000`) reachable over Tailscale, boat ethernet, boat WiFi, or `https://g5000.sulabassana.net` via Cloudflared.
 
 The g5000 app is the only deployed artifact — Next.js is mounted into it as a custom server, so `next start` is not used. Deploy is `git pull` + a documented rebuild order (composite project refs matter):
 
