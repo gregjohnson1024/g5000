@@ -183,6 +183,34 @@ kept working** — the tell is an empty v4 lease table beside a live v6 lease. A
 clean reboot restored it, most likely because it stands down when it boots
 alongside another DHCP server.
 
+**A blank mast panel is usually not the network.** Three separate causes seen on
+2026-09-06, none of which the service state reveals:
+
+1. **Chromium SingletonLock encodes the hostname.** `<profile>/SingletonLock` is a
+   symlink to `<hostname>-<pid>`; if the hostname in it is stale (e.g. after the
+   `raspberrypi` -> `g5000-mast` rename) Chromium assumes the profile is mounted
+   elsewhere and exits instantly. The kiosk wrapper's `|| true` swallows it, so
+   `systemctl is-active` reports **active** with an empty journal while the screen is
+   blank. Diagnose: `pgrep chromium` (empty) plus
+   `readlink /home/pi/.config/mast-chromium/SingletonLock` (wrong hostname).
+   `appliance/kiosk.sh` in `sula-mast-display` now clears `Singleton*` before each launch.
+2. **`systemctl restart mast-display` leaves duplicate kiosk loops.** The unit sets
+   `PAMName=login`, so `pam_systemd` moves the processes into a login-session scope
+   OUTSIDE the service cgroup (`systemctl show` reports `Tasks: 0`). Stop therefore kills
+   an empty cgroup and strands the runner; every restart adds another loop racing for the
+   same profile. A liveness check must assert **exactly one** Chromium, not merely >0.
+3. **A g5000 restart used to strand the page on a dead SSE stream** — fixed in
+   `packages/web/src/lib/reconnecting-sse.ts`, but any pre-fix build has it.
+
+⚠️ Do NOT `pkill -f <pattern>` over SSH when the pattern appears in your own command
+line — `pkill -f` matches `/proc/PID/cmdline` and will kill your own shell mid-script.
+Use `pkill chromium` (process name), or split the literal so your cmdline never contains
+it (`P="mast-kiosk""-run.sh"`).
+
+**Browser tabs open across a g5000 deploy stop working.** A new `BUILD_ID` invalidates
+the old chunks, so a stale tab's click handlers silently do nothing — no error, no
+feedback. Hard-reload (Cmd-Shift-R) after any deploy before concluding something is broken.
+
 **LuCI static leases only take effect after Save & Apply.** Hostnames shown in
 the Active Leases table come from the clients (DHCP option 12), so they are _not_
 evidence that reservations are loaded.
