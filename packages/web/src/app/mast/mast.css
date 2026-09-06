@@ -23,6 +23,43 @@
   overflow: hidden;
 }
 
+/* Day mode. The mast panel is a masthead instrument, so it deliberately does
+   NOT follow the app theme — it pins its own canvas and palette. Two canvases
+   are offered because legibility depends on ambient light, not taste: a light
+   canvas wins in direct sun (ambient competes with the panel's emission),
+   black wins in low light.
+
+   Semantic threshold colours are pinned per canvas rather than inherited, for
+   the same reason night mode pins its own. Inheriting them is exactly how this
+   broke: the UI overhaul made --canvas theme-driven, the panel silently became
+   cream-on-navy, and --mast-fg became a variable nothing consumed, so the
+   day-base-color control had no effect at all. Keep every mode self-contained
+   and a future theme change cannot reach in here.
+
+   --mast-fg is set inline by page.tsx and is already canvas-appropriate; see
+   mastBaseColorHex() in colors.ts. */
+.mast-root.mast-day-black {
+  --canvas: #000000;
+  --ink-value: var(--mast-fg, #ffffff);
+  --ink-3: #94a3b8;
+  --ok: #4ade80;
+  --accent-ink: #ffd23f;
+  --danger: #ff5555;
+  background: #000000;
+  color: var(--mast-fg, #ffffff);
+}
+
+.mast-root.mast-day-white {
+  --canvas: #ffffff;
+  --ink-value: var(--mast-fg, #0f172a);
+  --ink-3: #475569;
+  --ok: #15803d;
+  --accent-ink: #b45309;
+  --danger: #b91c1c;
+  background: #ffffff;
+  color: var(--mast-fg, #0f172a);
+}
+
 /* Night mode collapses all semantic colors to a single red to preserve night
    vision; threshold color-coding is intentionally sacrificed after dark.
    DO NOT merge this into data-theme='night' — it is a physical hardware

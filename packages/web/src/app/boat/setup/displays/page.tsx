@@ -1,17 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GRID_CAPACITY, DAY_BASE_COLORS } from '@g5000/mast';
+import { GRID_CAPACITY, DAY_BASE_COLORS, DAY_CANVASES } from '@g5000/mast';
 import type {
   DisplayUnit,
   DayBaseColor,
+  DayCanvas,
   GridKind,
   MastLayout,
   MastPage,
   MastThreshold,
   MastTile,
 } from '@g5000/mast';
-import { MAST_BASE_COLOR_HEX } from '../../../mast/colors';
+import { mastBaseColorHex } from '../../../mast/colors';
 import { MastPreview } from './MastPreview';
 import { SegmentedControl } from '../../../../components/ui/SegmentedControl';
 import { useThemeStore, SCALE_PRESETS, type ScalePreset } from '../../../../lib/theme-store';
@@ -76,6 +77,7 @@ export default function MastConfigPage() {
   const [brightnessPct, setBrightnessPct] = useState<number>(80);
   const [nightMode, setNightMode] = useState<boolean>(false);
   const [dayBaseColor, setDayBaseColor] = useState<DayBaseColor>('white');
+  const [dayCanvas, setDayCanvas] = useState<DayCanvas>('black');
   const brightnessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -125,6 +127,15 @@ export default function MastConfigPage() {
         }
       } catch {
         // non-fatal — day base colour stays at the default
+      }
+      try {
+        const cvRes = await fetch('/api/mast/day-canvas', { cache: 'no-store' });
+        if (cvRes.ok) {
+          const cvBody = (await cvRes.json()) as { ok: boolean; dayCanvas: DayCanvas };
+          if (cvBody.ok) setDayCanvas(cvBody.dayCanvas);
+        }
+      } catch {
+        // non-fatal — day canvas stays at the default
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -192,6 +203,15 @@ export default function MastConfigPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dayBaseColor: color }),
+    });
+  };
+
+  const onDayCanvasChange = (canvas: DayCanvas): void => {
+    setDayCanvas(canvas);
+    void fetch('/api/mast/day-canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dayCanvas: canvas }),
     });
   };
 
@@ -330,13 +350,41 @@ export default function MastConfigPage() {
               className={`w-8 h-8 rounded-full border-2 ${
                 dayBaseColor === c ? 'border-slate-100' : 'border-slate-600'
               }`}
-              style={{ backgroundColor: MAST_BASE_COLOR_HEX[c] }}
+              style={{ backgroundColor: mastBaseColorHex(c, dayCanvas) }}
             />
           ))}
         </div>
         <p className="text-xs text-slate-400">
-          Day-mode colour for cell values (black background). Alarm thresholds still override; night
-          mode shows everything in red.
+          Day-mode colour for cell values. Swatches preview the selected canvas. Alarm thresholds
+          still override; night mode shows everything in red.
+        </p>
+      </section>
+
+      <section className="border border-slate-700 rounded-md p-4 space-y-2">
+        <div className="text-sm font-medium">Day canvas</div>
+        <div className="flex flex-wrap gap-2">
+          {DAY_CANVASES.map((cv) => (
+            <button
+              key={cv}
+              type="button"
+              onClick={() => onDayCanvasChange(cv)}
+              aria-label={cv}
+              aria-pressed={dayCanvas === cv}
+              className={`px-3 py-1 rounded-md border-2 text-sm capitalize ${
+                dayCanvas === cv ? 'border-slate-100' : 'border-slate-600'
+              }`}
+              style={{
+                backgroundColor: cv === 'white' ? '#ffffff' : '#000000',
+                color: cv === 'white' ? '#0f172a' : '#ffffff',
+              }}
+            >
+              {cv}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-400">
+          Background for day mode. White is easier to read in direct sun; black is better in low
+          light. Night mode is always red on black and ignores this.
         </p>
       </section>
 

@@ -1,5 +1,5 @@
 import type { Observable } from 'rxjs';
-import type { DayBaseColor } from './colors.js';
+import type { DayBaseColor, DayCanvas } from './colors.js';
 
 /** App-wide UI theme. Drives <html data-theme> on every connected browser. */
 export type Theme = 'day' | 'night' | 'sun';
@@ -91,6 +91,8 @@ export interface MastRuntime {
   getNightMode(): boolean;
   readonly dayBaseColor$: Observable<DayBaseColor>;
   getDayBaseColor(): DayBaseColor;
+  readonly dayCanvas$: Observable<DayCanvas>;
+  getDayCanvas(): DayCanvas;
   readonly theme$: Observable<Theme>;
   getTheme(): Theme;
   /** Instrument numeral scale multiplier (1.0 / 1.15 / 1.6). */

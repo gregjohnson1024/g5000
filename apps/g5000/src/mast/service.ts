@@ -6,6 +6,7 @@ import {
   validateMastLayout,
   type ClockConfig,
   type DayBaseColor,
+  type DayCanvas,
   type MastLayout,
   type MastRuntime,
   type Theme,
@@ -112,6 +113,14 @@ export class MastService implements MastRuntime {
 
   getDayBaseColor(): DayBaseColor {
     return this.configStore.getDisplayConfig().dayBaseColor;
+  }
+
+  get dayCanvas$(): Observable<DayCanvas> {
+    return this.configStore.displayConfig$.pipe(map((c) => c.dayCanvas));
+  }
+
+  getDayCanvas(): DayCanvas {
+    return this.configStore.getDisplayConfig().dayCanvas;
   }
 
   get theme$(): Observable<Theme> {

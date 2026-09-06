@@ -11,7 +11,7 @@
 import type { SourcePriorityRule, SourcePriorityConfig } from '@g5000/core';
 export type { SourcePriorityRule, SourcePriorityConfig };
 import type { Station } from '@g5000/tide';
-import type { ClockConfig, DayBaseColor, Theme } from '@g5000/mast';
+import type { ClockConfig, DayBaseColor, DayCanvas, Theme } from '@g5000/mast';
 
 export interface BoatConfig {
   /** Mast height above the masthead unit's measurement reference, meters. */
@@ -419,6 +419,8 @@ export interface DisplayConfig {
   nightMode: boolean;
   /** Day-mode base colour for cell values (one of @g5000/mast DAY_BASE_COLORS). */
   dayBaseColor: DayBaseColor;
+  /** Day-mode canvas: 'black' (low light) or 'white' (direct sun). */
+  dayCanvas: DayCanvas;
   /** App-wide UI theme for connected browsers. Default 'day'. */
   theme: Theme;
   /**
@@ -440,6 +442,7 @@ export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   brightnessPct: 80,
   nightMode: false,
   dayBaseColor: 'white',
+  dayCanvas: 'black',
   theme: 'day',
   scale: 1.0,
   clock: { mode: 'utc', offsetMin: null },

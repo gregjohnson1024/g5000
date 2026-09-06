@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { DayBaseColor, MastLayout } from '@g5000/mast';
+import type { DayBaseColor, DayCanvas, MastLayout } from '@g5000/mast';
 import { openReconnectingSse } from '../lib/reconnecting-sse';
 
 export interface UseMastControlResult {
@@ -10,6 +10,7 @@ export interface UseMastControlResult {
   connected: boolean;
   nightMode: boolean;
   dayBaseColor: DayBaseColor;
+  dayCanvas: DayCanvas;
 }
 
 /**
@@ -23,6 +24,7 @@ export function useMastControl(): UseMastControlResult {
   const [connected, setConnected] = useState(false);
   const [nightMode, setNightMode] = useState(false);
   const [dayBaseColor, setDayBaseColor] = useState<DayBaseColor>('white');
+  const [dayCanvas, setDayCanvas] = useState<DayCanvas>('black');
 
   useEffect(() => {
     // Reconnecting: the mast panel is a kiosk that stays open for weeks, so a
@@ -59,9 +61,16 @@ export function useMastControl(): UseMastControlResult {
             /* ignore malformed payloads */
           }
         },
+        daycanvas: (ev) => {
+          try {
+            setDayCanvas(JSON.parse(ev.data) as DayCanvas);
+          } catch {
+            /* ignore malformed payloads */
+          }
+        },
       },
     });
   }, []);
 
-  return { layout, override, connected, nightMode, dayBaseColor };
+  return { layout, override, connected, nightMode, dayBaseColor, dayCanvas };
 }

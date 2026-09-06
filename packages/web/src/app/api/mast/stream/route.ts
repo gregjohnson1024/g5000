@@ -22,6 +22,7 @@ export async function GET(req: Request): Promise<Response> {
       send('brightness', mastRuntime.getBrightness());
       send('nightmode', mastRuntime.getNightMode());
       send('daybasecolor', mastRuntime.getDayBaseColor());
+      send('daycanvas', mastRuntime.getDayCanvas());
       send('theme', mastRuntime.getTheme());
       send('scale', mastRuntime.getScale());
       send('clock', mastRuntime.getClock());
@@ -31,6 +32,7 @@ export async function GET(req: Request): Promise<Response> {
       const brightnessSub = mastRuntime.brightness$.subscribe((b) => send('brightness', b));
       const nightModeSub = mastRuntime.nightMode$.subscribe((n) => send('nightmode', n));
       const dayBaseColorSub = mastRuntime.dayBaseColor$.subscribe((c) => send('daybasecolor', c));
+      const dayCanvasSub = mastRuntime.dayCanvas$.subscribe((c) => send('daycanvas', c));
       const themeSub = mastRuntime.theme$.subscribe((t) => send('theme', t));
       const scaleSub = mastRuntime.scale$.subscribe((s) => send('scale', s));
       const clockSub = mastRuntime.clock$.subscribe((c) => send('clock', c));
@@ -42,6 +44,7 @@ export async function GET(req: Request): Promise<Response> {
         brightnessSub.unsubscribe();
         nightModeSub.unsubscribe();
         dayBaseColorSub.unsubscribe();
+        dayCanvasSub.unsubscribe();
         themeSub.unsubscribe();
         scaleSub.unsubscribe();
         clockSub.unsubscribe();
