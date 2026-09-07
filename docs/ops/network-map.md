@@ -148,6 +148,9 @@ Reverse with:
 
 ## Gotchas
 
+> These are the network-specific instances. The general rule they all share —
+> and the instruments to use instead — is in [`diagnosing.md`](./diagnosing.md).
+
 **macOS Local Network privacy (macOS 15+).** The responsible _app_ (iTerm, not
 `ssh`) needs the Local Network grant. Without it: every on-subnet peer fails
 instantly with `No route to host`, IPv6 link-local fails too, ARP still
