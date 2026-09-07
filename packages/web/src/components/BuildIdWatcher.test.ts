@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { shouldReloadForBuildId } from './BuildIdWatcher';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { markConverged, shouldReloadForBuildId, takeReloadBudget } from './BuildIdWatcher';
 
 const OWN = '996eeca';
 
@@ -32,5 +32,57 @@ describe('shouldReloadForBuildId', () => {
   it('does not reload on malformed JSON', () => {
     expect(shouldReloadForBuildId(OWN, 'not json')).toBe(false);
     expect(shouldReloadForBuildId(OWN, '')).toBe(false);
+  });
+});
+
+describe('reload budget', () => {
+  // These exercise the exported helpers through sessionStorage, which is what
+  // survives a reload — the counter has to accumulate ACROSS reloads or it
+  // cannot bound a loop at all.
+  const KEY = 'g5000:build-reload-budget';
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('window', {
+      sessionStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+      },
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('allows three non-converging reloads then stops', () => {
+    expect(takeReloadBudget()).toBe(true);
+    expect(takeReloadBudget()).toBe(true);
+    expect(takeReloadBudget()).toBe(true);
+    expect(takeReloadBudget()).toBe(false);
+    expect(takeReloadBudget()).toBe(false);
+  });
+
+  it('converging resets the budget, so frequent real deploys never exhaust it', () => {
+    takeReloadBudget();
+    takeReloadBudget();
+    markConverged();
+    expect(window.sessionStorage.getItem(KEY)).toBeNull();
+    expect(takeReloadBudget()).toBe(true);
+  });
+
+  it('allows reloads when storage is unavailable rather than blocking updates', () => {
+    vi.stubGlobal('window', {
+      sessionStorage: {
+        getItem: () => {
+          throw new Error('private mode');
+        },
+        setItem: () => {
+          throw new Error('private mode');
+        },
+        removeItem: () => {
+          throw new Error('private mode');
+        },
+      },
+    });
+    expect(takeReloadBudget()).toBe(true);
   });
 });

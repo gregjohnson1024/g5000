@@ -11,6 +11,42 @@ import { attemptStaleBuildReload } from '../lib/stale-build-error';
  * answer here means an unattended display reload-loops, which is worse than the
  * staleness it is meant to fix. Every uncertain case must answer false.
  */
+const BUDGET_KEY = 'g5000:build-reload-budget';
+/**
+ * How many times we will reload for a build-id mismatch WITHOUT ever seeing the
+ * ids converge. The 30s window in attemptStaleBuildReload bounds the rate but
+ * not the total: a page that reloads twice a minute forever is still broken,
+ * just slowly, and on an unattended masthead display that is worse than being
+ * stale. The counter is cleared every time the ids DO match, so a boat that
+ * deploys ten times a week never runs out — only a genuinely non-converging
+ * loop does.
+ */
+const MAX_UNCONVERGED_RELOADS = 3;
+
+/** Called whenever the server's id matches ours: we are current, so forget any
+ *  failed attempts. */
+export function markConverged(): void {
+  try {
+    window.sessionStorage.removeItem(BUDGET_KEY);
+  } catch {
+    /* storage unavailable — nothing to reset */
+  }
+}
+
+/** Consume one reload from the budget. False when it is exhausted. */
+export function takeReloadBudget(): boolean {
+  try {
+    const used = Number(window.sessionStorage.getItem(BUDGET_KEY) ?? 0);
+    if (used >= MAX_UNCONVERGED_RELOADS) return false;
+    window.sessionStorage.setItem(BUDGET_KEY, String(used + 1));
+    return true;
+  } catch {
+    // Storage unavailable (private mode). Fall back to the rate guard alone —
+    // being unable to count is not a reason to never update.
+    return true;
+  }
+}
+
 export function shouldReloadForBuildId(own: string | undefined, serverRaw: string): boolean {
   if (!own) return false;
   let server: unknown;
@@ -54,7 +90,17 @@ export function BuildIdWatcher(): null {
     return openReconnectingSse('/api/mast/stream', {
       listeners: {
         buildid: (ev) => {
-          if (shouldReloadForBuildId(own, ev.data)) attemptStaleBuildReload();
+          if (!shouldReloadForBuildId(own, ev.data)) {
+            // Either we are current, or the payload was unusable. Only the
+            // former should clear the budget, so check explicitly.
+            try {
+              if (JSON.parse(ev.data) === own) markConverged();
+            } catch {
+              /* unusable payload — leave the budget alone */
+            }
+            return;
+          }
+          if (takeReloadBudget()) attemptStaleBuildReload();
         },
       },
     });
