@@ -38,6 +38,71 @@ The wired LAN and SulaLocal are the same `10.10.10.0/24`; the DataHub serves bot
 
 ---
 
+## Diagram
+
+```
+                              ┌──────────────────┐
+                              │  Starlink dish   │  192.168.100.1
+                              └────────┬─────────┘
+                              ┌────────┴─────────┐
+                              │ Starlink router  │  192.168.1.1
+                              └────────┬─────────┘   the ONLY source of internet
+                                       │
+ ══════════════════════════════════════╧═══════════════════════════════════════
+   Wi-Fi  ❶  "SulaStarlink"      192.168.1.0/24        internet ✅
+ ═══╤═════╤═════╤═════╤═════╤═════╤═════╤═════════════════════════╤════════════
+    │     │     │     │     │     │     │                         │
+  .100  .114  .129  .136  .140  .181  .232                      .64
+  YDWG   Mac  Ekrano Zeus  iPhone Zeus  g5000                  DataHub
+              (wifi) port         stbd  wlan0                  (wifi leg)
+                     (wifi)       (wifi)                          ╎
+                                                                  ╎ one box,
+                                                                  ╎ two legs
+                              ┌───────────────────┐               ╎
+                              │ PredictWind       │◁ ─ ─ ─ ─ ─ ─ ─╯
+                              │ DataHub           │
+                              │ 10.10.10.1        │  gateway · DNS
+                              │                   │  SOLE DHCP  .100–.249
+                              └─────┬───────┬─────┘
+                                    │       │
+        ┌───────────────────────────┘       └───────────────────────┐
+        │                                                           │
+ ═══════╧═══════════════════════════════  ═════════════════════════╧══════════
+  Wi-Fi ❷ "SulaLocal"   10.10.10.0/24      Wired segment  10.10.10.0/24
+        internet ✅                              internet ✅
+ ═══════════════════════════════════════  ═╤════╤════╤════╤════╤════╤════╤════
+  Same subnet as the wire — the DataHub    │    │    │    │    │    │    │
+  bridges its AP onto it, so a SulaLocal  .2   .10  .11  .20  .21 .145 .208
+  client and a wired device are peers.   GoFree g5000 mast Zeus Zeus Ekrano H5000
+                                         bridge eth0 panel port stbd (wire) CPU
+                                           ╎
+                                           ╎ transparent bridge: no DHCP,
+                                           ╎ no NAT, no SSID. It is the
+                                           ╎ physical switch everything
+                                           ╎ wired plugs into.
+```
+
+**Read it as: two Wi-Fi networks, one wire, and two devices that straddle them.**
+
+- **❶ SulaStarlink** is the Starlink router's own AP and the only path to the
+  internet. Most instruments keep a leg here.
+- **❷ SulaLocal** is the _DataHub's_ AP. It is bridged onto the wired segment, so
+  it is the **same `10.10.10.0/24`** — a laptop on SulaLocal is a peer of the
+  H5000, not a guest behind a router. It reaches the internet because the
+  DataHub is itself a client of SulaStarlink and forwards.
+- The **DataHub** is the hinge: a client on ❶, and gateway/DNS/DHCP for ❷ and the
+  wire. It is the single point of failure for wired addressing, and it hung once
+  on 2026-09-06 while still showing "good internet".
+- The **GoFree** is a transparent bridge, not a router. Nothing routes between
+  ❶ and the wire except through the DataHub.
+
+**Devices with a foot in both:** the Ekrano (`.129` Wi-Fi / `.145` wired), both
+Zeus SRs (Wi-Fi `.136`/`.181`, wired `.20`/`.21`), the g5000 Pi (`wlan0` `.232`,
+`eth0` `.10`), and the DataHub itself. The H5000 is wired only but held two
+addresses until the 192.168 network was retired.
+
+---
+
 ## Wired LAN — `10.10.10.0/24`
 
 Gateway / DNS / **sole DHCP server**: `10.10.10.1` (PredictWind DataHub).
