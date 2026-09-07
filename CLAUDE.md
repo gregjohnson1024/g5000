@@ -262,5 +262,5 @@ module) overrides only the **seed** file path — it matters at first boot / aga
 
 - Read `docs/superpowers/specs/` for design specs and `docs/superpowers/plans/` for the executable plans that produced the current code.
 - `docs/design/autopilot-design-notes.md` captures hard-won lessons from running an H5000 autopilot — particularly that "Performance level" silently swaps algorithms behind the user's dial. Don't replicate that anti-pattern.
-- `docs/ops/network-map.md` and `docs/ops/expedition-integration.md` are the canonical references for boat-network IPs and H-LINK protocol details respectively.
+- Boat network documentation lives in the **`sulabassana` reference repo**, not here: `~/code/sulabassana/reference/ip-network.md` (IP/Wi-Fi/ethernet) and `n2k-network.md` (NMEA 2000 bus). `docs/ops/network-map.md` is a stub pointing there plus the Pi reach paths. `docs/ops/expedition-integration.md` remains the H-LINK protocol reference.
 - `docs/ops/diagnosing.md` is the debugging runbook. Read it before chasing anything that "reports healthy but isn't working" — every fault found on 2026-09-06 was a true signal mistaken for the answer, and it lists the cheap measurement to take instead.
