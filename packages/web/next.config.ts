@@ -1,7 +1,34 @@
 import type { NextConfig } from 'next';
+import { execSync } from 'node:child_process';
+
+/**
+ * Build identity, exposed to BOTH sides so a long-lived page can tell that the
+ * server has moved on without it. The mast panel is a kiosk that stays open for
+ * weeks: its SSE stream reconnects after a deploy (see lib/reconnecting-sse.ts)
+ * and it then renders live, correct data using whatever bundle it loaded hours
+ * ago, with every health signal green. Comparing this value is the only way the
+ * page can notice.
+ *
+ * Derived from the commit so a rebuild of the same code is NOT treated as a new
+ * build — nothing to reload for. Falls back to a timestamp outside a git
+ * checkout (dev, tarball deploys).
+ */
+const buildId = ((): string => {
+  try {
+    return execSync('git rev-parse --short HEAD', {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return `dev-${Date.now()}`;
+  }
+})();
 
 const config: NextConfig = {
   reactStrictMode: true,
+  generateBuildId: () => buildId,
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   async redirects() {
     return [
       // Phase-2 Task 2f: /ais absorbed as chart AIS lens

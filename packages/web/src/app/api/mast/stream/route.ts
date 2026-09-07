@@ -23,6 +23,10 @@ export async function GET(req: Request): Promise<Response> {
       send('nightmode', mastRuntime.getNightMode());
       send('daybasecolor', mastRuntime.getDayBaseColor());
       send('daycanvas', mastRuntime.getDayCanvas());
+      // Build identity, so a page that has been open across a deploy can notice
+      // its bundle is stale and reload. Sent once per connection: the value
+      // cannot change without the server restarting, which drops the stream.
+      send('buildid', process.env.NEXT_PUBLIC_BUILD_ID ?? null);
       send('theme', mastRuntime.getTheme());
       send('scale', mastRuntime.getScale());
       send('clock', mastRuntime.getClock());

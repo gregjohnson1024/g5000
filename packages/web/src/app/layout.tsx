@@ -7,6 +7,7 @@ import { AlarmStore } from '../components/AlarmStore';
 import { StorageMigrationGate } from '../components/StorageMigrationGate';
 import { SseStoreProvider } from '../components/SseStoreProvider';
 import { ThemeController } from '../components/ThemeController';
+import { BuildIdWatcher } from '../components/BuildIdWatcher';
 import { ThemeStoreProvider } from '../lib/theme-store';
 import { Takeover } from '../components/ui/Takeover';
 
@@ -68,6 +69,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
              * It renders nothing — the AppBar ThemeChip is the UI.
              */}
             <ThemeController />
+            {/*
+             * Reloads this page if the server reports a build id different from
+             * the one this bundle was built with. Complements the reactive
+             * recovery in error.tsx, which only fires once a stale chunk 404s —
+             * an unattended kiosk never navigates, so it never hits that path.
+             */}
+            <BuildIdWatcher />
             {/*
              * AlarmStore mounts ONE /api/alarms poll (via usePoll) and exposes
              * the derived state through useAlarms(). All consumers — AlarmAudio,
