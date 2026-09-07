@@ -69,7 +69,18 @@ describe('reload budget', () => {
     expect(takeReloadBudget()).toBe(true);
   });
 
-  it('allows reloads when storage is unavailable rather than blocking updates', () => {
+  it('a flapping server id cannot loop forever — the absolute ceiling still bites', () => {
+    // Every reload converges momentarily, clearing the unconverged budget, so
+    // only the never-reset total can stop this.
+    let allowed = 0;
+    for (let i = 0; i < 50; i++) {
+      if (takeReloadBudget()) allowed++;
+      markConverged(); // the flap: ids match right after each reload
+    }
+    expect(allowed).toBe(10);
+  });
+
+  it('fails closed when storage is unavailable — cannot count, so does not reload', () => {
     vi.stubGlobal('window', {
       sessionStorage: {
         getItem: () => {
@@ -83,6 +94,6 @@ describe('reload budget', () => {
         },
       },
     });
-    expect(takeReloadBudget()).toBe(true);
+    expect(takeReloadBudget()).toBe(false);
   });
 });

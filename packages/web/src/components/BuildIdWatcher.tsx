@@ -23,6 +23,22 @@ const BUDGET_KEY = 'g5000:build-reload-budget';
  */
 const MAX_UNCONVERGED_RELOADS = 3;
 
+const TOTAL_KEY = 'g5000:build-reload-total';
+/**
+ * Absolute ceiling that is NEVER reset. The converging reset above is what
+ * keeps frequent legitimate deploys working, but it reopens one case: a
+ * FLAPPING served id (A, B, A, B…) converges after every reload, so the
+ * unconverged counter is cleared each time and never accumulates — leaving
+ * only the 30s rate limit, i.e. exactly the "slowly broken" state this is
+ * meant to prevent. Reaching it needs a redeploy fight (a rollback loop, or
+ * the Actions runner cycling between commits), which became marginally more
+ * reachable when that runner gained Restart=always.
+ *
+ * Ten is far above any plausible number of real deploys within one browser
+ * session on a panel that stays open for weeks, and far below "forever".
+ */
+const MAX_TOTAL_RELOADS = 10;
+
 /** Called whenever the server's id matches ours: we are current, so forget any
  *  failed attempts. */
 export function markConverged(): void {
@@ -33,17 +49,26 @@ export function markConverged(): void {
   }
 }
 
-/** Consume one reload from the budget. False when it is exhausted. */
+/**
+ * Consume one reload from both budgets. False when either is exhausted.
+ *
+ * Fails CLOSED when storage is unavailable: without it nothing survives the
+ * reload, so no counter can bound a loop and the only honest options are
+ * "unbounded" or "don't". An unattended display reloading forever is worse
+ * than a stale one, and staleness is still covered reactively by
+ * app/error.tsx on the next navigation — so we decline rather than guess.
+ */
 export function takeReloadBudget(): boolean {
   try {
+    const total = Number(window.sessionStorage.getItem(TOTAL_KEY) ?? 0);
+    if (total >= MAX_TOTAL_RELOADS) return false;
     const used = Number(window.sessionStorage.getItem(BUDGET_KEY) ?? 0);
     if (used >= MAX_UNCONVERGED_RELOADS) return false;
     window.sessionStorage.setItem(BUDGET_KEY, String(used + 1));
+    window.sessionStorage.setItem(TOTAL_KEY, String(total + 1));
     return true;
   } catch {
-    // Storage unavailable (private mode). Fall back to the rate guard alone —
-    // being unable to count is not a reason to never update.
-    return true;
+    return false;
   }
 }
 
